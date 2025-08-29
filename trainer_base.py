@@ -271,6 +271,8 @@ class TrainerBase(L.LightningModule):
         assert self.metrics.train_nlls.nll.weight == 0
 
     def training_step(self, batch, batch_idx):
+        torch.compiler.cudagraph_mark_step_begin()
+
         current_accumulation_step = batch_idx % self.trainer.accumulate_grad_batches
         losses = self._loss(
             batch["input_ids"],
@@ -301,6 +303,8 @@ class TrainerBase(L.LightningModule):
         assert self.metrics.valid_nlls.nll.weight == 0
 
     def validation_step(self, batch, batch_idx):
+        torch.compiler.cudagraph_mark_step_begin()
+
         del batch_idx
         losses = self._loss(batch["input_ids"], batch["attention_mask"])
         self.metrics.update_valid(losses.nlls, losses.prior_loss, losses.num_tokens)
