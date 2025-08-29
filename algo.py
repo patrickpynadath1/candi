@@ -691,7 +691,7 @@ class CANDI(trainer_base.Diffusion):
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
 
-        return -1 * log_p_theta, reveal_mask
+        return log_p_theta * dalpha_t / (1 - alpha_t), reveal_mask
 
     # gets noisy sample xt
     def q_xt(self, x, alpha_t):
