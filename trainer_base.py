@@ -67,7 +67,8 @@ class TrainerBase(L.LightningModule):
             self.backbone = models.dit.DIT(self.config, vocab_size=self.vocab_size)
 
         elif self.config.algo.backbone == "cont_dit": 
-            self.backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size)
+            backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size)
+            self.backbone = torch.compile(backbone, mode="max-autotune")
         elif self.config.algo.backbone == "dimamba":
             self.backbone = models.dimamba.DiMamba(
                 self.config,
@@ -78,6 +79,7 @@ class TrainerBase(L.LightningModule):
             self.backbone = transformers.AutoModelForMaskedLM.from_pretrained(
                 config.eval.checkpoint_path, trust_remote_code=True
             )
+
 
         self.T = self.config.algo.T
         self.num_tokens = self.config.model.length
