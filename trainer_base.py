@@ -68,7 +68,7 @@ class TrainerBase(L.LightningModule):
 
         elif self.config.algo.backbone == "cont_dit": 
             backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size)
-            self.backbone = torch.compile(backbone, mode="max-autotune")
+            self.backbone = torch.compile(backbone)
         elif self.config.algo.backbone == "dimamba":
             self.backbone = models.dimamba.DiMamba(
                 self.config,
