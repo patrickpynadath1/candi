@@ -18,8 +18,8 @@ loader:
   global_batch_size: ${batch_size}
   eval_global_batch_size: 128
   # Note: batch_size and eval_batch_size are **per machine**
-  batch_size: ${div_up:${.global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes}}}
-  eval_batch_size: ${div_up:${.eval_global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes}}}
+  batch_size: ${div_up:${.global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes} * ${trainer.accumulate_grad_batches}}}
+  eval_batch_size: ${div_up:${.eval_global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes} * ${trainer.accumulate_grad_batches}}}
   num_workers: 4
   pin_memory: True
 
