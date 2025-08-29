@@ -1,0 +1,13 @@
+name: candi
+backbone: cont_dit
+causal_attention: False
+scaling_factor: 1.0
+t_min: .05
+t_max: .95
+inference_start_t: .95
+inference_end_t: .05
+confidence_threshold: .95
+clean_reveal_ratio: .75
+parameterization: mean
+T: 1000 # doesnt mean anything
+time_conditioning: true
