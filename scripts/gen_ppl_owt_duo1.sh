@@ -23,6 +23,6 @@ CUDA_VISIBLE_DEVICCES=$1 python main.py \
   model=small \
   algo=duo_base \
   sampling.num_sample_batches=1 \
-  sampling.steps=1024 \
+  sampling.steps=128 \
   eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/2025.08.16/duo-baseline/checkpoints/cur_best.ckpt \
   +wandb.offline=true;

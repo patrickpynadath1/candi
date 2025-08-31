@@ -11,3 +11,4 @@ clean_reveal_ratio: .75
 parameterization: mean
 T: 1000 # doesnt mean anything
 time_conditioning: true
+weighted_loss: true

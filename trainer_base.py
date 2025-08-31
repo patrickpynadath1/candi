@@ -68,7 +68,7 @@ class TrainerBase(L.LightningModule):
 
         elif self.config.algo.backbone == "cont_dit": 
             backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size)
-            self.backbone = torch.compile(backbone)
+            self.backbone = backbone
         elif self.config.algo.backbone == "dimamba":
             self.backbone = models.dimamba.DiMamba(
                 self.config,
@@ -271,7 +271,6 @@ class TrainerBase(L.LightningModule):
         assert self.metrics.train_nlls.nll.weight == 0
 
     def training_step(self, batch, batch_idx):
-        torch.compiler.cudagraph_mark_step_begin()
 
         current_accumulation_step = batch_idx % self.trainer.accumulate_grad_batches
         losses = self._loss(
@@ -303,7 +302,6 @@ class TrainerBase(L.LightningModule):
         assert self.metrics.valid_nlls.nll.weight == 0
 
     def validation_step(self, batch, batch_idx):
-        torch.compiler.cudagraph_mark_step_begin()
 
         del batch_idx
         losses = self._loss(batch["input_ids"], batch["attention_mask"])

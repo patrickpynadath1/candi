@@ -24,10 +24,13 @@ omegaconf.OmegaConf.register_new_resolver("div_up", lambda x, y: (x + y - 1) // 
 def _load_from_checkpoint(diffusion_model, config, tokenizer):
     if "hf" in config.algo.backbone:
         return diffusion_model(config, tokenizer=tokenizer).to("cuda")
-
-    return diffusion_model.load_from_checkpoint(
+    
+    
+    model = diffusion_model.load_from_checkpoint(
         config.eval.checkpoint_path, tokenizer=tokenizer, config=config
     )
+    return model
+
 
 
 @L.pytorch.utilities.rank_zero_only
@@ -84,15 +87,14 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
     model = _load_from_checkpoint(
         diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
     )
-    model.metrics.gen_ppl.reset()
-    model.metrics.sample_entropy.reset()
+    # model.metrics.gen_ppl.reset()
+    # model.metrics.sample_entropy.reset()
     if config.eval.disable_ema:
         logger.info("Disabling EMA.")
         model.ema = None
     stride_length = config.sampling.stride_length
     num_strides = config.sampling.num_strides
     all_samples = []
-    pdb.set_trace()
     for _ in range(config.sampling.num_sample_batches):
         if config.sampling.semi_ar:
             _, intermediate_samples, _ = model.restore_model_and_semi_ar_sample(
@@ -118,14 +120,15 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
 
     for s in text_samples:
         print(s)
-    with open('samples.txt', 'w') as f:
-        for sample in text_samples:
-            f.write(f"{sample}\n")
+    # pdb.set_trace()
+    # with open('samples.txt', 'w') as f:
+    #     for sample in text_samples:
+    #         f.write(f"{sample}\n")
 
-    # Evaluate text metrics
-    train_texts = open("/home/patrick/duo/train_texts.txt", "r").readlines()
-    text_metrics = evaluate_text_metrics(all_samples, train_texts)
-    print(text_metrics)
+    # # Evaluate text metrics
+    # train_texts = open("/home/patrick/duo/train_texts.txt", "r").readlines()
+    # text_metrics = evaluate_text_metrics(all_samples, train_texts)
+    # print(text_metrics)
 
     generative_ppl = 0.0
     entropy = 0.0

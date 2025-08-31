@@ -648,6 +648,7 @@ class CANDI(trainer_base.Diffusion):
     def __init__(self, config, tokenizer):
         vocab_size = len(tokenizer) 
         super().__init__(config, tokenizer, vocab_size=vocab_size)
+        self._validate_configuration()
         self.save_hyperparameters()
         
         # building error tables
@@ -664,11 +665,12 @@ class CANDI(trainer_base.Diffusion):
             vocab_size, 
             sigma_range=(.01, 1), 
             num=1000, 
-            device=self.device, 
+            # device=self.device, 
             scaling_factor=self.scaling_factor
         )
-        self.continuous_noise = torch.tensor(self.continuous_noise, device=self.device)
-        self.discrete_noise = torch.tensor(self.discrete_noise, device=self.device)
+        self.continuous_noise = torch.tensor(self.continuous_noise)
+        self.discrete_noise = torch.tensor(self.discrete_noise)
+        self.weighted_loss = config.algo.weighted_loss
 
         self.get_continuous_from_discrete_noise = lambda discrete_noise: sigma_from_time_vectorized(discrete_noise, self.continuous_noise, self.discrete_noise)
 
@@ -676,6 +678,7 @@ class CANDI(trainer_base.Diffusion):
         super().to(*args, **kwargs)
         self.continuous_noise = self.continuous_noise.to(*args, **kwargs)
         self.discrete_noise = self.discrete_noise.to(*args, **kwargs)
+        return self
 
     def _validate_configuration(self):
         return
@@ -691,7 +694,12 @@ class CANDI(trainer_base.Diffusion):
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
 
-        return log_p_theta * dalpha_t / (1 - alpha_t), reveal_mask
+        if self.weighted_loss: 
+            nll = log_p_theta * dalpha_t / (1 - alpha_t)
+        else: 
+            nll = log_p_theta * -1
+
+        return nll, reveal_mask
 
     # gets noisy sample xt
     def q_xt(self, x, alpha_t):
