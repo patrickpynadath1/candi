@@ -744,4 +744,3 @@ class UniformState(Diffusion):
             0, self.vocab_size, batch_dims, dtype=torch.int64, device=self.device
         )
 
-
