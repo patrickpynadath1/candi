@@ -771,12 +771,6 @@ class CANDI(trainer_base.Diffusion):
             **noisy_output,
         )
     
-    def nll_per_token(self, log_x_theta, xt, x0, alpha_t, dalpha_t, low_var=False):
-        del xt
-        log_p_theta = torch.gather(
-            input=log_x_theta, dim=-1, index=x0[:, :, None]
-        ).squeeze(-1)
-        return log_p_theta * dalpha_t / (1 - alpha_t)
     
     def _loss(self, x0, valid_tokens, current_accumulation_step=None, train_mode=False, **kwargs):
         (input_tokens, output_tokens, valid_tokens) = self._process_model_input(
