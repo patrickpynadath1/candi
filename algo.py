@@ -103,6 +103,7 @@ class MDLM(trainer_base.AbsorbingState):
         log_p_theta = torch.gather(
             input=log_x_theta, dim=-1, index=x0[:, :, None]
         ).squeeze(-1)
+
         return log_p_theta * dalpha_t / (1 - alpha_t)
 
     def _get_score(self, x, sigma):
@@ -716,7 +717,6 @@ class CANDI(trainer_base.Diffusion):
             nll = log_p_theta * dalpha_t / (1 - alpha_t)
         else: 
             nll = log_p_theta * -1
-
         return nll, reveal_mask
 
     # gets noisy sample xt

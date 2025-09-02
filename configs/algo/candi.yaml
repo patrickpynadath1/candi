@@ -14,3 +14,4 @@ discretize_start_time: .9
 time_conditioning: true
 weighted_loss: true
 grad_calc: soft
+use_mixed_mask: false
