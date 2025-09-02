@@ -722,7 +722,7 @@ class CANDI(trainer_base.Diffusion):
     # gets noisy sample xt
     def q_xt(self, x, alpha_t):
         discrete_noise = (1 - alpha_t).squeeze()
-
+        sigma = self._sigma_from_alphat(alpha_t)
         onehot = F.one_hot(x, num_classes=self.vocab_size).float()
 
         discrete_noise = discrete_noise * (self.t_max - self.t_min) + self.t_min
@@ -741,8 +741,8 @@ class CANDI(trainer_base.Diffusion):
         return {
             'xt': xt, 
             'reveal_mask': reveal_mask, 
-            'discrete_noise': discrete_noise, 
-            'continuous_noise': continuous_noise
+            'discrete_noise': sigma, 
+            'continuous_noise': continuous_noise,
         }
 
     def prior_sample(self, *batch_dims): 
@@ -760,7 +760,6 @@ class CANDI(trainer_base.Diffusion):
         dalpha_t, alpha_t = self.noise(t)
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
-        sigma = self._sigma_from_alphat(alpha_t)
 
         noisy_output = self.q_xt(x0, alpha_t)
         log_x_theta = self.backbone(**noisy_output)
@@ -834,12 +833,13 @@ class CANDI(trainer_base.Diffusion):
         time_s: torch.Tensor,
     ) -> torch.Tensor:
         sigma_t = self.get_continuous_from_discrete_noise(time_t)
+        sigma_for_cond=self._sigma_from_alphat(1 - time_t)
 
         dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (time_t - time_s).item()
         time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
         sigma_t_vec = torch.ones(x.shape[0], device=x.device) * sigma_t.item()
 
-        denoised = self.backbone(x, time_t_vec, sigma_t_vec, torch.zeros(x.shape[:-1], device=x.device))
+        denoised = self.backbone(x, sigma_for_cond, sigma_t_vec, torch.zeros(x.shape[:-1], device=x.device))
         denoised = denoised.float().softmax(dim=-1)
         if self.grad_calc == 'soft': 
             d = (x - denoised) / (sigma_t_vec[:, None, None]**2)
