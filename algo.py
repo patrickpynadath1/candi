@@ -731,9 +731,13 @@ class CANDI(trainer_base.Diffusion):
 
         xt_cont = onehot + continuous_noise[:, None, None].to(x.device) * torch.randn_like(onehot, device=x.device)
         clean_mask = (xt_cont.argmax(dim=-1) == x).float()
-        keep_rate = torch.ones_like(discrete_noise, device=discrete_noise.device) * self.clean_reveal_ratio
-        reveal_mask = randomly_keep_mask(clean_mask, keep_rate)
-        xt = onehot * clean_mask.unsqueeze(-1) + (1 - clean_mask).unsqueeze(-1) * xt_cont
+        if self.clean_reveal_ratio < 1.0: 
+
+            keep_rate = torch.ones_like(discrete_noise, device=discrete_noise.device) * self.clean_reveal_ratio
+            reveal_mask = randomly_keep_mask(clean_mask, keep_rate)
+        else: 
+            reveal_mask = clean_mask
+        xt = onehot * reveal_mask.unsqueeze(-1) + (1 - reveal_mask).unsqueeze(-1) * xt_cont
         return {
             'xt': xt, 
             'reveal_mask': reveal_mask, 
@@ -759,7 +763,10 @@ class CANDI(trainer_base.Diffusion):
         sigma = self._sigma_from_alphat(alpha_t)
 
         noisy_output = self.q_xt(x0, alpha_t)
-        log_x_theta = self.forward(**noisy_output)
+        log_x_theta = self.backbone(**noisy_output)
+        log_x_theta = self._process_model_output(model_output=log_x_theta,
+                                                xt=noisy_output['xt'],
+                                                reveal_mask=noisy_output['reveal_mask'])
 
         utils.print_nans(log_x_theta, "model_output")
         return self.nll_per_token(
