@@ -24,5 +24,6 @@ CUDA_VISIBLE_DEVICCES=$1 python main.py \
   algo=candi \
   sampling.num_sample_batches=1 \
   sampling.steps=128 \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/fresh-unweighted-owt/checkpoints/last.ckpt \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/owt-1024-cur/checkpoints/last.ckpt \
+  model.length=1024 \
   +wandb.offline=true;

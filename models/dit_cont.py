@@ -451,6 +451,9 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.rotary_emb = Rotary(dim // config.n_heads)
         self.scaling_factor=scaling_factor
 
+        self.special_embedding = nn.Parameter(torch.randn(dim))
+
+
         blocks = []
         for _ in range(config.n_blocks):
             if self.causal:
@@ -493,6 +496,13 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         # # pdb.set_trace()
 
         x = self.vocab_embed(c_in[:, None, None] * x)
+        special = self.special_embedding.view(1, 1, -1).expand_as(x)
+        mask = reveal_mask.unsqueeze(-1).float()
+
+        # conditionall mix in the mask / special embedding 
+        # indicates that those positions are corrupted 
+        x = x * mask + (1 - mask) * .5 * (x + special)
+
         # x = c_in[:, None, None] * x
         if self.causal:
             t_cond = None

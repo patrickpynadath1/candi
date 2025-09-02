@@ -4,11 +4,13 @@ causal_attention: False
 scaling_factor: 1.0
 t_min: .05
 t_max: .95
-inference_start_t: .95
+inference_start_t: .99
 inference_end_t: .05
-confidence_threshold: .95
+confidence_threshold: .75
 clean_reveal_ratio: .75
 parameterization: mean
-T: 1000 # doesnt mean anything
+T: 0 # doesnt mean anything
+discretize_start_time: .9
 time_conditioning: true
 weighted_loss: true
+grad_calc: soft
