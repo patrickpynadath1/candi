@@ -435,7 +435,7 @@ class DDiTFinalLayer(nn.Module):
 
 
 class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
-    def __init__(self, config, vocab_size: int, scaling_factor: float=1.0):
+    def __init__(self, config, vocab_size: int, scaling_factor: float=1.0, use_mixed_mask:bool=False):
         super().__init__()
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
@@ -450,8 +450,10 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             self.sigma_map = TimestepEmbedder(cond_dim)
         self.rotary_emb = Rotary(dim // config.n_heads)
         self.scaling_factor=scaling_factor
+        self.use_mixed_mask = use_mixed_mask
 
-        self.special_embedding = nn.Parameter(torch.randn(dim))
+        if self.use_mixed_mask: 
+            self.special_embedding = nn.Parameter(torch.randn(dim))
 
 
         blocks = []
@@ -496,12 +498,14 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         # # pdb.set_trace()
 
         x = self.vocab_embed(c_in[:, None, None] * x)
-        special = self.special_embedding.view(1, 1, -1).expand_as(x)
-        mask = reveal_mask.unsqueeze(-1).float()
 
-        # conditionall mix in the mask / special embedding 
-        # indicates that those positions are corrupted 
-        x = x * mask + (1 - mask) * .5 * (x + special)
+        if self.use_mixed_mask: 
+            special = self.special_embedding.view(1, 1, -1).expand_as(x)
+            mask = reveal_mask.unsqueeze(-1).float()
+
+            # conditionall mix in the mask / special embedding 
+            # indicates that those positions are corrupted 
+            x = x * mask + (1 - mask) * .5 * (x + special)
 
         # x = c_in[:, None, None] * x
         if self.causal:
