@@ -104,7 +104,6 @@ class MDLM(trainer_base.AbsorbingState):
             input=log_x_theta, dim=-1, index=x0[:, :, None]
         ).squeeze(-1)
 
-        pdb.set_trace()
 
         return log_p_theta * dalpha_t / (1 - alpha_t)
 
@@ -719,7 +718,6 @@ class CANDI(trainer_base.Diffusion):
             nll = log_p_theta * dalpha_t / (1 - alpha_t)
         else: 
             nll = log_p_theta * -1
-        pdb.set_trace()
         return nll
 
     # gets noisy sample xt
@@ -739,7 +737,6 @@ class CANDI(trainer_base.Diffusion):
             reveal_mask = clean_mask
         xt = onehot * reveal_mask.unsqueeze(-1) + (1 - reveal_mask).unsqueeze(-1) * xt_cont
 
-        pdb.set_trace()
         return {
             'xt': xt, 
             'reveal_mask': reveal_mask, 
