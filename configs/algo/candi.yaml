@@ -7,7 +7,7 @@ t_max: .95
 inference_start_t: .99
 inference_end_t: .05
 confidence_threshold: .75
-clean_reveal_ratio: .75
+clean_reveal_ratio: 1.0
 parameterization: mean
 T: 0 # doesnt mean anything
 discretize_start_time: .9
