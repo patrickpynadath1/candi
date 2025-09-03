@@ -674,7 +674,11 @@ class AbsorbingState(Diffusion):
         q_xs[:, :, self.mask_index] = 1 - alpha_s
         _x = sample_categorical(q_xs)
 
+        # print((alpha_s - alpha_t).mean().item())
+
         copy_flag = (x != self.mask_index).to(x.dtype)
+
+        # print(copy_flag.float().mean().item())
         return p_x0, copy_flag * x + (1 - copy_flag) * _x
 
     def _staggered_score(self, score, dsigma):

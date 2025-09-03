@@ -6,12 +6,12 @@ t_min: .05
 t_max: .95
 inference_start_t: .99
 inference_end_t: .05
-confidence_threshold: .75
+confidence_threshold: .9
 clean_reveal_ratio: 1.0
 parameterization: mean
 T: 0 # doesnt mean anything
-discretize_start_time: .9
+discretize_start_time: 1.0
 time_conditioning: true
 weighted_loss: true
 grad_calc: soft
-use_mixed_mask: false
+use_mixed_mask: True 
