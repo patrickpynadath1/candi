@@ -648,7 +648,9 @@ class Distillation(DUO):
 
 class CANDI(trainer_base.Diffusion):
     def __init__(self, config, tokenizer):
-        vocab_size = len(tokenizer) 
+        self.mask_index = tokenizer.vocab_size 
+        vocab_size = tokenizer.vocab_size + 1
+
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self._validate_configuration()
         self.save_hyperparameters()
@@ -726,7 +728,9 @@ class CANDI(trainer_base.Diffusion):
     # gets noisy sample xt
     def q_xt(self, x, alpha_t):
         discrete_noise = (1 - alpha_t).squeeze()
-        onehot = F.one_hot(x, num_classes=self.vocab_size).float()
+
+        # accounting for the mask token
+        onehot = F.one_hot(x, num_classes=self.vocab_size-1).float()
 
         continuous_noise = self.get_continuous_from_discrete_noise(discrete_noise)
 
@@ -744,7 +748,6 @@ class CANDI(trainer_base.Diffusion):
             'xt': xt, 
             'reveal_mask': reveal_mask, 
             'discrete_noise': discrete_noise, 
-            'continuous_noise': continuous_noise,
         }
 
     def prior_sample(self, *batch_dims): 
@@ -796,21 +799,20 @@ class CANDI(trainer_base.Diffusion):
         if num_steps is None:
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
-        discrete_noise_steps = self.get_sampling_schedule(num_steps)
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-        prompt = "After the debate"
+        prompt = "Mr Trump, on Thursday,"
 
-        # end_prompt = "And Donald Trump's campaign"
+        timesteps = torch.linspace(1, eps, num_steps + 1, device=self.device)
+        dt = (1 - eps) / num_steps
 
         x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
-        # x, clean_mask = self.generate_sample_prompt(end_prompt, x, clean_mask, position='end')
+        for i in range(num_steps): 
+            t = timesteps[i]
 
-        for i, (t, s) in enumerate(
-            zip(discrete_noise_steps[:-1], discrete_noise_steps[1:])
-        ):
-            x_cont, p_x0 = self._continuous_step(x, t, s, clean_mask=clean_mask)
+            x_cont, p_x0 = self._continuous_step(x, t, t - dt, clean_mask=clean_mask)
+
             x, clean_mask = self._discrete_step(x_cont, 
-                                                p_x0, t, s, prev_clean_mask=clean_mask)
+                                                p_x0, t, dt, prev_clean_mask=clean_mask)
 
         return x.argmax(dim=-1)
 
@@ -819,26 +821,29 @@ class CANDI(trainer_base.Diffusion):
                               self.inference_end_t, 
                               num_steps)
 
-    
-    
-    def _discrete_step(self, x_sigma, p_x0, time_t, time_s, prev_clean_mask): 
-        time_t_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_t.item() 
-        time_s_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_s.item() 
+    def _discrete_step(self, x_sigma, p_x0, t, dt, prev_clean_mask, noise_removal_step=False): 
+        if noise_removal_step: 
+            s = 0.0
+        else:
+            s = t - dt
 
-        mask_probs = torch.ones((x_sigma.shape[0], x_sigma.shape[1], 1), device=x_sigma.device) * (time_s )
-        unmasked_probs = p_x0 * (time_t_vec - time_s_vec)[:, None, None]
-        mask_index = x_sigma.shape[-1]
-        # pdb.set_trace()
+
+        t_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * t.item()
+        s_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * s.item()
+        mask_probs = torch.ones((x_sigma.shape[0], x_sigma.shape[1], 1), device=x_sigma.device) * (s)
+        unmasked_probs = p_x0 * (t_vec - s_vec)[:, None, None]
 
         q_xs = torch.cat([unmasked_probs, mask_probs], dim=-1)
         _x = sample_categorical(q_xs)
-        new_clean_mask = (prev_clean_mask.bool() | (_x != mask_index)).float()
+        new_clean_mask = (prev_clean_mask.bool() | (_x != self.mask_index)).float()
+
 
         # For tokens that got sampled to real values (not mask), use those
         old_x_tokens=x_sigma.argmax(dim=-1)
+
+
         # For tokens that got sampled to mask, keep old tokens but mark as not clean
-        sampled_real_tokens = torch.where(_x != mask_index, _x, old_x_tokens)
-    
+        sampled_real_tokens = torch.where(_x != self.mask_index, _x, old_x_tokens)
         # Apply copy logic: keep old tokens where prev_clean_mask is True
         updated_tokens = torch.where(prev_clean_mask.bool(), old_x_tokens, sampled_real_tokens)
         updated_x = torch.nn.functional.one_hot(updated_tokens, num_classes=x_sigma.shape[-1]).float().to(x_sigma.device)
@@ -847,6 +852,32 @@ class CANDI(trainer_base.Diffusion):
 
         print(new_clean_mask.mean().item())
         return updated_x, new_clean_mask
+    # def _discrete_step(self, x_sigma, p_x0, time_t, time_s, prev_clean_mask): 
+    #     time_t_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_t.item() 
+    #     time_s_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_s.item() 
+
+    #     mask_probs = torch.ones((x_sigma.shape[0], x_sigma.shape[1], 1), device=x_sigma.device) * (time_s )
+    #     unmasked_probs = p_x0 * (time_t_vec - time_s_vec)[:, None, None]
+    #     mask_index = x_sigma.shape[-1]
+    #     # pdb.set_trace()
+
+    #     q_xs = torch.cat([unmasked_probs, mask_probs], dim=-1)
+    #     _x = sample_categorical(q_xs)
+    #     new_clean_mask = (prev_clean_mask.bool() | (_x != mask_index)).float()
+
+    #     # For tokens that got sampled to real values (not mask), use those
+    #     old_x_tokens=x_sigma.argmax(dim=-1)
+    #     # For tokens that got sampled to mask, keep old tokens but mark as not clean
+    #     sampled_real_tokens = torch.where(_x != mask_index, _x, old_x_tokens)
+    
+    #     # Apply copy logic: keep old tokens where prev_clean_mask is True
+    #     updated_tokens = torch.where(prev_clean_mask.bool(), old_x_tokens, sampled_real_tokens)
+    #     updated_x = torch.nn.functional.one_hot(updated_tokens, num_classes=x_sigma.shape[-1]).float().to(x_sigma.device)
+
+    #     updated_x = updated_x * new_clean_mask.unsqueeze(-1) + (1 - new_clean_mask).unsqueeze(-1) * x_sigma
+
+    #     print(new_clean_mask.mean().item())
+    #     return updated_x, new_clean_mask
     
 
 

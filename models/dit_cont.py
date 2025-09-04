@@ -439,6 +439,8 @@ class DDiTFinalLayer(nn.Module):
         return x
 
 
+
+# Assumes that the vocab size accounts for the mask token 
 class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def __init__(self, config, vocab_size: int, scaling_factor: float=1.0, use_mixed_mask:bool=False, mixed_coeff: float=.5):
         super().__init__()
@@ -451,7 +453,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         dim = config.hidden_size
         cond_dim = config.cond_dim
         if use_mixed_mask: 
-            self.vocab_embed = EmbeddingLayer(dim,vocab_size + 1)
+            self.vocab_embed = EmbeddingLayer(dim,vocab_size)
             self.mask_index = vocab_size
         else: 
             self.vocab_embed = EmbeddingLayer(dim,vocab_size)
@@ -488,7 +490,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         self.output_layer = DDiTFinalLayer(
             hidden_size=dim,
-            out_channels=vocab_size,
+            out_channels=vocab_size - 1,
             cond_dim=cond_dim,
             adaLN=self.adaLN,
         )
@@ -501,7 +503,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     
     # clean mask: indicates which positions are clean with 1, which are corrupted with 0
     # def forward(self, x, discrete_noise):
-    def forward(self, xt, discrete_noise, continuous_noise, reveal_mask):
+    def forward(self, xt, discrete_noise, reveal_mask):
         # sigma = discrete_noise
         # x = self.vocab_embed(x)
         x = xt 
@@ -520,7 +522,10 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             # indicates that those positions are corrupted 
             # x = x * mask + (1 - mask) * .5 * (x + special)
 
-            # if I do this, it should be the EXACT same as masked diffusion
+            # hypothesis: model starts focusing on noisy embeds too early 
+            # to counteract this, have the weight of the noisy embeds inversely proportionate to the noise
+
+            # x = x * mask + (1 - mask) * (discrete_noise[:, None, None] * special + (1 - discrete_noise[:, None, None]) * x)
             x = x * mask + (1 - mask) * (self.mixed_coeff * special + (1 - self.mixed_coeff) * x)
 
         # x = c_in[:, None, None] * x

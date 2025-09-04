@@ -4,8 +4,8 @@ causal_attention: False
 scaling_factor: 1.0
 t_min: .05
 t_max: .95
-inference_start_t: .95
-inference_end_t: .05
+inference_start_t: .99
+inference_end_t: .001
 confidence_threshold: .9
 clean_reveal_ratio: 1.0
 parameterization: mean
@@ -14,7 +14,7 @@ discretize_start_time: 1.0
 time_conditioning: true
 weighted_loss: true
 grad_calc: soft
-step_size: 1.0
+step_size: 0
 use_mixed_mask: True 
 top_k: 100
 mixed_coeff: .5 # interpolates between masked and continuous diffusion for corrupted positions

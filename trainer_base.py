@@ -679,6 +679,8 @@ class AbsorbingState(Diffusion):
         # print((alpha_s - alpha_t).mean().item())
 
         copy_flag = (x != self.mask_index).to(x.dtype)
+        print(copy_flag.float().mean())
+        pdb.set_trace()
 
         # print(copy_flag.float().mean().item())
         return p_x0, copy_flag * x + (1 - copy_flag) * _x

@@ -15,6 +15,7 @@
 
 export HYDRA_FULL_ERROR=1
 
+mixed_coef=1.0
 CUDA_VISIBLE_DEVICCES=$1 python main.py \
   mode=sample_eval \
   loader.batch_size=16 \
@@ -23,9 +24,10 @@ CUDA_VISIBLE_DEVICCES=$1 python main.py \
   model=small \
   algo=candi \
   sampling.num_sample_batches=1 \
-  sampling.steps=16 \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/owt-128-pseudomask/checkpoints/last.ckpt \
-  model.length=32 \
+  sampling.steps=32 \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/mixed-coef-$mixed_coef/checkpoints/last.ckpt \
+  model.length=128 \
   algo.top_k=50 \
-  algo.step_size=1.0 \
+  algo.step_size=2.0 \
+  algo.mixed_coeff=$mixed_coef \
   +wandb.offline=true;
