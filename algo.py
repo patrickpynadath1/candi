@@ -680,6 +680,9 @@ class CANDI(trainer_base.Diffusion):
         self.grad_calc=config.algo.grad_calc
         self.discretize_start_time = config.algo.discretize_start_time
 
+        self.step_size = config.algo.step_size
+        self.top_k = config.algo.top_k
+
     def to(self, *args, **kwargs): 
         super().to(*args, **kwargs)
         self.continuous_noise = self.continuous_noise.to(*args, **kwargs)
@@ -747,7 +750,7 @@ class CANDI(trainer_base.Diffusion):
     def prior_sample(self, *batch_dims): 
         return torch.randn(
             *batch_dims, self.vocab_size, dtype=torch.float32, device=self.device
-        ) 
+        )
     
     def forward(self, **kwargs): 
         with torch.cuda.amp.autocast(dtype=torch.float32):
@@ -774,15 +777,27 @@ class CANDI(trainer_base.Diffusion):
             low_var=train_mode,
             **noisy_output,
         )
-    
+
+
+    def generate_sample_prompt(self, prompt, x, clean_mask): 
+        prompt_tokens = self.tokenizer(prompt, add_special_tokens=False, return_tensors="pt")['input_ids'].to(x.device).squeeze()
+        prompt_onehots = torch.nn.functional.one_hot(prompt_tokens, x.size(-1)).float()
+        x[:, :len(prompt_tokens), :] = prompt_onehots
+        clean_mask[:, :len(prompt_tokens)] = 1.0
+        return x, clean_mask
+
     @torch.no_grad()
-    def generate_samples(self, num_samples, num_steps=None, eps=1e-5):
+    def generate_samples(self, num_samples, num_steps=None, eps=1e-5, prompt=None):
         """Generate samples from the model."""
         if num_steps is None:
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
         discrete_noise_steps = self.get_sampling_schedule(num_steps)
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
+        prompt = "Mr Trump, on thursday, did"
+
+        x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
+
         for i, (t, s) in enumerate(
             zip(discrete_noise_steps[:-1], discrete_noise_steps[1:])
         ):
@@ -792,6 +807,15 @@ class CANDI(trainer_base.Diffusion):
                                                     p_x0, t, s, prev_clean_mask=clean_mask)
             else: 
                 x = x_cont
+            x_tokens = x.argmax(dim=-1)
+            print("X tokens")
+            print(self.tokenizer.batch_decode(x_tokens))
+
+            pred_tokens = p_x0.argmax(dim=-1)
+            print("Pred tokens")
+            print(self.tokenizer.batch_decode(pred_tokens))
+
+
         return x.argmax(dim=-1)
 
     def get_sampling_schedule(self, num_steps):
@@ -810,7 +834,7 @@ class CANDI(trainer_base.Diffusion):
         time_t_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_t.item() 
         time_s_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_s.item() 
 
-        mask_probs = torch.ones((x_sigma.shape[0], x_sigma.shape[1], 1), device=x_sigma.device) * (time_s) 
+        mask_probs = torch.ones((x_sigma.shape[0], x_sigma.shape[1], 1), device=x_sigma.device) * (time_s)
         unmasked_probs = p_x0 * (time_t_vec - time_s_vec)[:, None, None]
         mask_index = x_sigma.shape[-1]
         # pdb.set_trace()
@@ -850,17 +874,46 @@ class CANDI(trainer_base.Diffusion):
         if clean_mask is None: 
             clean_mask = torch.zeros(x.shape[:-1], device=x.device)
 
-        denoised = self.backbone(x, time_t_vec, sigma_t_vec, clean_mask)
+        denoised = self.forward(xt=x, discrete_noise=time_t_vec, continuous_noise=sigma_t_vec, reveal_mask=clean_mask).float().exp()
+        # denoised = utils.top_k_top_p_filtering(denoised, top_k=self.top_k).softmax(dim=-1)
+
         # pdb.set_trace()
-        denoised = denoised.float().softmax(dim=-1)
+        # denoised = denoised.exp()
         if self.grad_calc == 'soft': 
             d = (x - denoised) / (sigma_t_vec[:, None, None]**2)
         else:
             sampled_tok = torch.distributions.Categorical(probs=denoised).sample()
             xhat = torch.nn.functional.one_hot(sampled_tok, num_classes=denoised.shape[-1]).float()
             d = (x - xhat) / (sigma_t_vec[:, None, None]**2)
-        x_cont = x - dt_cont_vec[:, None, None] * d * .2
+        x_cont = x - dt_cont_vec[:, None, None] * d * self.step_size
+        pdb.set_trace()
         return x_cont, denoised
+    
+    # def _continuous_step(
+    #     self,
+    #     x: torch.Tensor,
+    #     time_t: torch.Tensor,
+    #     time_s: torch.Tensor,
+    #     clean_mask: torch.Tensor=None,
+    # ) -> torch.Tensor:
+    #     sigma_s = self.get_continuous_from_discrete_noise(time_s)
+    #     sigma_t = self.get_continuous_from_discrete_noise(time_t)
+
+    #     dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (time_t - time_s).item()
+    #     time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
+    #     sigma_t_vec = torch.ones(x.shape[0], device=x.device) * sigma_t.item()
+    #     sigma_s_vec = torch.ones(x.shape[0], device=x.device) * sigma_s.item()
+
+    #     if clean_mask is None: 
+    #         clean_mask = torch.zeros(x.shape[:-1], device=x.device)
+
+    #     denoised = self.backbone(x, time_t_vec, sigma_t_vec, clean_mask).softmax(dim=-1)
+
+    #     rand_tokens = torch.randint(low=0, high=denoised.shape[-1], size=denoised.shape[:-1], device=denoised.device)
+    #     rand_onehot = torch.nn.functional.one_hot(rand_tokens, num_classes=denoised.shape[-1]).float()
+    #     x_cont = rand_onehot + torch.randn_like(rand_onehot) * sigma_s_vec[:, None, None]
+
+    #     return x_cont, denoised
     
 def randomly_keep_mask(mask: torch.Tensor, keep_rate: float) -> torch.Tensor:
 

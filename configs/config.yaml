@@ -11,7 +11,7 @@ defaults:
 
 mode: train  # train / ppl_eval / sample_eval
 
-seed: 23
+seed: 1
 scratch_dir:  /home/patrick/.cache/discrete_diffusion
 batch_size: 512
 loader:

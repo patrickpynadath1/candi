@@ -5,13 +5,15 @@ scaling_factor: 1.0
 t_min: .05
 t_max: .95
 inference_start_t: .99
-inference_end_t: .05
+inference_end_t: .01
 confidence_threshold: .9
 clean_reveal_ratio: 1.0
 parameterization: mean
-T: 0 # doesnt mean anything
-discretize_start_time: 1.0
+T: 0 # continuous time  
+discretize_start_time: .5
 time_conditioning: true
 weighted_loss: true
 grad_calc: soft
+step_size: .2
 use_mixed_mask: True 
+top_k: 100

@@ -396,8 +396,10 @@ class EmbeddingLayer(nn.Module):
         torch.nn.init.kaiming_uniform_(self.embedding, a=math.sqrt(5))
 
     def forward(self, x):
-        normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
-        normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
+        # normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
+        # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
+
+        normalized_embeddings = self.embedding
 
         if x.ndim == 2:
             return normalized_embeddings[x]
