@@ -507,7 +507,8 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
             # conditionall mix in the mask / special embedding 
             # indicates that those positions are corrupted 
-            x = 2 * x * mask + (1 - mask) * x 
+            x = x * mask + (1 - mask) * .5 * (x + special)
+            x = 2 * x * mask + (1 - mask) *(x)
 
         # x = c_in[:, None, None] * x
         if self.causal:
