@@ -396,6 +396,8 @@ class EmbeddingLayer(nn.Module):
         torch.nn.init.kaiming_uniform_(self.embedding, a=math.sqrt(5))
 
     def forward(self, x):
+
+        # Just for now 
         # normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
         # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
 
@@ -455,7 +457,8 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.use_mixed_mask = use_mixed_mask
 
         if self.use_mixed_mask: 
-            self.special_embedding = nn.Parameter(torch.randn(dim))
+            self.special_embedding = nn.Parameter(torch.empty(dim))
+            torch.nn.init.kaiming_uniform_(self.special_embedding, a=math.sqrt(5))
 
 
         blocks = []
@@ -495,11 +498,11 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         # x = self.vocab_embed(x)
         x = xt 
         sigma = torch.log(1 - discrete_noise)
-        c_in = 1 / (self.scaling_factor + continuous_noise ** 2) ** .5
+        # c_in = 1 / (self.scaling_factor + continuous_noise ** 2) ** .5
         # c_in = torch.ones_like(clean_mask, device=c_in.device)* clean_mask * (1/self.scaling_factor)+ (1 - clean_mask) * c_in[:, None]
         # # pdb.set_trace()
 
-        x = self.vocab_embed(c_in[:, None, None] * x)
+        x = self.vocab_embed(x)
 
         if self.use_mixed_mask: 
             special = self.special_embedding.view(1, 1, -1).expand_as(x)
@@ -507,8 +510,10 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
             # conditionall mix in the mask / special embedding 
             # indicates that those positions are corrupted 
-            x = x * mask + (1 - mask) * .5 * (x + special)
-            x = 2 * x * mask + (1 - mask) *(x)
+            # x = x * mask + (1 - mask) * .5 * (x + special)
+
+            # if I do this, it should be the EXACT same as masked diffusion
+            x = x * mask + (1 - mask) * (special)
 
         # x = c_in[:, None, None] * x
         if self.causal:

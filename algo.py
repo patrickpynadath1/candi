@@ -779,11 +779,15 @@ class CANDI(trainer_base.Diffusion):
         )
 
 
-    def generate_sample_prompt(self, prompt, x, clean_mask): 
+    def generate_sample_prompt(self, prompt, x, clean_mask, position='begin'): 
         prompt_tokens = self.tokenizer(prompt, add_special_tokens=False, return_tensors="pt")['input_ids'].to(x.device).squeeze()
         prompt_onehots = torch.nn.functional.one_hot(prompt_tokens, x.size(-1)).float()
-        x[:, :len(prompt_tokens), :] = prompt_onehots
-        clean_mask[:, :len(prompt_tokens)] = 1.0
+        if position == 'begin':
+            x[:, :len(prompt_tokens), :] = prompt_onehots
+            clean_mask[:, :len(prompt_tokens)] = 1.0
+        elif position == 'end':
+            x[:, -len(prompt_tokens):, :] = prompt_onehots
+            clean_mask[:, -len(prompt_tokens):] = 1.0
         return x, clean_mask
 
     @torch.no_grad()
@@ -794,27 +798,19 @@ class CANDI(trainer_base.Diffusion):
         x = self.prior_sample(num_samples, self.num_tokens)
         discrete_noise_steps = self.get_sampling_schedule(num_steps)
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-        prompt = "Mr Trump, on thursday, did"
+        prompt = "After the debate"
+
+        # end_prompt = "And Donald Trump's campaign"
 
         x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
+        # x, clean_mask = self.generate_sample_prompt(end_prompt, x, clean_mask, position='end')
 
         for i, (t, s) in enumerate(
             zip(discrete_noise_steps[:-1], discrete_noise_steps[1:])
         ):
             x_cont, p_x0 = self._continuous_step(x, t, s, clean_mask=clean_mask)
-            if t < self.discretize_start_time:
-                x, clean_mask = self._discrete_step(x_cont, 
-                                                    p_x0, t, s, prev_clean_mask=clean_mask)
-            else: 
-                x = x_cont
-            x_tokens = x.argmax(dim=-1)
-            print("X tokens")
-            print(self.tokenizer.batch_decode(x_tokens))
-
-            pred_tokens = p_x0.argmax(dim=-1)
-            print("Pred tokens")
-            print(self.tokenizer.batch_decode(pred_tokens))
-
+            x, clean_mask = self._discrete_step(x_cont, 
+                                                p_x0, t, s, prev_clean_mask=clean_mask)
 
         return x.argmax(dim=-1)
 
@@ -824,17 +820,12 @@ class CANDI(trainer_base.Diffusion):
                               num_steps)
 
     
-    # def _discrete_step(self, x_sigma, p_x0, *args, **kwargs): 
-    #     clean_mask = (p_x0.max(dim=-1).values > self.confidence_threshold).float()
-    #     new_onehots =torch.nn.functional.one_hot(p_x0.argmax(dim=-1), num_classes=p_x0.shape[-1]).float()
-    #     x_disc = new_onehots * clean_mask.unsqueeze(-1) + x_sigma * (1 - clean_mask).unsqueeze(-1)
-    #     return x_disc, clean_mask
     
     def _discrete_step(self, x_sigma, p_x0, time_t, time_s, prev_clean_mask): 
         time_t_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_t.item() 
         time_s_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_s.item() 
 
-        mask_probs = torch.ones((x_sigma.shape[0], x_sigma.shape[1], 1), device=x_sigma.device) * (time_s)
+        mask_probs = torch.ones((x_sigma.shape[0], x_sigma.shape[1], 1), device=x_sigma.device) * (time_s )
         unmasked_probs = p_x0 * (time_t_vec - time_s_vec)[:, None, None]
         mask_index = x_sigma.shape[-1]
         # pdb.set_trace()
@@ -856,6 +847,8 @@ class CANDI(trainer_base.Diffusion):
 
         print(new_clean_mask.mean().item())
         return updated_x, new_clean_mask
+    
+
 
 
     def _continuous_step(
