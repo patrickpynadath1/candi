@@ -463,8 +463,8 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.rotary_emb = Rotary(dim // config.n_heads)
         self.scaling_factor=scaling_factor
         self.use_mixed_mask = use_mixed_mask
-        self.mixed_coeff_max = mixed_coeff_max
-        self.mixed_coeff_min = mixed_coeff_min
+        self.mixed_coeff_max = float(mixed_coeff_max)
+        self.mixed_coeff_min = float(mixed_coeff_min)
 
         # if self.use_mixed_mask: 
         #     self.special_embedding = nn.Parameter(torch.empty(dim))
