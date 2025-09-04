@@ -752,7 +752,7 @@ class CANDI(trainer_base.Diffusion):
 
     def prior_sample(self, *batch_dims): 
         return torch.randn(
-            *batch_dims, self.vocab_size, dtype=torch.float32, device=self.device
+            *batch_dims, self.vocab_size-1, dtype=torch.float32, device=self.device
         )
     
     def forward(self, **kwargs): 
@@ -802,7 +802,7 @@ class CANDI(trainer_base.Diffusion):
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
         prompt = "Mr Trump, on Thursday,"
 
-        timesteps = torch.linspace(1, eps, num_steps + 1, device=self.device)
+        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / num_steps
 
         x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
@@ -834,6 +834,8 @@ class CANDI(trainer_base.Diffusion):
         unmasked_probs = p_x0 * (t_vec - s_vec)[:, None, None]
 
         q_xs = torch.cat([unmasked_probs, mask_probs], dim=-1)
+
+            
         _x = sample_categorical(q_xs)
         new_clean_mask = (prev_clean_mask.bool() | (_x != self.mask_index)).float()
 
@@ -898,7 +900,7 @@ class CANDI(trainer_base.Diffusion):
         if clean_mask is None: 
             clean_mask = torch.zeros(x.shape[:-1], device=x.device)
 
-        denoised = self.forward(xt=x, discrete_noise=time_t_vec, continuous_noise=sigma_t_vec, reveal_mask=clean_mask).float().exp()
+        denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask).float().exp()
         # denoised = utils.top_k_top_p_filtering(denoised, top_k=self.top_k).softmax(dim=-1)
 
         # pdb.set_trace()

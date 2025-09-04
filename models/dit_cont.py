@@ -408,7 +408,6 @@ class EmbeddingLayer(nn.Module):
             return normalized_embeddings[x]
         assert x.ndim == 3
 
-        # pdb.set_trace()
         return torch.einsum(
             "blv,ve->ble",
             x.float(),
@@ -490,7 +489,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         self.output_layer = DDiTFinalLayer(
             hidden_size=dim,
-            out_channels=vocab_size - 1,
+            out_channels=vocab_size,
             cond_dim=cond_dim,
             adaLN=self.adaLN,
         )
@@ -507,7 +506,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         # sigma = discrete_noise
         # x = self.vocab_embed(x)
         x = xt 
-        sigma = torch.log(1 - discrete_noise)
+        sigma = -1 * torch.log(1 - discrete_noise)
         # c_in = 1 / (self.scaling_factor + continuous_noise ** 2) ** .5
         # c_in = torch.ones_like(clean_mask, device=c_in.device)* clean_mask * (1/self.scaling_factor)+ (1 - clean_mask) * c_in[:, None]
         # # pdb.set_trace()
@@ -541,4 +540,4 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
             x = self.output_layer(x, c=t_cond)
 
-        return x
+        return x[:, :, :-1]
