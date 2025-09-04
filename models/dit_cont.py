@@ -390,6 +390,7 @@ class EmbeddingLayer(nn.Module):
     def __init__(self, dim, vocab_dim):
         super().__init__()
         self.dim = dim
+        
 
 
         self.embedding = nn.Parameter(torch.empty((vocab_dim, dim)))
@@ -400,8 +401,8 @@ class EmbeddingLayer(nn.Module):
         # Just for now 
         # normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
         # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
-
-        normalized_embeddings = self.embedding
+        
+        normalized_embeddings = self.embedding[:-1]
 
         if x.ndim == 2:
             return normalized_embeddings[x]
@@ -449,16 +450,22 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.vocab_size = vocab_size
         dim = config.hidden_size
         cond_dim = config.cond_dim
-        self.vocab_embed = EmbeddingLayer(dim,vocab_size)
+        if use_mixed_mask: 
+            self.vocab_embed = EmbeddingLayer(dim,vocab_size + 1)
+            self.mask_index = vocab_size
+        else: 
+            self.vocab_embed = EmbeddingLayer(dim,vocab_size)
+
+
         if not self.causal:
             self.sigma_map = TimestepEmbedder(cond_dim)
         self.rotary_emb = Rotary(dim // config.n_heads)
         self.scaling_factor=scaling_factor
         self.use_mixed_mask = use_mixed_mask
 
-        if self.use_mixed_mask: 
-            self.special_embedding = nn.Parameter(torch.empty(dim))
-            torch.nn.init.kaiming_uniform_(self.special_embedding, a=math.sqrt(5))
+        # if self.use_mixed_mask: 
+        #     self.special_embedding = nn.Parameter(torch.empty(dim))
+        #     torch.nn.init.kaiming_uniform_(self.special_embedding, a=math.sqrt(5))
 
 
         blocks = []
@@ -505,7 +512,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         x = self.vocab_embed(x)
 
         if self.use_mixed_mask: 
-            special = self.special_embedding.view(1, 1, -1).expand_as(x)
+            special = self.vocab_embed.embedding[-1].view(1, 1, -1).expand_as(x)
             mask = reveal_mask.unsqueeze(-1).float()
 
             # conditionall mix in the mask / special embedding 
