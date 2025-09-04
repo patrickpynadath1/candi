@@ -440,7 +440,7 @@ class DDiTFinalLayer(nn.Module):
 
 
 class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
-    def __init__(self, config, vocab_size: int, scaling_factor: float=1.0, use_mixed_mask:bool=False):
+    def __init__(self, config, vocab_size: int, scaling_factor: float=1.0, use_mixed_mask:bool=False, mixed_coeff: float=.5):
         super().__init__()
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
@@ -462,6 +462,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.rotary_emb = Rotary(dim // config.n_heads)
         self.scaling_factor=scaling_factor
         self.use_mixed_mask = use_mixed_mask
+        self.mixed_coeff = mixed_coeff
 
         # if self.use_mixed_mask: 
         #     self.special_embedding = nn.Parameter(torch.empty(dim))
@@ -520,7 +521,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             # x = x * mask + (1 - mask) * .5 * (x + special)
 
             # if I do this, it should be the EXACT same as masked diffusion
-            x = x * mask + (1 - mask) * (special)
+            x = x * mask + (1 - mask) * (self.mixed_coeff * special + (1 - self.mixed_coeff) * x)
 
         # x = c_in[:, None, None] * x
         if self.causal:
