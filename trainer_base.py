@@ -523,6 +523,8 @@ class Diffusion(TrainerBase):
         if num_steps is None:
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
+        prompt = self.tokenizer('Mr Trump, on Thursday,', add_special_tokens=False, return_tensors='pt')['input_ids']
+        x[:, :prompt.shape[-1]] = prompt
         timesteps = torch.linspace(1, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / num_steps
         p_x0_cache = None
