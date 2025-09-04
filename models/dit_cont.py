@@ -441,7 +441,7 @@ class DDiTFinalLayer(nn.Module):
 
 # Assumes that the vocab size accounts for the mask token 
 class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
-    def __init__(self, config, vocab_size: int, scaling_factor: float=1.0, use_mixed_mask:bool=False, mixed_coeff_max: float=1.0, mixed_coeff_min: float=0.0):
+    def __init__(self, config, vocab_size: int, scaling_factor: float=1.0, use_mixed_mask:bool=False, mixed_coeff: float=.5):
         super().__init__()
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
@@ -463,8 +463,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.rotary_emb = Rotary(dim // config.n_heads)
         self.scaling_factor=scaling_factor
         self.use_mixed_mask = use_mixed_mask
-        self.mixed_coeff_max = mixed_coeff_max
-        self.mixed_coeff_min = mixed_coeff_min
+        self.mixed_coeff = mixed_coeff
 
         # if self.use_mixed_mask: 
         #     self.special_embedding = nn.Parameter(torch.empty(dim))
@@ -526,9 +525,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             # to counteract this, have the weight of the noisy embeds inversely proportionate to the noise
 
             # x = x * mask + (1 - mask) * (discrete_noise[:, None, None] * special + (1 - discrete_noise[:, None, None]) * x)
-
-            mixed_coeffs = (discrete_noise * (self.mixed_coeff_max - self.mixed_coeff_min) + self.mixed_coeff_min)[:, None, None]
-            x = x * mask + (1 - mask) * (mixed_coeffs * special + (1 - mixed_coeffs) * x)
+            x = x * mask + (1 - mask) * (self.mixed_coeff * special + (1 - self.mixed_coeff) * x)
 
         # x = c_in[:, None, None] * x
         if self.causal:
