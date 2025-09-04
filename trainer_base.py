@@ -67,7 +67,7 @@ class TrainerBase(L.LightningModule):
             self.backbone = models.dit.DIT(self.config, vocab_size=self.vocab_size)
 
         elif self.config.algo.backbone == "cont_dit": 
-            backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size, use_mixed_mask=self.config.algo.use_mixed_mask, mixed_coeff=self.config.algo.mixed_coeff)
+            backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size, use_mixed_mask=self.config.algo.use_mixed_mask, mixed_coeff_min=self.config.algo.mixed_coeff_min, mixed_coeff_max=self.config.algo.mixed_coeff_max)
             self.backbone = backbone
         elif self.config.algo.backbone == "dimamba":
             self.backbone = models.dimamba.DiMamba(
