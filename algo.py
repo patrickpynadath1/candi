@@ -886,7 +886,6 @@ class CANDI(trainer_base.Diffusion):
             xhat = torch.nn.functional.one_hot(sampled_tok, num_classes=denoised.shape[-1]).float()
             d = (x - xhat) / (sigma_t_vec[:, None, None]**2)
         x_cont = x - dt_cont_vec[:, None, None] * d * self.step_size
-        pdb.set_trace()
         return x_cont, denoised
     
     # def _continuous_step(
