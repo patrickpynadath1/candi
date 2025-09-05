@@ -519,12 +519,13 @@ class Diffusion(TrainerBase):
     @torch.no_grad()
     def generate_samples(self, num_samples, num_steps=None, eps=1e-5):
         """Generate samples from the model."""
+        pdb.set_trace()
         # Lightning auto-casting is not working in this method for some reason
         if num_steps is None:
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
-        prompt = self.tokenizer('Mr Trump, on Thursday,', add_special_tokens=False, return_tensors='pt')['input_ids']
-        x[:, :prompt.shape[-1]] = prompt
+        # prompt = self.tokenizer('Mr Trump, on Thursday,', add_special_tokens=False, return_tensors='pt')['input_ids']
+        # x[:, :prompt.shape[-1]] = prompt
         timesteps = torch.linspace(1, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / num_steps
         p_x0_cache = None
@@ -680,7 +681,6 @@ class AbsorbingState(Diffusion):
 
         copy_flag = (x != self.mask_index).to(x.dtype)
         print(copy_flag.float().mean())
-        pdb.set_trace()
 
         # print(copy_flag.float().mean().item())
         return p_x0, copy_flag * x + (1 - copy_flag) * _x

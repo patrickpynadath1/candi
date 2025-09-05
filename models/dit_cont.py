@@ -525,7 +525,12 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             # to counteract this, have the weight of the noisy embeds inversely proportionate to the noise
 
             # x = x * mask + (1 - mask) * (discrete_noise[:, None, None] * special + (1 - discrete_noise[:, None, None]) * x)
-            x = x * mask + (1 - mask) * (self.mixed_coeff * special + (1 - self.mixed_coeff) * x)
+
+            # version 1: detach 
+            x = x * mask + (1 - mask) * (self.mixed_coeff * special + (1 - self.mixed_coeff) * x.detach())
+
+            # version 2: no detach but normalize
+            x = x * mask + (1 - mask) * (self.mixed_coeff * special + (1 - self.mixed_coeff) * x / x.norm(dim=-1, keepdim=True) * special.norm(dim=-1, keepdim=True))
 
         # x = c_in[:, None, None] * x
         if self.causal:

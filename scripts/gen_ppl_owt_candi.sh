@@ -15,19 +15,19 @@
 
 export HYDRA_FULL_ERROR=1
 
-mixed_coef=1.0
+mixed_coeff=.5
 CUDA_VISIBLE_DEVICCES=$1 python main.py \
   mode=sample_eval \
   loader.batch_size=16 \
-  loader.eval_batch_size=1 \
+  loader.eval_batch_size=128 \
   data=openwebtext-split \
   model=small \
   algo=candi \
   sampling.num_sample_batches=1 \
-  sampling.steps=32 \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/mdlm-short-run/checkpoints/last.ckpt \
+  sampling.steps=16 \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/psuedo-mdlm/checkpoints/last.ckpt \
   model.length=128 \
   algo.top_k=50 \
   algo.step_size=2.0 \
-  algo.mixed_coeff=$mixed_coef \
+  algo.mixed_coeff=$mixed_coeff \
   +wandb.offline=true;
