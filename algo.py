@@ -796,7 +796,6 @@ class CANDI(trainer_base.Diffusion):
     @torch.no_grad()
     def generate_samples(self, num_samples, num_steps=None, eps=1e-5, prompt=None):
         """Generate samples from the model."""
-        pdb.set_trace()
         if num_steps is None:
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)

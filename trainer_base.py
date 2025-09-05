@@ -519,7 +519,6 @@ class Diffusion(TrainerBase):
     @torch.no_grad()
     def generate_samples(self, num_samples, num_steps=None, eps=1e-5):
         """Generate samples from the model."""
-        pdb.set_trace()
         # Lightning auto-casting is not working in this method for some reason
         if num_steps is None:
             num_steps = self.config.sampling.steps
