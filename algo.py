@@ -684,7 +684,6 @@ class CANDI(trainer_base.Diffusion):
 
         self.step_size = config.algo.step_size
         self.top_k = config.algo.top_k
-        pdb.set_trace()
 
     def to(self, *args, **kwargs): 
         super().to(*args, **kwargs)
