@@ -25,6 +25,6 @@ CUDA_VISIBLE_DEVICCES=$1 python main.py \
   eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/mdlm-short-run/checkpoints/last.ckpt \
   sampling.num_sample_batches=1 \
   sampling.predictor=ancestral_cache \
-  sampling.steps=1024 \
+  sampling.steps=16 \
   model.length=128 \
   +wandb.offline=true

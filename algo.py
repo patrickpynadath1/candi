@@ -648,8 +648,8 @@ class Distillation(DUO):
 
 class CANDI(trainer_base.Diffusion):
     def __init__(self, config, tokenizer):
-        self.mask_index = tokenizer.vocab_size 
-        vocab_size = tokenizer.vocab_size + 1
+        self.mask_index = len(tokenizer)
+        vocab_size = len(tokenizer) + 1
 
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self._validate_configuration()
@@ -684,6 +684,7 @@ class CANDI(trainer_base.Diffusion):
 
         self.step_size = config.algo.step_size
         self.top_k = config.algo.top_k
+        pdb.set_trace()
 
     def to(self, *args, **kwargs): 
         super().to(*args, **kwargs)
@@ -796,16 +797,17 @@ class CANDI(trainer_base.Diffusion):
     @torch.no_grad()
     def generate_samples(self, num_samples, num_steps=None, eps=1e-5, prompt=None):
         """Generate samples from the model."""
+        # pdb.set_trace()
         if num_steps is None:
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-        # prompt = "Mr Trump, on Thursday,"
+        prompt = "The President"
 
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / num_steps
 
-        # x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
+        x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
         for i in range(num_steps): 
             t = timesteps[i]
 
