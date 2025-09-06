@@ -15,7 +15,7 @@
 
 export HYDRA_FULL_ERROR=1
 
-CUDA_VISIBLE_DEVICCES=$1 python main.py \
+CUDA_VISIBLE_DEVICCES=2 python main.py \
   mode=sample_eval \
   loader.batch_size=16 \
   loader.eval_batch_size=1 \

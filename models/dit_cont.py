@@ -427,7 +427,7 @@ class DDiTFinalLayer(nn.Module):
         if self.adaLN:
             self.adaLN_modulation = nn.Linear(cond_dim, 2 * hidden_size, bias=False)
             self.adaLN_modulation.weight.data.zero_()
-            self.adaLN_modulation.bias.data.zero_()
+            # self.adaLN_modulation.bias.data.zero_()
 
     def forward(self, x, c):
         x = self.norm_final(x)
