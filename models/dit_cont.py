@@ -399,10 +399,10 @@ class EmbeddingLayer(nn.Module):
     def forward(self, x):
 
         # Just for now 
-        # normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
+        normalized_embeddings = F.normalize(self.embedding[:-1], p=2, dim=-1)
         # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
         
-        normalized_embeddings = self.embedding[:-1]
+        # normalized_embeddings = self.embedding[:-1]
 
         if x.ndim == 2:
             return normalized_embeddings[x]
@@ -425,7 +425,7 @@ class DDiTFinalLayer(nn.Module):
         self.linear.bias.data.zero_()
         self.adaLN = adaLN
         if self.adaLN:
-            self.adaLN_modulation = nn.Linear(cond_dim, 2 * hidden_size, bias=True)
+            self.adaLN_modulation = nn.Linear(cond_dim, 2 * hidden_size, bias=False)
             self.adaLN_modulation.weight.data.zero_()
             self.adaLN_modulation.bias.data.zero_()
 
@@ -434,7 +434,10 @@ class DDiTFinalLayer(nn.Module):
         if self.adaLN:
             shift, scale = self.adaLN_modulation(c)[:, None].chunk(2, dim=2)
             x = modulate_fused(x, shift, scale)
-        x = self.linear(x)
+        # x = self.linear(x)
+
+        normalized_weight = F.normalize(self.linear.weight, p=2, dim=-1)
+        x = F.linear(x, normalized_weight)
         return x
 
 
@@ -524,13 +527,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             # hypothesis: model starts focusing on noisy embeds too early 
             # to counteract this, have the weight of the noisy embeds inversely proportionate to the noise
 
-            # x = x * mask + (1 - mask) * (discrete_noise[:, None, None] * special + (1 - discrete_noise[:, None, None]) * x)
-
-            # version 1: detach 
-            # x = x * mask + (1 - mask) * (self.mixed_coeff * special + (1 - self.mixed_coeff) * x.detach())
-
-            # version 2: no detach but normalize
-            x = x * mask + (1 - mask) * (self.mixed_coeff * special + (1 - self.mixed_coeff) * x / x.norm(dim=-1, keepdim=True) * special.norm(dim=-1, keepdim=True))
+            x = x * mask + (1 - mask) * (self.mixed_coeff * special / special.norm(dim=-1, keepdim=True)+ (1 - self.mixed_coeff) * x )
 
         # x = c_in[:, None, None] * x
         if self.causal:
