@@ -417,7 +417,7 @@ class EmbeddingLayer(nn.Module):
 
 
 class DDiTFinalLayer(nn.Module):
-    def __init__(self, hidden_size, out_channels, cond_dim, adaLN, bias=False):
+    def __init__(self, hidden_size, out_channels, cond_dim, adaLN, bias=True):
         super().__init__()
         self.norm_final = LayerNorm(hidden_size)
         self.linear = nn.Linear(hidden_size, out_channels, bias=bias)
@@ -427,8 +427,8 @@ class DDiTFinalLayer(nn.Module):
         if self.adaLN:
             self.adaLN_modulation = nn.Linear(cond_dim, 2 * hidden_size, bias=bias)
             self.adaLN_modulation.weight.data.zero_()
-            if bias:
-                self.adaLN_modulation.bias.data.zero_()
+            # if bias:
+            self.adaLN_modulation.bias.data.zero_()
 
     def forward(self, x, c):
         x = self.norm_final(x)
@@ -438,7 +438,7 @@ class DDiTFinalLayer(nn.Module):
         # x = self.linear(x)
 
         normalized_weight = F.normalize(self.linear.weight, p=2, dim=-1)
-        x = F.linear(x, normalized_weight)
+        x = F.linear(x, normalized_weight, bias=self.linear.bias)
         return x
 
 
