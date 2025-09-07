@@ -719,8 +719,12 @@ class CANDI(trainer_base.Diffusion):
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
 
-        if self.weighted_loss: 
+        if self.weighted_loss or not self.training:
+
+            # the actual elbo will probably include an mse 
             nll = log_p_theta * dalpha_t / (1 - alpha_t)
+            mse =(log_p_theta.exp() - torch.nn.functional.one_hot(x0_tokens, log_x_theta.size(-1)).to(log_p_theta.dtype)).pow(2).sum(-1)
+            nll = nll + mse * (1 + dalpha_t / (1 - alpha_t))
         else: 
             nll = log_p_theta * -1
         return nll
@@ -801,12 +805,11 @@ class CANDI(trainer_base.Diffusion):
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-        # prompt = "The Doctor"
-
+        prompt = "Donald Trump"
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / num_steps
 
-        # x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
+        x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
         for i in range(num_steps): 
             t = timesteps[i]
 
