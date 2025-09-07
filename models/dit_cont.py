@@ -435,10 +435,10 @@ class DDiTFinalLayer(nn.Module):
         if self.adaLN:
             shift, scale = self.adaLN_modulation(c)[:, None].chunk(2, dim=2)
             x = modulate_fused(x, shift, scale)
-        # x = self.linear(x)
+        x = self.linear(x)
 
-        normalized_weight = F.normalize(self.linear.weight, p=2, dim=-1)
-        x = F.linear(x, normalized_weight, bias=self.linear.bias)
+        # normalized_weight = F.normalize(self.linear.weight, p=2, dim=-1)
+        # x = F.linear(x, normalized_weight, bias=self.linear.bias)
         return x
 
 

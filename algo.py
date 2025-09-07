@@ -719,11 +719,11 @@ class CANDI(trainer_base.Diffusion):
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
 
-        if self.weighted_loss or not self.training:
+        if not self.training:
 
             # the actual elbo will probably include an mse 
             nll = log_p_theta * dalpha_t / (1 - alpha_t)
-            mse =(log_p_theta.exp() - torch.nn.functional.one_hot(x0_tokens, log_x_theta.size(-1)).to(log_p_theta.dtype)).pow(2).sum(-1)
+            mse =(log_x_theta.exp() - torch.nn.functional.one_hot(x0_tokens, log_x_theta.size(-1)).to(log_x_theta.dtype)).pow(2).sum(-1)
             nll = nll + mse * (1 + dalpha_t / (1 - alpha_t))
         else: 
             nll = log_p_theta * -1
