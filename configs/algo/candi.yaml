@@ -18,3 +18,4 @@ step_size: 0
 use_mixed_mask: True 
 top_k: 100
 mixed_coeff: 1.0 # interpolates between masked and continuous diffusion for corrupted positions
+use_actual_elbo: False

@@ -659,6 +659,7 @@ class CANDI(trainer_base.Diffusion):
         self.scaling_factor = config.algo.scaling_factor
         self.t_min = config.algo.t_min
         self.t_max = config.algo.t_max
+        self.use_actual_elbo = config.algo.use_actual_elbo
 
         self.inference_start_t = config.algo.inference_start_t
         self.inference_end_t = config.algo.inference_end_t
@@ -719,7 +720,7 @@ class CANDI(trainer_base.Diffusion):
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
 
-        if not self.training:
+        if not self.training or self.use_actual_elbo:
 
             # the actual elbo will probably include an mse 
             nll = log_p_theta * dalpha_t / (1 - alpha_t)
