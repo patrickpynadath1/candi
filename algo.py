@@ -774,6 +774,7 @@ class CANDI(trainer_base.Diffusion):
             'xt': xt, 
             'reveal_mask': reveal_mask, 
             'discrete_noise': discrete_noise, 
+            'continuous_noise': continuous_noise
         }
 
     def prior_sample(self, *batch_dims): 
@@ -798,7 +799,7 @@ class CANDI(trainer_base.Diffusion):
         assert alpha_t.ndim == 2
 
         noisy_output = self.q_xt(x0, alpha_t)
-        log_x_theta = self.forward(**noisy_output, only_corrupt_rate=self.only_corrupt_rate)
+        log_x_theta = self.forward(**noisy_output)
 
         utils.print_nans(log_x_theta, "model_output")
         return self.nll_per_token(
@@ -892,8 +893,8 @@ class CANDI(trainer_base.Diffusion):
         time_s: torch.Tensor,
         clean_mask: torch.Tensor=None,
     ) -> torch.Tensor:
-        sigma_t = time_t * (self.sigma_max - self.sigma_min) + self.sigma_min
-        sigma_s = time_s * (self.sigma_max - self.sigma_min) + self.sigma_min
+        sigma_t = self.get_continuous_from_discrete_noise(time_t)
+        sigma_s = self.get_continuous_from_discrete_noise(time_s)
 
         dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_t - sigma_s).item()
         time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
@@ -902,7 +903,7 @@ class CANDI(trainer_base.Diffusion):
         if clean_mask is None: 
             clean_mask = torch.zeros(x.shape[:-1], device=x.device)
 
-        denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask).float().exp()
+        denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec).float().exp()
         # denoised = utils.top_k_top_p_filtering(denoised, top_k=self.top_k).softmax(dim=-1)
 
         # pdb.set_trace()
