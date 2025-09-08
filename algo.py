@@ -685,6 +685,7 @@ class CANDI(trainer_base.Diffusion):
 
         self.step_size = config.algo.step_size
         self.top_k = config.algo.top_k
+        self.only_corrupt_rate = config.algo.only_corrupt_rate
 
     def to(self, *args, **kwargs): 
         super().to(*args, **kwargs)
@@ -719,15 +720,16 @@ class CANDI(trainer_base.Diffusion):
         log_p_theta = torch.gather(
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
+        sigmas = self.get_continuous_from_discrete_noise(1 - alpha_t).squeeze()
 
         if not self.training or self.use_actual_elbo:
 
             # the actual elbo will probably include an mse 
             nll = log_p_theta * dalpha_t / (1 - alpha_t)
-            mse =(log_x_theta.exp() - torch.nn.functional.one_hot(x0_tokens, log_x_theta.size(-1)).to(log_x_theta.dtype)).pow(2).sum(-1)
+            mse =(log_x_theta.exp() - torch.nn.functional.one_hot(x0_tokens, log_x_theta.size(-1)).to(log_x_theta.dtype)).pow(2).sum(-1) * (1 / sigmas[:, None] ** 2)
             nll = nll + mse * (1 + dalpha_t / (1 - alpha_t))
         else: 
-            nll = log_p_theta * -1
+            nll = log_p_theta * dalpha_t / (1 - alpha_t)
         return nll
 
     # gets noisy sample xt
@@ -774,7 +776,7 @@ class CANDI(trainer_base.Diffusion):
         assert alpha_t.ndim == 2
 
         noisy_output = self.q_xt(x0, alpha_t)
-        log_x_theta = self.forward(**noisy_output)
+        log_x_theta = self.forward(**noisy_output, only_corrupt_rate=self.only_corrupt_rate)
 
         utils.print_nans(log_x_theta, "model_output")
         return self.nll_per_token(
@@ -806,11 +808,11 @@ class CANDI(trainer_base.Diffusion):
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-        prompt = "Donald Trump"
+        # prompt = "Donald Trump"
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / num_steps
 
-        x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
+        # x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
         for i in range(num_steps): 
             t = timesteps[i]
 

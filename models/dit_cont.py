@@ -506,7 +506,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     
     # clean mask: indicates which positions are clean with 1, which are corrupted with 0
     # def forward(self, x, discrete_noise):
-    def forward(self, xt, discrete_noise, reveal_mask):
+    def forward(self, xt, discrete_noise, reveal_mask, only_corrupt_rate=0.0):
         # sigma = discrete_noise
         # x = self.vocab_embed(x)
         x = xt 
@@ -520,6 +520,10 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if self.use_mixed_mask: 
             special = self.vocab_embed.embedding[-1].view(1, 1, -1).expand_as(x)
             mask = reveal_mask.unsqueeze(-1).float()
+            coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff
+            if only_corrupt_rate > 0.0:
+                complete_mask = (torch.rand_like(coeffs) < only_corrupt_rate).float()
+                coeffs =  complete_mask * (1 - complete_mask) * coeffs 
 
             # conditionall mix in the mask / special embedding 
             # indicates that those positions are corrupted 
@@ -528,7 +532,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             # hypothesis: model starts focusing on noisy embeds too early 
             # to counteract this, have the weight of the noisy embeds inversely proportionate to the noise
 
-            x = x * mask + (1 - mask) * (self.mixed_coeff * special / special.norm(dim=-1, keepdim=True)+ (1 - self.mixed_coeff) * x )
+            x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x )
 
         # x = c_in[:, None, None] * x
         if self.causal:
