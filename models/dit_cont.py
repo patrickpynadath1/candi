@@ -523,7 +523,6 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff
             if only_corrupt_rate > 0.0:
 
-                pdb.set_trace()
                 complete_mask = (torch.rand_like(coeffs) < only_corrupt_rate).float()
                 coeffs =  complete_mask + (1 - complete_mask) * coeffs 
 
