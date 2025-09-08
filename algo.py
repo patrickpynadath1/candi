@@ -666,18 +666,20 @@ class CANDI(trainer_base.Diffusion):
         self.confidence_threshold = config.algo.confidence_threshold
 
         self.clean_reveal_ratio = config.algo.clean_reveal_ratio
-        self.continuous_noise, self.discrete_noise = build_sigma_error_table(
-            vocab_size, 
-            sigma_range=(.01, 2), 
-            num=1000, 
-            # device=self.device, 
-            scaling_factor=self.scaling_factor
-        )
+        # self.continuous_noise, self.discrete_noise = build_sigma_error_table(
+        #     vocab_size, 
+        #     sigma_range=(.01, 2), 
+        #     num=1000, 
+        #     # device=self.device, 
+        #     scaling_factor=self.scaling_factor
+        # )
+
+        self.continuous_noise =torch.linspace(.2, 4.0, 1000)
+        self.discrete_noise = expected_rank(d=self.vocab_size-1, a=torch.tensor(1).to(self.device), sigma=self.continuous_noise)
+
         self.continuous_noise = torch.tensor(self.continuous_noise)
         self.discrete_noise = torch.tensor(self.discrete_noise)
         self.weighted_loss = config.algo.weighted_loss
-
-        self.get_continuous_from_discrete_noise = lambda discrete_noise: sigma_from_time_vectorized(discrete_noise, self.continuous_noise, self.discrete_noise)
 
         # can either be soft (expectation) or hard (sampled from prob dist) 
         self.grad_calc=config.algo.grad_calc
@@ -686,6 +688,16 @@ class CANDI(trainer_base.Diffusion):
         self.step_size = config.algo.step_size
         self.top_k = config.algo.top_k
         self.only_corrupt_rate = config.algo.only_corrupt_rate
+
+        self.min_percentile = config.algo.min_percentile
+        self.max_percentile = config.algo.max_percentile
+
+
+
+    def get_continuous_from_discrete_noise(self, discrete_noise):
+        target_percentile = discrete_noise * (self.max_percentile - self.min_percentile) + self.min_percentile
+        return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
+
 
     def to(self, *args, **kwargs): 
         super().to(*args, **kwargs)
@@ -725,23 +737,37 @@ class CANDI(trainer_base.Diffusion):
         nll = log_p_theta * dalpha_t / (1 - alpha_t)
         return nll
 
+
+    def discrete_noising(self, x, alpha_t):
+        """Computes the noisy sample xt.
+
+        Args:
+          x: int torch.Tensor with shape (batch_size,
+              diffusion_model_input_length), input.
+          move_chance: float torch.Tensor with shape
+            (batch_size, 1).
+        """
+        move_indices = torch.rand(*x.shape, device=x.device) < 1 - alpha_t
+        uniform_tensor = torch.randint(0, self.vocab_size, x.shape, device=x.device)
+        xt = torch.where(move_indices, uniform_tensor, x)
+        if self.ignore_bos:
+            xt[:, 0] = x[:, 0]
+        return xt
+
+
     # gets noisy sample xt
     def q_xt(self, x, alpha_t):
+
+        disc_xt = self.discrete_noising(x, alpha_t)
+        reveal_mask = (disc_xt == x).float()
+
         discrete_noise = (1 - alpha_t).squeeze()
+        continuous_noise = self.get_continuous_from_discrete_noise(discrete_noise) 
 
         # accounting for the mask token
         onehot = F.one_hot(x, num_classes=self.vocab_size-1).float()
 
-        continuous_noise = self.get_continuous_from_discrete_noise(discrete_noise)
-
         xt_cont = onehot + continuous_noise[:, None, None].to(x.device) * torch.randn_like(onehot, device=x.device)
-        clean_mask = (xt_cont.argmax(dim=-1) == x).float()
-        if self.clean_reveal_ratio < 1.0: 
-
-            keep_rate = torch.ones_like(discrete_noise, device=discrete_noise.device) * self.clean_reveal_ratio
-            reveal_mask = randomly_keep_mask(clean_mask, keep_rate)
-        else: 
-            reveal_mask = clean_mask
         xt = onehot * reveal_mask.unsqueeze(-1) + (1 - reveal_mask).unsqueeze(-1) * xt_cont
 
         return {
@@ -751,9 +777,12 @@ class CANDI(trainer_base.Diffusion):
         }
 
     def prior_sample(self, *batch_dims): 
+
+        max_percentile = self.max_percentile
+        sigma = self.get_continuous_from_discrete_noise(torch.tensor(max_percentile).to(self.device))
         return torch.randn(
             *batch_dims, self.vocab_size-1, dtype=torch.float32, device=self.device
-        )
+        )  * sigma
     
     def forward(self, **kwargs): 
         with torch.cuda.amp.autocast(dtype=torch.float32):
@@ -854,34 +883,6 @@ class CANDI(trainer_base.Diffusion):
 
         print(new_clean_mask.mean().item())
         return updated_x, new_clean_mask
-    # def _discrete_step(self, x_sigma, p_x0, time_t, time_s, prev_clean_mask): 
-    #     time_t_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_t.item() 
-    #     time_s_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * time_s.item() 
-
-    #     mask_probs = torch.ones((x_sigma.shape[0], x_sigma.shape[1], 1), device=x_sigma.device) * (time_s )
-    #     unmasked_probs = p_x0 * (time_t_vec - time_s_vec)[:, None, None]
-    #     mask_index = x_sigma.shape[-1]
-    #     # pdb.set_trace()
-
-    #     q_xs = torch.cat([unmasked_probs, mask_probs], dim=-1)
-    #     _x = sample_categorical(q_xs)
-    #     new_clean_mask = (prev_clean_mask.bool() | (_x != mask_index)).float()
-
-    #     # For tokens that got sampled to real values (not mask), use those
-    #     old_x_tokens=x_sigma.argmax(dim=-1)
-    #     # For tokens that got sampled to mask, keep old tokens but mark as not clean
-    #     sampled_real_tokens = torch.where(_x != mask_index, _x, old_x_tokens)
-    
-    #     # Apply copy logic: keep old tokens where prev_clean_mask is True
-    #     updated_tokens = torch.where(prev_clean_mask.bool(), old_x_tokens, sampled_real_tokens)
-    #     updated_x = torch.nn.functional.one_hot(updated_tokens, num_classes=x_sigma.shape[-1]).float().to(x_sigma.device)
-
-    #     updated_x = updated_x * new_clean_mask.unsqueeze(-1) + (1 - new_clean_mask).unsqueeze(-1) * x_sigma
-
-    #     print(new_clean_mask.mean().item())
-    #     return updated_x, new_clean_mask
-    
-
 
 
     def _continuous_step(
@@ -891,9 +892,10 @@ class CANDI(trainer_base.Diffusion):
         time_s: torch.Tensor,
         clean_mask: torch.Tensor=None,
     ) -> torch.Tensor:
-        sigma_t = self.get_continuous_from_discrete_noise(time_t)
+        sigma_t = time_t * (self.sigma_max - self.sigma_min) + self.sigma_min
+        sigma_s = time_s * (self.sigma_max - self.sigma_min) + self.sigma_min
 
-        dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (time_t - time_s).item()
+        dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_t - sigma_s).item()
         time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
         sigma_t_vec = torch.ones(x.shape[0], device=x.device) * sigma_t.item()
 
@@ -1000,3 +1002,29 @@ def sigma_from_time_vectorized(
 def sample_categorical(categorical_probs):
     gumbel_norm = 1e-10 - (torch.rand_like(categorical_probs) + 1e-10).log()
     return (categorical_probs / gumbel_norm).argmax(dim=-1)
+
+
+def expected_rank(d: int, a: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
+    """
+    Vectorized expected rank of the true coordinate in a one-hot vector
+    corrupted by Gaussian noise.
+
+    Args:
+        d: dimension (number of coordinates)
+        a: amplitude(s) of the true coordinate, scalar or tensor
+        sigma: noise standard deviation(s), scalar or tensor
+
+    Returns:
+        Expected rank(s), same broadcasted shape as a and sigma
+    """
+    # ensure tensors
+    a = torch.as_tensor(a, dtype=torch.float32)
+    sigma = torch.as_tensor(sigma, dtype=torch.float32)
+
+    # standard normal CDF in torch
+    Phi = torch.distributions.Normal(0.0, 1.0).cdf
+
+    # compute p = P(other beats true coordinate)
+    p = Phi(-a / (sigma * torch.sqrt(torch.tensor(2.0, dtype=torch.float32))))
+
+    return (d - 1) * p / d

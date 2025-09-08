@@ -20,3 +20,5 @@ top_k: 100
 mixed_coeff: 0.5
 use_actual_elbo: False
 only_corrupt_rate: 0.5 # for this fraction of the batch, the model only sees fully corrupted inputs
+max_percentile: .45
+min_percentile: .05
