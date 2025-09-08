@@ -22,3 +22,7 @@ use_actual_elbo: False
 only_corrupt_rate: 0.5 # for this fraction of the batch, the model only sees fully corrupted inputs
 max_percentile: .45
 min_percentile: .05
+
+sigma_min: .1
+sigma_max: 4.0
+use_percentile_scheduling: False

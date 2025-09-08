@@ -677,6 +677,8 @@ class CANDI(trainer_base.Diffusion):
         self.continuous_noise =torch.linspace(.2, 4.0, 1000)
         self.discrete_noise = expected_rank(d=self.vocab_size-1, a=torch.tensor(1).to(self.device), sigma=self.continuous_noise)
 
+        self.use_percentile_scheduling = config.algo.use_percentile_scheduling
+
         self.continuous_noise = torch.tensor(self.continuous_noise)
         self.discrete_noise = torch.tensor(self.discrete_noise)
         self.weighted_loss = config.algo.weighted_loss
@@ -692,12 +694,18 @@ class CANDI(trainer_base.Diffusion):
         self.min_percentile = config.algo.min_percentile
         self.max_percentile = config.algo.max_percentile
 
+        self.sigma_min = config.algo.sigma_min
+        self.sigma_max = config.algo.sigma_max
+
 
 
     def get_continuous_from_discrete_noise(self, discrete_noise):
-        target_percentile = discrete_noise * (self.max_percentile - self.min_percentile) + self.min_percentile
-        return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
-
+        if self.use_percentile_scheduling:
+            target_percentile = discrete_noise * (self.max_percentile - self.min_percentile) + self.min_percentile
+            return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
+        else: 
+            sigmas = training_sigma(discrete_noise, sigma_min=self.sigma_min, sigma_max=self.sigma_max)
+            return sigmas
 
     def to(self, *args, **kwargs): 
         super().to(*args, **kwargs)
@@ -833,13 +841,19 @@ class CANDI(trainer_base.Diffusion):
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
         # prompt = "The President"
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
+        if self.use_percentile_scheduling:
+            continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
+        else: 
+            continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
         dt = (1 - eps) / num_steps
 
         # x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
         for i in range(num_steps): 
             t = timesteps[i]
+            sigma_s = continuous_noise[i]
+            sigma_t = continuous_noise[i+1]
 
-            x_cont, p_x0 = self._continuous_step(x, t, t - dt, clean_mask=clean_mask)
+            x_cont, p_x0 = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask)
 
             x, clean_mask = self._discrete_step(x_cont, 
                                                 p_x0, t, dt, prev_clean_mask=clean_mask)
@@ -890,11 +904,10 @@ class CANDI(trainer_base.Diffusion):
         self,
         x: torch.Tensor,
         time_t: torch.Tensor,
-        time_s: torch.Tensor,
+        sigma_s: torch.Tensor,
+        sigma_t: torch.Tensor,
         clean_mask: torch.Tensor=None,
     ) -> torch.Tensor:
-        sigma_t = self.get_continuous_from_discrete_noise(time_t)
-        sigma_s = self.get_continuous_from_discrete_noise(time_s)
 
         dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_t - sigma_s).item()
         time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
@@ -1029,3 +1042,40 @@ def expected_rank(d: int, a: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
     p = Phi(-a / (sigma * torch.sqrt(torch.tensor(2.0, dtype=torch.float32))))
 
     return (d - 1) * p / d
+
+
+def training_sigma(t: torch.Tensor, sigma_min: float, sigma_max: float) -> torch.Tensor:
+    """
+    Map training time t ∈ [0,1] to sigma via log-linear schedule.
+
+    σ(t) = σ_min * (σ_max / σ_min) ** t
+
+    Args:
+        t: tensor of shape [...] with values in [0,1]
+        sigma_min: minimum noise level
+        sigma_max: maximum noise level
+
+    Returns:
+        σ(t) with same shape as t
+    """
+    t = torch.as_tensor(t, dtype=torch.float32)
+    log_ratio = torch.log(torch.tensor(sigma_max / sigma_min, dtype=torch.float32).to(t.device))
+    return sigma_min * torch.exp(t * log_ratio)
+
+
+def inference_sigmas(n_steps: int, sigma_min: float, sigma_max: float) -> torch.Tensor:
+    """
+    Log-linear schedule of sigmas for inference, decreasing from sigma_max to sigma_min.
+
+    σ_k = σ_max * (σ_min / σ_max) ** (k / (n_steps-1))
+
+    Args:
+        n_steps: number of inference steps
+        sigma_min: minimum noise level
+        sigma_max: maximum noise level
+
+    Returns:
+        Tensor of shape [n_steps], from σ_max down to σ_min
+    """
+    ks = torch.linspace(0, 1, n_steps, dtype=torch.float32)
+    return sigma_max * (sigma_min / sigma_max) ** ks
