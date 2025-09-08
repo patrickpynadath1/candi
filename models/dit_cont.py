@@ -521,11 +521,6 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             special = self.vocab_embed.embedding[-1].view(1, 1, -1).expand_as(x)
             mask = reveal_mask.unsqueeze(-1).float()
             coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff
-            if only_corrupt_rate > 0.0:
-
-                complete_mask = (torch.rand_like(coeffs) < only_corrupt_rate).float()
-                coeffs =  complete_mask + (1 - complete_mask) * coeffs 
-
             # conditionall mix in the mask / special embedding 
             # indicates that those positions are corrupted 
             # x = x * mask + (1 - mask) * .5 * (x + special)

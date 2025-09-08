@@ -801,7 +801,7 @@ class CANDI(trainer_base.Diffusion):
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-        # prompt = "Donald Trump"
+        # prompt = "The President"
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / num_steps
 
