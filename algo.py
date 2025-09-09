@@ -787,8 +787,7 @@ class CANDI(trainer_base.Diffusion):
 
     def prior_sample(self, *batch_dims): 
 
-        max_percentile = self.max_percentile
-        sigma = self.get_continuous_from_discrete_noise(torch.tensor(max_percentile).to(self.device))
+        sigma = self.get_continuous_from_discrete_noise(torch.tensor(.999).to(self.device))
         return torch.randn(
             *batch_dims, self.vocab_size-1, dtype=torch.float32, device=self.device
         )  * sigma
