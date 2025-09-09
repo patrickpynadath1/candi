@@ -25,4 +25,4 @@ min_percentile: .01
 
 sigma_min: .1
 sigma_max: 4.0
-use_percentile_scheduling: False
+use_percentile_scheduling: True 
