@@ -845,8 +845,8 @@ class CANDI(trainer_base.Diffusion):
             continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
         dt = (1 - eps) / num_steps
 
-        prompt = "The President"
-        x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
+        # prompt = "The President"
+        # x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
         for i in range(num_steps): 
             t = timesteps[i]
             sigma_s = continuous_noise[i]
