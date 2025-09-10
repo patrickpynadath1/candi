@@ -28,6 +28,6 @@ CUDA_VISIBLE_DEVICES=$1 python main.py \
   eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/cur-linear-percentile/checkpoints/last.ckpt \
   model.length=1024 \
   algo.top_k=100 \
-  algo.step_size=.25 \
+  algo.step_size=0.5 \
   algo.mixed_coeff=$mixed_coeff \
   +wandb.offline=true;

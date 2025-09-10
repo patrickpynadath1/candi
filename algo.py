@@ -838,7 +838,6 @@ class CANDI(trainer_base.Diffusion):
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-        # prompt = "The President"
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         if self.use_percentile_scheduling:
             continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
@@ -846,7 +845,8 @@ class CANDI(trainer_base.Diffusion):
             continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
         dt = (1 - eps) / num_steps
 
-        # x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
+        prompt = "The President"
+        x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
         for i in range(num_steps): 
             t = timesteps[i]
             sigma_s = continuous_noise[i]
@@ -915,7 +915,7 @@ class CANDI(trainer_base.Diffusion):
         if clean_mask is None: 
             clean_mask = torch.zeros(x.shape[:-1], device=x.device)
 
-        denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec).float().exp()
+        denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec).exp()
         # denoised = utils.top_k_top_p_filtering(denoised, top_k=self.top_k).softmax(dim=-1)
 
         # pdb.set_trace()
@@ -926,9 +926,36 @@ class CANDI(trainer_base.Diffusion):
             sampled_tok = torch.distributions.Categorical(probs=denoised).sample()
             xhat = torch.nn.functional.one_hot(sampled_tok, num_classes=denoised.shape[-1]).float()
             d = (x - xhat) / (sigma_t_vec[:, None, None]**2)
-        x_cont = x - dt_cont_vec[:, None, None] * d * self.step_size
+        x_cont = x - dt_cont_vec[:, None, None] * d * self.step_size + torch.randn_like(x) * (sigma_s**2 - sigma_t**2).sqrt() * (self.step_size**0.5)
         return x_cont, denoised
     
+    def _continuous_step(
+        self,
+        x: torch.Tensor,
+        time_t: torch.Tensor,
+        sigma_s: float,
+        sigma_t: float,
+        clean_mask: torch.Tensor=None,
+    ) -> torch.Tensor:
+
+        dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_s - sigma_t)
+        time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
+        sigma_t_vec = torch.ones(x.shape[0], device=x.device) * sigma_t
+
+        if clean_mask is None: 
+            clean_mask = torch.zeros(x.shape[:-1], device=x.device)
+
+        denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec).exp()
+
+        if self.grad_calc == 'soft': 
+            d = (x - denoised) / (sigma_t_vec[:, None, None]**2)
+        else:
+            sampled_tok = torch.distributions.Categorical(probs=denoised).sample()
+            xhat = torch.nn.functional.one_hot(sampled_tok, num_classes=denoised.shape[-1]).float()
+            d = (x - xhat) / (sigma_t_vec[:, None, None]**2)
+        x_cont = x - dt_cont_vec[:, None, None] * d * self.step_size 
+        return x_cont, denoised
+
     # def _continuous_step(
     #     self,
     #     x: torch.Tensor,
