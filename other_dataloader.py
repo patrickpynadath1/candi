@@ -272,6 +272,29 @@ def get_text8_dataset(cache_dir, max_seq_length=256, drop_last=True, crop_train=
     return dataset
 
 
+def get_algorithmic_creativity_dataset(cache_dir, tokenizer, max_seq_length=256, drop_last=True, crop_train=False):
+
+    train_path = f"{cache_dir}/train.json"
+    valid_path = f"{cache_dir}/valid.json"
+    test_path = f"{cache_dir}/test.json"
+    
+    train_data = json.load(open(train_path, 'r'))
+    valid_data = json.load(open(valid_path, 'r'))
+    test_data = json.load(open(test_path, 'r'))
+    vocab = json.load(open(f"{cache_dir}/vocab.json", 'r'))
+    tokenizer.add_tokens(vocab)
+
+    # add vocab to the tokenizer 
+
+    dataset = datasets.DatasetDict({
+        "train": datasets.Dataset.from_list(train_data),
+        "validation": datasets.Dataset.from_list(valid_data),
+        "test": datasets.Dataset.from_list(test_data),
+    })
+    return dataset, tokenizer, vocab
+
+
+
 def _group_texts(examples, block_size, bos, eos, insert_special_tokens=True):
     # Concatenate all texts.
     concatenated_examples = list(itertools.chain(*examples["input_ids"]))
@@ -407,6 +430,8 @@ def get_dataset(
         dataset = datasets.load_dataset(
             "ag_news", cache_dir=cache_dir, streaming=streaming, revision=revision
         )
+    elif dataset_name in ["lines", "circle", "triangle", "sibling"]:
+        dataset, tokenizer, added_vocab = get_algorithmic_creativity_dataset(cache_dir, tokenizer, max_seq_length=block_size)
     else:
         dataset = datasets.load_dataset(
             dataset_name,
@@ -488,12 +513,46 @@ def get_dataset(
                 return_token_type_ids=True,
             )
         return tokens
+    
+    
+    def preprocess_and_tokenize_algorithmic(example):
+        # You have input_text and target_text
+        src = example["input_text"]
+        tgt = example["target_text"]
 
+        # Pre-tokenize them with no padding/truncation
+        inputs = tokenizer(
+            src,
+            add_special_tokens=True,
+            return_attention_mask=False,
+            return_token_type_ids=False,
+        )
+        targets = tokenizer(
+            tgt,
+            add_special_tokens=True,
+            return_attention_mask=True,
+            return_token_type_ids=False,
+        )
+
+        token_offset = added_vocab[0] # account new tokens 
+
+        return {
+            "labels": inputs["input_ids"] - token_offset,
+            "input_ids": targets["input_ids"] - token_offset,
+            "attention_mask": targets["attention_mask"],
+            "text": tgt,
+        }
+
+
+    if dataset_name in ['lines', 'circle', 'triangle', 'sibling']:
+        process_fn = preprocess_and_tokenize_algorithmic
+    else: 
+        process_fn = preprocess_and_tokenize
     if streaming:
-        tokenized_dataset = data.map(preprocess_and_tokenize, batched=True)
+        tokenized_dataset = data.map(process_fn, batched=True)
     else:
         tokenized_dataset = data.map(
-            preprocess_and_tokenize,
+            process_fn,
             batched=True,
             num_proc=num_proc,
             load_from_cache_file=True,
