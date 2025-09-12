@@ -517,21 +517,28 @@ class Diffusion(TrainerBase):
         raise NotImplementedError
 
     @torch.no_grad()
-    def generate_samples(self, num_samples, num_steps=None, eps=1e-5):
+    def generate_samples(self, num_samples, num_steps=None, eps=1e-5, prompt_mask=None, prompt_tokens=None):
         """Generate samples from the model."""
         # Lightning auto-casting is not working in this method for some reason
         if num_steps is None:
             num_steps = self.config.sampling.steps
         x = self.prior_sample(num_samples, self.num_tokens)
-        # prompt = self.tokenizer('Mr Trump, on Thursday,', add_special_tokens=False, return_tensors='pt')['input_ids']
-        # x[:, :prompt.shape[-1]] = prompt
+        if prompt_tokens is not None and prompt_mask is not None:
+
+            # assumes that they will be the same shape
+            x = (prompt_mask * prompt_tokens + (1 - prompt_mask) * x).long()
+            
+
         timesteps = torch.linspace(1, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / num_steps
         p_x0_cache = None
         for i in range(num_steps):
             t = timesteps[i] * torch.ones(x.shape[0], 1, device=self.device)
             if self.sampler == "ancestral":
-                _, x = self._ancestral_update(x=x, t=t, dt=dt, p_x0=None)
+                # for mdlm, because of SUBS, the prompt mask wont be used 
+                # but is needed to make duo / usdms condition on promtps / infill
+
+                _, x = self._ancestral_update(x=x, t=t, dt=dt, p_x0=None, prompt_mask=prompt_mask)
             elif self.sampler == "ancestral_cache":
                 p_x0_cache, x_next = self._ancestral_update(
                     x=x, t=t, dt=dt, p_x0=p_x0_cache
@@ -551,7 +558,7 @@ class Diffusion(TrainerBase):
                 x = self._denoiser_update(x=x, t=t0)
             else:
                 _, x = self._ancestral_update(
-                    x=x, t=t0, dt=None, p_x0=p_x0_cache, noise_removal_step=True
+                    x=x, t=t0, dt=None, p_x0=p_x0_cache, noise_removal_step=True, prompt_mask=prompt_mask
                 )
         elif self.config.sampling.noise_removal == "greedy":
             sigma = self._sigma_from_alphat(self.noise(t0)[1])
@@ -662,7 +669,7 @@ class AbsorbingState(Diffusion):
             *batch_dims, dtype=torch.int64, device=self.device
         )
 
-    def _ancestral_update(self, x, t, dt, p_x0=None, noise_removal_step=False):
+    def _ancestral_update(self, x, t, dt, p_x0=None, noise_removal_step=False, **kwargs):
         _, alpha_t = self.noise(t)
         if noise_removal_step:
             alpha_s = torch.ones_like(alpha_t)
@@ -670,7 +677,7 @@ class AbsorbingState(Diffusion):
             _, alpha_s = self.noise(t - dt)
         assert alpha_t.ndim == 2
         if p_x0 is None:
-            p_x0 = self.forward(x, self._sigma_from_alphat(alpha_t)).exp()
+            p_x0 = (self.forward(x, self._sigma_from_alphat(alpha_t)).double()).exp()
 
         q_xs = p_x0 * (alpha_s - alpha_t)[:, :, None]
         q_xs[:, :, self.mask_index] = 1 - alpha_s
@@ -679,7 +686,6 @@ class AbsorbingState(Diffusion):
         # print((alpha_s - alpha_t).mean().item())
 
         copy_flag = (x != self.mask_index).to(x.dtype)
-        print(copy_flag.float().mean())
 
         # print(copy_flag.float().mean().item())
         return p_x0, copy_flag * x + (1 - copy_flag) * _x

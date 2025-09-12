@@ -1,6 +1,8 @@
+from tqdm import tqdm
 import json
 import os
 
+from typing import List, Dict, Tuple
 import fsspec
 import hydra
 import lightning as L
@@ -8,18 +10,22 @@ import omegaconf
 import rich.syntax
 import rich.tree
 import torch
-
+import mauve
+import evaluate
 import algo
 import other_dataloader as dataloader
 import utils
 import pdb
-from text_metrics import evaluate_text_metrics
+import numpy as np
+from lm_eval.models.huggingface import HFLM
+from lm_eval import evaluator
+from hugging_face_wrappers import DiffusionEvalWrapper, CandiEvalWrapper
+
 
 omegaconf.OmegaConf.register_new_resolver("cwd", os.getcwd)
 omegaconf.OmegaConf.register_new_resolver("device_count", torch.cuda.device_count)
 omegaconf.OmegaConf.register_new_resolver("eval", eval)
 omegaconf.OmegaConf.register_new_resolver("div_up", lambda x, y: (x + y - 1) // y)
-
 
 def _load_from_checkpoint(diffusion_model, config, tokenizer):
     if "hf" in config.algo.backbone:
@@ -151,6 +157,155 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
     print("Samples saved at:", samples_path)
 
 
+def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
+
+    logger.info("Starting Conditional Eval.")
+    # load dataset 
+    # only use the validation ds 
+    _, valid_ds = dataloader.get_dataloaders(config, tokenizer)
+
+    # load diffusion model from checkpoint 
+    model = _load_from_checkpoint(
+        diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
+    )
+
+    # sample first 1000 examples 
+    num_samples = config.eval.num_conditional_samples
+    batch_size =64 
+    model_length = config.model.length
+    counter = 0
+    model.backbone = torch.compile(model.backbone)
+
+    samples_to_eval = []
+    reference_samples = []
+    with tqdm(total=num_samples, desc="Generating samples") as pbar:
+        while counter < num_samples:
+            batch = next(iter(valid_ds))
+            clean_sequences = batch['input_ids'].to(model.device)
+
+            eval_batch_size = clean_sequences.shape[0]
+            # repeat over batch size 
+            # dataloader will be set to batch size of 1 
+            clean_sequences_repeated = clean_sequences
+            # clean_sequences_repeated = clean_sequences.repeat_interleave(batch_size // eval_batch_size, dim=0)
+            prompt_tokens, prompt_mask = mask_clean_samples(clean_sequences_repeated, config.eval.prompt_type, batch_size, model_length, config.eval.revealed_fraction)
+            prompt_tokens = prompt_tokens.to(model.device)
+            prompt_mask = prompt_mask.to(model.device)
+            # generate samples from diffusion model 
+            samples = model.generate_samples(
+                num_samples=batch_size, 
+                num_steps=config.sampling.steps, 
+                prompt_tokens=prompt_tokens, 
+                prompt_mask=prompt_mask
+            )
+            model.metrics.record_entropy(samples)
+        
+            gen_sequences = tokenizer.batch_decode(samples)
+            model.metrics.record_generative_perplexity(gen_sequences, config.model.length, model.device)
+
+            clean_samples = tokenizer.batch_decode(clean_sequences)
+
+            counter += eval_batch_size
+
+            samples_to_eval.extend(list(gen_sequences))
+            reference_samples.extend(list(clean_samples))
+            pbar.update(eval_batch_size)
+
+
+        # either use prompting style input or masked style input
+
+    # given generations, compute standard metrics -- perplexity, generative entropy, bleu, rouge, mauve, etc 
+    generative_ppl = model.metrics.gen_ppl.compute().item()
+    entropy = model.metrics.sample_entropy.compute().item()
+    device = model.device
+    # move model from gpu to cpu
+    del model
+
+    bertscore = evaluate.load("bertscore")
+    bertscore_res = bertscore.compute(predictions=samples_to_eval, references=reference_samples, lang="en", model_type='roberta-large', batch_size=64, device=device)
+    mauve_res = mauve.compute_mauve(p_text=samples_to_eval, q_text=reference_samples, device_id=0, num_buckets=50) 
+
+    metrics = {
+        'generative_ppl': generative_ppl,
+        'entropy': entropy,
+        'bertscore_precision': np.mean(bertscore_res['precision']),
+        'bertscore_recall': np.mean(bertscore_res['recall']),
+        'bertscore_f1': np.mean(bertscore_res['f1']),
+        'mauve': mauve_res, 
+        'gen_samples': samples_to_eval,
+        'ref_samples': reference_samples
+    }
+    samples_path = config.eval.generated_samples_path
+    with fsspec.open(samples_path, "w") as f:
+        json.dump(metrics, f,
+            indent=4,
+        )
+    print("Samples saved at:", samples_path)
+
+
+
+    for k, v in metrics.items(): 
+        if k not in ['gen_samples', 'ref_samples']:
+            print(f"{k}: {v}")
+    return 
+
+
+def _automated_benchmarks(diffusion_model, config, logger, tokenizer):
+
+    logger.info("Starting automated benchmarks.")
+
+    # load diffusion model from checkpoint 
+    model = _load_from_checkpoint(
+        diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
+    )
+
+    # first wrap it in a transformer class 
+
+    if config.algo.name == "candi":
+        lm = CandiEvalWrapper(model, tokenizer)
+    else: 
+        lm = DiffusionEvalWrapper(model, tokenizer)
+
+
+    results = evaluator.simple_evaluate(
+        model=lm, 
+        tasks=['hellaswag'], 
+        batch_size=32)
+    
+    print(results['results'])
+
+
+
+
+# computes prompt tokens and prompt mask 
+def mask_clean_samples(clean_sequence, prompt_type, batch_size, model_length, revealed_fraction=.1): 
+    prompt_tokens = torch.zeros((batch_size, model_length), dtype=torch.long)
+    prompt_mask = torch.zeros((batch_size, model_length), dtype=torch.float)
+
+    positions_to_reveal = int(revealed_fraction * model_length)
+
+    if prompt_type == 'prefix':
+
+        prompt_tokens[:, :positions_to_reveal] = clean_sequence[:, :positions_to_reveal]
+        prompt_mask[:, :positions_to_reveal] = 1
+
+
+    if prompt_type == 'suffix': 
+        prompt_tokens[:, -positions_to_reveal:] = clean_sequence[:, -positions_to_reveal:]
+        prompt_mask[:, -positions_to_reveal:] = 1
+
+    if prompt_type == 'infill': 
+
+        positions_to_reveal = positions_to_reveal // 2
+        prompt_tokens[:, :positions_to_reveal] = clean_sequence[:, :positions_to_reveal]
+        prompt_tokens[:, -positions_to_reveal:] = clean_sequence[:, -positions_to_reveal:]
+
+        prompt_mask[:, :positions_to_reveal] = 1
+        prompt_mask[:, -positions_to_reveal:] = 1
+    return prompt_tokens, prompt_mask
+
+
+
 def _eval_ppl(diffusion_model, config, logger, tokenizer):
     logger.info("Starting Perplexity Eval.")
 
@@ -181,6 +336,10 @@ def _eval_ppl(diffusion_model, config, logger, tokenizer):
         config, tokenizer, skip_train=True, valid_seed=config.seed
     )
     trainer.validate(model, valid_ds)
+
+def calc_mauve(generated_texts: List[str], reference_texts: List[str]) -> float:
+    out = mauve.compute_mauve(p_text=generated_texts, q_text=reference_texts, device_id=0)
+    return out.mauve
 
 
 def _train(diffusion_model, config, logger, tokenizer):
@@ -227,6 +386,8 @@ def _train(diffusion_model, config, logger, tokenizer):
     trainer.fit(model, train_ds, valid_ds, ckpt_path=ckpt_path)
 
 
+
+
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(config):
     """Main entry point for training."""
@@ -253,6 +414,7 @@ def main(config):
         diffusion_model = algo.OptimalTransportFinetune
     elif config.algo.name == "candi":
         diffusion_model = algo.CANDI
+
     else:
         raise ValueError(f"Invalid algorithm name: {config.algo.name}")
     kwargs = {
@@ -265,6 +427,12 @@ def main(config):
         _generate_samples(**kwargs)
     elif config.mode == "ppl_eval":
         _eval_ppl(**kwargs)
+
+    elif config.mode == "conditional_eval":
+        _generate_conditional_samples(**kwargs)
+
+    elif config.mode == "automated_benchmarks":
+        _automated_benchmarks(**kwargs)
     else:
         _train(**kwargs)
 

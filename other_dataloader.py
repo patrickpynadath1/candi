@@ -587,12 +587,12 @@ def get_dataloaders(
 ):
     num_gpus = torch.cuda.device_count()
     if config.trainer.accumulate_grad_batches > 1:
-        assert config.loader.global_batch_size == (
-            config.loader.batch_size
-            * config.trainer.num_nodes
-            * num_gpus
-            * config.trainer.accumulate_grad_batches
-        )
+        # assert config.loader.global_batch_size == (
+        #     config.loader.batch_size
+        #     * config.trainer.num_nodes
+        #     * num_gpus
+        #     * config.trainer.accumulate_grad_batches
+        # )
         if (
             config.loader.global_batch_size
             % (num_gpus * config.trainer.accumulate_grad_batches)

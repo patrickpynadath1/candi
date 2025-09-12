@@ -1,7 +1,10 @@
 import math
+from typing import List, Dict, Tuple
 import os
+import mauve
 import typing
 
+import evaluate
 import torch
 import torch.nn.functional as F
 import torchmetrics
@@ -204,3 +207,32 @@ class Metrics:
                 token_mask = sample_chunk != self.tokenizer.eos_token_id
                 valid_tokens = first_eos[..., 1:] + token_mask[..., 1:]
                 self.gen_ppl.update(nlls * valid_tokens, valid_tokens)
+
+
+
+class ConditionalMetrics(Metrics): 
+    def __init__(
+        self, gen_ppl_eval_model_name_or_path=None, eval_ppl_batch_size=None
+    ) -> None:
+        super().__init__(gen_ppl_eval_model_name_or_path, eval_ppl_batch_size)
+
+
+    def record_self_bleu(self): 
+        return 
+         
+
+    def record_mauve(self): 
+        return 
+
+
+    def record_bertscore(self): 
+        return 
+    
+
+    def record_distinctn(self):
+        return 
+    
+
+def calc_mauve(generated_texts: List[str], train_texts: List[str]) -> float:
+    out = mauve.compute_mauve(p_text=generated_texts, q_text=train_texts, device_id=0)
+    return out.mauve
