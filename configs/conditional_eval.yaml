@@ -54,7 +54,7 @@ eval:
   gen_ppl_eval_model_name_or_path: gpt2-large  # gpt2-large, meta-llama/Llama-2-7b-hf
   generate_samples: True
   generated_samples_path: ${cwd:}/samples.json
-  num_conditional_samples: 10000
+  num_conditional_samples: 1000
   conditional_batch_size: 128
   revealed_fraction: 0.5
   prompt_type: "prefix"

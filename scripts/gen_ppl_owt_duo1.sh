@@ -15,14 +15,14 @@
 
 export HYDRA_FULL_ERROR=1
 
-CUDA_VISIBLE_DEVICCES=1 python main.py \
+CUDA_VISIBLE_DEVICCES=2 python main.py \
   mode=sample_eval \
   loader.batch_size=16 \
   loader.eval_batch_size=1 \
   data=openwebtext-split \
   model=small \
   algo=duo_base \
-  sampling.num_sample_batches=16 \
+  sampling.num_sample_batches=1 \
   sampling.steps=128 \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/duo-paper-checkpoint-orig/duo.ckpt \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/2025.08.16/duo-baseline/checkpoints/cur_best.ckpt \
   +wandb.offline=true;

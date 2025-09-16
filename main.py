@@ -75,21 +75,26 @@ def _print_config(
 
 
 @L.pytorch.utilities.rank_zero_only
-def _print_batch(train_ds, valid_ds, tokenizer, k=64):
+def _print_batch(train_ds, valid_ds, tokenizer, k=64, vocab_offset=False):
     for dl_type, dl in [("train", train_ds), ("valid", valid_ds)]:
         print(f"Printing {dl_type} dataloader batch.")
         batch = next(iter(dl))
         print("Batch input_ids.shape", batch["input_ids"].shape)
         first = batch["input_ids"][0, :k]
         last = batch["input_ids"][0, -k:]
-        print(f"First {k} tokens:", tokenizer.decode(first))
+        print(f"First {k} tokens:", tokenizer.decode(first + tokenizer.eos_token_id))
         print("ids:", first)
-        print(f"Last {k} tokens:", tokenizer.decode(last))
+        print(f"Last {k} tokens:", tokenizer.decode(last + tokenizer.eos_token_id))
         print("ids:", last)
 
 
 def _generate_samples(diffusion_model, config, logger, tokenizer):
     logger.info("Starting Sample Eval.")
+
+    if hasattr(config.data, "vocab_file"):
+        vocab_offset = True 
+        new_vocab = json.load(open(f'{config.data.cache_dir}/{config.data.vocab_file}', 'r'))
+        tokenizer.add_tokens(new_vocab)
     model = _load_from_checkpoint(
         diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
     )
@@ -100,7 +105,7 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
         model.ema = None
     stride_length = config.sampling.stride_length
     num_strides = config.sampling.num_strides
-    all_samples = []
+    all_samples = [] 
     for _ in range(config.sampling.num_sample_batches):
         if config.sampling.semi_ar:
             _, intermediate_samples, _ = model.restore_model_and_semi_ar_sample(
@@ -124,8 +129,6 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
             )
             all_samples.extend(list(text_samples))
 
-    for s in text_samples:
-        print(s)
     # pdb.set_trace()
     # with open('samples.txt', 'w') as f:
     #     for sample in text_samples:
@@ -170,7 +173,7 @@ def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
     )
 
     # sample first 1000 examples 
-    num_samples = config.eval.num_conditional_samples
+    num_samples = min(config.eval.num_conditional_samples, len(valid_ds))
     batch_size =64 
     model_length = config.model.length
     counter = 0
@@ -231,7 +234,7 @@ def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
         'bertscore_precision': np.mean(bertscore_res['precision']),
         'bertscore_recall': np.mean(bertscore_res['recall']),
         'bertscore_f1': np.mean(bertscore_res['f1']),
-        'mauve': mauve_res, 
+        'mauve': mauve_res.mauve, 
         'gen_samples': samples_to_eval,
         'ref_samples': reference_samples
     }
@@ -366,7 +369,14 @@ def _train(diffusion_model, config, logger, tokenizer):
             callbacks.append(hydra.utils.instantiate(callback))
 
     train_ds, valid_ds = dataloader.get_dataloaders(config, tokenizer)
-    _print_batch(train_ds, valid_ds, tokenizer)
+
+    if hasattr(config.data, "vocab_file"): 
+        vocab_offset = True 
+        new_vocab = json.load(open(f'{config.data.cache_dir}/{config.data.vocab_file}', 'r'))
+        tokenizer.add_tokens(new_vocab)
+    else: 
+        vocab_offset = False
+    _print_batch(train_ds, valid_ds, tokenizer, vocab_offset=vocab_offset)
 
     if config.training.finetune_path != "":
         assert utils.fsspec_exists(config.training.finetune_path)
@@ -374,7 +384,7 @@ def _train(diffusion_model, config, logger, tokenizer):
             config.training.finetune_path, tokenizer=tokenizer, config=config
         )
     else:
-        model = diffusion_model(config, tokenizer=valid_ds.tokenizer)
+        model = diffusion_model(config, tokenizer=tokenizer)
 
     trainer = hydra.utils.instantiate(
         config.trainer,
@@ -386,13 +396,31 @@ def _train(diffusion_model, config, logger, tokenizer):
     trainer.fit(model, train_ds, valid_ds, ckpt_path=ckpt_path)
 
 
+def _abductive_reasoning(diffusion_model, config, logger, tokenizer):
+    logger.info("Starting Abductive Reasoning Eval.")
+
+    model = _load_from_checkpoint(
+        diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
+    )
+
+    data_file = config.eval.abductive_data_file
+
+    with open(f"{config.scratch_dir}/{data_file}", "r") as f:
+        data = json.load(f)
+
+    # do it in batches 
+
+    # problem: how do deal with the fixed length issue? 
+
+    
+
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(config):
     """Main entry point for training."""
     L.seed_everything(config.seed)
-    _print_config(config, resolve=True, save_cfg=True)
+    # _print_config(config, resolve=True, save_cfg=True)
 
     logger = utils.get_logger(__name__)
     tokenizer = dataloader.get_tokenizer(config)

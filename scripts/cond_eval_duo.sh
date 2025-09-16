@@ -14,17 +14,22 @@
 
 
 export HYDRA_FULL_ERROR=1
+CUDA_DEVICES=$1
+SAMPLE_STEPS=$2
+TEMP=$3
 
-CUDA_VISIBLE_DEVICES=$1 python main.py --config-name=conditional_eval \
+CUDA_VISIBLE_DEVICES=$CUDA_DEVICES python main.py --config-name=conditional_eval \
   mode=conditional_eval \
   loader.batch_size=16 \
   loader.eval_batch_size=64 \
-  data=openwebtext-split \
+  data=openwebtext \
   model=small \
   algo=duo_base \
   sampling.num_sample_batches=1 \
   sampling.predictor=ancestral \
-  sampling.steps=128 \
+  sampling.steps=$SAMPLE_STEPS \
   model.length=128 \
+  algo.temp=$TEMP \
+  eval.prompt_type=suffix \
   eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/duo-paper-checkpoint-orig/duo.ckpt \
   +wandb.offline=true;

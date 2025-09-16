@@ -82,6 +82,7 @@ class MDLM(trainer_base.AbsorbingState):
 
     def _process_model_output(self, model_output, xt, sigma):
         del sigma
+        model_output = model_output / self.temp
         model_output[:, :, self.mask_index] += self.neg_infinity
 
         # Normalize the model_output such that x.exp() is
@@ -276,6 +277,7 @@ class SEDDAbsorb(trainer_base.AbsorbingState):
 
 class DUO_BASE(trainer_base.UniformState):
     def __init__(self, config, tokenizer):
+        self.temp = config.algo.get("temp", 1.0)
         super().__init__(config, tokenizer)
         self._validate_configuration()
 
@@ -297,7 +299,7 @@ class DUO_BASE(trainer_base.UniformState):
 
     def _process_model_output(self, model_output, xt, sigma):
         del xt, sigma
-        return model_output.log_softmax(dim=-1)
+        return (model_output / self.temp).log_softmax(dim=-1)
 
     def _compute_posterior(self, x, xt, alpha_s, alpha_t):
         """Computes the posterior / approximate posterior.
@@ -380,7 +382,7 @@ class DUO_BASE(trainer_base.UniformState):
         assert alpha_t.ndim == 2
 
         q_xs = self._compute_posterior(
-            x=self.forward(x, sigma_t).exp().double(), xt=x, alpha_s=alpha_s, alpha_t=alpha_t
+            x=(self.forward(x, sigma_t) / self.temp).exp().double(), xt=x, alpha_s=alpha_s, alpha_t=alpha_t
         )
         if self.p_nucleus < 1:
             q_xs = utils.top_k_top_p_filtering(q_xs.log(), top_p=self.p_nucleus)
@@ -438,6 +440,7 @@ class DUO(DUO_BASE):
         self.curriculum_start = self.config.algo.curriculum_start
         self.curriculum_end = self.config.algo.curriculum_end
         self.loss_type = self.config.algo.loss_type
+        self.temp = config.algo.temp
         self._validate_configuration()
 
     def to(self, *args, **kwargs):
@@ -658,6 +661,14 @@ class CANDI(trainer_base.Diffusion):
         self.mask_index = len(tokenizer)
         vocab_size = len(tokenizer) + 1
 
+        if hasattr(config.data, "vocab_file"): 
+            vocab_size = len(tokenizer.added_tokens_encoder)
+            self.mask_index = vocab_size 
+            vocab_size += 1
+            self.token_offset = True
+        else: 
+            self.token_offset = False
+
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self._validate_configuration()
         self.save_hyperparameters()
@@ -725,7 +736,7 @@ class CANDI(trainer_base.Diffusion):
         return
 
     def _process_model_output(self, xt, model_output, reveal_mask): 
-
+        model_output = model_output / self.temp
         xt_tokens = xt.argmax(dim=-1)
         model_output = model_output - torch.logsumexp(
             model_output, dim=-1, keepdim=True
@@ -852,19 +863,26 @@ class CANDI(trainer_base.Diffusion):
             continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
         dt = (1 - eps) / num_steps
 
-        # prompt = "What is the meaning of life?"
-        # x, clean_mask = self.generate_sample_prompt(prompt, x, clean_mask)
+
         for i in range(num_steps): 
             t = timesteps[i]
+            s = timesteps[i+1]
+
+            # TODO: this is a bug -- really these should be swapped. I've adjusted the code to make sure it still works
             sigma_s = continuous_noise[i]
             sigma_t = continuous_noise[i+1]
 
+            # x_cont, p_x0 = self._continuous_step_heun(x, t, s, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask)
             x_cont, p_x0 = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask)
 
             x, clean_mask = self._discrete_step(x_cont, 
                                                 p_x0, t, dt, prev_clean_mask=clean_mask)
 
-        return x.argmax(dim=-1)
+        final_tokens = x.argmax(dim=-1)
+
+        if self.token_offset: 
+            final_tokens += self.tokenizer.eos_token_id
+        return final_tokens
 
     def get_sampling_schedule(self, num_steps):
         return torch.linspace(self.inference_start_t, 
@@ -902,8 +920,87 @@ class CANDI(trainer_base.Diffusion):
 
         updated_x = updated_x * new_clean_mask.unsqueeze(-1) + (1 - new_clean_mask).unsqueeze(-1) * x_sigma
 
-        return updated_x, new_clean_mask
+        print(new_clean_mask.mean().item())
 
+        return updated_x, new_clean_mask
+    
+    def _discrete_step_ordered(self, x_sigma, p_x0, t, dt, prev_clean_mask,  noise_removal_step=False): 
+        """
+        Two-stage sampling version:
+        1. First sample which positions to unmask
+        2. Then sample token values for those positions
+        
+        oracle_values: optional tensor [batch_size, seq_len] for oracle-informed sampling
+        sampling_method: "uniform", "top_k", or "weighted"
+        """
+
+        p_x0_sorted = torch.sort(p_x0, dim=-1, descending=True)[0]
+        oracle_values = p_x0_sorted[:, :, 0] - p_x0.mean(dim=-1)
+        oracle_values = oracle_values * (1 - prev_clean_mask)
+
+        if noise_removal_step: 
+            s = 0.0
+        else:
+            s = t - dt
+        
+        t_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * t.item()
+        s_vec = torch.ones(x_sigma.shape[0], device=x_sigma.device) * s.item()
+        
+        batch_size, seq_len = x_sigma.shape[:2]
+        
+        # Stage 1: Sample which positions to unmask
+        # Original probability of unmasking = (t - s)
+        base_unmask_prob = (t_vec - s_vec)[:, None].expand(-1, seq_len)  # [batch_size, seq_len]
+
+        # Top-k sampling with exact count preservation
+        expected_counts = base_unmask_prob.sum(dim=-1).round().long()  # [batch_size]
+        unmask_decisions = torch.zeros_like(base_unmask_prob)
+        
+        for b in range(batch_size):
+            k = expected_counts[b].item()
+            if k > 0:
+                _, top_indices = torch.topk(oracle_values[b], min(k, seq_len))
+                unmask_decisions[b, top_indices] = 1.0
+    
+    
+        # Stage 2: Sample token values for positions that will be unmasked
+        positions_to_unmask = unmask_decisions.bool()
+        
+        # Initialize with old tokens
+        old_x_tokens = x_sigma.argmax(dim=-1)
+        updated_tokens = old_x_tokens.clone()
+        
+        # Sample new tokens only for positions that will be unmasked
+        if positions_to_unmask.any():
+            # Get flattened indices of positions to sample
+            flat_positions = positions_to_unmask.flatten()
+            flat_p_x0 = p_x0.view(-1, p_x0.shape[-1])
+            
+            if flat_positions.any():
+                # Sample from p_x0 for positions that need new tokens
+                sampled_flat = torch.multinomial(flat_p_x0[flat_positions], 1).squeeze(-1)
+                
+                # Create full tensor of sampled tokens
+                sampled_tokens_flat = torch.zeros(batch_size * seq_len, dtype=torch.long, device=x_sigma.device)
+                sampled_tokens_flat[flat_positions] = sampled_flat
+                sampled_tokens = sampled_tokens_flat.view(batch_size, seq_len)
+                
+                # Update tokens: use sampled tokens where unmasking, keep old tokens elsewhere
+                updated_tokens = torch.where(positions_to_unmask, sampled_tokens, old_x_tokens)
+        
+        # Update clean mask: positions are clean if previously clean OR got unmasked this step
+        new_clean_mask = (prev_clean_mask.bool() | positions_to_unmask).float()
+        
+        # Apply copy logic: keep old tokens where prev_clean_mask is True (already clean)
+        final_tokens = torch.where(prev_clean_mask.bool(), old_x_tokens, updated_tokens)
+        
+        # Convert back to one-hot representation
+        updated_x = torch.nn.functional.one_hot(final_tokens, num_classes=x_sigma.shape[-1]).float().to(x_sigma.device)
+        
+        # Apply masking: clean positions use one-hot, masked positions use original x_sigma
+        updated_x = updated_x * new_clean_mask.unsqueeze(-1) + (1 - new_clean_mask).unsqueeze(-1) * x_sigma
+        print(new_clean_mask.mean().item())
+        return updated_x, new_clean_mask
 
     def _continuous_step(
         self,
@@ -922,7 +1019,7 @@ class CANDI(trainer_base.Diffusion):
             clean_mask = torch.zeros(x.shape[:-1], device=x.device)
 
         denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec).double()
-        denoised = (denoised / self.temp).exp()
+        denoised = (denoised).exp()
 
         # pdb.set_trace()
         # denoised = denoised.exp()
@@ -935,33 +1032,40 @@ class CANDI(trainer_base.Diffusion):
         x_cont = x - dt_cont_vec[:, None, None] * d * self.step_size 
         return x_cont, denoised
     
+    def _continuous_step_heun(self, 
+                              x: torch.Tensor, 
+                              time_t: torch.Tensor,
+                              time_s: torch.Tensor,
+                              sigma_s: torch.Tensor, 
+                              sigma_t: torch.Tensor, 
+                              clean_mask: torch.Tensor=None, 
+                              ) -> torch.Tensor:
 
+        dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_s - sigma_t).item()
+        time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
+        time_s_vec = torch.ones(x.shape[0], device=x.device) * time_s.item()
+        sigma_t_vec = torch.ones(x.shape[0], device=x.device) * sigma_t.item()
+        sigma_s_vec = torch.ones(x.shape[0], device=x.device) * sigma_s.item()
 
-    # def _continuous_step(
-    #     self,
-    #     x: torch.Tensor,
-    #     time_t: torch.Tensor,
-    #     time_s: torch.Tensor,
-    #     clean_mask: torch.Tensor=None,
-    # ) -> torch.Tensor:
-    #     sigma_s = self.get_continuous_from_discrete_noise(time_s)
-    #     sigma_t = self.get_continuous_from_discrete_noise(time_t)
+        if clean_mask is None: 
+            clean_mask = torch.zeros(x.shape[:-1], device=x.device)
 
-    #     dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (time_t - time_s).item()
-    #     time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
-    #     sigma_t_vec = torch.ones(x.shape[0], device=x.device) * sigma_t.item()
-    #     sigma_s_vec = torch.ones(x.shape[0], device=x.device) * sigma_s.item()
+        denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec).double()
+        denoised = (denoised / self.temp).exp()
 
-    #     if clean_mask is None: 
-    #         clean_mask = torch.zeros(x.shape[:-1], device=x.device)
+        d = (x - denoised) / (sigma_t_vec[:, None, None]**2)
 
-    #     denoised = self.backbone(x, time_t_vec, sigma_t_vec, clean_mask).softmax(dim=-1)
+        x_cont = x - dt_cont_vec[:, None, None] * d * self.step_size
 
-    #     rand_tokens = torch.randint(low=0, high=denoised.shape[-1], size=denoised.shape[:-1], device=denoised.device)
-    #     rand_onehot = torch.nn.functional.one_hot(rand_tokens, num_classes=denoised.shape[-1]).float()
-    #     x_cont = rand_onehot + torch.randn_like(rand_onehot) * sigma_s_vec[:, None, None]
+        denoised_2 = self.forward(xt=x_cont, discrete_noise=time_s_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec-dt_cont_vec).double()
 
-    #     return x_cont, denoised
+        denoised_2 = (denoised_2 / self.temp).exp()
+
+        d2 = (x_cont - denoised_2) / ((sigma_s_vec)[:, None, None]**2)
+
+        x_cont = x - 0.5 * dt_cont_vec[:, None, None] * (d + d2) * self.step_size
+
+        return x_cont, denoised_2
     
 def randomly_keep_mask(mask: torch.Tensor, keep_rate: float) -> torch.Tensor:
 

@@ -57,9 +57,15 @@ class TrainerBase(L.LightningModule):
             self.loss_type = config.algo.loss_type
         self.tokenizer = tokenizer
         if vocab_size is None:
-            self.vocab_size = len(self.tokenizer)
+            if hasattr(self.config.data, 'vocab_file'): 
+                self.vocab_size = len(self.tokenizer.added_tokens_decoder)
+                self.token_offset = True
+            else: 
+                self.token_offset = False
+                self.vocab_size = len(self.tokenizer)
         else:
             self.vocab_size = vocab_size
+
         self.sampler = self.config.sampling.predictor
         self.antithetic_sampling = self.config.training.antithetic_sampling
         self.parameterization = self.config.algo.parameterization
@@ -492,6 +498,7 @@ class Diffusion(TrainerBase):
         sigma = self._sigma_from_alphat(alpha_t)
 
         xt = self.q_xt(x0, alpha_t)
+
         log_x_theta = self.forward(xt, sigma=sigma)
         utils.print_nans(log_x_theta, "model_output")
         return self.nll_per_token(
@@ -563,6 +570,9 @@ class Diffusion(TrainerBase):
         elif self.config.sampling.noise_removal == "greedy":
             sigma = self._sigma_from_alphat(self.noise(t0)[1])
             x = self.forward(xt=x, sigma=sigma).argmax(dim=-1)
+
+        if self.token_offset: 
+            x += self.tokenizer.eos_token_id
         return x
 
     @torch.no_grad
@@ -625,12 +635,18 @@ class Diffusion(TrainerBase):
 
 class AbsorbingState(Diffusion):
     def __init__(self, config, tokenizer):
+        self.temp = config.algo.get("temp", 1.0)
         # NOTE: Ideally, we should do
         # vocab_size = len(tokenizer), so that we account
         # for the special tokens added in dataloader.py.
         # But we use tokenizer.vocab_size so as to to be
         # consistent with the prior checkpoints.
         vocab_size = tokenizer.vocab_size
+        if hasattr(config.data, 'vocab_file'):
+            vocab_size = len(tokenizer.added_tokens_decoder)
+            self.token_offset = True
+        else:
+            self.token_offset = False
         if not hasattr(tokenizer, "mask_token") or tokenizer.mask_token is None:
             self.mask_index = vocab_size
             vocab_size += 1
@@ -639,6 +655,8 @@ class AbsorbingState(Diffusion):
         self.subs_masking = config.algo.subs_masking
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self.save_hyperparameters()
+
+
 
     def _validate_configuration(self):
         super()._validate_configuration()

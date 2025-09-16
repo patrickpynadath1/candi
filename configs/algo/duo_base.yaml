@@ -7,3 +7,4 @@ subs_masking: False
 causal_attention: False
 ignore_bos: False
 loss_type: elbo  # elbo, low_var
+temp: 1.0
