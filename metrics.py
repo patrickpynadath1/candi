@@ -1,7 +1,6 @@
 import math
 from typing import List, Dict, Tuple
 import os
-import mauve
 import typing
 
 import evaluate
@@ -232,7 +231,3 @@ class ConditionalMetrics(Metrics):
     def record_distinctn(self):
         return 
     
-
-def calc_mauve(generated_texts: List[str], train_texts: List[str]) -> float:
-    out = mauve.compute_mauve(p_text=generated_texts, q_text=train_texts, device_id=0)
-    return out.mauve
