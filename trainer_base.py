@@ -160,6 +160,19 @@ class TrainerBase(L.LightningModule):
             "epoch_loop.batch_progress"
         ]["current"]["completed"]
 
+        if 'state_dict' in checkpoint:
+            state_dict = checkpoint['state_dict']
+            cleaned_state_dict = {}
+            
+            for key, value in state_dict.items():
+                cleaned_key = key
+                # Remove _orig and other modifiers
+                cleaned_key = cleaned_key.replace('_orig_mod.', '') 
+                cleaned_state_dict[cleaned_key] = value
+            
+            checkpoint['state_dict'] = cleaned_state_dict
+
+
     def on_save_checkpoint(self, checkpoint):
         if self.ema:
             checkpoint["ema"] = self.ema.state_dict()
@@ -652,6 +665,7 @@ class AbsorbingState(Diffusion):
             vocab_size += 1
         else:
             self.mask_index = tokenizer.mask_token_id
+
         self.subs_masking = config.algo.subs_masking
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self.save_hyperparameters()
@@ -683,6 +697,7 @@ class AbsorbingState(Diffusion):
         return xt
 
     def prior_sample(self, *batch_dims):
+        # pdb.set_trace()
         return self.mask_index * torch.ones(
             *batch_dims, dtype=torch.int64, device=self.device
         )
