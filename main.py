@@ -1,4 +1,5 @@
 from tqdm import tqdm
+
 import json
 import os
 
@@ -17,9 +18,10 @@ import other_dataloader as dataloader
 import utils
 import pdb
 import numpy as np
-from lm_eval.models.huggingface import HFLM
-from lm_eval import evaluator
-from hugging_face_wrappers import DiffusionEvalWrapper, CandiEvalWrapper
+from text_metrics import evaluate_text_metrics
+# from lm_eval.models.huggingface import HFLM
+# from lm_eval import evaluator
+# from hugging_face_wrappers import DiffusionEvalWrapper, CandiEvalWrapper
 
 
 omegaconf.OmegaConf.register_new_resolver("cwd", os.getcwd)
@@ -82,15 +84,14 @@ def _print_batch(train_ds, valid_ds, tokenizer, k=64, vocab_offset=False):
         print("Batch input_ids.shape", batch["input_ids"].shape)
         first = batch["input_ids"][0, :k]
         last = batch["input_ids"][0, -k:]
-        print(f"First {k} tokens:", tokenizer.decode(first + tokenizer.eos_token_id))
+        print(f"First {k} tokens:", tokenizer.decode(first))
         print("ids:", first)
-        print(f"Last {k} tokens:", tokenizer.decode(last + tokenizer.eos_token_id))
+        print(f"Last {k} tokens:", tokenizer.decode(last))
         print("ids:", last)
 
 
 def _generate_samples(diffusion_model, config, logger, tokenizer):
     logger.info("Starting Sample Eval.")
-
     if hasattr(config.data, "vocab_file"):
         vocab_offset = True 
         new_vocab = json.load(open(f'{config.data.cache_dir}/{config.data.vocab_file}', 'r'))
@@ -134,30 +135,48 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
     #     for sample in text_samples:
     #         f.write(f"{sample}\n")
 
-    # # Evaluate text metrics
+    # Evaluate text metrics
     # train_texts = open("/home/patrick/duo/train_texts.txt", "r").readlines()
     # text_metrics = evaluate_text_metrics(all_samples, train_texts)
     # print(text_metrics)
+    if config.data.train == 'text8': 
+        train_ds, valid_ds = dataloader.get_dataloaders(config, tokenizer)
+        train_texts = []
+        # check if train_texts.txt exists
+        if os.path.exists("/home/patrick/duo/train_texts.txt"):
+            print("Loading training texts from train_texts.txt for text metrics...")
+            train_texts = open("/home/patrick/duo/train_texts.txt", "r").readlines()
+        else: 
+            print("Loading training texts for text metrics...")
+            for batch in tqdm(train_ds):
+                batch_texts = tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
+                train_texts.extend(batch_texts)
 
-    generative_ppl = 0.0
-    entropy = 0.0
-    if not config.sampling.semi_ar:
-        generative_ppl = model.metrics.gen_ppl.compute().item()
-        entropy = model.metrics.sample_entropy.compute().item()
-        print("Generative perplexity:", generative_ppl)
-        print("Sample entropy:", entropy)
-    samples_path = config.eval.generated_samples_path
-    with fsspec.open(samples_path, "w") as f:
-        json.dump(
-            {
-                "generative_ppl": generative_ppl,
-                "entropy": entropy,
-                "generated_seqs": all_samples,
-            },
-            f,
-            indent=4,
-        )
-    print("Samples saved at:", samples_path)
+            with open("/home/patrick/duo/train_texts.txt", "w") as f:
+                for text in train_texts:
+                    f.write(f"{text}\n")
+        text_metrics = evaluate_text_metrics(all_samples, train_texts)
+        print(text_metrics)
+    else: 
+        generative_ppl = 0.0
+        entropy = 0.0
+        if not config.sampling.semi_ar:
+            generative_ppl = model.metrics.gen_ppl.compute().item()
+            entropy = model.metrics.sample_entropy.compute().item()
+            print("Generative perplexity:", generative_ppl)
+            print("Sample entropy:", entropy)
+        samples_path = config.eval.generated_samples_path
+        with fsspec.open(samples_path, "w") as f:
+            json.dump(
+                {
+                    "generative_ppl": generative_ppl,
+                    "entropy": entropy,
+                    "generated_seqs": all_samples,
+                },
+                f,
+                indent=4,
+            )
+        print("Samples saved at:", samples_path)
 
 
 def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
@@ -174,7 +193,7 @@ def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
 
     # sample first 1000 examples 
     num_samples = min(config.eval.num_conditional_samples, len(valid_ds))
-    batch_size =64 
+    batch_size =32
     model_length = config.model.length
     counter = 0
     model.backbone = torch.compile(model.backbone)
@@ -186,7 +205,7 @@ def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
             batch = next(iter(valid_ds))
             clean_sequences = batch['input_ids'].to(model.device)
 
-            eval_batch_size = clean_sequences.shape[0]
+            batch_size = clean_sequences.shape[0]
             # repeat over batch size 
             # dataloader will be set to batch size of 1 
             clean_sequences_repeated = clean_sequences
@@ -208,11 +227,11 @@ def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
 
             clean_samples = tokenizer.batch_decode(clean_sequences)
 
-            counter += eval_batch_size
+            counter += batch_size
 
             samples_to_eval.extend(list(gen_sequences))
             reference_samples.extend(list(clean_samples))
-            pbar.update(eval_batch_size)
+            pbar.update(batch_size)
 
 
         # either use prompting style input or masked style input
@@ -226,7 +245,7 @@ def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
 
     bertscore = evaluate.load("bertscore")
     bertscore_res = bertscore.compute(predictions=samples_to_eval, references=reference_samples, lang="en", model_type='roberta-large', batch_size=64, device=device)
-    mauve_res = mauve.compute_mauve(p_text=samples_to_eval, q_text=reference_samples, device_id=0, num_buckets=50) 
+    mauve_res = mauve.compute_mauve(q_text=samples_to_eval, p_text=reference_samples, device_id=0) 
 
     metrics = {
         'generative_ppl': generative_ppl,
@@ -251,32 +270,6 @@ def _generate_conditional_samples(diffusion_model, config, logger, tokenizer):
         if k not in ['gen_samples', 'ref_samples']:
             print(f"{k}: {v}")
     return 
-
-
-def _automated_benchmarks(diffusion_model, config, logger, tokenizer):
-
-    logger.info("Starting automated benchmarks.")
-
-    # load diffusion model from checkpoint 
-    model = _load_from_checkpoint(
-        diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
-    )
-
-    # first wrap it in a transformer class 
-
-    if config.algo.name == "candi":
-        lm = CandiEvalWrapper(model, tokenizer)
-    else: 
-        lm = DiffusionEvalWrapper(model, tokenizer)
-
-
-    results = evaluator.simple_evaluate(
-        model=lm, 
-        tasks=['hellaswag'], 
-        batch_size=32)
-    
-    print(results['results'])
-
 
 
 
@@ -459,8 +452,8 @@ def main(config):
     elif config.mode == "conditional_eval":
         _generate_conditional_samples(**kwargs)
 
-    elif config.mode == "automated_benchmarks":
-        _automated_benchmarks(**kwargs)
+    # elif config.mode == "automated_benchmarks":
+        # _automated_benchmarks(**kwargs)
     else:
         _train(**kwargs)
 
