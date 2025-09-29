@@ -727,8 +727,18 @@ class CANDI(trainer_base.Diffusion):
         self.sigma_min = config.algo.sigma_min
         self.sigma_max = config.algo.sigma_max
         self.temp = config.algo.temp
+        self.alpha_beta = config.algo.alpha_beta
+        self.use_uniform_sampling = config.algo.use_uniform_sampling
 
 
+    def sample_t(self, n, accum_step):
+        if self.use_uniform_sampling: 
+            return super()._sample_t(n, accum_step) 
+        
+        else: 
+            return torch.distributions.Beta(alpha=self.alpha_beta, beta=self.alpha_beta).sample((n,)).to(self.device)
+        return
+    
 
     def get_continuous_from_discrete_noise(self, discrete_noise):
         if self.use_percentile_scheduling:
