@@ -787,7 +787,7 @@ class CANDI(trainer_base.Diffusion):
         ).squeeze(-1)
         sigmas = self.get_continuous_from_discrete_noise(1 - alpha_t).squeeze()
 
-        if self.pure_continuous:
+        if self.pure_continuous or not self.weighted_loss:
             nll = -1 * log_p_theta
         else: 
             nll = log_p_theta * dalpha_t / (1 - alpha_t)
