@@ -4,7 +4,7 @@
 export HYDRA_FULL_ERROR=1
 
 
-file_name=cond_sweep_candi_suffix_real.txt
+file_name=cond_sweep_candi_suffix.txt
 touch $file_name
 
 for steps in 8 16 32 64 

@@ -28,7 +28,7 @@ CUDA_VISIBLE_DEVICES=$CUDA_DEVICES python main.py --config-name=conditional_eval
   algo=candi \
   sampling.num_sample_batches=1 \
   sampling.steps=$SAMPLE_STEPS \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/owt-1024-latest2/checkpoints/last.ckpt \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/owt-1024-latest5/checkpoints/best.ckpt \
   model.length=128 \
   algo.step_size=1 \
   algo.temp=$TEMP \

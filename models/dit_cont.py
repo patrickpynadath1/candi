@@ -469,10 +469,6 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.use_mixed_mask = use_mixed_mask
         self.mixed_coeff = mixed_coeff
 
-        # if self.use_mixed_mask: 
-        #     self.special_embedding = nn.Parameter(torch.empty(dim))
-        #     torch.nn.init.kaiming_uniform_(self.special_embedding, a=math.sqrt(5))
-
 
         blocks = []
         for _ in range(config.n_blocks):
@@ -503,10 +499,13 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             return bias_dropout_add_scale_fused_train
         else:
             return bias_dropout_add_scale_fused_inference
+        
+
+    
     
     # clean mask: indicates which positions are clean with 1, which are corrupted with 0
     # def forward(self, x, discrete_noise):
-    def forward(self, xt, discrete_noise, reveal_mask, continuous_noise):
+    def forward(self, xt, discrete_noise, reveal_mask, continuous_noise, embedding=None):
         # sigma = discrete_noise
         # x = self.vocab_embed(x)
         x = xt 
@@ -520,15 +519,13 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if self.use_mixed_mask: 
             special = self.vocab_embed.embedding[-1].view(1, 1, -1).expand_as(x)
             mask = reveal_mask.unsqueeze(-1).float()
-            coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff
-            # conditionall mix in the mask / special embedding 
-            # indicates that those positions are corrupted 
-            # x = x * mask + (1 - mask) * .5 * (x + special)
+            coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff 
 
-            # hypothesis: model starts focusing on noisy embeds too early 
-            # to counteract this, have the weight of the noisy embeds inversely proportionate to the noise
 
-            x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None]) 
+            if embedding is not None: 
+                x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * embedding * c_in[:, None, None]) 
+            else:
+                x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None])
 
         # x = c_in[:, None, None] * x
         if self.causal:
@@ -544,3 +541,6 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             x = self.output_layer(x, c=t_cond)
 
         return x[:, :, :-1]
+    
+    def get_embedding(self, x): 
+        return self.vocab_embed(x)

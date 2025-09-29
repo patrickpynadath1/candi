@@ -14,17 +14,22 @@
 
 
 export HYDRA_FULL_ERROR=1
+steps=$2
+temp=$3
+number_sample_batches=$4
 
-CUDA_VISIBLE_DEVICCES=$1 python main.py \
+
+CUDA_VISIBLE_DEVICES=$1 python main.py \
   mode=sample_eval \
   loader.batch_size=16 \
-  loader.eval_batch_size=4 \
+  loader.eval_batch_size=1 \
   data=openwebtext-split \
   model=small \
   algo=mdlm \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/mdlm-short-run/checkpoints/last.ckpt \
-  sampling.num_sample_batches=1 \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/mdlm_paper_ckpt/mdlm_ckpt.ckpt \
+  sampling.num_sample_batches=$number_sample_batches \
   sampling.predictor=ancestral_cache \
-  sampling.steps=16 \
-  model.length=128 \
+  sampling.steps=$steps \
+  model.length=1024 \
+  algo.temp=$temp \
   +wandb.offline=true

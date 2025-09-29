@@ -22,14 +22,14 @@ mixed_coeff=0.5
 CUDA_VISIBLE_DEVICES=$CUDA_DEVICES python main.py --config-name=conditional_eval \
   mode=conditional_eval \
   loader.batch_size=16 \
-  loader.eval_batch_size=64 \
+  loader.eval_batch_size=2 \
   data=openwebtext \
   model=small \
   algo=candi \
   sampling.num_sample_batches=1 \
   sampling.steps=$SAMPLE_STEPS \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/owt-1024-latest2/checkpoints/last.ckpt \
-  model.length=128 \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/owt-1024-latest5/checkpoints/best.ckpt \
+  model.length=1024 \
   algo.step_size=1 \
   algo.temp=$TEMP \
   algo.mixed_coeff=$mixed_coeff \

@@ -748,7 +748,8 @@ class CANDI(trainer_base.Diffusion):
         return
 
     def _process_model_output(self, xt, model_output, reveal_mask): 
-        if self.use_embedding_cache: 
+        # if xt is already in token form
+        if xt.ndim == 2: 
             xt_tokens = xt
         else: 
             xt_tokens = xt.argmax(dim=-1)

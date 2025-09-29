@@ -13,7 +13,7 @@ import metrics
 import models
 import utils
 
-
+import time
 @dataclass
 class Loss:
     loss: torch.FloatTensor
@@ -404,9 +404,11 @@ class TrainerBase(L.LightningModule):
         """Generate samples from the model."""
         # Lightning auto-casting is not working in this method for some reason
         self._eval_mode()
+        start = time.time()
         samples = self.generate_samples(
             num_samples=self.config.loader.eval_batch_size, num_steps=num_steps, eps=eps
         )
+        end = time.time()
         self._train_mode()
         return samples
 
@@ -671,6 +673,13 @@ class AbsorbingState(Diffusion):
         self.save_hyperparameters()
 
 
+        # settings for cfg
+        self.use_cfg = config.algo.get("use_cfg", False)
+        self.prev_px0 = None
+        self.w = config.algo.get("cfg_w", 1.0)
+        self.use_prev_logits = config.algo.get("use_prev_logits", False)
+
+
 
     def _validate_configuration(self):
         super()._validate_configuration()
@@ -710,7 +719,25 @@ class AbsorbingState(Diffusion):
             _, alpha_s = self.noise(t - dt)
         assert alpha_t.ndim == 2
         if p_x0 is None:
-            p_x0 = (self.forward(x, self._sigma_from_alphat(alpha_t)).double()).exp()
+            p_x0 = (self.forward(x, self._sigma_from_alphat(alpha_t)).double())
+
+
+        # some logic to test out cfg
+        if self.use_cfg: 
+            if self.prev_px0 is not None: 
+                p_x0 = (p_x0 * (1 + self.w) - self.w * self.prev_px0).softmax(dim=-1)
+
+                # if we are using prev logits
+                if self.use_prev_logits: 
+                    self.prev_px0 = p_x0.detach().clone()
+            
+            # we skip the first steps
+            if self.prev_px0 is None:
+                self.prev_px0 = p_x0.detach().clone()
+        else: 
+            p_x0 = p_x0.exp()
+
+
 
         q_xs = p_x0 * (alpha_s - alpha_t)[:, :, None]
         q_xs[:, :, self.mask_index] = 1 - alpha_s

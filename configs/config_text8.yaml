@@ -16,7 +16,7 @@ scratch_dir:  /home/patrick/.cache/discrete_diffusion
 batch_size: 512
 loader:
   global_batch_size: ${batch_size}
-  eval_global_batch_size: 128
+  eval_global_batch_size: 256
   # Note: batch_size and eval_batch_size are **per machine**
   batch_size: ${div_up:${.global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes} * ${trainer.accumulate_grad_batches}}}
   eval_batch_size: ${div_up:${.eval_global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes} * ${trainer.accumulate_grad_batches}}}

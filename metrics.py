@@ -206,28 +206,3 @@ class Metrics:
                 token_mask = sample_chunk != self.tokenizer.eos_token_id
                 valid_tokens = first_eos[..., 1:] + token_mask[..., 1:]
                 self.gen_ppl.update(nlls * valid_tokens, valid_tokens)
-
-
-
-class ConditionalMetrics(Metrics): 
-    def __init__(
-        self, gen_ppl_eval_model_name_or_path=None, eval_ppl_batch_size=None
-    ) -> None:
-        super().__init__(gen_ppl_eval_model_name_or_path, eval_ppl_batch_size)
-
-
-    def record_self_bleu(self): 
-        return 
-         
-
-    def record_mauve(self): 
-        return 
-
-
-    def record_bertscore(self): 
-        return 
-    
-
-    def record_distinctn(self):
-        return 
-    

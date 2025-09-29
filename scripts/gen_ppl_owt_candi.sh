@@ -14,20 +14,24 @@
 
 
 export HYDRA_FULL_ERROR=1
-
+steps=$2
+temp=$3
+eval_batch_size=8
+number_sample_batches=$4
 mixed_coeff=0.5
 CUDA_VISIBLE_DEVICES=$1 python main.py \
   mode=sample_eval \
   loader.batch_size=16 \
-  loader.eval_batch_size=1 \
+  loader.eval_batch_size=2 \
   data=openwebtext-split \
   model=small \
   algo=candi \
-  sampling.num_sample_batches=1 \
-  sampling.steps=1024 \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/cur-linear-percentile/checkpoints/last.ckpt \
+  sampling.num_sample_batches=$number_sample_batches \
+  sampling.steps=$steps \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/owt-1024-latest5/checkpoints/best.ckpt \
   model.length=1024 \
   algo.top_k=100 \
-  algo.step_size=0.5 \
+  algo.step_size=1 \
   algo.mixed_coeff=$mixed_coeff \
+  algo.temp=$temp \
   +wandb.offline=true;

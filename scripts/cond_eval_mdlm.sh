@@ -33,5 +33,5 @@ CUDA_VISIBLE_DEVICES=$CUDA_DEVICES python main.py --config-name=conditional_eval
   sampling.steps=$SAMPLE_STEPS \
   model.length=128 \
   algo.temp=$TEMP \
-  eval.prompt_type=suffix \
+  eval.prompt_type=prefix \
   +wandb.offline=true
