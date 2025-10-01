@@ -1228,7 +1228,7 @@ class CANDI_Distill(CANDI):
         self.last_update_step = 0
 
         # only load the final weights 
-        teacher_weights = torch.load(config.algo.base_path, map_location='cpu')['state_dict']
+        teacher_weights = torch.load(config.algo.base_path, map_location='cpu', weights_only=False)['state_dict']
 
         # replace backbone. with nothing 
         new_weights = {}
