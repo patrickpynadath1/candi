@@ -1234,7 +1234,7 @@ class CANDI_Distill(CANDI):
         new_weights = {}
         for k, v in teacher_weights.items():
             if k.startswith('backbone.'):
-                new_k = k.replace('backbone.', '')
+                new_k = k.replace('backbone.', '').replace('_orig_mod.', '')
                 new_weights[new_k] = v
 
         self.backbone.load_state_dict(new_weights)
