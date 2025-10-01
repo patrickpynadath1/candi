@@ -16,7 +16,7 @@ import utils
 import torch
 from omegaconf import DictConfig
 
-torch.serialization.add_safe_globals([DictConfig])
+# torch.serialization.add_safe_globals([DictConfig])
 
 
 class AR(trainer_base.TrainerBase):
@@ -908,7 +908,7 @@ class CANDI(trainer_base.Diffusion):
             num_steps = self.config.sampling.steps
 
         x = self.prior_sample(num_samples, self.num_tokens)
-
+        pdb.set_trace()
 
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
 
@@ -1240,6 +1240,35 @@ class CANDI_Distill(CANDI):
         self.backbone.load_state_dict(new_weights)
         self.prepare_teacher_and_student()
 
+    def load_backbone_weights(self):    
+        # Load weights on ALL processes
+        teacher_weights = torch.load(self.config.algo.base_path, map_location='cpu', weights_only=False)['state_dict']
+        
+        new_weights = {}
+        for k, v in teacher_weights.items():
+            if k.startswith('backbone.'):
+                new_k = k.replace('backbone.', '').replace('_orig_mod.', '')
+                new_weights[new_k] = v
+        
+        self.backbone.load_state_dict(new_weights)
+        
+        # Sync across processes (DDP is now available)
+        if torch.distributed.is_initialized():
+            for param in self.backbone.parameters():
+                torch.distributed.broadcast(param.data, src=0)
+
+    def setup(self, stage=None):
+        """Called after DDP is initialized, on each process"""
+        if stage == 'fit':
+            # NOW load and sync the weights
+            self.load_backbone_weights()
+            self.prepare_teacher_and_student()
+
+        super().setup(stage)
+
+
+    
+
     def prepare_teacher_and_student(self): 
         if self.teacher is not None: 
             del self.teacher[0]
@@ -1250,6 +1279,29 @@ class CANDI_Distill(CANDI):
         teacher.eval()
         teacher.requires_grad_(False)
         self.teacher = [teacher]
+
+    def _sync_distillation_state(self):
+        """Synchronize distillation state across DDP processes"""
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            # Broadcast key state variables
+            state_tensor = torch.tensor([
+                self.number_steps, 
+                self.dt, 
+                self.cur_round,
+                self.last_update_step
+            ], device=self.device)
+            
+            torch.distributed.broadcast(state_tensor, src=0)
+            
+            # Update local state on non-zero ranks
+            if not self.trainer.is_global_zero:
+                self.number_steps = float(state_tensor[0])
+                self.dt = float(state_tensor[1])
+                self.cur_round = int(state_tensor[2])
+                self.last_update_step = int(state_tensor[3])
+                
+                # Sync teacher weights using your existing function
+                self.update_teacher()
 
     def update_teacher(self): 
         for teacher_param, student_param in zip(self.teacher[0].parameters(), self.backbone.parameters()): 
@@ -1293,6 +1345,7 @@ class CANDI_Distill(CANDI):
         embedding_cache: torch.Tensor,
         clean_mask: torch.Tensor=None,
     ) -> torch.Tensor:
+
         dt = sigma_s - sigma_t
         time_t_vec = time_t 
         sigma_t_vec = sigma_t 
@@ -1437,100 +1490,7 @@ class CANDI_Distill(CANDI):
         if still_masked.any():
             teacher_predictions[still_masked] = p_x0[still_masked].float()
         return teacher_predictions
-    
-    @torch.no_grad()
-    def sample_teacher_trajectories_embeddings(self, x0, noisy_output, t_start, distill_steps=2, eps=1e-5):
-        """
-        Generate teacher trajectories for CANDI's hybrid continuous-discrete method.
-        
-        Args:
-            x0: Clean tokens [batch_size, seq_len] 
-            t_start: Starting timestep [batch_size, 1]
-            distill_steps: Number of teacher denoising steps
-            eps: Minimum timestep
-            
-        Returns:
-            teacher_predictions: Log probabilities from teacher trajectory [batch_size, seq_len, vocab_size]
-        """
-        batch_size, seq_len = x0.shape
-        device = x0.device
-        
-        # Create timestep schedule for each batch element
-        dt = (1 - eps) / self.config.sampling.steps
-        
-        # Create time schedule spanning distill_steps for each batch element
-        # t_start: [batch_size, 1] -> [1, batch_size, 1] 
-        # space: [distill_steps+1, 1, 1]
-        space = torch.linspace(1, 0, distill_steps + 1, device=device)[:, None, None]
-        t_start_expanded = t_start[None, :, :]  # [1, batch_size, 1]
-        t_end = torch.clamp(t_start_expanded - dt * distill_steps, min=eps)
-        
-        # Interpolate: [distill_steps+1, batch_size, 1]
-        timesteps = t_start_expanded * space + (1 - space) * t_end
-        
-        # Initialize with corrupted input using t_start
-        dalpha_t, alpha_t = self.noise(t_start)
-        alpha_t = alpha_t.unsqueeze(-1)
-        
-        x = noisy_output['xt']  # Current state (continuous representation)
-        clean_mask = noisy_output['reveal_mask'].bool()  # Which tokens are clean
-        
-        # Storage for teacher predictions
-        teacher_predictions = torch.zeros(
-            (batch_size, seq_len, self.backbone.dim), device=device
-        )
-        tokens_denoised = torch.zeros((batch_size, seq_len), dtype=torch.bool, device=device)
-        embedding_cache = self.backbone.get_embedding(x)
-
-
-        x = x.argmax(dim=-1)
-        # Run teacher trajectory
-        for i in range(distill_steps):
-            t = timesteps[i].squeeze(-1)  # [batch_size]
-            s = timesteps[i+1].squeeze(-1)  # [batch_size]
-            
-            # Get continuous noise for each batch element's timestep
-            continuous_noise_t = self.get_continuous_from_discrete_noise(t)
-            continuous_noise_s = self.get_continuous_from_discrete_noise(s)
-            
-            # Continuous step - get teacher's predictions
-            embedding_cache, p_x0, output_embedding = self._continuous_step_teacher_embedding(x, 
-                                                                 sigma_s = continuous_noise_t, 
-                                                                 sigma_t=continuous_noise_s,
-                                                                 time_s=s,
-                                                                 time_t=t,
-                                                                 embedding_cache=embedding_cache,
-                                                                 clean_mask=clean_mask) 
-            
-            # sample x0 hat
-            x0_hat = sample_categorical(p_x0)
-            
-            # Discrete step - sample updates  
-            new_x, new_clean_mask = self._discrete_step_teacher(x0_hat, 
-                                                                x, t, dt, 
-                                                                prev_clean_mask=clean_mask)
-            # Track which tokens got denoised this step
-            newly_denoised = (~tokens_denoised) & (new_clean_mask.bool() & ~clean_mask.bool())
-
-
-            
-            # Store teacher predictions for newly denoised tokens
-            if newly_denoised.any():
-                teacher_predictions[newly_denoised] = output_embedding[newly_denoised].float()
-            tokens_denoised = tokens_denoised | newly_denoised
-            
-            # Update state
-            x = new_x
-            clean_mask = new_clean_mask
-        
-        # For any remaining masked tokens, use final predictions
-        still_masked = ~tokens_denoised
-        if still_masked.any():
-            teacher_predictions[still_masked] = output_embedding[still_masked].float()
-        return teacher_predictions
                
-
-
     
     def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
         del output_tokens
@@ -1581,6 +1541,9 @@ class CANDI_Distill(CANDI):
             self.last_update_step = step
             if self.number_steps <= self.max_distill_steps: 
                 self.trainer.should_stop = True
+
+        self._sync_distillation_state()
+
         return super().training_step(batch, batch_idx)
     
 def compute_growth_schedule(adapt_every, initial_steps, final_steps, total_training_steps):
