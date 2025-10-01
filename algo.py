@@ -908,7 +908,6 @@ class CANDI(trainer_base.Diffusion):
             num_steps = self.config.sampling.steps
 
         x = self.prior_sample(num_samples, self.num_tokens)
-        pdb.set_trace()
 
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
 
