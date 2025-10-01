@@ -435,6 +435,8 @@ def main(config):
         diffusion_model = algo.OptimalTransportFinetune
     elif config.algo.name == "candi":
         diffusion_model = algo.CANDI
+    elif config.algo.name == "candi_distill":
+        diffusion_model = algo.CANDI_Distill
 
     else:
         raise ValueError(f"Invalid algorithm name: {config.algo.name}")
