@@ -1,3 +1,4 @@
+import models
 import os
 import time
 import pdb
@@ -695,7 +696,7 @@ class CANDI(trainer_base.Diffusion):
 
         self.clean_reveal_ratio = config.algo.clean_reveal_ratio
         self.pure_continuous = config.algo.pure_continuous
-        self.use_embedding_cache = config.algo.use_embedding_cache
+        # self.use_embedding_cache = config.algo.use_embedding_cache
         # self.continuous_noise, self.discrete_noise = build_sigma_error_table(
         #     vocab_size, 
         #     sigma_range=(.01, 2), 
@@ -729,6 +730,7 @@ class CANDI(trainer_base.Diffusion):
         self.temp = config.algo.temp
         self.alpha_beta = config.algo.alpha_beta
         self.use_uniform_sampling = config.algo.use_uniform_sampling
+        self.sampler = config.algo.sampler
 
 
     def sample_t(self, n, accum_step):
@@ -888,10 +890,62 @@ class CANDI(trainer_base.Diffusion):
         return x, prompt_mask
     
     def generate_samples(self, **kwargs): 
-        if self.use_embedding_cache: 
+        if self.sampler == 'cached': 
             return self.generate_samples_cache(**kwargs)
+        elif self.sampler == 'distilled': 
+            return self.generate_samples_distilled(**kwargs)
         else:
             return self.generate_samples_nocache(**kwargs)
+        
+
+    def generate_samples_distilled(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
+        # pdb.set_trace()
+        if num_steps is None:
+            num_steps = self.config.sampling.steps
+
+        x = self.prior_sample(num_samples, self.num_tokens)
+
+
+        clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
+
+        if prompt_tokens is not None and prompt_mask is not None: 
+            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
+
+        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
+        if self.use_percentile_scheduling:
+            continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
+        else: 
+            continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
+        dt = (1 - eps) / (num_steps)
+
+        self.max_sigma = continuous_noise.max().item()
+
+        self.prev_px0 = None
+        for i in range(num_steps): 
+            t = timesteps[i]
+            s = timesteps[i+1]
+
+            # TODO: this is a bug -- really these should be swapped. I've adjusted the code to make sure it still works
+            sigma_s = continuous_noise[i]
+            sigma_t = continuous_noise[i+1]
+
+            time_t_vec = torch.ones(x.size(0), device=x.device) * t
+            time_s_vec = torch.ones(x.size(0), device=x.device) * s
+            sigma_t_vec = torch.ones(x.size(0), device=x.device) * sigma_t
+
+            
+            p_x0 = self.forward(xt=x, 
+                                discrete_noise=time_t_vec, 
+                                reveal_mask=clean_mask,
+                                continuous_noise=sigma_t_vec).double()
+            x0_hat = sample_categorical(p_x0)
+            _, alpha_s = self.noise(time_s_vec)
+            
+            noisy_outputs = self.q_xt(x0_hat, alpha_t=alpha_s[:, None])
+            clean_mask = noisy_outputs['reveal_mask']
+            x = noisy_outputs['xt']
+            
+        return x0_hat
 
     @torch.no_grad()
     def generate_samples_nocache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
@@ -928,21 +982,12 @@ class CANDI(trainer_base.Diffusion):
             sigma_s = continuous_noise[i]
             sigma_t = continuous_noise[i+1]
 
-            start_cont = time.time() 
             x_cont, p_x0 = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s)
-            end_cont = time.time()
             
             x, clean_mask = self._discrete_step(x_cont, 
                                                 p_x0, t, dt, prev_clean_mask=clean_mask)
-            
-            start_cont = time.time()
-            end_cont = time.time()
-
-            
-
 
         final_tokens = x.argmax(dim=-1)
-
         if self.token_offset: 
             final_tokens += self.tokenizer.eos_token_id
         return final_tokens
@@ -966,6 +1011,14 @@ class CANDI(trainer_base.Diffusion):
         if prompt_tokens is not None and prompt_mask is not None: 
             x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
 
+
+        # for using the beta dist 
+        # from scipy.stats import beta
+        # u = torch.linspace(1, 0, num_steps + 1).numpy()
+
+        # inverse CDF using SciPy
+        # timesteps = torch.Tensor(beta.ppf(u, a=3, b=3)).to(self.device)
+        # pdb.set_trace()
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         if self.use_percentile_scheduling:
             continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
@@ -997,7 +1050,7 @@ class CANDI(trainer_base.Diffusion):
                                                                 sigma_s=sigma_s, 
                                                                 sigma_t=sigma_t, 
                                                                 clean_mask=clean_mask.float(), 
-                                                                time_s=s, 
+                                                                time_s=s,
                                                                 embedding_cache=embedding_cache, 
                                                                 w=w, 
                                                                 is_first=(i==0))
@@ -1149,6 +1202,388 @@ def build_sigma_error_table(K, sigma_range=(1e-3, 3.0), num=500, device=None, sc
     sigmas = torch.linspace(*sigma_range, steps=num, device=device)
     errors = torch.tensor([compute_discrete_errors(K, s.item(), scaling_factor) for s in sigmas], device=device)
     return sigmas, errors
+
+
+
+class CANDI_Distill(CANDI):
+    def __init__(self, config, tokenizer):
+        super().__init__(config, tokenizer)
+        self.save_hyperparameters()
+        self.number_steps = config.algo.number_steps
+        self.initial_steps = config.algo.number_steps
+        self.distill_steps = config.algo.distill_steps
+        self.dt = 1 / self.number_steps
+        self.cur_round = 0
+        # self.grow_every = config.algo.grow_every
+        self.max_distill_steps = config.algo.max_distill_steps
+        self.budget = config.algo.budget
+        self.adapt_every = config.algo.adapt_every
+        growth_factor, _ = compute_growth_schedule(self.adapt_every, self.initial_steps, self.max_distill_steps, self.budget)
+        self.growth_factor = growth_factor
+        self.teacher = None
+        self.last_update_step = 0
+
+        # only load the final weights 
+        teacher_weights = torch.load(config.algo.base_path, map_location='cpu')['state_dict']
+
+        # replace backbone. with nothing 
+        new_weights = {}
+        for k, v in teacher_weights.items():
+            if k.startswith('backbone.'):
+                new_k = k.replace('backbone.', '')
+                new_weights[new_k] = v
+
+        self.backbone.load_state_dict(new_weights)
+        self.prepare_teacher_and_student()
+
+    def prepare_teacher_and_student(self): 
+        if self.teacher is not None: 
+            del self.teacher[0]
+        # Step 1: Load empty teacher 
+        teacher = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size, use_mixed_mask=self.config.algo.use_mixed_mask, mixed_coeff=self.config.algo.mixed_coeff)
+
+        teacher.load_state_dict(self.backbone.state_dict())
+        teacher.eval()
+        teacher.requires_grad_(False)
+        self.teacher = [teacher]
+
+    def update_teacher(self): 
+        for teacher_param, student_param in zip(self.teacher[0].parameters(), self.backbone.parameters()): 
+            teacher_param.data.copy_(student_param.data)
+        self.teacher[0].eval()
+        self.teacher[0].requires_grad_(False)
+
+    def update_round(self): 
+        self.cur_round += 1
+        
+        # Use gradual growth instead of halving
+        self.number_steps = self.number_steps / 2
+        self.dt = 1 / self.number_steps
+        
+        print("Updated to round {}, dt {:.6f}, number_steps {:.1f}".format(
+            self.cur_round, self.dt, self.number_steps))
+
+
+    def _teacher_forward(self, **kwargs):
+        with torch.cuda.amp.autocast(dtype=torch.float32):
+            model_output = self.teacher[0](**kwargs)
+        if kwargs.get('ret_embedding', False): 
+            return self._process_model_output(model_output=model_output[0], xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask']), model_output[1]
+        return self._process_model_output(model_output=model_output, xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask'])
+    
+    def forward(self, **kwargs):
+        with torch.cuda.amp.autocast(dtype=torch.float32):
+            model_output = self.backbone(**kwargs)
+        if kwargs.get('ret_embedding', False): 
+            return self._process_model_output(model_output=model_output[0], xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask']), model_output[1]
+        return self._process_model_output(model_output=model_output, xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask'])
+
+
+    def _continuous_step_teacher(
+        self,
+        x: torch.Tensor,
+        time_t: torch.Tensor,
+        time_s: torch.Tensor,
+        sigma_s: torch.Tensor,
+        sigma_t: torch.Tensor,
+        embedding_cache: torch.Tensor,
+        clean_mask: torch.Tensor=None,
+    ) -> torch.Tensor:
+        dt = sigma_s - sigma_t
+        time_t_vec = time_t 
+        sigma_t_vec = sigma_t 
+        if clean_mask is None: 
+            clean_mask = torch.zeros(x.shape[:-1], device=x.device)
+        denoised = self._teacher_forward(xt=x, 
+                                    discrete_noise=time_t_vec, 
+                                    reveal_mask=clean_mask,
+                                    continuous_noise=sigma_t_vec,
+                                    embedding=embedding_cache).double()
+        x0_hat = sample_categorical(denoised)
+        embedding_hat = self.backbone.get_embedding(x0_hat)
+        d = (embedding_cache - embedding_hat) / (sigma_t[:, None, None] ** 2)
+        new_embedding_cache = embedding_cache - dt[:, None, None] * d * self.step_size
+        return new_embedding_cache, x0_hat, denoised
+    
+    def _continuous_step_teacher_embedding(
+        self,
+        x: torch.Tensor,
+        time_t: torch.Tensor,
+        time_s: torch.Tensor,
+        sigma_s: torch.Tensor,
+        sigma_t: torch.Tensor,
+        embedding_cache: torch.Tensor,
+        clean_mask: torch.Tensor=None,
+    ) -> torch.Tensor:
+        dt = sigma_s - sigma_t
+        time_t_vec = time_t 
+        sigma_t_vec = sigma_t 
+        if clean_mask is None: 
+            clean_mask = torch.zeros(x.shape[:-1], device=x.device)
+        denoised, embedding_output = self._teacher_forward(xt=x, 
+                                    discrete_noise=time_t_vec, 
+                                    reveal_mask=clean_mask,
+                                    continuous_noise=sigma_t_vec,
+                                    embedding=embedding_cache, ret_embedding=True)
+        embedding_hat = self.backbone.get_embedding(denoised.double().exp())
+        d = (embedding_cache - embedding_hat) / (sigma_t[:, None, None] ** 2)
+        new_embedding_cache = embedding_cache - dt[:, None, None] * d * self.step_size
+        return new_embedding_cache, denoised, embedding_output
+
+
+    def _discrete_step_teacher(self, x0_hat, xt, t, dt, prev_clean_mask, noise_removal_step=False): 
+
+        s = (t - dt).clamp(min=0.0)
+
+        unmask = torch.rand(prev_clean_mask.shape, device=prev_clean_mask.device) < ((t-s)/t)[:, None]
+        xt[~prev_clean_mask] = x0_hat[~prev_clean_mask]
+        new_clean_mask = prev_clean_mask | unmask
+        return xt, new_clean_mask
+
+    def to(self, *args, **kwargs):
+        self = super().to(*args, **kwargs)
+        self.teacher[0] = self.teacher[0].to(*args, **kwargs)
+        return self
+
+
+    @torch.no_grad()
+    def sample_teacher_trajectories(self, x0, noisy_output, t_start, distill_steps=2, eps=1e-5):
+        """
+        Generate teacher trajectories for CANDI's hybrid continuous-discrete method.
+        
+        Args:
+            x0: Clean tokens [batch_size, seq_len] 
+            t_start: Starting timestep [batch_size, 1]
+            distill_steps: Number of teacher denoising steps
+            eps: Minimum timestep
+            
+        Returns:
+            teacher_predictions: Log probabilities from teacher trajectory [batch_size, seq_len, vocab_size]
+        """
+        batch_size, seq_len = x0.shape
+        device = x0.device
+        
+        # Create timestep schedule for each batch element
+        dt = (1 - eps) / self.config.sampling.steps
+        
+        # Create time schedule spanning distill_steps for each batch element
+        # t_start: [batch_size, 1] -> [1, batch_size, 1] 
+        # space: [distill_steps+1, 1, 1]
+        space = torch.linspace(1, 0, distill_steps + 1, device=device)[:, None, None]
+        t_start_expanded = t_start[None, :, :]  # [1, batch_size, 1]
+        t_end = torch.clamp(t_start_expanded - dt * distill_steps, min=eps)
+        
+        # Interpolate: [distill_steps+1, batch_size, 1]
+        timesteps = t_start_expanded * space + (1 - space) * t_end
+        
+        # Initialize with corrupted input using t_start
+        dalpha_t, alpha_t = self.noise(t_start)
+        alpha_t = alpha_t.unsqueeze(-1)
+        
+        x = noisy_output['xt']  # Current state (continuous representation)
+        clean_mask = noisy_output['reveal_mask'].bool()  # Which tokens are clean
+        
+        # Storage for teacher predictions
+        teacher_predictions = torch.zeros(
+            (batch_size, seq_len, x.size(-1)), device=device
+        )
+        tokens_denoised = torch.zeros((batch_size, seq_len), dtype=torch.bool, device=device)
+        embedding_cache = self.backbone.get_embedding(x)
+
+
+        x = x.argmax(dim=-1)
+        # Run teacher trajectory
+        for i in range(distill_steps):
+            t = timesteps[i].squeeze(-1)  # [batch_size]
+            s = timesteps[i+1].squeeze(-1)  # [batch_size]
+            
+            # Get continuous noise for each batch element's timestep
+            continuous_noise_t = self.get_continuous_from_discrete_noise(t)
+            continuous_noise_s = self.get_continuous_from_discrete_noise(s)
+            
+            # Continuous step - get teacher's predictions
+            embedding_cache, x0_hat, p_x0 = self._continuous_step_teacher(x, 
+                                                                 sigma_s = continuous_noise_t, 
+                                                                 sigma_t=continuous_noise_s,
+                                                                 time_s=s,
+                                                                 time_t=t,
+                                                                 embedding_cache=embedding_cache,
+                                                                 clean_mask=clean_mask) 
+            
+            # Discrete step - sample updates  
+            new_x, new_clean_mask = self._discrete_step_teacher(x0_hat, 
+                                                                x, t, dt, 
+                                                                prev_clean_mask=clean_mask)
+            # Track which tokens got denoised this step
+            newly_denoised = (~tokens_denoised) & (new_clean_mask.bool() & ~clean_mask.bool())
+
+
+            
+            # Store teacher predictions for newly denoised tokens
+            if newly_denoised.any():
+                teacher_predictions[newly_denoised] = p_x0[newly_denoised].float()
+            tokens_denoised = tokens_denoised | newly_denoised
+            
+            # Update state
+            x = new_x
+            clean_mask = new_clean_mask
+        
+        # For any remaining masked tokens, use final predictions
+        still_masked = ~tokens_denoised
+        if still_masked.any():
+            teacher_predictions[still_masked] = p_x0[still_masked].float()
+        return teacher_predictions
+    
+    @torch.no_grad()
+    def sample_teacher_trajectories_embeddings(self, x0, noisy_output, t_start, distill_steps=2, eps=1e-5):
+        """
+        Generate teacher trajectories for CANDI's hybrid continuous-discrete method.
+        
+        Args:
+            x0: Clean tokens [batch_size, seq_len] 
+            t_start: Starting timestep [batch_size, 1]
+            distill_steps: Number of teacher denoising steps
+            eps: Minimum timestep
+            
+        Returns:
+            teacher_predictions: Log probabilities from teacher trajectory [batch_size, seq_len, vocab_size]
+        """
+        batch_size, seq_len = x0.shape
+        device = x0.device
+        
+        # Create timestep schedule for each batch element
+        dt = (1 - eps) / self.config.sampling.steps
+        
+        # Create time schedule spanning distill_steps for each batch element
+        # t_start: [batch_size, 1] -> [1, batch_size, 1] 
+        # space: [distill_steps+1, 1, 1]
+        space = torch.linspace(1, 0, distill_steps + 1, device=device)[:, None, None]
+        t_start_expanded = t_start[None, :, :]  # [1, batch_size, 1]
+        t_end = torch.clamp(t_start_expanded - dt * distill_steps, min=eps)
+        
+        # Interpolate: [distill_steps+1, batch_size, 1]
+        timesteps = t_start_expanded * space + (1 - space) * t_end
+        
+        # Initialize with corrupted input using t_start
+        dalpha_t, alpha_t = self.noise(t_start)
+        alpha_t = alpha_t.unsqueeze(-1)
+        
+        x = noisy_output['xt']  # Current state (continuous representation)
+        clean_mask = noisy_output['reveal_mask'].bool()  # Which tokens are clean
+        
+        # Storage for teacher predictions
+        teacher_predictions = torch.zeros(
+            (batch_size, seq_len, self.backbone.dim), device=device
+        )
+        tokens_denoised = torch.zeros((batch_size, seq_len), dtype=torch.bool, device=device)
+        embedding_cache = self.backbone.get_embedding(x)
+
+
+        x = x.argmax(dim=-1)
+        # Run teacher trajectory
+        for i in range(distill_steps):
+            t = timesteps[i].squeeze(-1)  # [batch_size]
+            s = timesteps[i+1].squeeze(-1)  # [batch_size]
+            
+            # Get continuous noise for each batch element's timestep
+            continuous_noise_t = self.get_continuous_from_discrete_noise(t)
+            continuous_noise_s = self.get_continuous_from_discrete_noise(s)
+            
+            # Continuous step - get teacher's predictions
+            embedding_cache, p_x0, output_embedding = self._continuous_step_teacher_embedding(x, 
+                                                                 sigma_s = continuous_noise_t, 
+                                                                 sigma_t=continuous_noise_s,
+                                                                 time_s=s,
+                                                                 time_t=t,
+                                                                 embedding_cache=embedding_cache,
+                                                                 clean_mask=clean_mask) 
+            
+            # sample x0 hat
+            x0_hat = sample_categorical(p_x0)
+            
+            # Discrete step - sample updates  
+            new_x, new_clean_mask = self._discrete_step_teacher(x0_hat, 
+                                                                x, t, dt, 
+                                                                prev_clean_mask=clean_mask)
+            # Track which tokens got denoised this step
+            newly_denoised = (~tokens_denoised) & (new_clean_mask.bool() & ~clean_mask.bool())
+
+
+            
+            # Store teacher predictions for newly denoised tokens
+            if newly_denoised.any():
+                teacher_predictions[newly_denoised] = output_embedding[newly_denoised].float()
+            tokens_denoised = tokens_denoised | newly_denoised
+            
+            # Update state
+            x = new_x
+            clean_mask = new_clean_mask
+        
+        # For any remaining masked tokens, use final predictions
+        still_masked = ~tokens_denoised
+        if still_masked.any():
+            teacher_predictions[still_masked] = output_embedding[still_masked].float()
+        return teacher_predictions
+               
+
+
+    
+    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
+        del output_tokens
+        t = self._sample_t(x0.shape[0], current_accumulation_step)
+        assert t.shape[0] == x0.shape[0]
+        dalpha_t, alpha_t = self.noise(t)
+        alpha_t = alpha_t.unsqueeze(-1)
+        assert alpha_t.ndim == 2
+
+        noisy_output = self.q_xt(x0, alpha_t)
+        teacher_probs = self.sample_teacher_trajectories(x0, noisy_output, t.unsqueeze(-1), distill_steps=2)
+        log_x_theta = self.forward(**noisy_output)
+        kl_per_token = self._fwd_kl(log_x_theta, teacher_probs)
+        utils.print_nans(log_x_theta, "model_output")
+
+        return kl_per_token
+    
+
+    def _bwd_kl(self, preds, target):
+        kl_per_coord = F.kl_div(preds, target, reduction="none", log_target=True)
+        kl_per_position = kl_per_coord.sum(-1)
+        return kl_per_position
+    
+    def _fwd_kl(self, preds, target):
+        kl_per_coord = F.kl_div(target, preds, reduction="none", log_target=True)
+        kl_per_position = kl_per_coord.sum(-1)
+        return kl_per_position
+
+    def sample_t_adaptive(self, batch_size, device):
+        """
+        Sample t ensuring we have enough runway for the teacher trajectory.
+        Need: t_start >= dt * (distill_steps - 1) + eps
+        """
+        dt = self.dt 
+        distill_steps = self.distill_steps
+        min_t = dt * (distill_steps - 1) + self.sampling_eps
+        
+        if min_t >= 0.95:  # If we need almost the full range
+            return torch.ones(batch_size, 1, device=device)
+        else:
+            return torch.rand(batch_size, 1, device=device) * (1.0 - min_t) + min_t
+        
+    def training_step(self, batch, batch_idx):
+        step = self.global_step
+        if step > 0 and step % self.adapt_every == 0 and step != self.last_update_step:
+            self.update_round()
+            self.update_teacher()
+            self.last_update_step = step
+            if self.number_steps <= self.max_distill_steps: 
+                self.trainer.should_stop = True
+        return super().training_step(batch, batch_idx)
+    
+def compute_growth_schedule(adapt_every, initial_steps, final_steps, total_training_steps):
+    total_adaptations = total_training_steps // adapt_every
+    total_compression = initial_steps / final_steps
+    growth_factor = total_compression ** (1 / total_adaptations)
+    return growth_factor, total_adaptations
 
 
 

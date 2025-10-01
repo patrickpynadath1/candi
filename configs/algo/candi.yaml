@@ -29,6 +29,6 @@ use_percentile_scheduling: True
 temp: 1.0
 use_cfg: False
 pure_continuous: False
-use_embedding_cache: True
 alpha_beta: 3.0
 use_uniform_sampling: False
+sampler: distilled
