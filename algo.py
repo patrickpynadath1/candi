@@ -1226,46 +1226,6 @@ class CANDI_Distill(CANDI):
         self.teacher = None
         self.last_update_step = 0
 
-        # only load the final weights 
-        teacher_weights = torch.load(config.algo.base_path, map_location='cpu', weights_only=False)['state_dict']
-
-        # replace backbone. with nothing 
-        new_weights = {}
-        for k, v in teacher_weights.items():
-            if k.startswith('backbone.'):
-                new_k = k.replace('backbone.', '').replace('_orig_mod.', '')
-                new_weights[new_k] = v
-
-        self.backbone.load_state_dict(new_weights)
-        self.prepare_teacher_and_student()
-
-    def load_backbone_weights(self):    
-        # Load weights on ALL processes
-        teacher_weights = torch.load(self.config.algo.base_path, map_location='cpu', weights_only=False)['state_dict']
-        
-        new_weights = {}
-        for k, v in teacher_weights.items():
-            if k.startswith('backbone.'):
-                new_k = k.replace('backbone.', '').replace('_orig_mod.', '')
-                new_weights[new_k] = v
-        
-        self.backbone.load_state_dict(new_weights)
-        self.backbone = self.backbone.to(self.device)
-
-        # Sync across processes (DDP is now available)
-        if torch.distributed.is_initialized():
-            for param in self.backbone.parameters():
-                torch.distributed.broadcast(param.data, src=0)
-
-    def setup(self, stage=None):
-        """Called after DDP is initialized, on each process"""
-        if stage == 'fit':
-            # NOW load and sync the weights
-            self.load_backbone_weights()
-            self.prepare_teacher_and_student()
-
-        super().setup(stage)
-
 
     def prepare_teacher_and_student(self): 
         if self.teacher is not None: 
@@ -1278,34 +1238,12 @@ class CANDI_Distill(CANDI):
         teacher.requires_grad_(False)
         self.teacher = [teacher]
 
-    def _sync_distillation_state(self):
-        """Synchronize distillation state across DDP processes"""
-        if torch.distributed.is_available() and torch.distributed.is_initialized():
-            # Broadcast key state variables
-            state_tensor = torch.tensor([
-                self.number_steps, 
-                self.dt, 
-                self.cur_round,
-                self.last_update_step
-            ], device=self.device)
-            
-            torch.distributed.broadcast(state_tensor, src=0)
-            
-            # Update local state on non-zero ranks
-            if not self.trainer.is_global_zero:
-                self.number_steps = float(state_tensor[0])
-                self.dt = float(state_tensor[1])
-                self.cur_round = int(state_tensor[2])
-                self.last_update_step = int(state_tensor[3])
-                
-                # Sync teacher weights using your existing function
-                self.update_teacher()
 
     def update_teacher(self): 
-        for teacher_param, student_param in zip(self.teacher[0].parameters(), self.backbone.parameters()): 
+        for teacher_param, student_param in zip(self.teacher.parameters(), self.backbone.parameters()): 
             teacher_param.data.copy_(student_param.data)
-        self.teacher[0].eval()
-        self.teacher[0].requires_grad_(False)
+        self.teacher.eval()
+        self.teacher.requires_grad_(False)
 
     def update_round(self): 
         self.cur_round += 1
@@ -1320,7 +1258,7 @@ class CANDI_Distill(CANDI):
 
     def _teacher_forward(self, **kwargs):
         with torch.cuda.amp.autocast(dtype=torch.float32):
-            model_output = self.teacher[0](**kwargs)
+            model_output = self.teacher(**kwargs)
         if kwargs.get('ret_embedding', False): 
             return self._process_model_output(model_output=model_output[0], xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask']), model_output[1]
         return self._process_model_output(model_output=model_output, xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask'])
@@ -1397,7 +1335,8 @@ class CANDI_Distill(CANDI):
 
     def to(self, *args, **kwargs):
         self = super().to(*args, **kwargs)
-        self.teacher[0] = self.teacher[0].to(*args, **kwargs)
+        if self.teacher is not None:
+            self.teacher = self.teacher.to(*args, **kwargs)
         return self
 
 
@@ -1417,7 +1356,10 @@ class CANDI_Distill(CANDI):
         """
         batch_size, seq_len = x0.shape
         device = x0.device
-        
+        if self.teacher is None:
+            self.teacher = copy.deepcopy(self.backbone)
+            self.teacher.eval()
+            self.teacher.requires_grad_(False)
         # Create timestep schedule for each batch element
         dt = (1 - eps) / self.config.sampling.steps
         
@@ -1539,9 +1481,6 @@ class CANDI_Distill(CANDI):
             self.last_update_step = step
             if self.number_steps <= self.max_distill_steps: 
                 self.trainer.should_stop = True
-
-        self._sync_distillation_state()
-
         return super().training_step(batch, batch_idx)
     
 def compute_growth_schedule(adapt_every, initial_steps, final_steps, total_training_steps):
