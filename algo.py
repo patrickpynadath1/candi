@@ -1251,7 +1251,8 @@ class CANDI_Distill(CANDI):
                 new_weights[new_k] = v
         
         self.backbone.load_state_dict(new_weights)
-        
+        self.backbone = self.backbone.to(self.device)
+
         # Sync across processes (DDP is now available)
         if torch.distributed.is_initialized():
             for param in self.backbone.parameters():
@@ -1266,8 +1267,6 @@ class CANDI_Distill(CANDI):
 
         super().setup(stage)
 
-
-    
 
     def prepare_teacher_and_student(self): 
         if self.teacher is not None: 
