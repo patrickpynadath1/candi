@@ -13,6 +13,10 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 import trainer_base
 import utils
+import torch
+from omegaconf import DictConfig
+
+torch.serialization.add_safe_globals([DictConfig])
 
 
 class AR(trainer_base.TrainerBase):
