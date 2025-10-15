@@ -156,6 +156,7 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
                 for text in train_texts:
                     f.write(f"{text}\n")
         text_metrics = evaluate_text_metrics(all_samples, train_texts)
+        
         print(text_metrics)
     else: 
         generative_ppl = 0.0

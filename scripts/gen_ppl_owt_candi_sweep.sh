@@ -13,40 +13,10 @@
 #SBATCH --requeue                     # Requeue upon preemption
 
 
-
-
-
-# CKPT=orig-10k
-
-# export HYDRA_FULL_ERROR=1
-# eval_batch_size=8
-# number_sample_batches=4
-# mixed_coeff=0.5
-# CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
-#   mode=sample_eval \
-#   loader.batch_size=16 \
-#   loader.eval_batch_size=8 \
-#   data=openwebtext-split \
-#   model=small \
-#   algo=candi \
-#   sampling.num_sample_batches=$number_sample_batches \
-#   eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/$CKPT/checkpoints/0-10000.ckpt \
-#   model.length=1024 \
-#   algo.top_k=100 \
-#   algo.step_size=1 \
-#   algo.mixed_coeff=$mixed_coeff \
-#   algo.min_percentile=.01 \
-#   algo.max_percentile=.25 \
-#   +wandb.offline=true;
-
-
-
-CKPT=.05-.4-10k
-
 export HYDRA_FULL_ERROR=1
+
 eval_batch_size=8
-number_sample_batches=4
-mixed_coeff=0.5
+mixed_coeff=1.0
 CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
   mode=sample_eval \
   loader.batch_size=16 \
@@ -54,63 +24,17 @@ CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
   data=openwebtext-split \
   model=small \
   algo=candi \
-  sampling.num_sample_batches=$number_sample_batches \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/$CKPT/checkpoints/0-10000.ckpt \
+  sampling.num_sample_batches=16 \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/aggressive-lr-distill/checkpoints/last.ckpt \
   model.length=1024 \
   algo.top_k=100 \
   algo.step_size=1 \
+  algo.use_cfg=false \
+  algo.sampler=cached \
   algo.mixed_coeff=$mixed_coeff \
-  algo.min_percentile=.05 \
-  algo.max_percentile=.4 \
+  algo.is_greedy=true \
   +wandb.offline=true;
 
 
-CKPT=.1-.4-10k
-
-export HYDRA_FULL_ERROR=1
-eval_batch_size=8
-number_sample_batches=4
-mixed_coeff=0.5
-CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
-  mode=sample_eval \
-  loader.batch_size=16 \
-  loader.eval_batch_size=8 \
-  data=openwebtext-split \
-  model=small \
-  algo=candi \
-  sampling.num_sample_batches=$number_sample_batches \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/$CKPT/checkpoints/0-10000.ckpt \
-  model.length=1024 \
-  algo.top_k=100 \
-  algo.step_size=1 \
-  algo.mixed_coeff=$mixed_coeff \
-  algo.min_percentile=.1 \
-  algo.max_percentile=.4 \
-  +wandb.offline=true;
-
-
-CKPT=unweighted-10k 
-
-export HYDRA_FULL_ERROR=1
-eval_batch_size=8
-number_sample_batches=4
-mixed_coeff=0.5
-CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
-  mode=sample_eval \
-  loader.batch_size=16 \
-  loader.eval_batch_size=8 \
-  data=openwebtext-split \
-  model=small \
-  algo=candi \
-  sampling.num_sample_batches=$number_sample_batches \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/$CKPT/checkpoints/0-10000.ckpt \
-  model.length=1024 \
-  algo.top_k=100 \
-  algo.step_size=1 \
-  algo.mixed_coeff=$mixed_coeff \
-  algo.min_percentile=.1 \
-  algo.max_percentile=.4 \
-  +wandb.offline=true;
-
-
-
+  # distill-r3-bwd
+  # eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/owt-1024-latest5/checkpoints/best.ckpt \

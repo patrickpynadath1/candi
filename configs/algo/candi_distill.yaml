@@ -27,17 +27,17 @@ sigma_min: .1
 sigma_max: 4.0
 use_percentile_scheduling: True 
 temp: 5
-use_cfg: False
+use_cfg: True
 pure_continuous: False
 alpha_beta: 3.0
 use_uniform_sampling: True
-sampler: distilled
+sampler: cached
 
 # distill hyperparam
 number_steps: 128
 distill_steps: 2
 grow_every: 10000
 base_path: /data/remote_cache/patrick/discrete_diffusion/text8/2025.09.19/054800/checkpoints/20-28500.ckpt 
-max_distill_steps: 8
+max_distill_steps: 2
 budget: 5000
-adapt_every: 100
+adapt_every: 1000

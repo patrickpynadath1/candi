@@ -294,6 +294,9 @@ class DUO_BASE(trainer_base.UniformState):
         self.temp = config.algo.get("temp", 1.0)
         super().__init__(config, tokenizer)
         self._validate_configuration()
+        self.prev_logits = None
+        self.use_cfg = config.algo.get("use_cfg", False)
+        self.w = config.algo.get("w", .5)
 
     def on_save_checkpoint(self, checkpoint):
         checkpoint["state_dict"] = collections.OrderedDict(
@@ -395,8 +398,20 @@ class DUO_BASE(trainer_base.UniformState):
         sigma_t = self._sigma_from_alphat(alpha_t)
         assert alpha_t.ndim == 2
 
+        cur_logits = (self.forward(x, sigma_t)).double()
+        if self.use_cfg: 
+            
+            if self.prev_logits is not None: 
+                cur_logits = cur_logits * (1 + self.w) - self.w * self.prev_logits
+            self.prev_logits = cur_logits.detach().clone()
+            xtheta_to_use = cur_logits.softmax(dim=-1)
+        else: 
+            xtheta_to_use = cur_logits.exp()
+
+
+
         q_xs = self._compute_posterior(
-            x=(self.forward(x, sigma_t) / self.temp).exp().double(), xt=x, alpha_s=alpha_s, alpha_t=alpha_t
+            x=xtheta_to_use, xt=x, alpha_s=alpha_s, alpha_t=alpha_t
         )
         if self.p_nucleus < 1:
             q_xs = utils.top_k_top_p_filtering(q_xs.log(), top_p=self.p_nucleus)
@@ -700,6 +715,7 @@ class CANDI(trainer_base.Diffusion):
 
         self.clean_reveal_ratio = config.algo.clean_reveal_ratio
         self.pure_continuous = config.algo.pure_continuous
+        self.use_fixed_masking = config.algo.use_fixed_masking
         # self.use_embedding_cache = config.algo.use_embedding_cache
         # self.continuous_noise, self.discrete_noise = build_sigma_error_table(
         #     vocab_size, 
@@ -735,6 +751,7 @@ class CANDI(trainer_base.Diffusion):
         self.alpha_beta = config.algo.alpha_beta
         self.use_uniform_sampling = config.algo.use_uniform_sampling
         self.sampler = config.algo.sampler
+        self.is_greedy = config.algo.is_greedy
 
 
     def sample_t(self, n, accum_step):
@@ -824,10 +841,17 @@ class CANDI(trainer_base.Diffusion):
         reveal_mask = (disc_xt == x).float()
 
         discrete_noise = (1 - alpha_t).squeeze()
+        if self.use_fixed_masking:
+            discrete_noise = torch.ones_like(discrete_noise) * .5
         continuous_noise = self.get_continuous_from_discrete_noise(discrete_noise) 
 
         # accounting for the mask token
         onehot = F.one_hot(x, num_classes=self.vocab_size-1).float()
+
+        if self.use_embedding_space_noise: 
+            clean_embeddings = self.backbone.get_input_embeddings()(x)
+            pass
+
 
         xt_cont = onehot + continuous_noise[:, None, None].to(x.device) * torch.randn_like(onehot, device=x.device)
 
@@ -894,12 +918,15 @@ class CANDI(trainer_base.Diffusion):
         return x, prompt_mask
     
     def generate_samples(self, **kwargs): 
-        if self.sampler == 'cached': 
-            return self.generate_samples_cache(**kwargs)
-        elif self.sampler == 'distilled': 
-            return self.generate_samples_distilled(**kwargs)
-        else:
-            return self.generate_samples_nocache(**kwargs)
+        if self.pure_continuous:
+            return self.generate_samples_pure_cont(**kwargs)
+        else: 
+            if self.sampler == 'cached': 
+                return self.generate_samples_cache(**kwargs)
+            elif self.sampler == 'distilled': 
+                return self.generate_samples_distilled(**kwargs)
+            else:
+                return self.generate_samples_nocache(**kwargs)
         
 
     def generate_samples_distilled(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
@@ -908,6 +935,7 @@ class CANDI(trainer_base.Diffusion):
             num_steps = self.config.sampling.steps
 
         x = self.prior_sample(num_samples, self.num_tokens)
+        print("num steps: ", num_steps)
 
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
 
@@ -953,7 +981,6 @@ class CANDI(trainer_base.Diffusion):
     @torch.no_grad()
     def generate_samples_nocache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
 
-
         """Generate samples from the model."""
         # pdb.set_trace()
         if num_steps is None:
@@ -995,6 +1022,50 @@ class CANDI(trainer_base.Diffusion):
             final_tokens += self.tokenizer.eos_token_id
         return final_tokens
     
+
+    def generate_samples_pure_cont(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
+
+        """Generate samples from the model."""
+        # pdb.set_trace()
+        if num_steps is None:
+            num_steps = self.config.sampling.steps
+
+        x = self.prior_sample(num_samples, self.num_tokens)
+
+
+        clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
+
+        if prompt_tokens is not None and prompt_mask is not None: 
+            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
+
+        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
+        if self.use_percentile_scheduling:
+            continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
+        else: 
+            continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
+        dt = (1 - eps) / (num_steps)
+
+        self.max_sigma = continuous_noise.max().item()
+
+        self.prev_px0 = None
+        total_hops = []
+        for i in range(num_steps): 
+            t = timesteps[i]
+            s = timesteps[i+1]
+
+            # TODO: this is a bug -- really these should be swapped. I've adjusted the code to make sure it still works
+            sigma_s = continuous_noise[i]
+            sigma_t = continuous_noise[i+1]
+
+            new_x, _ = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s)
+            hops = (new_x.argmax(dim=-1) != x.argmax(dim=-1)).float().mean()
+            total_hops.append(hops.item())
+
+        final_tokens = x.argmax(dim=-1)
+        if self.token_offset: 
+            final_tokens += self.tokenizer.eos_token_id
+        return final_tokens
+    
     # optimized function with cached embeddings
     @torch.no_grad()
     def generate_samples_cache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
@@ -1004,6 +1075,7 @@ class CANDI(trainer_base.Diffusion):
         # pdb.set_trace()
         if num_steps is None:
             num_steps = self.config.sampling.steps
+        print("num steps: ", num_steps)
 
         embedding_cache = self.backbone.get_embedding(x)
 
@@ -1058,9 +1130,14 @@ class CANDI(trainer_base.Diffusion):
                                                                 w=w, 
                                                                 is_first=(i==0))
             is_noise_removal_step = (i == num_steps - 1)
-            x, clean_mask = self._discrete_step_optimized(x0_hat, x, t, dt, 
-                                                        prev_clean_mask=clean_mask, 
+            if is_noise_removal_step and self.is_greedy: 
+                x = x0_hat.argmax(dim=-1)
+            else: 
+                x, clean_mask = self._discrete_step_optimized(x0_hat, x, t, dt, 
+                                                            prev_clean_mask=clean_mask, 
                                                         noise_removal_step=is_noise_removal_step)
+            
+        
         return x
     
 
@@ -1151,7 +1228,7 @@ class CANDI(trainer_base.Diffusion):
         embedding_cache: torch.Tensor,
         clean_mask: torch.Tensor=None,
         is_first=False,
-        w=.1,
+        w=.5,
     ) -> torch.Tensor:
         dt = sigma_s - sigma_t
         time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()

@@ -165,10 +165,11 @@ class TrainerBase(L.LightningModule):
             cleaned_state_dict = {}
             
             for key, value in state_dict.items():
-                cleaned_key = key
-                # Remove _orig and other modifiers
-                cleaned_key = cleaned_key.replace('_orig_mod.', '') 
-                cleaned_state_dict[cleaned_key] = value
+                if "teacher" not in key: 
+                    cleaned_key = key
+                    # Remove _orig and other modifiers
+                    cleaned_key = cleaned_key.replace('_orig_mod.', '') 
+                    cleaned_state_dict[cleaned_key] = value
             
             checkpoint['state_dict'] = cleaned_state_dict
 
@@ -718,22 +719,29 @@ class AbsorbingState(Diffusion):
         else:
             _, alpha_s = self.noise(t - dt)
         assert alpha_t.ndim == 2
-        if p_x0 is None:
-            p_x0 = (self.forward(x, self._sigma_from_alphat(alpha_t)).double())
+        p_x0 = (self.forward(x, self._sigma_from_alphat(alpha_t)).double())
 
 
         # some logic to test out cfg
         if self.use_cfg: 
-            if self.prev_px0 is not None: 
-                p_x0 = (p_x0 * (1 + self.w) - self.w * self.prev_px0).softmax(dim=-1)
+            if self.prev_px0 is not None:
+                alpha = .5
+                p_x0_prime = (p_x0  + 2 * (1-t)* (p_x0 - self.prev_px0)).softmax(dim=-1)
+                # self.prev_px0 = p_x0.detach().clone()
+                # self.prev_px0 = alpha * self.prev_px0 + (1 - alpha) * p_x0_prime
+                # self.prev_px0 = p_x0.detach().clone() * alpha + (1 - alpha) * self.prev_px0
+                if self.counter > 2: 
+                    p_x0 = p_x0_prime
+                self.counter += 1
 
-                # if we are using prev logits
-                if self.use_prev_logits: 
-                    self.prev_px0 = p_x0.detach().clone()
+                # # if we are using prev logits
+                # if self.use_prev_logits: 
+                #     self.prev_px0 = p_x0.detach().clone()
             
             # we skip the first steps
             if self.prev_px0 is None:
                 self.prev_px0 = p_x0.detach().clone()
+                self.counter = 1
         else: 
             p_x0 = p_x0.exp()
 

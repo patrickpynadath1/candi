@@ -28,7 +28,9 @@ sigma_max: 4.0
 use_percentile_scheduling: True 
 temp: 1.0
 use_cfg: False
+use_fixed_masking: True
 pure_continuous: False
 alpha_beta: 3.0
-use_uniform_sampling: False
-sampler: distilled
+use_uniform_sampling: True
+sampler: cached
+is_greedy: False

@@ -454,6 +454,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.config = config
         self.vocab_size = vocab_size
         dim = config.hidden_size
+        self.dim=dim
         cond_dim = config.cond_dim
         if use_mixed_mask: 
             self.vocab_embed = EmbeddingLayer(dim,vocab_size)
@@ -505,7 +506,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     
     # clean mask: indicates which positions are clean with 1, which are corrupted with 0
     # def forward(self, x, discrete_noise):
-    def forward(self, xt, discrete_noise, reveal_mask, continuous_noise, embedding=None):
+    def forward(self, xt, discrete_noise, reveal_mask, continuous_noise, embedding=None, ret_embedding=False):
         # sigma = discrete_noise
         # x = self.vocab_embed(x)
         x = xt 
@@ -538,9 +539,11 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         with torch.cuda.amp.autocast(dtype=torch.bfloat16):
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
-            x = self.output_layer(x, c=t_cond)
+            logits = self.output_layer(x, c=t_cond)
 
-        return x[:, :, :-1]
+        if ret_embedding:
+            return logits[:, :, :-1], x 
+        return logits[:, :, :-1]
     
     def get_embedding(self, x): 
         return self.vocab_embed(x)

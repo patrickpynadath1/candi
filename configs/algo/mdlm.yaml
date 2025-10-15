@@ -9,5 +9,5 @@ ignore_bos: False
 loss_type: elbo
 temp: 0.95
 use_cfg: False
-use_prev_logits: False
-w: 1.0
+use_prev_logits: True
+cfg_w: 0.5

@@ -130,13 +130,13 @@ def _generate_samples(model, config, logger, tokenizer):
 
 def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
-    temps_to_use = torch.linspace(.7, 1.0, steps=8).tolist()
-    steps_to_use = [8, 16, 32]
+    temps_to_use = torch.linspace(.7, 1.0, steps=30).tolist()
+    steps_to_use = [8]
 
     model = _load_from_checkpoint(
         diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
     )
-    model.backbone = torch.compile(model.backbone)
+    # model.backbone = torch.compile(model.backbone)
     total_metadata = {}
     for steps in steps_to_use:
         cur_step_info = {}
