@@ -752,7 +752,15 @@ class CANDI(trainer_base.Diffusion):
         self.use_uniform_sampling = config.algo.use_uniform_sampling
         self.sampler = config.algo.sampler
         self.is_greedy = config.algo.is_greedy
+        self.is_embed = config.algo.is_embed
+        self.cont_noise_schedule = config.algo.cont_noise_schedule
+        if self.pure_continuous: 
+            if self.cont_noise_schedule == 'corruption': 
+               self.sigma_table, self.error_table = build_error_to_sigma_schedule (self.vocab_size, num_points=1000)
+                
 
+    def ve_sde_noise_sched(self, t, sigma_min=0.01, sigma_max=10.0):
+        return sigma_min * (sigma_max / sigma_min) ** t
 
     def sample_t(self, n, accum_step):
         if self.use_uniform_sampling: 
@@ -848,40 +856,61 @@ class CANDI(trainer_base.Diffusion):
         # accounting for the mask token
         onehot = F.one_hot(x, num_classes=self.vocab_size-1).float()
 
-        if self.use_embedding_space_noise: 
-            clean_embeddings = self.backbone.get_input_embeddings()(x)
-            pass
-
+        if self.pure_continuous: 
+            if self.is_embed: 
+                clean_embeddings = self.backbone.get_embedding(x)
+                t = discrete_noise
+                sigma = self.get_continuous_from_discrete_noise(t).squeeze()
+                noise = torch.randn_like(clean_embeddings, device=x.device) * sigma[:, None, None]
+                xt = clean_embeddings + noise
+                reveal_mask = torch.zeros_like(reveal_mask)
+                return {
+                    'xt': xt, 
+                    'reveal_mask': reveal_mask, 
+                    'discrete_noise': discrete_noise, 
+                    'continuous_noise': continuous_noise,
+                    'is_embed': True
+                }
+            else: 
+                if self.cont_noise_schedule == 'corruption': 
+                    if self.sigma_table.device != discrete_noise.device:
+                        self.sigma_table = self.sigma_table.to(discrete_noise.device)
+                        self.error_table = self.error_table.to(discrete_noise.device)
+                    sigma = sigma_to_error(discrete_noise, self.sigma_table, self.error_table)
+                else: 
+                    sigma = continuous_noise
+                noise = torch.randn_like(onehot, device=x.device) * sigma[:, None, None]
+                xt = onehot + noise
+                reveal_mask = torch.zeros_like(reveal_mask)
+                return {
+                    'xt': xt, 
+                    'reveal_mask': reveal_mask, 
+                    'discrete_noise': discrete_noise, 
+                    'continuous_noise': continuous_noise,
+                    'is_embed': False
+                }
 
         xt_cont = onehot + continuous_noise[:, None, None].to(x.device) * torch.randn_like(onehot, device=x.device)
 
-        if self.pure_continuous: 
-            xt = xt_cont
-            reveal_mask = torch.zeros_like(reveal_mask)
-
-            return {
-                'xt': xt, 
-                'reveal_mask': reveal_mask, 
-                'discrete_noise': discrete_noise, 
-                'continuous_noise': continuous_noise
-            }
-        else: 
-            xt = onehot * reveal_mask.unsqueeze(-1) + (1 - reveal_mask).unsqueeze(-1) * xt_cont
-            return {
-                'xt': xt, 
-                'reveal_mask': reveal_mask, 
-                'discrete_noise': discrete_noise, 
-                'continuous_noise': continuous_noise
-            }
+        xt = onehot * reveal_mask.unsqueeze(-1) + (1 - reveal_mask).unsqueeze(-1) * xt_cont
+        return {
+            'xt': xt, 
+            'reveal_mask': reveal_mask, 
+            'discrete_noise': discrete_noise, 
+            'continuous_noise': continuous_noise
+        }
 
     def prior_sample(self, *batch_dims): 
 
         sigma = self.get_continuous_from_discrete_noise(torch.tensor(.999).to(self.device))
-        noise = torch.randn(
-            *batch_dims, self.vocab_size-1, dtype=torch.float32, device=self.device
-        )  * sigma
-
-
+        if self.is_embed:
+            sigma_max = self.sigma_max 
+            noise = torch.randn(
+                *batch_dims, self.backbone.config.hidden_size, dtype=torch.float32, device=self.device) * sigma_max
+        else: 
+            noise = torch.randn(
+                *batch_dims, self.vocab_size-1, dtype=torch.float32, device=self.device
+            )  * sigma
         return noise
     
     def forward(self, **kwargs): 
@@ -947,6 +976,9 @@ class CANDI(trainer_base.Diffusion):
             continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
         else: 
             continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
+
+        if self.is_embed: 
+            continuous_noise = self.ve_sde_noise_sched(timesteps, sigma_min=self.sigma_min, sigma_max=self.sigma_max)   
         dt = (1 - eps) / (num_steps)
 
         self.max_sigma = continuous_noise.max().item()
@@ -1057,11 +1089,13 @@ class CANDI(trainer_base.Diffusion):
             sigma_s = continuous_noise[i]
             sigma_t = continuous_noise[i+1]
 
-            new_x, _ = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s)
-            hops = (new_x.argmax(dim=-1) != x.argmax(dim=-1)).float().mean()
-            total_hops.append(hops.item())
-
-        final_tokens = x.argmax(dim=-1)
+            new_x, denoised = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s, is_embed=True)
+            x = new_x
+        
+        if self.is_embed: 
+            final_tokens = denoised.argmax(dim=-1)
+        else: 
+            final_tokens = x.argmax(dim=-1)
         if self.token_offset: 
             final_tokens += self.tokenizer.eos_token_id
         return final_tokens
@@ -1193,7 +1227,7 @@ class CANDI(trainer_base.Diffusion):
 
         return updated_x, new_clean_mask
     
-
+    @torch.no_grad()
     def _continuous_step(
         self,
         x: torch.Tensor,
@@ -1202,6 +1236,7 @@ class CANDI(trainer_base.Diffusion):
         sigma_s: torch.Tensor,
         sigma_t: torch.Tensor,
         clean_mask: torch.Tensor=None,
+        is_embed=False,
     ) -> torch.Tensor:
 
         dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_s - sigma_t).item()
@@ -1209,10 +1244,11 @@ class CANDI(trainer_base.Diffusion):
         sigma_t_vec = torch.ones(x.shape[0], device=x.device) * sigma_t.item()
         if clean_mask is None: 
             clean_mask = torch.zeros(x.shape[:-1], device=x.device)
-        cond_denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec).double()
+        cond_denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec, is_embed=is_embed).double()
         denoised = cond_denoised.exp()
-        x0_hat = sample_categorical(denoised)
-        x0_hat = torch.nn.functional.one_hot(x0_hat, num_classes=x.shape[-1]).float().to(x.device)
+        x0_hat = self.backbone.get_embedding(denoised)
+        # x0_hat = sample_categorical(denoised)
+        # x0_hat = torch.nn.functional.one_hot(x0_hat, num_classes=x.shape[-1]).float().to(x.device)
         d = (x - x0_hat) / (sigma_t_vec[:, None, None] ** 2)
         x_cont = x - dt_cont_vec[:, None, None]  * d
         return x_cont, denoised
@@ -1750,3 +1786,116 @@ def compute_sigma(t, r_max, r_min):
     sigma = 1 / (sqrt_2 * phi_inv_r)
     
     return sigma
+
+
+def bayes_error(K: int, sigma: float) -> float:
+    """
+    Compute the Bayes error rate for K classes given noise level sigma.
+    
+    Args:
+        K: Number of classes (vocabulary size)
+        sigma: Continuous noise level
+    
+    Returns:
+        Bayes error rate (probability of misclassification)
+    """
+    normal = Normal(0., 1.)
+    s = torch.linspace(-4*sigma, 1+6*sigma, 1001)
+    phi = normal.log_prob((s-1)/sigma).exp() / sigma
+    cdf_power = normal.cdf(s/sigma).pow(K-1)
+    return 1.0 - torch.trapz(cdf_power * phi, s).item()
+
+
+def build_error_to_sigma_schedule(
+    vocab_size: int,
+    sigma_range: tuple = (0.01, 1.0),
+    num_points: int = 500,
+    device: str = 'cpu'
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Build a lookup table mapping between sigma and Bayes error rate.
+    
+    Args:
+        vocab_size: Number of discrete classes
+        sigma_range: (min_sigma, max_sigma) range to compute
+        num_points: Number of points in lookup table
+        device: Device to store tensors on
+    
+    Returns:
+        sigmas: Tensor of sigma values
+        errors: Tensor of corresponding Bayes error rates
+    """
+    sigmas = torch.linspace(*sigma_range, steps=num_points, device=device)
+    errors = torch.tensor(
+        [bayes_error(vocab_size, s.item()) for s in sigmas], 
+        device=device
+    )
+    return sigmas, errors
+
+
+def error_to_sigma(
+    error_rates: torch.Tensor,
+    sigmas: torch.Tensor,
+    errors: torch.Tensor
+) -> torch.Tensor:
+    """
+    Convert Bayes error rates to continuous noise levels (sigma) via linear interpolation.
+    
+    Args:
+        error_rates: Target Bayes error rates (ε ∈ [0, 1])
+        sigmas: Precomputed sigma values from lookup table
+        errors: Precomputed error values from lookup table
+    
+    Returns:
+        Interpolated sigma values
+    """
+    error_rates = error_rates.clamp(min=0.0, max=1.0)
+    
+    # Find bracketing indices
+    indices = torch.searchsorted(errors, error_rates, right=True).clamp(1, len(errors)-1)
+    i0 = indices - 1
+    i1 = indices
+    
+    # Get bracketing values
+    e0 = errors[i0]
+    e1 = errors[i1]
+    s0 = sigmas[i0]
+    s1 = sigmas[i1]
+    
+    # Linear interpolation
+    interp_t = (error_rates - e0) / (e1 - e0 + 1e-8)
+    return s0 + interp_t * (s1 - s0)
+
+
+def sigma_to_error(
+    sigma_vals: torch.Tensor,
+    sigmas: torch.Tensor,
+    errors: torch.Tensor
+) -> torch.Tensor:
+    """
+    Convert continuous noise levels (sigma) to Bayes error rates via linear interpolation.
+    
+    Args:
+        sigma_vals: Sigma values to convert
+        sigmas: Precomputed sigma values from lookup table
+        errors: Precomputed error values from lookup table
+    
+    Returns:
+        Interpolated Bayes error rates
+    """
+    sigma_vals = sigma_vals.clamp(min=sigmas[0], max=sigmas[-1])
+    
+    # Find bracketing indices
+    indices = torch.searchsorted(sigmas, sigma_vals, right=True).clamp(1, len(sigmas)-1)
+    i0 = indices - 1
+    i1 = indices
+    
+    # Get bracketing values
+    s0 = sigmas[i0]
+    s1 = sigmas[i1]
+    e0 = errors[i0]
+    e1 = errors[i1]
+    
+    # Linear interpolation
+    interp_t = (sigma_vals - s0) / (s1 - s0 + 1e-8)
+    return e0 + interp_t * (e1 - e0)

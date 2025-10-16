@@ -506,7 +506,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     
     # clean mask: indicates which positions are clean with 1, which are corrupted with 0
     # def forward(self, x, discrete_noise):
-    def forward(self, xt, discrete_noise, reveal_mask, continuous_noise, embedding=None, ret_embedding=False):
+    def forward(self, xt, discrete_noise, reveal_mask, continuous_noise, embedding=None, ret_embedding=False, is_embed=False):
         # sigma = discrete_noise
         # x = self.vocab_embed(x)
         x = xt 
@@ -514,8 +514,8 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         c_in = 1 / (1 + continuous_noise ** 2) ** .5
         # c_in = torch.ones_like(clean_mask, device=c_in.device)* clean_mask * (1/self.scaling_factor)+ (1 - clean_mask) * c_in[:, None]
         # # pdb.set_trace()
-
-        x = self.vocab_embed(x)
+        if is_embed == False:
+            x = self.vocab_embed(x)
 
         if self.use_mixed_mask: 
             special = self.vocab_embed.embedding[-1].view(1, 1, -1).expand_as(x)
@@ -547,3 +547,4 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     
     def get_embedding(self, x): 
         return self.vocab_embed(x)
+    
