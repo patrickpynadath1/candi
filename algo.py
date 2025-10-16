@@ -779,6 +779,20 @@ class CANDI(trainer_base.Diffusion):
             sigmas = training_sigma(discrete_noise, sigma_min=self.sigma_min, sigma_max=self.sigma_max)
             return sigmas
 
+    def get_continuous_noise_sched_pure_cont(self, timesteps): 
+        if self.is_embed: 
+            target_percentile = timesteps * (self.max_percentile - self.min_percentile) + self.min_percentile
+            return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
+        else: 
+            if self.cont_noise_schedule == "corruption": 
+                if self.error_table.device != timesteps.device:
+                    self.sigma_table = self.sigma_table.to(timesteps.device)
+                    self.error_table = self.error_table.to(timesteps.device)
+                return error_to_sigma(timesteps, self.error_table, self.sigma_table)
+            else:
+                target_percentile = timesteps * (self.max_percentile - self.min_percentile) + self.min_percentile
+                return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
+
     def to(self, *args, **kwargs): 
         super().to(*args, **kwargs)
         self.continuous_noise = self.continuous_noise.to(*args, **kwargs)
@@ -977,8 +991,6 @@ class CANDI(trainer_base.Diffusion):
         else: 
             continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
 
-        if self.is_embed: 
-            continuous_noise = self.ve_sde_noise_sched(timesteps, sigma_min=self.sigma_min, sigma_max=self.sigma_max)   
         dt = (1 - eps) / (num_steps)
 
         self.max_sigma = continuous_noise.max().item()
@@ -1071,10 +1083,7 @@ class CANDI(trainer_base.Diffusion):
             x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
 
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
-        if self.use_percentile_scheduling:
-            continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
-        else: 
-            continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
+        continuous_noise = self.get_continuous_noise_sched_pure_cont(timesteps)
         dt = (1 - eps) / (num_steps)
 
         self.max_sigma = continuous_noise.max().item()
@@ -1089,7 +1098,7 @@ class CANDI(trainer_base.Diffusion):
             sigma_s = continuous_noise[i]
             sigma_t = continuous_noise[i+1]
 
-            new_x, denoised = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s, is_embed=True)
+            new_x, denoised = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s, is_embed=self.is_embed)
             x = new_x
         
         if self.is_embed: 
@@ -1246,7 +1255,10 @@ class CANDI(trainer_base.Diffusion):
             clean_mask = torch.zeros(x.shape[:-1], device=x.device)
         cond_denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec, is_embed=is_embed).double()
         denoised = cond_denoised.exp()
-        x0_hat = self.backbone.get_embedding(denoised)
+        if self.is_embed: 
+            x0_hat = self.backbone.get_embedding(denoised)
+        else: 
+            x0_hat = denoised
         # x0_hat = sample_categorical(denoised)
         # x0_hat = torch.nn.functional.one_hot(x0_hat, num_classes=x.shape[-1]).float().to(x.device)
         d = (x - x0_hat) / (sigma_t_vec[:, None, None] ** 2)
