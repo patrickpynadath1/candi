@@ -890,7 +890,7 @@ class CANDI(trainer_base.Diffusion):
                     if self.sigma_table.device != discrete_noise.device:
                         self.sigma_table = self.sigma_table.to(discrete_noise.device)
                         self.error_table = self.error_table.to(discrete_noise.device)
-                    sigma = sigma_to_error(discrete_noise, self.sigma_table, self.error_table)
+                    sigma = error_to_sigma(discrete_noise, self.sigma_table, self.error_table)
                 else: 
                     sigma = continuous_noise
                 noise = torch.randn_like(onehot, device=x.device) * sigma[:, None, None]
