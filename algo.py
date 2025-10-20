@@ -878,6 +878,9 @@ class CANDI(trainer_base.Diffusion):
                 noise = torch.randn_like(clean_embeddings, device=x.device) * sigma[:, None, None]
                 xt = clean_embeddings + noise
                 reveal_mask = torch.zeros_like(reveal_mask)
+
+                # give it 50% random mask
+
                 return {
                     'xt': xt, 
                     'reveal_mask': reveal_mask, 
@@ -1130,13 +1133,7 @@ class CANDI(trainer_base.Diffusion):
             x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
 
 
-        # for using the beta dist 
-        # from scipy.stats import beta
-        # u = torch.linspace(1, 0, num_steps + 1).numpy()
 
-        # inverse CDF using SciPy
-        # timesteps = torch.Tensor(beta.ppf(u, a=3, b=3)).to(self.device)
-        # pdb.set_trace()
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         if self.use_percentile_scheduling:
             continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
@@ -1146,14 +1143,7 @@ class CANDI(trainer_base.Diffusion):
 
         self.max_sigma = continuous_noise.max().item()
 
-        # manually did a grid search and found in general, 
-        # > 64 for cfg is best with small w, 
-        # < 64 for cfg is best with larger 2 
-        # could be tuned further, just nice defaults
-        if num_steps > 64: 
-            w = .1
-        else: 
-            w = .5
+
         # convert to tokens
         x = x.argmax(dim=-1)
         for i in range(num_steps): 
@@ -1170,17 +1160,13 @@ class CANDI(trainer_base.Diffusion):
                                                                 clean_mask=clean_mask.float(), 
                                                                 time_s=s,
                                                                 embedding_cache=embedding_cache, 
-                                                                w=w, 
                                                                 is_first=(i==0))
-            is_noise_removal_step = (i == num_steps - 1)
-            if is_noise_removal_step and self.is_greedy: 
-                x = x0_hat.argmax(dim=-1)
-            else: 
-                x, clean_mask = self._discrete_step_optimized(x0_hat, x, t, dt, 
-                                                            prev_clean_mask=clean_mask, 
-                                                        noise_removal_step=is_noise_removal_step)
-            
+
+            x, clean_mask = self._discrete_step_optimized(x0_hat, x, t, dt, 
+                                                        prev_clean_mask=clean_mask, 
+                                                    noise_removal_step=False)
         
+    
         return x
     
 

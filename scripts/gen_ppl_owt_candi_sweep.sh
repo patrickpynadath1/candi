@@ -16,7 +16,7 @@
 export HYDRA_FULL_ERROR=1
 
 eval_batch_size=8
-mixed_coeff=1.0
+mixed_coeff=.5
 CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
   mode=sample_eval \
   loader.batch_size=16 \
@@ -25,7 +25,7 @@ CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
   model=small \
   algo=candi \
   sampling.num_sample_batches=16 \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/aggressive-lr-distill/checkpoints/last.ckpt \
+  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/candi-50k-ckpt/checkpoints/last.ckpt \
   model.length=1024 \
   algo.top_k=100 \
   algo.step_size=1 \

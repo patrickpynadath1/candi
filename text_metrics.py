@@ -146,28 +146,6 @@ def calculate_char_distribution_metrics(
     return gen_freqs, kl_div
 
 
-def calculate_entropy(texts: List[str]) -> float:
-    """
-    Calculate entropy in bits per character.
-
-    Args:
-        texts: List of text samples
-
-    Returns:
-        Entropy in bits per character
-    """
-    all_chars = "".join(texts)
-    char_counts = Counter(all_chars)
-    total_chars = len(all_chars)
-
-    entropy = 0.0
-    for count in char_counts.values():
-        p = count / total_chars
-        entropy -= p * math.log2(p)
-
-    return entropy
-
-
 def calculate_word_dictionary_match(
     generated_texts: List[str], train_texts: List[str], n: int = 4
 ) -> float:
@@ -434,6 +412,7 @@ def evaluate_text_metrics(
     train_texts: List[str],
     include_perplexity: bool = True,
     perplexity_model: str = "gpt2-large",
+    tokens: torch.Tensor = None,
 ) -> Dict[str, float]:
     """
     Calculate all text metrics for generated samples.
@@ -451,7 +430,6 @@ def evaluate_text_metrics(
         "ngram_coverage_3": calculate_ngram_coverage(generated_texts, train_texts, n=3),
         "ngram_coverage_4": calculate_ngram_coverage(generated_texts, train_texts, n=4),
         # 'char_kl_divergence': calculate_char_distribution_metrics(generated_texts, train_texts)[1],
-        # 'entropy_bits_per_char': calculate_entropy(generated_texts),
         "unique_ngrams_per_sample_3": unique_ngrams_per_sample(generated_texts, n=3),
         "unique_ngrams_per_sample_4": unique_ngrams_per_sample(generated_texts, n=4),
         "total_unique_ngrams_3": total_unique_ngrams(generated_texts, n=3),
@@ -462,28 +440,26 @@ def evaluate_text_metrics(
         "repetition_rate_4": calculate_repetition_rate(generated_texts, n=4),
         "total_valid_words": total_valid_words(generated_texts, train_texts),
         "total_unique_words": total_unique_words(generated_texts, train_texts),
-        "self_bleu_4": compute_self_bleu_hf(generated_texts, n_gram=4),
-        "self_bleu_3": compute_self_bleu_hf(generated_texts, n_gram=3),
         # 'mauve': calc_mauve(generated_texts, train_texts)
     }
 
     # Calculate perplexity if requested
-    if include_perplexity:
-        try:
-            # perplexity_stats = record_generative_perplexity(
-            #     generated_texts,
-            #     model_name_or_path=perplexity_model
-            # )
-            # # Add perplexity metrics to the results
-            # metrics.update(perplexity_stats)
-            perplexity = evaluate.load("perplexity", module_type="metric")
-            results = perplexity.compute(
-                predictions=generated_texts, model_id="gpt2-large"
-            )
-            metrics["perplexity_mean"] = np.mean(results["perplexities"])
-            # metrics.update(results)
-        except Exception as e:
-            print(f"Error calculating perplexity: {e}")
-    with open("/home/patrick/bd3lms/generations_tg_16.pkl", "wb") as f:
-        pickle.dump(generated_texts, f)
+    # if include_perplexity:
+    #     try:
+    #         # perplexity_stats = record_generative_perplexity(
+    #         #     generated_texts,
+    #         #     model_name_or_path=perplexity_model
+    #         # )
+    #         # # Add perplexity metrics to the results
+    #         # metrics.update(perplexity_stats)
+    #         perplexity = evaluate.load("perplexity", module_type="metric")
+    #         results = perplexity.compute(
+    #             predictions=generated_texts, model_id="gpt2-large"
+    #         )
+    #         metrics["perplexity_mean"] = np.mean(results["perplexities"])
+    #         # metrics.update(results)
+    #     except Exception as e:
+    #         print(f"Error calculating perplexity: {e}")
+    # with open("/home/patrick/bd3lms/generations_tg_16.pkl", "wb") as f:
+    #     pickle.dump(generated_texts, f)
     return metrics

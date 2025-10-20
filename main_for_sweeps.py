@@ -130,8 +130,8 @@ def _generate_samples(model, config, logger, tokenizer):
 
 def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
-    temps_to_use = torch.linspace(.7, 1.0, steps=30).tolist()
-    steps_to_use = [8]
+    temps_to_use = torch.linspace(.1, 2.0, steps=30).tolist()
+    steps_to_use = [8, 16, 32, 64, 128]
 
     model = _load_from_checkpoint(
         diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
@@ -159,6 +159,9 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
                 "perplexity": res["generative_ppl"],
                 "entropy": res["entropy"],
             }
+            print(f"Steps: {steps}, Temp: {temp}")
+            print("perplexity: ", res["generative_ppl"])
+            print("entropy: ", res["entropy"])
         total_metadata[steps] = cur_step_info
     
     metadata_path = config.eval.generated_samples_path.replace('.json', f'_sweep_metadata.json')

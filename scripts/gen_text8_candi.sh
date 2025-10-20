@@ -2,11 +2,16 @@
 
 steps=$2
 temp=$3
+# CUDA_VISIBLE_DEVICES=$1 python main.py --config-name=config_text8 mode=sample_eval algo=candi \
+#         eval.checkpoint_path=/data/remote_cache/patrick/discrete_diffusion/text8/2025.09.19/054800/checkpoints/20-28500.ckpt \
+#         algo.temp=$temp \
+#         sampling.steps=$steps;
 CUDA_VISIBLE_DEVICES=$1 python main.py --config-name=config_text8 mode=sample_eval algo=candi \
-        eval.checkpoint_path=/data/remote_cache/patrick/discrete_diffusion/text8/2025.09.19/054800/checkpoints/20-28500.ckpt \
+        model=small \
+        model.length=1024 \
+        eval.checkpoint_path=/data/remote_cache/patrick/discrete_diffusion/openwebtext-train/text8-candi-1024/checkpoints/last.ckpt \
         algo.temp=$temp \
         sampling.steps=$steps;
-
 
 # steps=$2
 # CUDA_VISIBLE_DEVICES=$1 python main.py --config-name=config_text8 mode=sample_eval algo=candi \
