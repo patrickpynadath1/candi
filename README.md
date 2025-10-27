@@ -35,6 +35,11 @@ pip install -r requirements.txt
 pip install flash-attn --no-build-isolation
 ```
 
+4. Download the OWT data
+```bash
+bash manual_download.sh
+```
+
 ## Experiments 
 
 This codebase includes the code for running experiments on Text8 and OWT. We will integrate the QM9 experiments later. In general, we re-use the same experimental methodology and codebase from https://github.com/kuleshov-group/discrete-diffusion-guidance.
