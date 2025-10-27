@@ -1,28 +1,11 @@
 import numpy as np
 import evaluate
-import pickle
 from collections import Counter, defaultdict
 import math
 from typing import List, Dict, Tuple
 import torch
-from torch.utils.data import DataLoader
-import pdb
 import transformers
-import torch.nn.functional as F
-from tqdm import tqdm
 import os
-import mauve
-
-
-def calc_mauve(generated_texts: List[str], train_texts: List[str]) -> float:
-    train_file = "/home/patrick/bd3lms/train_texts.txt"
-    with open(train_file, "r") as f:
-        text = f.read().lower()  # Ensure it's lowercase like the dataset expects
-    # pdb.set_trace()
-    # chunked_text = [text[i:i+128] for i in range(0, len(text), 128)]
-    out = mauve.compute_mauve(p_text=generated_texts, q_text=text[:1024], device_id=0)
-    return out.mauve
-
 
 def calculate_ngram_coverage(
     generated_texts: List[str], train_texts: List[str], n: int = 3, word_based=True
@@ -410,9 +393,8 @@ def compute_self_bleu_hf(sentences: List[str], n_gram: int = 4) -> float:
 def evaluate_text_metrics(
     generated_texts: List[str],
     train_texts: List[str],
-    include_perplexity: bool = True,
-    perplexity_model: str = "gpt2-large",
-    tokens: torch.Tensor = None,
+    *args, 
+    **kwargs,
 ) -> Dict[str, float]:
     """
     Calculate all text metrics for generated samples.
@@ -429,37 +411,13 @@ def evaluate_text_metrics(
     metrics = {
         "ngram_coverage_3": calculate_ngram_coverage(generated_texts, train_texts, n=3),
         "ngram_coverage_4": calculate_ngram_coverage(generated_texts, train_texts, n=4),
-        # 'char_kl_divergence': calculate_char_distribution_metrics(generated_texts, train_texts)[1],
         "unique_ngrams_per_sample_3": unique_ngrams_per_sample(generated_texts, n=3),
         "unique_ngrams_per_sample_4": unique_ngrams_per_sample(generated_texts, n=4),
         "total_unique_ngrams_3": total_unique_ngrams(generated_texts, n=3),
         "total_unique_ngrams_4": total_unique_ngrams(generated_texts, n=4),
-        # 'word_dictionary_match-4': calculate_word_dictionary_match(generated_texts, train_texts, n=4),
-        # 'word_dictionary_match-5': calculate_word_dictionary_match(generated_texts, train_texts, n=5),
         "repetition_rate_3": calculate_repetition_rate(generated_texts, n=3),
         "repetition_rate_4": calculate_repetition_rate(generated_texts, n=4),
         "total_valid_words": total_valid_words(generated_texts, train_texts),
         "total_unique_words": total_unique_words(generated_texts, train_texts),
-        # 'mauve': calc_mauve(generated_texts, train_texts)
     }
-
-    # Calculate perplexity if requested
-    # if include_perplexity:
-    #     try:
-    #         # perplexity_stats = record_generative_perplexity(
-    #         #     generated_texts,
-    #         #     model_name_or_path=perplexity_model
-    #         # )
-    #         # # Add perplexity metrics to the results
-    #         # metrics.update(perplexity_stats)
-    #         perplexity = evaluate.load("perplexity", module_type="metric")
-    #         results = perplexity.compute(
-    #             predictions=generated_texts, model_id="gpt2-large"
-    #         )
-    #         metrics["perplexity_mean"] = np.mean(results["perplexities"])
-    #         # metrics.update(results)
-    #     except Exception as e:
-    #         print(f"Error calculating perplexity: {e}")
-    # with open("/home/patrick/bd3lms/generations_tg_16.pkl", "wb") as f:
-    #     pickle.dump(generated_texts, f)
     return metrics
