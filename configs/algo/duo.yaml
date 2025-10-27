@@ -15,5 +15,3 @@ ignore_bos: False
 gamma_min: -3.5
 gamma_max: -1.75
 temp: 1.0
-use_cfg: False
-w: .5

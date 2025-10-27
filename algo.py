@@ -294,9 +294,6 @@ class DUO_BASE(trainer_base.UniformState):
         self.temp = config.algo.get("temp", 1.0)
         super().__init__(config, tokenizer)
         self._validate_configuration()
-        self.prev_logits = None
-        self.use_cfg = config.algo.get("use_cfg", False)
-        self.w = config.algo.get("w", .5)
 
     def on_save_checkpoint(self, checkpoint):
         checkpoint["state_dict"] = collections.OrderedDict(
@@ -399,14 +396,7 @@ class DUO_BASE(trainer_base.UniformState):
         assert alpha_t.ndim == 2
 
         cur_logits = (self.forward(x, sigma_t)).double()
-        if self.use_cfg: 
-            
-            if self.prev_logits is not None: 
-                cur_logits = cur_logits * (1 + self.w) - self.w * self.prev_logits
-            self.prev_logits = cur_logits.detach().clone()
-            xtheta_to_use = cur_logits.softmax(dim=-1)
-        else: 
-            xtheta_to_use = cur_logits.exp()
+        xtheta_to_use = cur_logits.exp()
 
 
 
@@ -689,58 +679,19 @@ class CANDI(trainer_base.Diffusion):
     def __init__(self, config, tokenizer):
         self.mask_index = len(tokenizer)
         vocab_size = len(tokenizer) + 1
-
-        if hasattr(config.data, "vocab_file"): 
-            vocab_size = len(tokenizer.added_tokens_encoder)
-            self.mask_index = vocab_size 
-            vocab_size += 1
-            self.token_offset = True
-        else: 
-            self.token_offset = False
-
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self._validate_configuration()
         self.save_hyperparameters()
         
-        # building error tables
-        self.scaling_factor = config.algo.scaling_factor
-        self.t_min = config.algo.t_min
-        self.t_max = config.algo.t_max
-        self.use_actual_elbo = config.algo.use_actual_elbo
-        self.use_cfg = config.algo.use_cfg
-
-        self.inference_start_t = config.algo.inference_start_t
-        self.inference_end_t = config.algo.inference_end_t
-        self.confidence_threshold = config.algo.confidence_threshold
-
-        self.clean_reveal_ratio = config.algo.clean_reveal_ratio
         self.pure_continuous = config.algo.pure_continuous
-        self.use_fixed_masking = config.algo.use_fixed_masking
-        # self.use_embedding_cache = config.algo.use_embedding_cache
-        # self.continuous_noise, self.discrete_noise = build_sigma_error_table(
-        #     vocab_size, 
-        #     sigma_range=(.01, 2), 
-        #     num=1000, 
-        #     # device=self.device, 
-        #     scaling_factor=self.scaling_factor
-        # )
 
         self.continuous_noise =torch.linspace(.2, 4.0, 1000)
         self.discrete_noise = expected_rank(d=self.vocab_size-1, a=torch.tensor(1).to(self.device), sigma=self.continuous_noise)
 
-        self.use_percentile_scheduling = config.algo.use_percentile_scheduling
-
         self.continuous_noise = torch.tensor(self.continuous_noise)
         self.discrete_noise = torch.tensor(self.discrete_noise)
-        self.weighted_loss = config.algo.weighted_loss
-
-        # can either be soft (expectation) or hard (sampled from prob dist) 
-        self.grad_calc=config.algo.grad_calc
-        self.discretize_start_time = config.algo.discretize_start_time
 
         self.step_size = config.algo.step_size
-        self.top_k = config.algo.top_k
-        self.only_corrupt_rate = config.algo.only_corrupt_rate
 
         self.min_percentile = config.algo.min_percentile
         self.max_percentile = config.algo.max_percentile
@@ -748,50 +699,30 @@ class CANDI(trainer_base.Diffusion):
         self.sigma_min = config.algo.sigma_min
         self.sigma_max = config.algo.sigma_max
         self.temp = config.algo.temp
-        self.alpha_beta = config.algo.alpha_beta
-        self.use_uniform_sampling = config.algo.use_uniform_sampling
         self.sampler = config.algo.sampler
-        self.is_greedy = config.algo.is_greedy
         self.is_embed = config.algo.is_embed
-        self.cont_noise_schedule = config.algo.cont_noise_schedule
-        if self.pure_continuous: 
-            if self.cont_noise_schedule == 'corruption': 
-               self.sigma_table, self.error_table = build_error_to_sigma_schedule (self.vocab_size, num_points=1000)
-                
+        self.use_percentile_scheduling = config.algo.use_percentile_scheduling
 
     def ve_sde_noise_sched(self, t, sigma_min=0.01, sigma_max=10.0):
         return sigma_min * (sigma_max / sigma_min) ** t
 
     def sample_t(self, n, accum_step):
-        if self.use_uniform_sampling: 
-            return super()._sample_t(n, accum_step) 
-        
-        else: 
-            return torch.distributions.Beta(alpha=self.alpha_beta, beta=self.alpha_beta).sample((n,)).to(self.device)
-        return
-    
+        return super()._sample_t(n, accum_step) 
 
     def get_continuous_from_discrete_noise(self, discrete_noise):
-        if self.use_percentile_scheduling:
+        if self.is_embed: 
+            sigmas = training_sigma_ve(discrete_noise, sigma_min=self.sigma_min, sigma_max=self.sigma_max)
+            return sigmas
+        else:
             target_percentile = discrete_noise * (self.max_percentile - self.min_percentile) + self.min_percentile
             return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
-        else: 
-            sigmas = training_sigma(discrete_noise, sigma_min=self.sigma_min, sigma_max=self.sigma_max)
-            return sigmas
 
+    # inference schedule 
+    # while the embedding diffusion should use the VE schedule, this produced better results 
+    # at least on text8 -- both schedules for embedding diffusion collapsed on OWT
     def get_continuous_noise_sched_pure_cont(self, timesteps): 
-        if self.is_embed: 
-            target_percentile = timesteps * (self.max_percentile - self.min_percentile) + self.min_percentile
-            return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
-        else: 
-            if self.cont_noise_schedule == "corruption": 
-                if self.error_table.device != timesteps.device:
-                    self.sigma_table = self.sigma_table.to(timesteps.device)
-                    self.error_table = self.error_table.to(timesteps.device)
-                return error_to_sigma(timesteps, self.error_table, self.sigma_table)
-            else:
-                target_percentile = timesteps * (self.max_percentile - self.min_percentile) + self.min_percentile
-                return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
+        target_percentile = timesteps * (self.max_percentile - self.min_percentile) + self.min_percentile
+        return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
 
     def to(self, *args, **kwargs): 
         super().to(*args, **kwargs)
@@ -803,7 +734,6 @@ class CANDI(trainer_base.Diffusion):
         return
 
     def _process_model_output(self, xt, model_output, reveal_mask): 
-        # if xt is already in token form
         if xt.ndim == 2: 
             xt_tokens = xt
         else: 
@@ -814,6 +744,7 @@ class CANDI(trainer_base.Diffusion):
         )
         reveal_mask = reveal_mask.bool()
 
+        # for pure continuous diffusion, reveal mask is all false -- so this doesnt have any impact
         model_output[reveal_mask] = self.neg_infinity
         model_output[reveal_mask, xt_tokens[reveal_mask]] = 0
         return model_output
@@ -830,9 +761,7 @@ class CANDI(trainer_base.Diffusion):
         log_p_theta = torch.gather(
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
-        sigmas = self.get_continuous_from_discrete_noise(1 - alpha_t).squeeze()
-
-        if self.pure_continuous or not self.weighted_loss:
+        if self.pure_continuous:
             nll = -1 * log_p_theta
         else: 
             nll = log_p_theta * dalpha_t / (1 - alpha_t)
@@ -863,8 +792,6 @@ class CANDI(trainer_base.Diffusion):
         reveal_mask = (disc_xt == x).float()
 
         discrete_noise = (1 - alpha_t).squeeze()
-        if self.use_fixed_masking:
-            discrete_noise = torch.ones_like(discrete_noise) * .5
         continuous_noise = self.get_continuous_from_discrete_noise(discrete_noise) 
 
         # accounting for the mask token
@@ -877,9 +804,9 @@ class CANDI(trainer_base.Diffusion):
                 sigma = self.get_continuous_from_discrete_noise(t).squeeze()
                 noise = torch.randn_like(clean_embeddings, device=x.device) * sigma[:, None, None]
                 xt = clean_embeddings + noise
-                reveal_mask = torch.zeros_like(reveal_mask)
 
-                # give it 50% random mask
+                # in pure continuous with embedding diffusion, we dont use any reveal mask
+                reveal_mask = torch.zeros_like(reveal_mask)
 
                 return {
                     'xt': xt, 
@@ -964,72 +891,17 @@ class CANDI(trainer_base.Diffusion):
         return x, prompt_mask
     
     def generate_samples(self, **kwargs): 
-        if self.pure_continuous:
+        if self.pure_continuous or self.is_embed:
             return self.generate_samples_pure_cont(**kwargs)
         else: 
             if self.sampler == 'cached': 
                 return self.generate_samples_cache(**kwargs)
-            elif self.sampler == 'distilled': 
-                return self.generate_samples_distilled(**kwargs)
             else:
                 return self.generate_samples_nocache(**kwargs)
         
-
-    def generate_samples_distilled(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
-        # pdb.set_trace()
-        if num_steps is None:
-            num_steps = self.config.sampling.steps
-
-        x = self.prior_sample(num_samples, self.num_tokens)
-        print("num steps: ", num_steps)
-
-        clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-
-        if prompt_tokens is not None and prompt_mask is not None: 
-            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
-
-        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
-        if self.use_percentile_scheduling:
-            continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
-        else: 
-            continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
-
-        dt = (1 - eps) / (num_steps)
-
-        self.max_sigma = continuous_noise.max().item()
-
-        self.prev_px0 = None
-        for i in range(num_steps): 
-            t = timesteps[i]
-            s = timesteps[i+1]
-
-            # TODO: this is a bug -- really these should be swapped. I've adjusted the code to make sure it still works
-            sigma_s = continuous_noise[i]
-            sigma_t = continuous_noise[i+1]
-
-            time_t_vec = torch.ones(x.size(0), device=x.device) * t
-            time_s_vec = torch.ones(x.size(0), device=x.device) * s
-            sigma_t_vec = torch.ones(x.size(0), device=x.device) * sigma_t
-
-            
-            p_x0 = self.forward(xt=x, 
-                                discrete_noise=time_t_vec, 
-                                reveal_mask=clean_mask,
-                                continuous_noise=sigma_t_vec).double()
-            x0_hat = sample_categorical(p_x0)
-            _, alpha_s = self.noise(time_s_vec)
-            
-            noisy_outputs = self.q_xt(x0_hat, alpha_t=alpha_s[:, None])
-            clean_mask = noisy_outputs['reveal_mask']
-            x = noisy_outputs['xt']
-            
-        return x0_hat
-
     @torch.no_grad()
     def generate_samples_nocache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
 
-        """Generate samples from the model."""
-        # pdb.set_trace()
         if num_steps is None:
             num_steps = self.config.sampling.steps
 
@@ -1055,7 +927,6 @@ class CANDI(trainer_base.Diffusion):
             t = timesteps[i]
             s = timesteps[i+1]
 
-            # TODO: this is a bug -- really these should be swapped. I've adjusted the code to make sure it still works
             sigma_s = continuous_noise[i]
             sigma_t = continuous_noise[i+1]
 
@@ -1065,39 +936,25 @@ class CANDI(trainer_base.Diffusion):
                                                 p_x0, t, dt, prev_clean_mask=clean_mask)
 
         final_tokens = x.argmax(dim=-1)
-        if self.token_offset: 
-            final_tokens += self.tokenizer.eos_token_id
         return final_tokens
     
 
     def generate_samples_pure_cont(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
-
-        """Generate samples from the model."""
-        # pdb.set_trace()
         if num_steps is None:
             num_steps = self.config.sampling.steps
-
         x = self.prior_sample(num_samples, self.num_tokens)
-
-
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-
         if prompt_tokens is not None and prompt_mask is not None: 
             x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
-
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         continuous_noise = self.get_continuous_noise_sched_pure_cont(timesteps)
-        dt = (1 - eps) / (num_steps)
 
         self.max_sigma = continuous_noise.max().item()
 
-        self.prev_px0 = None
-        total_hops = []
         for i in range(num_steps): 
             t = timesteps[i]
             s = timesteps[i+1]
 
-            # TODO: this is a bug -- really these should be swapped. I've adjusted the code to make sure it still works
             sigma_s = continuous_noise[i]
             sigma_t = continuous_noise[i+1]
 
@@ -1108,8 +965,6 @@ class CANDI(trainer_base.Diffusion):
             final_tokens = denoised.argmax(dim=-1)
         else: 
             final_tokens = x.argmax(dim=-1)
-        if self.token_offset: 
-            final_tokens += self.tokenizer.eos_token_id
         return final_tokens
     
     # optimized function with cached embeddings
@@ -1117,23 +972,13 @@ class CANDI(trainer_base.Diffusion):
     def generate_samples_cache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
 
         x = self.prior_sample(num_samples, self.num_tokens)
-        """Generate samples from the model."""
-        # pdb.set_trace()
         if num_steps is None:
             num_steps = self.config.sampling.steps
-        print("num steps: ", num_steps)
 
         embedding_cache = self.backbone.get_embedding(x)
-
-
-
         clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device, dtype=torch.bool)
-
         if prompt_tokens is not None and prompt_mask is not None: 
             x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
-
-
-
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         if self.use_percentile_scheduling:
             continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
@@ -1150,7 +995,6 @@ class CANDI(trainer_base.Diffusion):
             t = timesteps[i]
             s = timesteps[i+1]
 
-            # TODO: this is a bug -- really these should be swapped. I've adjusted the code to make sure it still works
             sigma_s = continuous_noise[i]
             sigma_t = continuous_noise[i+1]
 
@@ -1165,15 +1009,7 @@ class CANDI(trainer_base.Diffusion):
             x, clean_mask = self._discrete_step_optimized(x0_hat, x, t, dt, 
                                                         prev_clean_mask=clean_mask, 
                                                     noise_removal_step=False)
-        
-    
         return x
-    
-
-    def get_sampling_schedule(self, num_steps):
-        return torch.linspace(self.inference_start_t, 
-                              self.inference_end_t, 
-                              num_steps)
 
     def _discrete_step_optimized(self, x0_hat, xt, t, dt, prev_clean_mask, noise_removal_step=False): 
 
@@ -1188,8 +1024,6 @@ class CANDI(trainer_base.Diffusion):
         xt[~prev_clean_mask] = x0_hat[~prev_clean_mask]
         new_clean_mask = prev_clean_mask | unmask
         return xt, new_clean_mask
-    
-
     
     def _discrete_step(self, x_sigma, p_x0, t, dt, prev_clean_mask, noise_removal_step=False): 
         if noise_removal_step: 
@@ -1245,8 +1079,6 @@ class CANDI(trainer_base.Diffusion):
             x0_hat = self.backbone.get_embedding(denoised)
         else: 
             x0_hat = denoised
-        # x0_hat = sample_categorical(denoised)
-        # x0_hat = torch.nn.functional.one_hot(x0_hat, num_classes=x.shape[-1]).float().to(x.device)
         d = (x - x0_hat) / (sigma_t_vec[:, None, None] ** 2)
         x_cont = x - dt_cont_vec[:, None, None]  * d
         return x_cont, denoised
@@ -1262,7 +1094,6 @@ class CANDI(trainer_base.Diffusion):
         embedding_cache: torch.Tensor,
         clean_mask: torch.Tensor=None,
         is_first=False,
-        w=.5,
     ) -> torch.Tensor:
         dt = sigma_s - sigma_t
         time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
@@ -1276,331 +1107,12 @@ class CANDI(trainer_base.Diffusion):
                                     embedding=embedding_cache).double()
         
 
-        # use classifier free guidance here? 
-        if self.use_cfg: 
-            if not is_first: 
-                uncond_denoised = self.prev_px0
-                denoised = (cond_denoised * (1 + w) - uncond_denoised * w).softmax(dim=-1)
-
-            else: 
-                self.prev_px0 = cond_denoised.clone()
-                denoised = cond_denoised.exp()
-        else: 
-            denoised = cond_denoised.exp()
+        denoised = cond_denoised.exp()
         x0_hat = sample_categorical(denoised)
         embedding_hat = self.backbone.get_embedding(x0_hat)
         d = (embedding_cache - embedding_hat) / (sigma_t ** 2)
         new_embedding_cache = embedding_cache - dt* d * self.step_size
         return new_embedding_cache, x0_hat 
-
-
-def randomly_keep_mask(mask: torch.Tensor, keep_rate: float) -> torch.Tensor:
-
-    if mask.dtype != torch.float:
-        mask = mask.float()
-
-    probs = torch.ones_like(mask, device=mask.device) * keep_rate.unsqueeze(-1)
-    bernoulli_sample = torch.bernoulli(probs * mask)
-
-    return bernoulli_sample.float() 
-
-def compute_discrete_errors(K, sigma, scaling_factor,**kwargs):
-    normal = Normal(0.0, 1.0)
-    s = torch.linspace(-4 * sigma, scaling_factor + 6 * sigma, 1001)
-    phi = normal.log_prob((s - scaling_factor) / sigma).exp() / sigma
-    cdf_power = normal.cdf(s / sigma).pow(K - 1)
-    return 1.0 - torch.trapz(cdf_power * phi, s).item()
-
-
-def build_sigma_error_table(K, sigma_range=(1e-3, 3.0), num=500, device=None, scaling_factor=1.0, **kwargs):
-    sigmas = torch.linspace(*sigma_range, steps=num, device=device)
-    errors = torch.tensor([compute_discrete_errors(K, s.item(), scaling_factor) for s in sigmas], device=device)
-    return sigmas, errors
-
-
-
-class CANDI_Distill(CANDI):
-    def __init__(self, config, tokenizer):
-        super().__init__(config, tokenizer)
-        self.save_hyperparameters()
-        self.number_steps = config.algo.number_steps
-        self.initial_steps = config.algo.number_steps
-        self.distill_steps = config.algo.distill_steps
-        self.dt = 1 / self.number_steps
-        self.cur_round = 0
-        # self.grow_every = config.algo.grow_every
-        self.max_distill_steps = config.algo.max_distill_steps
-        self.budget = config.algo.budget
-        self.adapt_every = config.algo.adapt_every
-        growth_factor, _ = compute_growth_schedule(self.adapt_every, self.initial_steps, self.max_distill_steps, self.budget)
-        self.growth_factor = growth_factor
-        self.teacher = None
-        self.last_update_step = 0
-
-
-    def prepare_teacher_and_student(self): 
-        if self.teacher is not None: 
-            del self.teacher[0]
-        # Step 1: Load empty teacher 
-        teacher = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size, use_mixed_mask=self.config.algo.use_mixed_mask, mixed_coeff=self.config.algo.mixed_coeff)
-
-        teacher.load_state_dict(self.backbone.state_dict())
-        teacher.eval()
-        teacher.requires_grad_(False)
-        self.teacher = [teacher]
-
-
-    def update_teacher(self): 
-        for teacher_param, student_param in zip(self.teacher.parameters(), self.backbone.parameters()): 
-            teacher_param.data.copy_(student_param.data)
-        self.teacher.eval()
-        self.teacher.requires_grad_(False)
-
-    def update_round(self): 
-        self.cur_round += 1
-        
-        # Use gradual growth instead of halving
-        self.number_steps = self.number_steps / 2
-        self.dt = 1 / self.number_steps
-        
-        print("Updated to round {}, dt {:.6f}, number_steps {:.1f}".format(
-            self.cur_round, self.dt, self.number_steps))
-
-
-    def _teacher_forward(self, **kwargs):
-        with torch.cuda.amp.autocast(dtype=torch.float32):
-            model_output = self.teacher(**kwargs)
-        if kwargs.get('ret_embedding', False): 
-            return self._process_model_output(model_output=model_output[0], xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask']), model_output[1]
-        return self._process_model_output(model_output=model_output, xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask'])
-    
-    def forward(self, **kwargs):
-        with torch.cuda.amp.autocast(dtype=torch.float32):
-            model_output = self.backbone(**kwargs)
-        if kwargs.get('ret_embedding', False): 
-            return self._process_model_output(model_output=model_output[0], xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask']), model_output[1]
-        return self._process_model_output(model_output=model_output, xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask'])
-
-
-    def _continuous_step_teacher(
-        self,
-        x: torch.Tensor,
-        time_t: torch.Tensor,
-        time_s: torch.Tensor,
-        sigma_s: torch.Tensor,
-        sigma_t: torch.Tensor,
-        embedding_cache: torch.Tensor,
-        clean_mask: torch.Tensor=None,
-    ) -> torch.Tensor:
-
-        dt = sigma_s - sigma_t
-        time_t_vec = time_t 
-        sigma_t_vec = sigma_t 
-        if clean_mask is None: 
-            clean_mask = torch.zeros(x.shape[:-1], device=x.device)
-        denoised = self._teacher_forward(xt=x, 
-                                    discrete_noise=time_t_vec, 
-                                    reveal_mask=clean_mask,
-                                    continuous_noise=sigma_t_vec,
-                                    embedding=embedding_cache).double()
-        x0_hat = sample_categorical(denoised)
-        embedding_hat = self.backbone.get_embedding(x0_hat)
-        d = (embedding_cache - embedding_hat) / (sigma_t[:, None, None] ** 2)
-        new_embedding_cache = embedding_cache - dt[:, None, None] * d * self.step_size
-        return new_embedding_cache, x0_hat, denoised
-    
-    def _continuous_step_teacher_embedding(
-        self,
-        x: torch.Tensor,
-        time_t: torch.Tensor,
-        time_s: torch.Tensor,
-        sigma_s: torch.Tensor,
-        sigma_t: torch.Tensor,
-        embedding_cache: torch.Tensor,
-        clean_mask: torch.Tensor=None,
-    ) -> torch.Tensor:
-        dt = sigma_s - sigma_t
-        time_t_vec = time_t 
-        sigma_t_vec = sigma_t 
-        if clean_mask is None: 
-            clean_mask = torch.zeros(x.shape[:-1], device=x.device)
-        denoised, embedding_output = self._teacher_forward(xt=x, 
-                                    discrete_noise=time_t_vec, 
-                                    reveal_mask=clean_mask,
-                                    continuous_noise=sigma_t_vec,
-                                    embedding=embedding_cache, ret_embedding=True)
-        embedding_hat = self.backbone.get_embedding(denoised.double().exp())
-        d = (embedding_cache - embedding_hat) / (sigma_t[:, None, None] ** 2)
-        new_embedding_cache = embedding_cache - dt[:, None, None] * d * self.step_size
-        return new_embedding_cache, denoised, embedding_output
-
-
-    def _discrete_step_teacher(self, x0_hat, xt, t, dt, prev_clean_mask, noise_removal_step=False): 
-
-        s = (t - dt).clamp(min=0.0)
-
-        unmask = torch.rand(prev_clean_mask.shape, device=prev_clean_mask.device) < ((t-s)/t)[:, None]
-        xt[~prev_clean_mask] = x0_hat[~prev_clean_mask]
-        new_clean_mask = prev_clean_mask | unmask
-        return xt, new_clean_mask
-
-    def to(self, *args, **kwargs):
-        self = super().to(*args, **kwargs)
-        if self.teacher is not None:
-            self.teacher = self.teacher.to(*args, **kwargs)
-        return self
-
-
-    @torch.no_grad()
-    def sample_teacher_trajectories(self, x0, noisy_output, t_start, distill_steps=2, eps=1e-5):
-        """
-        Generate teacher trajectories for CANDI's hybrid continuous-discrete method.
-        
-        Args:
-            x0: Clean tokens [batch_size, seq_len] 
-            t_start: Starting timestep [batch_size, 1]
-            distill_steps: Number of teacher denoising steps
-            eps: Minimum timestep
-            
-        Returns:
-            teacher_predictions: Log probabilities from teacher trajectory [batch_size, seq_len, vocab_size]
-        """
-        batch_size, seq_len = x0.shape
-        device = x0.device
-        if self.teacher is None:
-            self.teacher = copy.deepcopy(self.backbone)
-            self.teacher.eval()
-            self.teacher.requires_grad_(False)
-        # Create timestep schedule for each batch element
-        dt = (1 - eps) / self.config.sampling.steps
-        
-        # Create time schedule spanning distill_steps for each batch element
-        # t_start: [batch_size, 1] -> [1, batch_size, 1] 
-        # space: [distill_steps+1, 1, 1]
-        space = torch.linspace(1, 0, distill_steps + 1, device=device)[:, None, None]
-        t_start_expanded = t_start[None, :, :]  # [1, batch_size, 1]
-        t_end = torch.clamp(t_start_expanded - dt * distill_steps, min=eps)
-        
-        # Interpolate: [distill_steps+1, batch_size, 1]
-        timesteps = t_start_expanded * space + (1 - space) * t_end
-        
-        # Initialize with corrupted input using t_start
-        dalpha_t, alpha_t = self.noise(t_start)
-        alpha_t = alpha_t.unsqueeze(-1)
-        
-        x = noisy_output['xt']  # Current state (continuous representation)
-        clean_mask = noisy_output['reveal_mask'].bool()  # Which tokens are clean
-        
-        # Storage for teacher predictions
-        teacher_predictions = torch.zeros(
-            (batch_size, seq_len, x.size(-1)), device=device
-        )
-        tokens_denoised = torch.zeros((batch_size, seq_len), dtype=torch.bool, device=device)
-        embedding_cache = self.backbone.get_embedding(x)
-
-
-        x = x.argmax(dim=-1)
-        # Run teacher trajectory
-        for i in range(distill_steps):
-            t = timesteps[i].squeeze(-1)  # [batch_size]
-            s = timesteps[i+1].squeeze(-1)  # [batch_size]
-            
-            # Get continuous noise for each batch element's timestep
-            continuous_noise_t = self.get_continuous_from_discrete_noise(t)
-            continuous_noise_s = self.get_continuous_from_discrete_noise(s)
-            
-            # Continuous step - get teacher's predictions
-            embedding_cache, x0_hat, p_x0 = self._continuous_step_teacher(x, 
-                                                                 sigma_s = continuous_noise_t, 
-                                                                 sigma_t=continuous_noise_s,
-                                                                 time_s=s,
-                                                                 time_t=t,
-                                                                 embedding_cache=embedding_cache,
-                                                                 clean_mask=clean_mask) 
-            
-            # Discrete step - sample updates  
-            new_x, new_clean_mask = self._discrete_step_teacher(x0_hat, 
-                                                                x, t, dt, 
-                                                                prev_clean_mask=clean_mask)
-            # Track which tokens got denoised this step
-            newly_denoised = (~tokens_denoised) & (new_clean_mask.bool() & ~clean_mask.bool())
-
-
-            
-            # Store teacher predictions for newly denoised tokens
-            if newly_denoised.any():
-                teacher_predictions[newly_denoised] = p_x0[newly_denoised].float()
-            tokens_denoised = tokens_denoised | newly_denoised
-            
-            # Update state
-            x = new_x
-            clean_mask = new_clean_mask
-        
-        # For any remaining masked tokens, use final predictions
-        still_masked = ~tokens_denoised
-        if still_masked.any():
-            teacher_predictions[still_masked] = p_x0[still_masked].float()
-        return teacher_predictions
-               
-    
-    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
-        del output_tokens
-        t = self._sample_t(x0.shape[0], current_accumulation_step)
-        assert t.shape[0] == x0.shape[0]
-        dalpha_t, alpha_t = self.noise(t)
-        alpha_t = alpha_t.unsqueeze(-1)
-        assert alpha_t.ndim == 2
-
-        noisy_output = self.q_xt(x0, alpha_t)
-        teacher_probs = self.sample_teacher_trajectories(x0, noisy_output, t.unsqueeze(-1), distill_steps=2)
-        log_x_theta = self.forward(**noisy_output)
-        kl_per_token = self._fwd_kl(log_x_theta, teacher_probs)
-        utils.print_nans(log_x_theta, "model_output")
-
-        return kl_per_token
-    
-
-    def _bwd_kl(self, preds, target):
-        kl_per_coord = F.kl_div(preds, target, reduction="none", log_target=True)
-        kl_per_position = kl_per_coord.sum(-1)
-        return kl_per_position
-    
-    def _fwd_kl(self, preds, target):
-        kl_per_coord = F.kl_div(target, preds, reduction="none", log_target=True)
-        kl_per_position = kl_per_coord.sum(-1)
-        return kl_per_position
-
-    def sample_t_adaptive(self, batch_size, device):
-        """
-        Sample t ensuring we have enough runway for the teacher trajectory.
-        Need: t_start >= dt * (distill_steps - 1) + eps
-        """
-        dt = self.dt 
-        distill_steps = self.distill_steps
-        min_t = dt * (distill_steps - 1) + self.sampling_eps
-        
-        if min_t >= 0.95:  # If we need almost the full range
-            return torch.ones(batch_size, 1, device=device)
-        else:
-            return torch.rand(batch_size, 1, device=device) * (1.0 - min_t) + min_t
-        
-    def training_step(self, batch, batch_idx):
-        step = self.global_step
-        if step > 0 and step % self.adapt_every == 0 and step != self.last_update_step:
-            self.update_round()
-            self.update_teacher()
-            self.last_update_step = step
-            if self.number_steps <= self.max_distill_steps: 
-                self.trainer.should_stop = True
-        return super().training_step(batch, batch_idx)
-    
-def compute_growth_schedule(adapt_every, initial_steps, final_steps, total_training_steps):
-    total_adaptations = total_training_steps // adapt_every
-    total_compression = initial_steps / final_steps
-    growth_factor = total_compression ** (1 / total_adaptations)
-    return growth_factor, total_adaptations
-
-
 
 def sigma_from_time_vectorized(
     t: torch.Tensor, sigmas: torch.Tensor, errors: torch.Tensor
@@ -1665,7 +1177,8 @@ def expected_rank(d: int, a: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
     return (d - 1) * p / d
 
 
-def training_sigma(t: torch.Tensor, sigma_min: float, sigma_max: float) -> torch.Tensor:
+# below is the noise schedule used for embedding diffusion -- follows the VE SDE schedule
+def training_sigma_ve(t: torch.Tensor, sigma_min: float, sigma_max: float) -> torch.Tensor:
     """
     Map training time t ∈ [0,1] to sigma via log-linear schedule.
 
@@ -1702,101 +1215,7 @@ def inference_sigmas(n_steps: int, sigma_min: float, sigma_max: float) -> torch.
     return sigma_max * (sigma_min / sigma_max) ** ks
 
 
-import torch
-import numpy as np
-from scipy.stats import norm
-
-def compute_dsigma_dt(t, r_max, r_min):
-    """
-    Compute dσ/dt for the one-hot noise schedule.
-    
-    Given:
-    - r(t) = (1 - t)(r_max - r_min) + r_min
-    - σ(t) = 1 / (√2 · Φ⁻¹(r(t)))
-    
-    Returns dσ/dt where Φ⁻¹ is the inverse standard normal CDF.
-    
-    Args:
-        t: Time vector, shape (n,) or scalar
-        r_max: Maximum percentile probability (e.g., 0.99)
-        r_min: Minimum percentile probability (e.g., 0.51)
-    
-    Returns:
-        dsigma_dt: Derivative dσ/dt, same shape as t
-    """
-    # Convert to tensor if needed
-    if isinstance(t, (int, float)):
-        t = torch.tensor([t], dtype=torch.float32)
-    elif not isinstance(t, torch.Tensor):
-        t = torch.tensor(t, dtype=torch.float32)
-    
-    # Compute r(t) = (1 - t)(r_max - r_min) + r_min
-    r_t = (1 - t) * (r_max - r_min) + r_min
-    
-    # Compute dr/dt = -(r_max - r_min)
-    dr_dt = -(r_max - r_min)
-    
-    # Compute Φ⁻¹(r(t)) - inverse standard normal CDF
-    # Using scipy for numerical stability
-    phi_inv_r = torch.tensor([norm.ppf(r_val.item()) for r_val in r_t], dtype=torch.float32)
-    
-    # Compute standard normal PDF at Φ⁻¹(r(t))
-    # φ(x) = (1/√(2π)) * exp(-x²/2)
-    phi_pdf = torch.exp(-0.5 * phi_inv_r**2) / torch.sqrt(torch.tensor(2 * np.pi))
-    
-    # Compute dσ/dr using chain rule
-    # σ(r) = 1 / (√2 · Φ⁻¹(r))
-    # dσ/dr = -1/(√2) · 1/(Φ⁻¹(r))² · d/dr[Φ⁻¹(r)]
-    # d/dr[Φ⁻¹(r)] = 1/φ(Φ⁻¹(r))
-    sqrt_2 = torch.sqrt(torch.tensor(2.0))
-    dsigma_dr = -1 / (sqrt_2 * phi_inv_r**2 * phi_pdf)
-    
-    # Apply chain rule: dσ/dt = (dσ/dr) * (dr/dt)
-    dsigma_dt = dsigma_dr * dr_dt
-    
-    return dsigma_dt
-
-def compute_sigma(t, r_max, r_min):
-    """
-    Compute σ(t) for comparison.
-    
-    Args:
-        t: Time vector, shape (n,) or scalar
-        r_max: Maximum percentile probability
-        r_min: Minimum percentile probability
-    
-    Returns:
-        sigma: Noise level σ(t), same shape as t
-    """
-    if isinstance(t, (int, float)):
-        t = torch.tensor([t], dtype=torch.float32)
-    elif not isinstance(t, torch.Tensor):
-        t = torch.tensor(t, dtype=torch.float32)
-    
-    # Compute r(t)
-    r_t = (1 - t) * (r_max - r_min) + r_min
-    
-    # Compute Φ⁻¹(r(t))
-    phi_inv_r = torch.tensor([norm.ppf(r_val.item()) for r_val in r_t], dtype=torch.float32)
-    
-    # Compute σ(t) = 1 / (√2 · Φ⁻¹(r(t)))
-    sqrt_2 = torch.sqrt(torch.tensor(2.0))
-    sigma = 1 / (sqrt_2 * phi_inv_r)
-    
-    return sigma
-
-
-def bayes_error(K: int, sigma: float) -> float:
-    """
-    Compute the Bayes error rate for K classes given noise level sigma.
-    
-    Args:
-        K: Number of classes (vocabulary size)
-        sigma: Continuous noise level
-    
-    Returns:
-        Bayes error rate (probability of misclassification)
-    """
+def gaussian_to_disc_corruption(K: int, sigma: float) -> float:
     normal = Normal(0., 1.)
     s = torch.linspace(-4*sigma, 1+6*sigma, 1001)
     phi = normal.log_prob((s-1)/sigma).exp() / sigma
@@ -1810,22 +1229,9 @@ def build_error_to_sigma_schedule(
     num_points: int = 500,
     device: str = 'cpu'
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Build a lookup table mapping between sigma and Bayes error rate.
-    
-    Args:
-        vocab_size: Number of discrete classes
-        sigma_range: (min_sigma, max_sigma) range to compute
-        num_points: Number of points in lookup table
-        device: Device to store tensors on
-    
-    Returns:
-        sigmas: Tensor of sigma values
-        errors: Tensor of corresponding Bayes error rates
-    """
     sigmas = torch.linspace(*sigma_range, steps=num_points, device=device)
     errors = torch.tensor(
-        [bayes_error(vocab_size, s.item()) for s in sigmas], 
+        [gaussian_to_disc_corruption(vocab_size, s.item()) for s in sigmas], 
         device=device
     )
     return sigmas, errors
@@ -1836,17 +1242,6 @@ def error_to_sigma(
     sigmas: torch.Tensor,
     errors: torch.Tensor
 ) -> torch.Tensor:
-    """
-    Convert Bayes error rates to continuous noise levels (sigma) via linear interpolation.
-    
-    Args:
-        error_rates: Target Bayes error rates (ε ∈ [0, 1])
-        sigmas: Precomputed sigma values from lookup table
-        errors: Precomputed error values from lookup table
-    
-    Returns:
-        Interpolated sigma values
-    """
     error_rates = error_rates.clamp(min=0.0, max=1.0)
     
     # Find bracketing indices
@@ -1870,17 +1265,6 @@ def sigma_to_error(
     sigmas: torch.Tensor,
     errors: torch.Tensor
 ) -> torch.Tensor:
-    """
-    Convert continuous noise levels (sigma) to Bayes error rates via linear interpolation.
-    
-    Args:
-        sigma_vals: Sigma values to convert
-        sigmas: Precomputed sigma values from lookup table
-        errors: Precomputed error values from lookup table
-    
-    Returns:
-        Interpolated Bayes error rates
-    """
     sigma_vals = sigma_vals.clamp(min=sigmas[0], max=sigmas[-1])
     
     # Find bracketing indices

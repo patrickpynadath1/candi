@@ -12,7 +12,8 @@ import rich.syntax
 import rich.tree
 import torch
 import algo
-import other_dataloader as dataloader
+import dataloader as dataloader
+from text_metrics import evaluate_text_metrics
 import utils
 import pdb
 # from lm_eval.models.huggingface import HFLM
@@ -154,14 +155,35 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
                 json.dump(res, f,
                     indent=4,
                 )
-            print("Samples saved at:", samples_path) 
-            cur_step_info[temp] = {
-                "perplexity": res["generative_ppl"],
-                "entropy": res["entropy"],
-            }
-            print(f"Steps: {steps}, Temp: {temp}")
-            print("perplexity: ", res["generative_ppl"])
-            print("entropy: ", res["entropy"])
+            print("Samples saved at:", samples_path)
+            if config.data.train == 'text8': 
+                train_ds, valid_ds = dataloader.get_dataloaders(config, tokenizer)
+                train_texts = []
+                # check if train_texts.txt exists
+                if os.path.exists("/home/patrick/duo/train_texts.txt"):
+                    print("Loading training texts from train_texts.txt for text metrics...")
+                    train_texts = open("/home/patrick/duo/train_texts.txt", "r").readlines()
+                else: 
+                    print("Loading training texts for text metrics...")
+                    for batch in tqdm(train_ds):
+                        batch_texts = tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
+                        train_texts.extend(batch_texts)
+
+                    with open("/home/patrick/duo/train_texts.txt", "w") as f:
+                        for text in train_texts:
+                            f.write(f"{text}\n")
+                text_metrics = evaluate_text_metrics(res["generated_seqs"], train_texts)
+                cur_step_info[temp] = text_metrics
+                print(f"Steps: {steps}, Temp: {temp}")
+                print(text_metrics)
+            else: 
+                cur_step_info[temp] = {
+                    "perplexity": res["generative_ppl"],
+                    "entropy": res["entropy"],
+                }
+                print(f"Steps: {steps}, Temp: {temp}")
+                print("perplexity: ", res["generative_ppl"])
+                print("entropy: ", res["entropy"])
         total_metadata[steps] = cur_step_info
     
     metadata_path = config.eval.generated_samples_path.replace('.json', f'_sweep_metadata.json')

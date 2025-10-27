@@ -7,7 +7,4 @@ subs_masking: False
 causal_attention: False
 ignore_bos: False
 loss_type: elbo
-temp: 0.95
-use_cfg: False
-use_prev_logits: True
-cfg_w: 0.5
+temp: 1.0

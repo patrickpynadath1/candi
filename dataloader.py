@@ -1,4 +1,5 @@
 import functools
+import pdb
 import itertools
 import json
 import math
@@ -12,7 +13,6 @@ from typing import Optional
 
 import datasets
 import fsspec
-import numpy as np
 import requests
 import tokenizers
 import torch
@@ -103,117 +103,6 @@ def scientific_papers_detokenizer(x):
     x = wt_detokenizer(x)
     x = lm1b_detokenizer(x)
     return x
-
-
-class SyntheticTokenizer(transformers.PreTrainedTokenizer):
-    def __init__(
-        self,
-        vocab_size,
-        bos_token="[BOS]",
-        eos_token="[EOS]",
-        sep_token=None,
-        cls_token=None,
-        pad_token=None,
-        mask_token=None,
-        unk_token=None,
-        **kwargs,
-    ):
-
-        self.tokens = []
-
-        for i in range(vocab_size - 2):
-            # appending space for readability
-            self.tokens.append(str(i) + " ")
-
-        self._vocab_str_to_int = {
-            "[BOS]": vocab_size - 2,
-            "[EOS]": vocab_size - 1,
-            **{ch: i for i, ch in enumerate(self.tokens)},
-        }
-
-        self._vocab_int_to_str = {v: k for k, v in self._vocab_str_to_int.items()}
-
-        super().__init__(
-            bos_token=bos_token,
-            eos_token=eos_token,
-            sep_token=sep_token,
-            cls_token=cls_token,
-            pad_token=pad_token,
-            mask_token=mask_token,
-            unk_token=unk_token,
-            **kwargs,
-        )
-
-    @property
-    def vocab_size(self) -> int:
-        return len(self._vocab_str_to_int)
-
-    def _tokenize(self, text: str, **kwargs) -> typing.List[str]:
-        return list(text.lower())
-
-    def _convert_token_to_id(self, token: str) -> int:
-        return self._vocab_str_to_int.get(token, self._vocab_str_to_int["[UNK]"])
-
-    def _convert_id_to_token(self, index: int) -> str:
-        return self._vocab_int_to_str[index]
-
-    def convert_tokens_to_string(self, tokens):
-        return "".join(tokens)
-
-    def get_vocab(self) -> typing.Dict[str, int]:
-        return self._vocab_str_to_int
-
-
-def _generate_synthetic_data(dataset_size, seq_len, vocab_size):
-    dataset = np.zeros((dataset_size, seq_len), dtype=int)
-    # tokens representing sequence boundary
-    dataset[:, 0] = vocab_size - 2  # bos
-    dataset[:, -1] = vocab_size - 1  # eos
-
-    for i in range(dataset_size):
-        # sample from 0, 1, ..., vocab_size - 3
-        temp = np.random.randint(vocab_size - 2)
-        for j in reversed(range(1, seq_len - 1)):
-            dataset[i, j] = temp
-            if temp != 0:
-                temp = temp // 4
-            else:
-                temp = np.random.randint(vocab_size - 2)
-
-    return dataset
-
-
-def generate_synthetic_dataset(
-    train_dataset_size, validation_dataset_size, seq_len, vocab_size
-):
-    np.random.seed(42)
-    train_data = torch.from_numpy(
-        _generate_synthetic_data(train_dataset_size, seq_len, vocab_size)
-    )
-    train_dataset = datasets.Dataset.from_dict(
-        {
-            "input_ids": train_data,
-            "attention_mask": torch.ones_like(train_data),
-        }
-    )
-    train_dataset.set_format(type="torch")
-
-    np.random.seed(41)
-    validation_data = torch.from_numpy(
-        _generate_synthetic_data(validation_dataset_size, seq_len, vocab_size)
-    )
-    validation_dataset = datasets.Dataset.from_dict(
-        {
-            "input_ids": validation_data,
-            "attention_mask": torch.ones_like(validation_data),
-        }
-    )
-    validation_dataset.set_format(type="torch")
-
-    return {
-        "train": train_dataset,
-        "validation": validation_dataset,
-    }
 
 
 class Text8Tokenizer(transformers.PreTrainedTokenizer):
@@ -383,7 +272,30 @@ def get_text8_dataset(cache_dir, max_seq_length=256, drop_last=True, crop_train=
     return dataset
 
 
-def _group_texts(examples, block_size, bos, eos):
+def get_algorithmic_creativity_dataset(cache_dir, tokenizer, max_seq_length=256, drop_last=True, crop_train=False):
+
+    train_path = f"{cache_dir}/train.json"
+    valid_path = f"{cache_dir}/valid.json"
+    test_path = f"{cache_dir}/test.json"
+    
+    train_data = json.load(open(train_path, 'r'))
+    valid_data = json.load(open(valid_path, 'r'))
+    test_data = json.load(open(test_path, 'r'))
+    vocab = json.load(open(f"{cache_dir}/vocab.json", 'r'))
+    tokenizer.add_tokens(vocab)
+
+    # add vocab to the tokenizer 
+
+    dataset = datasets.DatasetDict({
+        "train": datasets.Dataset.from_list(train_data),
+        "validation": datasets.Dataset.from_list(valid_data),
+        "test": datasets.Dataset.from_list(test_data),
+    })
+    return dataset, tokenizer, vocab
+
+
+
+def _group_texts(examples, block_size, bos, eos, insert_special_tokens=True):
     # Concatenate all texts.
     concatenated_examples = list(itertools.chain(*examples["input_ids"]))
     total_length = len(concatenated_examples)
@@ -392,14 +304,22 @@ def _group_texts(examples, block_size, bos, eos):
     # we exclude this batch and return an empty dict.
     # We could add padding if the model supported it instead of
     # this drop, you can customize this part to your needs.
-    new_block_size = block_size - 2  # [BOS] and [EOS] to be added
+    if insert_special_tokens:
+        new_block_size = block_size - 2  # [BOS] and [EOS] to be added
+    else:
+        new_block_size = block_size
     total_length = (total_length // new_block_size) * new_block_size
     # Split by chunks of max_len.
     result = {}
     _values = []
     _attn_masks = []
     for i in range(0, total_length, new_block_size):
-        _values.append([bos] + concatenated_examples[i : i + new_block_size] + [eos])
+        if insert_special_tokens:
+            _values.append(
+                [bos] + concatenated_examples[i : i + new_block_size] + [eos]
+            )
+        else:
+            _values.append(concatenated_examples[i : i + new_block_size])
         _attn_masks.append(torch.ones(block_size))
     result["input_ids"] = _values
     result["attention_mask"] = _attn_masks
@@ -412,15 +332,21 @@ def get_dataset(
     wrap,
     mode,
     cache_dir,
-    insert_eos=True,
     block_size=1024,
     num_proc=len(os.sched_getaffinity(0)),
     streaming=False,
     revision: Optional[str] = None,
+    insert_eos=True,
+    insert_special_tokens=True,
 ):
     eos_tag = ""
     if not insert_eos:
         eos_tag = "_eosFalse"
+    if not insert_special_tokens:
+        eos_tag = "_specialFalse"
+
+    if dataset_name == "openwebtext-train":
+        pass
     if wrap:
         filename = f"{dataset_name}_{mode}_bs{block_size}_wrapped{eos_tag}.dat"
     else:
@@ -471,8 +397,8 @@ def get_dataset(
             cache_dir=cache_dir,
             revision=revision,
             streaming=False,
-            num_proc=num_proc,
             trust_remote_code=True,
+            download_config=datasets.DownloadConfig(num_proc=1)
         )
     elif dataset_name == "openwebtext-valid":
         dataset = datasets.load_dataset(
@@ -481,8 +407,8 @@ def get_dataset(
             cache_dir=cache_dir,
             revision=revision,
             streaming=False,
-            num_proc=num_proc,
             trust_remote_code=True,
+            download_config=datasets.DownloadConfig(num_proc=1,)
         )
     elif dataset_name == "scientific_papers_arxiv":
         dataset = datasets.load_dataset(
@@ -506,15 +432,8 @@ def get_dataset(
         dataset = datasets.load_dataset(
             "ag_news", cache_dir=cache_dir, streaming=streaming, revision=revision
         )
-    elif dataset_name == "synthetic":
-        assert streaming
-        assert wrap  # i.e., no pad tokens
-        dataset = generate_synthetic_dataset(
-            train_dataset_size=100000,
-            validation_dataset_size=1024,
-            seq_len=32,
-            vocab_size=256,
-        )
+    elif dataset_name in ["lines", "circle", "triangle", "sibling"]:
+        dataset, tokenizer, added_vocab = get_algorithmic_creativity_dataset(cache_dir, tokenizer, max_seq_length=block_size)
     else:
         dataset = datasets.load_dataset(
             dataset_name,
@@ -528,9 +447,6 @@ def get_dataset(
         data = dataset
     else:
         data = dataset[mode]
-        if dataset_name == "synthetic":
-            # already tokenized, no further actions required
-            return data
 
     if dataset_name.startswith("wikitext"):
         detokenizer = wt_detokenizer
@@ -580,6 +496,14 @@ def get_dataset(
             if insert_eos:
                 tokens = {"input_ids": [t + [EOS] for t in tokens["input_ids"]]}
             # Still missing BOS, but will be added in group_texts
+        elif dataset_name == "lambada":
+            tokens = tokenizer(
+                text,
+                truncation=True,
+                add_special_tokens=True,
+                return_attention_mask=True,
+                return_token_type_ids=True,
+            )
         else:
             tokens = tokenizer(
                 text,
@@ -591,12 +515,46 @@ def get_dataset(
                 return_token_type_ids=True,
             )
         return tokens
+    
+    
+    def preprocess_and_tokenize_algorithmic(example):
+        # You have input_text and target_text
+        src = example["input_text"]
+        tgt = example["target_text"]
 
+        # Pre-tokenize them with no padding/truncation
+        inputs = tokenizer(
+            src,
+            add_special_tokens=True,
+            return_attention_mask=False,
+            return_token_type_ids=False,
+        )
+        targets = tokenizer(
+            tgt,
+            add_special_tokens=True,
+            return_attention_mask=True,
+            return_token_type_ids=False,
+        )
+
+        token_offset = added_vocab[0] # account new tokens 
+
+        return {
+            "labels": inputs["input_ids"] - token_offset,
+            "input_ids": targets["input_ids"] - token_offset,
+            "attention_mask": targets["attention_mask"],
+            "text": tgt,
+        }
+
+
+    if dataset_name in ['lines', 'circle', 'triangle', 'sibling']:
+        process_fn = preprocess_and_tokenize_algorithmic
+    else: 
+        process_fn = preprocess_and_tokenize
     if streaming:
-        tokenized_dataset = data.map(preprocess_and_tokenize, batched=True)
+        tokenized_dataset = data.map(process_fn, batched=True)
     else:
         tokenized_dataset = data.map(
-            preprocess_and_tokenize,
+            process_fn,
             batched=True,
             num_proc=num_proc,
             load_from_cache_file=True,
@@ -619,19 +577,29 @@ def get_dataset(
         return tokenized_dataset.with_format("torch")
 
     group_texts = functools.partial(
-        _group_texts, block_size=block_size, bos=BOS, eos=EOS
+        _group_texts,
+        block_size=block_size,
+        bos=BOS,
+        eos=EOS,
+        insert_special_tokens=insert_special_tokens,
     )
     if streaming:
         chunked_dataset = tokenized_dataset.map(group_texts, batched=True)
     else:
+        print("\n\n\n mapping dataset")
         chunked_dataset = tokenized_dataset.map(
             group_texts,
             batched=True,
             num_proc=num_proc,
+            batch_size=8,
             load_from_cache_file=True,
             desc="Grouping",
         )
-        chunked_dataset.save_to_disk(_path)
+        if not os.path.exists(_path):
+            chunked_dataset.save_to_disk(_path)
+        else:
+            print("\n\n\n loading dataset")
+            chunked_dataset = datasets.load_from_disk(_path)
     chunked_dataset = chunked_dataset.with_format("torch")
     return chunked_dataset
 
@@ -641,8 +609,6 @@ def get_tokenizer(config):
         tokenizer = Text8Tokenizer()
     elif config.data.tokenizer_name_or_path == "bert-base-uncased":
         tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
-    elif config.data.tokenizer_name_or_path == "synthetic":
-        tokenizer = SyntheticTokenizer(vocab_size=256)
     else:
         tokenizer = transformers.AutoTokenizer.from_pretrained(
             config.data.tokenizer_name_or_path
@@ -681,12 +647,23 @@ def get_dataloaders(
     config, tokenizer, skip_train=False, skip_valid=False, valid_seed=None
 ):
     num_gpus = torch.cuda.device_count()
-    assert config.loader.global_batch_size == (
-        config.loader.batch_size
-        * config.trainer.num_nodes
-        * num_gpus
-        * config.trainer.accumulate_grad_batches
-    )
+    if config.trainer.accumulate_grad_batches > 1:
+        # assert config.loader.global_batch_size == (
+        #     config.loader.batch_size
+        #     * config.trainer.num_nodes
+        #     * num_gpus
+        #     * config.trainer.accumulate_grad_batches
+        # )
+        if (
+            config.loader.global_batch_size
+            % (num_gpus * config.trainer.accumulate_grad_batches)
+            != 0
+        ):
+            raise ValueError(
+                f"Train Batch Size {config.training.batch_size}"
+                f"not divisible by {num_gpus} gpus with accumulation "
+                f"{config.trainer.accumulate_grad_batches}."
+            )
     if (
         config.loader.global_batch_size
         % (num_gpus * config.trainer.accumulate_grad_batches)
@@ -710,11 +687,15 @@ def get_dataloaders(
             tokenizer,
             mode="train",
             wrap=config.data.wrap,
-            insert_eos=config.data.insert_train_eos,
+            insert_eos=True
+            if not hasattr(config.data, "insert_train_eos")
+            else config.data.insert_train_eos,
+            insert_special_tokens=True
+            if not hasattr(config.data, "insert_train_special")
+            else config.data.insert_train_special,
             cache_dir=config.data.cache_dir,
             block_size=config.model.length,
             streaming=config.data.streaming,
-            num_proc=config.loader.num_workers,
             revision=config.data.get("train_revision", None),
         )
 
@@ -729,12 +710,16 @@ def get_dataloaders(
             config.data.valid,
             tokenizer,
             wrap=config.data.wrap,
+            insert_eos=True
+            if not hasattr(config.data, "insert_valid_eos")
+            else config.data.insert_valid_eos,
+            insert_special_tokens=True
+            if not hasattr(config.data, "insert_valid_special")
+            else config.data.insert_valid_special,
             mode=validation_split,
             cache_dir=config.data.cache_dir,
-            insert_eos=config.data.insert_valid_eos,
             block_size=config.model.length,
             streaming=config.data.streaming,
-            num_proc=config.loader.num_workers,
             revision=config.data.get("valid_revision", None),
         )
 
@@ -747,6 +732,7 @@ def get_dataloaders(
             num_workers=config.loader.num_workers,
             pin_memory=config.loader.pin_memory,
             shuffle=not config.data.streaming,
+            drop_last=True,
             persistent_workers=True,
         )
         train_loader.tokenizer = tokenizer
@@ -766,6 +752,7 @@ def get_dataloaders(
             pin_memory=config.loader.pin_memory,
             shuffle=shuffle_valid,
             generator=generator,
+            drop_last=True,
         )
         # Will be used in generative perplexity calculation
         valid_loader.tokenizer = tokenizer

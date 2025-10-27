@@ -33,6 +33,5 @@ CUDA_VISIBLE_DEVICES=$1 python main.py \
   algo.mixed_coeff=0 \
   algo.is_embed=False \
   algo.pure_continuous=True \
-  algo.cont_noise_schedule='percentile' \
   algo.temp=$temp \
   +wandb.offline=true;

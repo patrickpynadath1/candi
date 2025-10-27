@@ -486,3 +486,22 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             x = self.output_layer(x, c=t_cond)
 
         return x
+    
+    def get_embedding(self, x):
+        return self.vocab_embed(x)
+    
+    def forward_with_embeddings(self, x_emb, sigma):
+        if self.causal:
+            t_cond = None
+        else:
+            t_cond = F.silu(self.sigma_map(sigma))
+
+        rotary_cos_sin = self.rotary_emb(x_emb)
+
+        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+            x = x_emb
+            for i in range(len(self.blocks)):
+                x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
+            x = self.output_layer(x, c=t_cond)
+
+        return x

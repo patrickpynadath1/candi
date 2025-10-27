@@ -15,7 +15,7 @@ CUDA_VISIBLE_DEVICES=$1 python main.py --config-name=config_text8 mode=sample_ev
         model=small \
         model.length=1024 \
         algo.min_percentile=.05 \
-        algo.max_percentile=.35\
+        algo.max_percentile=.4\
         algo.temp=$temp \
         algo.pure_continuous=true sampling.steps=$steps;
 

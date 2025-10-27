@@ -445,7 +445,7 @@ class DDiTFinalLayer(nn.Module):
 
 # Assumes that the vocab size accounts for the mask token 
 class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
-    def __init__(self, config, vocab_size: int, scaling_factor: float=1.0, use_mixed_mask:bool=False, mixed_coeff: float=.5):
+    def __init__(self, config, vocab_size: int, mixed_coeff: float=.5):
         super().__init__()
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
@@ -456,18 +456,13 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         dim = config.hidden_size
         self.dim=dim
         cond_dim = config.cond_dim
-        if use_mixed_mask: 
-            self.vocab_embed = EmbeddingLayer(dim,vocab_size)
-            self.mask_index = vocab_size
-        else: 
-            self.vocab_embed = EmbeddingLayer(dim,vocab_size)
+        self.vocab_embed = EmbeddingLayer(dim,vocab_size)
+        self.mask_index = vocab_size
 
 
         if not self.causal:
             self.sigma_map = TimestepEmbedder(cond_dim)
         self.rotary_emb = Rotary(dim // config.n_heads)
-        self.scaling_factor=scaling_factor
-        self.use_mixed_mask = use_mixed_mask
         self.mixed_coeff = mixed_coeff
 
 
@@ -517,16 +512,15 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if is_embed == False:
             x = self.vocab_embed(x)
 
-        if self.use_mixed_mask: 
-            special = self.vocab_embed.embedding[-1].view(1, 1, -1).expand_as(x)
-            mask = reveal_mask.unsqueeze(-1).float()
-            coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff 
+        special = self.vocab_embed.embedding[-1].view(1, 1, -1).expand_as(x)
+        mask = reveal_mask.unsqueeze(-1).float()
+        coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff 
 
 
-            if embedding is not None: 
-                x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * embedding * c_in[:, None, None]) 
-            else:
-                x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None])
+        if embedding is not None: 
+            x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * embedding * c_in[:, None, None]) 
+        else:
+            x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None])
 
         # x = c_in[:, None, None] * x
         if self.causal:

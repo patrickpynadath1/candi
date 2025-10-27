@@ -398,6 +398,7 @@ def get_dataset(
             revision=revision,
             streaming=False,
             trust_remote_code=True,
+            download_config=datasets.DownloadConfig(num_proc=1)
         )
     elif dataset_name == "openwebtext-valid":
         dataset = datasets.load_dataset(
@@ -407,6 +408,7 @@ def get_dataset(
             revision=revision,
             streaming=False,
             trust_remote_code=True,
+            download_config=datasets.DownloadConfig(num_proc=1,)
         )
     elif dataset_name == "scientific_papers_arxiv":
         dataset = datasets.load_dataset(

@@ -73,7 +73,7 @@ class TrainerBase(L.LightningModule):
             self.backbone = models.dit.DIT(self.config, vocab_size=self.vocab_size)
 
         elif self.config.algo.backbone == "cont_dit": 
-            backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size, use_mixed_mask=self.config.algo.use_mixed_mask, mixed_coeff=self.config.algo.mixed_coeff)
+            backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size, mixed_coeff=self.config.algo.mixed_coeff)
             self.backbone = backbone
         elif self.config.algo.backbone == "dimamba":
             self.backbone = models.dimamba.DiMamba(
@@ -673,15 +673,6 @@ class AbsorbingState(Diffusion):
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self.save_hyperparameters()
 
-
-        # settings for cfg
-        self.use_cfg = config.algo.get("use_cfg", False)
-        self.prev_px0 = None
-        self.w = config.algo.get("cfg_w", 1.0)
-        self.use_prev_logits = config.algo.get("use_prev_logits", False)
-
-
-
     def _validate_configuration(self):
         super()._validate_configuration()
         if self.parameterization in {"score", "mean"}:
@@ -720,42 +711,11 @@ class AbsorbingState(Diffusion):
             _, alpha_s = self.noise(t - dt)
         assert alpha_t.ndim == 2
         p_x0 = (self.forward(x, self._sigma_from_alphat(alpha_t)).double())
-
-
-        # some logic to test out cfg
-        if self.use_cfg: 
-            if self.prev_px0 is not None:
-                alpha = .5
-                p_x0_prime = (p_x0  + 2 * (1-t)* (p_x0 - self.prev_px0)).softmax(dim=-1)
-                # self.prev_px0 = p_x0.detach().clone()
-                # self.prev_px0 = alpha * self.prev_px0 + (1 - alpha) * p_x0_prime
-                # self.prev_px0 = p_x0.detach().clone() * alpha + (1 - alpha) * self.prev_px0
-                if self.counter > 2: 
-                    p_x0 = p_x0_prime
-                self.counter += 1
-
-                # # if we are using prev logits
-                # if self.use_prev_logits: 
-                #     self.prev_px0 = p_x0.detach().clone()
-            
-            # we skip the first steps
-            if self.prev_px0 is None:
-                self.prev_px0 = p_x0.detach().clone()
-                self.counter = 1
-        else: 
-            p_x0 = p_x0.exp()
-
-
-
+        p_x0 = p_x0.exp()
         q_xs = p_x0 * (alpha_s - alpha_t)[:, :, None]
         q_xs[:, :, self.mask_index] = 1 - alpha_s
         _x = sample_categorical(q_xs)
-
-        # print((alpha_s - alpha_t).mean().item())
-
         copy_flag = (x != self.mask_index).to(x.dtype)
-
-        # print(copy_flag.float().mean().item())
         return p_x0, copy_flag * x + (1 - copy_flag) * _x
 
     def _staggered_score(self, score, dsigma):
