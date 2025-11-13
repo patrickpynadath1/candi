@@ -703,6 +703,14 @@ class CANDI(trainer_base.Diffusion):
         self.is_embed = config.algo.is_embed
         self.use_percentile_scheduling = config.algo.use_percentile_scheduling
 
+        if self.pure_continuous: 
+            if self.is_embed: 
+                self.corruption = 'continuous_embed'
+            else: 
+                self.corruption = 'continuous_onehot'
+        else: 
+            self.corruption = "candi"
+
     def ve_sde_noise_sched(self, t, sigma_min=0.01, sigma_max=10.0):
         return sigma_min * (sigma_max / sigma_min) ** t
 
@@ -785,8 +793,58 @@ class CANDI(trainer_base.Diffusion):
         return xt
 
 
-    # gets noisy sample xt
-    def q_xt(self, x, alpha_t):
+    def q_xt(self, *args, **kwargs):
+        if self.corruption == 'continuous_embed':
+            return self.q_xt_cont_embed(*args, **kwargs)
+        elif self.corruption == 'continuous_onehot':
+            return self.q_xt_cont_onehot(*args, **kwargs)
+        elif self.corruption == 'candi':
+            return self.q_xt_candi(*args, **kwargs)
+        else:
+            raise NotImplementedError(f"corruption type {self.corruption} not implemented")
+
+
+    def q_xt_cont_embed(self, x, alpha_t):
+        t = (1 - alpha_t).squeeze()
+        continuous_noise = self.get_continuous_from_discrete_noise(t)
+
+        clean_embeddings = self.backbone.get_embedding(x)
+        sigma = self.get_continuous_from_discrete_noise(t).squeeze()
+        noise = torch.randn_like(clean_embeddings, device=x.device) * sigma[:, None, None]
+        xt = clean_embeddings + noise
+
+        # in pure continuous with embedding diffusion, we dont use any reveal mask
+        reveal_mask = torch.zeros(x.shape, device=x.device)
+
+        return {
+            'xt': xt, 
+            'reveal_mask': reveal_mask, 
+            'discrete_noise': t, 
+            'continuous_noise': continuous_noise,
+            'is_embed': True
+        }
+    
+    def q_xt_cont_onehot(self, x, alpha_t):
+
+        reveal_mask = torch.zeros_like(x) 
+
+        t = (1 - alpha_t).squeeze()
+        continuous_noise = self.get_continuous_from_discrete_noise(t) 
+
+        # accounting for the mask token
+        onehot = F.one_hot(x, num_classes=self.vocab_size-1).float()
+        sigma = continuous_noise
+        noise = torch.randn_like(onehot, device=x.device) * sigma[:, None, None]
+        xt = onehot + noise
+        return {
+            'xt': xt, 
+            'reveal_mask': reveal_mask, 
+            'discrete_noise': t, 
+            'continuous_noise': continuous_noise,
+            'is_embed': False
+        }
+
+    def q_xt_candi(self, x, alpha_t):
 
         disc_xt = self.discrete_noising(x, alpha_t)
         reveal_mask = (disc_xt == x).float()
@@ -797,42 +855,6 @@ class CANDI(trainer_base.Diffusion):
         # accounting for the mask token
         onehot = F.one_hot(x, num_classes=self.vocab_size-1).float()
 
-        if self.pure_continuous: 
-            if self.is_embed: 
-                clean_embeddings = self.backbone.get_embedding(x)
-                t = discrete_noise
-                sigma = self.get_continuous_from_discrete_noise(t).squeeze()
-                noise = torch.randn_like(clean_embeddings, device=x.device) * sigma[:, None, None]
-                xt = clean_embeddings + noise
-
-                # in pure continuous with embedding diffusion, we dont use any reveal mask
-                reveal_mask = torch.zeros_like(reveal_mask)
-
-                return {
-                    'xt': xt, 
-                    'reveal_mask': reveal_mask, 
-                    'discrete_noise': discrete_noise, 
-                    'continuous_noise': continuous_noise,
-                    'is_embed': True
-                }
-            else: 
-                if self.cont_noise_schedule == 'corruption': 
-                    if self.sigma_table.device != discrete_noise.device:
-                        self.sigma_table = self.sigma_table.to(discrete_noise.device)
-                        self.error_table = self.error_table.to(discrete_noise.device)
-                    sigma = error_to_sigma(discrete_noise, self.sigma_table, self.error_table)
-                else: 
-                    sigma = continuous_noise
-                noise = torch.randn_like(onehot, device=x.device) * sigma[:, None, None]
-                xt = onehot + noise
-                reveal_mask = torch.zeros_like(reveal_mask)
-                return {
-                    'xt': xt, 
-                    'reveal_mask': reveal_mask, 
-                    'discrete_noise': discrete_noise, 
-                    'continuous_noise': continuous_noise,
-                    'is_embed': False
-                }
 
         xt_cont = onehot + continuous_noise[:, None, None].to(x.device) * torch.randn_like(onehot, device=x.device)
 
