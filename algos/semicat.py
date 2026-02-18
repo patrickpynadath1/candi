@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from typing import Literal, cast
 from torchdiffeq import odeint
-
+import pdb
 
 
 def _view_for(t: Tensor, other: Tensor) -> Tensor:
@@ -137,7 +137,7 @@ class Semicat(Diffusion):
         """
         sigma = self._sigma_from_time(t)
         x1_logits = self.backbone(xt, sigma)
-        dr = x1_logits.softmax(dim=-1) - xt
+        dr = (x1_logits / self.temp).softmax(dim=-1) - xt
         scale = 1.0 / (1.0 - _view_for(t, xt) + 1e-8)
         return dr * scale
 
@@ -156,7 +156,7 @@ class Semicat(Diffusion):
         """
         dt = (t - s) / (1.0 - s + 1e-8)
         sigma_s = self._sigma_from_time(s)
-        diff = self.backbone(x, sigma_s).softmax(dim=-1) - x
+        diff = (self.backbone(x, sigma_s) / self.temp).softmax(dim=-1) - x
         return x + _view_for(dt, x) * diff
 
     # ------------------------------------------------------------------

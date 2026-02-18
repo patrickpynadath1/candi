@@ -402,36 +402,10 @@ class EmbeddingLayer(nn.Module):
         ).to(x.dtype)
 
 
-# instead of doing vocab lookup, 
-# does weighted average
-class EmbeddingLayerMixture_norm(nn.Module):
-    def __init__(self, dim, vocab_dim):
-        super().__init__()
-        self.dim = dim
-        self.embedding = nn.Parameter(torch.empty((vocab_dim, dim)))
-        torch.nn.init.kaiming_uniform_(self.embedding, a=math.sqrt(5))
-
-    def forward(self, x):
-
-        # Just for now 
-        normalized_embeddings = F.normalize(self.embedding[:-1], p=2, dim=-1)
-        # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
-        
-        # normalized_embeddings = self.embedding[:-1]
-
-        if x.ndim == 2:
-            return normalized_embeddings[x]
-        assert x.ndim == 3
-
-        return torch.einsum(
-            "blv,ve->ble",
-            x.float(),
-            normalized_embeddings.float(),
-        ).to(x.dtype)
     
 # instead of doing vocab lookup, 
 # does weighted average
-class EmbeddingLayerMixture_(nn.Module):
+class EmbeddingLayerMixture_norm(nn.Module):
 
     def __init__(self, dim, vocab_dim):
         super().__init__()
@@ -450,7 +424,6 @@ class EmbeddingLayerMixture_(nn.Module):
         if x.ndim == 2:
             return normalized_embeddings[x]
         assert x.ndim == 3
-
         return torch.einsum(
             "blv,ve->ble",
             x.float(),

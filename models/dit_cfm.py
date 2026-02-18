@@ -1,3 +1,4 @@
+import pdb
 from .common import (
     EmbeddingLayerMixture_norm,
     TimestepEmbedder,
@@ -31,11 +32,11 @@ class CFMDit(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.causal = False
         self.adaLN = True
         self.config = config
-        self.vocab_size = vocab_size + 1
+        self.vocab_size = vocab_size
         dim = config.hidden_size
         self.dim=dim
         cond_dim = config.cond_dim
-        self.vocab_embed = EmbeddingLayerMixture_norm(dim,vocab_size+1)
+        self.vocab_embed = EmbeddingLayerMixture_norm(dim,vocab_size)
 
 
         if not self.causal:
@@ -55,7 +56,7 @@ class CFMDit(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         self.output_layer = DDiTFinalLayer(
             hidden_size=dim,
-            out_channels=vocab_size + 1,
+            out_channels=vocab_size,
             cond_dim=cond_dim,
             adaLN=self.adaLN,
         )
@@ -83,7 +84,7 @@ class CFMDit(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         with torch.cuda.amp.autocast(dtype=torch.bfloat16):
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
-            logits = self.output_layer(x, c=t_cond)[:, :, :-1]
+            logits = self.output_layer(x, c=t_cond)
 
         return logits
     
