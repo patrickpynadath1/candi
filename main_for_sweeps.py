@@ -11,7 +11,7 @@ import omegaconf
 import rich.syntax
 import rich.tree
 import torch
-import algo
+import algos
 import dataloader as dataloader
 from text_metrics import evaluate_text_metrics
 import utils
@@ -203,23 +203,25 @@ def main(config):
     logger = utils.get_logger(__name__)
     tokenizer = dataloader.get_tokenizer(config)
     if config.algo.name == "ar":
-        diffusion_model = algo.AR
+        diffusion_model = algos.AR
     elif config.algo.name == "mdlm":
-        diffusion_model = algo.MDLM
+        diffusion_model = algos.MDLM
     elif config.algo.name == "duo_base":
-        diffusion_model = algo.DUO_BASE
+        diffusion_model = algos.DUO_BASE
     elif config.algo.name == "d3pm":
-        diffusion_model = algo.D3PMAbsorb
+        diffusion_model = algos.D3PMAbsorb
     elif config.algo.name == "sedd":
-        diffusion_model = algo.SEDDAbsorb
+        diffusion_model = algos.SEDDAbsorb
     elif config.algo.name == "duo":
-        diffusion_model = algo.DUO
+        diffusion_model = algos.DUO
     elif config.algo.name == "distillation":
-        diffusion_model = algo.Distillation
+        diffusion_model = algos.Distillation
     elif config.algo.name == "ot-finetune":
-        diffusion_model = algo.OptimalTransportFinetune
+        diffusion_model = algos.OptimalTransportFinetune
     elif config.algo.name == "candi":
-        diffusion_model = algo.CANDI
+        diffusion_model = algos.CANDI
+    elif config.algo.name == "semicat":
+        diffusion_model = algos.Semicat
 
     else:
         raise ValueError(f"Invalid algorithm name: {config.algo.name}")
