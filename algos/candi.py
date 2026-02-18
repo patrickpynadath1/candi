@@ -40,33 +40,12 @@ class CANDI(Diffusion):
         self.is_embed = config.algo.is_embed
         self.use_percentile_scheduling = config.algo.use_percentile_scheduling
 
-        if self.pure_continuous:
-            if self.is_embed:
-                self.corruption = 'continuous_embed'
-            else:
-                self.corruption = 'continuous_onehot'
-        else:
-            self.corruption = "candi"
-
-    def ve_sde_noise_sched(self, t, sigma_min=0.01, sigma_max=10.0):
-        return sigma_min * (sigma_max / sigma_min) ** t
 
     def sample_t(self, n, accum_step):
         return super()._sample_t(n, accum_step)
 
     def get_continuous_from_discrete_noise(self, discrete_noise):
-        if self.is_embed:
-            sigmas = training_sigma_ve(discrete_noise, sigma_min=self.sigma_min, sigma_max=self.sigma_max)
-            return sigmas
-        else:
-            target_percentile = discrete_noise * (self.max_percentile - self.min_percentile) + self.min_percentile
-            return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
-
-    # inference schedule 
-    # while the embedding diffusion should use the VE schedule, this produced better results 
-    # at least on text8 -- both schedules for embedding diffusion collapsed on OWT
-    def get_continuous_noise_sched_pure_cont(self, timesteps):
-        target_percentile = timesteps * (self.max_percentile - self.min_percentile) + self.min_percentile
+        target_percentile = discrete_noise * (self.max_percentile - self.min_percentile) + self.min_percentile
         return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
 
     def to(self, *args, **kwargs):
@@ -129,59 +108,7 @@ class CANDI(Diffusion):
             xt[:, 0] = x[:, 0]
         return xt
 
-
-    def q_xt(self, *args, **kwargs):
-        if self.corruption == 'continuous_embed':
-            return self.q_xt_cont_embed(*args, **kwargs)
-        elif self.corruption == 'continuous_onehot':
-            return self.q_xt_cont_onehot(*args, **kwargs)
-        elif self.corruption == 'candi':
-            return self.q_xt_candi(*args, **kwargs)
-        else:
-            raise NotImplementedError(f"corruption type {self.corruption} not implemented")
-
-
-    def q_xt_cont_embed(self, x, alpha_t):
-        t = (1 - alpha_t).squeeze()
-        continuous_noise = self.get_continuous_from_discrete_noise(t)
-
-        clean_embeddings = self.backbone.get_embedding(x)
-        sigma = self.get_continuous_from_discrete_noise(t).squeeze()
-        noise = torch.randn_like(clean_embeddings, device=x.device) * sigma[:, None, None]
-        xt = clean_embeddings + noise
-
-        # in pure continuous with embedding diffusion, we dont use any reveal mask
-        reveal_mask = torch.zeros(x.shape, device=x.device)
-
-        return {
-            'xt': xt,
-            'reveal_mask': reveal_mask,
-            'discrete_noise': t,
-            'continuous_noise': continuous_noise,
-            'is_embed': True
-        }
-
-    def q_xt_cont_onehot(self, x, alpha_t):
-
-        reveal_mask = torch.zeros_like(x)
-
-        t = (1 - alpha_t).squeeze()
-        continuous_noise = self.get_continuous_from_discrete_noise(t)
-
-        # accounting for the mask token
-        onehot = F.one_hot(x, num_classes=self.vocab_size).float()
-        sigma = continuous_noise
-        noise = torch.randn_like(onehot, device=x.device) * sigma[:, None, None]
-        xt = onehot + noise
-        return {
-            'xt': xt,
-            'reveal_mask': reveal_mask,
-            'discrete_noise': t,
-            'continuous_noise': continuous_noise,
-            'is_embed': False
-        }
-
-    def q_xt_candi(self, x, alpha_t):
+    def q_xt(self, x, alpha_t):
 
         disc_xt = self.discrete_noising(x, alpha_t)
         reveal_mask = (disc_xt == x).float()
@@ -204,16 +131,10 @@ class CANDI(Diffusion):
         }
 
     def prior_sample(self, *batch_dims):
-
         sigma = self.get_continuous_from_discrete_noise(torch.tensor(.999).to(self.device))
-        if self.is_embed:
-            sigma_max = self.sigma_max
-            noise = torch.randn(
-                *batch_dims, self.backbone.config.hidden_size, dtype=torch.float32, device=self.device) * sigma_max
-        else:
-            noise = torch.randn(
-                *batch_dims, self.vocab_size, dtype=torch.float32, device=self.device
-            )  * sigma
+        noise = torch.randn(
+            *batch_dims, self.vocab_size, dtype=torch.float32, device=self.device
+        )  * sigma
         return noise
 
     def forward(self, **kwargs):
@@ -250,13 +171,10 @@ class CANDI(Diffusion):
         return x, prompt_mask
 
     def generate_samples(self, **kwargs):
-        if self.pure_continuous or self.is_embed:
-            return self.generate_samples_pure_cont(**kwargs)
+        if self.sampler == 'cached':
+            return self.generate_samples_cache(**kwargs)
         else:
-            if self.sampler == 'cached':
-                return self.generate_samples_cache(**kwargs)
-            else:
-                return self.generate_samples_nocache(**kwargs)
+            return self.generate_samples_nocache(**kwargs)
 
     @torch.no_grad()
     def generate_samples_nocache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
@@ -295,35 +213,6 @@ class CANDI(Diffusion):
                                                 p_x0, t, dt, prev_clean_mask=clean_mask)
 
         final_tokens = x.argmax(dim=-1)
-        return final_tokens
-
-
-    def generate_samples_pure_cont(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
-        if num_steps is None:
-            num_steps = self.config.sampling.steps
-        x = self.prior_sample(num_samples, self.num_tokens)
-        clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-        if prompt_tokens is not None and prompt_mask is not None:
-            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
-        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
-        continuous_noise = self.get_continuous_noise_sched_pure_cont(timesteps)
-
-        self.max_sigma = continuous_noise.max().item()
-
-        for i in range(num_steps):
-            t = timesteps[i]
-            s = timesteps[i+1]
-
-            sigma_s = continuous_noise[i]
-            sigma_t = continuous_noise[i+1]
-
-            new_x, denoised = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s, is_embed=self.is_embed)
-            x = new_x
-
-        if self.is_embed:
-            final_tokens = denoised.argmax(dim=-1)
-        else:
-            final_tokens = x.argmax(dim=-1)
         return final_tokens
 
     # optimized function with cached embeddings
