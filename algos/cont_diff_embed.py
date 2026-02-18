@@ -107,7 +107,7 @@ class ContDiffEmbed(Diffusion):
 
     def forward(self, **kwargs):
         with torch.cuda.amp.autocast(dtype=torch.float32):
-            model_output = self.backbone(**kwargs, reveal_mask=None)
+            model_output = self.backbone(**kwargs, reveal_mask=None, is_embed=True)
         return self._process_model_output(model_output=model_output)
 
     def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):

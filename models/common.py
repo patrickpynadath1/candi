@@ -454,19 +454,21 @@ class DDiTFinalLayer(nn.Module):
 
 
 class Preconditioning(nn.Module):
-    def __init__(self, dim, cond_dim):
+    def __init__(self, embed_table, mixed_coeff, masked_index=-1):
         super().__init__()
+        self.embed_table = embed_table
+        self.mixed_coeff = mixed_coeff
+        self.masked_index = masked_index
 
-    def forward(self, embeds, continuous_noise):
+    def forward(self, x, continuous_noise, reveal_mask=None, embeds=None):
         c_in = 1 / (1 + continuous_noise ** 2) ** .5
+        if reveal_mask is not None:
+            special = self.vocab_embed.embedding[self.masked_index].view(1, 1, -1).expand_as(x)
+            mask = reveal_mask.unsqueeze(-1).float()
+            coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff
+            if embeds is not None: 
+                x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * embeds * c_in[:, None, None]) 
+            else: 
+                x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None])
+            return x
         return embeds * c_in[:, None, None]
-    
-class PreconditioningHybrid(nn.Module):
-    def __init__(self, dim, cond_dim):
-        super().__init__()
-
-
-    def forward(self, c):
-        return self.linear(c)
-
-    

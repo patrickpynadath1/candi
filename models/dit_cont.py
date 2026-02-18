@@ -6,6 +6,7 @@ from .common import (
     DDiTFinalLayer,
     bias_dropout_add_scale_fused_train,
     bias_dropout_add_scale_fused_inference,
+    Preconditioning
 )
 import huggingface_hub
 import omegaconf
@@ -43,6 +44,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             self.sigma_map = TimestepEmbedder(cond_dim)
         self.rotary_emb = Rotary(dim // config.n_heads)
         self.mixed_coeff = mixed_coeff
+        self.precond = Preconditioning(self.vocab_embed, self.mixed_coeff)
 
 
 
@@ -76,26 +78,11 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def forward(self, xt, discrete_noise, reveal_mask, continuous_noise, embedding=None, ret_embedding=False, is_embed=False):
         x = xt 
         sigma = -1 * torch.log(1 - discrete_noise)
-        c_in = 1 / (1 + continuous_noise ** 2) ** .5
-        if is_embed == False:
+        if not is_embed:
             x = self.vocab_embed(x)
+        x = self.precond(x, continuous_noise=continuous_noise, embeds=embedding, reveal_mask=reveal_mask)
 
-        special = self.vocab_embed.embedding[-1].view(1, 1, -1).expand_as(x)
-        mask = reveal_mask.unsqueeze(-1).float()
-        coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff 
-
-
-        if embedding is not None: 
-            x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * embedding * c_in[:, None, None]) 
-        else:
-            x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None])
-
-        # x = c_in[:, None, None] * x
-        if self.causal:
-            t_cond = None
-        else:
-            t_cond = F.silu(self.sigma_map(sigma))
-
+        t_cond = F.silu(self.sigma_map(sigma))
         rotary_cos_sin = self.rotary_emb(x)
 
         with torch.cuda.amp.autocast(dtype=torch.bfloat16):
