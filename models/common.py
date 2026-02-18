@@ -1,5 +1,4 @@
 import math
-import pdb
 import typing
 
 import einops
@@ -389,27 +388,74 @@ class DDiTBlock(nn.Module):
 class EmbeddingLayer(nn.Module):
     def __init__(self, dim, vocab_dim):
         super().__init__()
-        self.dim = dim
-
-
         self.embedding = nn.Parameter(torch.empty((vocab_dim, dim)))
         torch.nn.init.kaiming_uniform_(self.embedding, a=math.sqrt(5))
 
     def forward(self, x):
-        normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
-        normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
+        if x.ndim == 2:
+            return self.embedding[x]
+        assert x.ndim == 3
+        return torch.einsum(
+            "blv,ve->ble",
+            torch.nn.functional.softmax(x, dim=-1).float(),
+            self.embedding.float(),
+        ).to(x.dtype)
+
+
+# instead of doing vocab lookup, 
+# does weighted average
+class EmbeddingLayerMixture_norm(nn.Module):
+    def __init__(self, dim, vocab_dim):
+        super().__init__()
+        self.dim = dim
+        self.embedding = nn.Parameter(torch.empty((vocab_dim, dim)))
+        torch.nn.init.kaiming_uniform_(self.embedding, a=math.sqrt(5))
+
+    def forward(self, x):
+
+        # Just for now 
+        normalized_embeddings = F.normalize(self.embedding[:-1], p=2, dim=-1)
+        # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
+        
+        # normalized_embeddings = self.embedding[:-1]
 
         if x.ndim == 2:
             return normalized_embeddings[x]
         assert x.ndim == 3
 
-        # pdb.set_trace()
         return torch.einsum(
             "blv,ve->ble",
             x.float(),
             normalized_embeddings.float(),
         ).to(x.dtype)
+    
+# instead of doing vocab lookup, 
+# does weighted average
+class EmbeddingLayerMixture_(nn.Module):
 
+    def __init__(self, dim, vocab_dim):
+        super().__init__()
+        self.dim = dim
+        self.embedding = nn.Parameter(torch.empty((vocab_dim, dim)))
+        torch.nn.init.kaiming_uniform_(self.embedding, a=math.sqrt(5))
+
+    def forward(self, x):
+
+        # Just for now 
+        normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
+        # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
+        
+        # normalized_embeddings = self.embedding[:-1]
+
+        if x.ndim == 2:
+            return normalized_embeddings[x]
+        assert x.ndim == 3
+
+        return torch.einsum(
+            "blv,ve->ble",
+            x.float(),
+            normalized_embeddings.float(),
+        ).to(x.dtype)
 
 
 class DDiTFinalLayer(nn.Module):
@@ -434,76 +480,20 @@ class DDiTFinalLayer(nn.Module):
         return x
 
 
-class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
-    def __init__(self, config, vocab_size: int, scaling_factor: float=1.0):
+class Preconditioning(nn.Module):
+    def __init__(self, dim, cond_dim):
         super().__init__()
-        if type(config) == dict:
-            config = omegaconf.OmegaConf.create(config)
-        self.causal = False
-        self.adaLN = True
-        self.config = config
-        self.vocab_size = vocab_size
-        dim = config.hidden_size
-        cond_dim = config.cond_dim
-        self.vocab_embed = EmbeddingLayer(dim,vocab_size)
-        if not self.causal:
-            self.sigma_map = TimestepEmbedder(cond_dim)
-        self.rotary_emb = Rotary(dim // config.n_heads)
-        self.scaling_factor=scaling_factor
 
-        blocks = []
-        for _ in range(config.n_blocks):
-            if self.causal:
-                block = DDiTBlockCausal(
-                    dim=dim, n_heads=config.n_heads, dropout=config.dropout
-                )
-            else:
-                block = DDiTBlock(
-                    dim=dim,
-                    n_heads=config.n_heads,
-                    cond_dim=cond_dim,
-                    adaLN=self.adaLN,
-                    dropout=config.dropout,
-                )
-            blocks.append(block)
-        self.blocks = nn.ModuleList(blocks)
-
-        self.output_layer = DDiTFinalLayer(
-            hidden_size=dim,
-            out_channels=vocab_size,
-            cond_dim=cond_dim,
-            adaLN=self.adaLN,
-        )
-
-    def _get_bias_dropout_scale(self):
-        if self.training:
-            return bias_dropout_add_scale_fused_train
-        else:
-            return bias_dropout_add_scale_fused_inference
+    def forward(self, embeds, continuous_noise):
+        c_in = 1 / (1 + continuous_noise ** 2) ** .5
+        return embeds * c_in[:, None, None]
     
-    # clean mask: indicates which positions are clean with 1, which are corrupted with 0
-    # def forward(self, x, discrete_noise):
-    def forward(self, xt, discrete_noise, continuous_noise, reveal_mask):
-        # sigma = discrete_noise
-        # x = self.vocab_embed(x)
-        x = xt 
-        sigma = torch.log(1 - discrete_noise)
-        c_in = 1 / (self.scaling_factor + continuous_noise ** 2) ** .5
-        # c_in = torch.ones_like(clean_mask, device=c_in.device)* clean_mask * (1/self.scaling_factor)+ (1 - clean_mask) * c_in[:, None]
-        # # pdb.set_trace()
+class PreconditioningHybrid(nn.Module):
+    def __init__(self, dim, cond_dim):
+        super().__init__()
 
-        x = self.vocab_embed(c_in[:, None, None] * x)
-        # x = c_in[:, None, None] * x
-        if self.causal:
-            t_cond = None
-        else:
-            t_cond = F.silu(self.sigma_map(sigma))
 
-        rotary_cos_sin = self.rotary_emb(x)
+    def forward(self, c):
+        return self.linear(c)
 
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
-            for i in range(len(self.blocks)):
-                x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
-            x = self.output_layer(x, c=t_cond)
-
-        return x
+    
