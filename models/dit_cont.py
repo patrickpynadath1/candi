@@ -445,7 +445,7 @@ class DDiTFinalLayer(nn.Module):
 
 # Assumes that the vocab size accounts for the mask token 
 class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
-    def __init__(self, config, vocab_size: int, mixed_coeff: float=.5):
+    def __init__(self, config, vocab_size: int, mixed_coeff: float=.5, use_precond=True):
         super().__init__()
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
@@ -458,12 +458,14 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         cond_dim = config.cond_dim
         self.vocab_embed = EmbeddingLayer(dim,vocab_size)
         self.mask_index = vocab_size
+        self.use_precond = use_precond
 
 
         if not self.causal:
             self.sigma_map = TimestepEmbedder(cond_dim)
         self.rotary_emb = Rotary(dim // config.n_heads)
         self.mixed_coeff = mixed_coeff
+
 
 
         blocks = []
