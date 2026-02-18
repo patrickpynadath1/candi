@@ -157,7 +157,7 @@ class ContDiffEmbed(Diffusion):
             new_x, denoised = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s, is_embed=self.is_embed)
             x = new_x
 
-        final_tokens = sample_categorical(denoised)
+        final_tokens = denoised.argmax(dim=-1)
         return final_tokens
 
     @torch.no_grad()

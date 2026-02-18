@@ -158,7 +158,7 @@ class CANDI(Diffusion):
             new_x, denoised = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, time_s=s)
             x = new_x
 
-        final_tokens = sample_categorical(denoised)
+        final_tokens = x.argmax(dim=-1)
         return final_tokens
 
     @torch.no_grad()
