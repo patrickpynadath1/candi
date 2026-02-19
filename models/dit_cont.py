@@ -36,7 +36,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.dim=dim
         cond_dim = config.cond_dim
         self.vocab_embed = EmbeddingLayerMixture_norm(dim,vocab_size)
-        self.mask_index = vocab_size
+        self.mask_index = vocab_size-1
         self.use_precond = use_precond
 
 
@@ -75,12 +75,21 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         
     # clean mask: indicates which positions are clean with 1, which are corrupted with 0
     # def forward(self, x, discrete_noise):
-    def forward(self, xt, discrete_noise, reveal_mask, continuous_noise, embedding=None, ret_embedding=False, is_embed=False):
+    def forward(self, xt, 
+                discrete_noise, 
+                reveal_mask, 
+                continuous_noise=None, 
+                embedding=None, 
+                ret_embedding=False, 
+                is_embed=False, 
+                precond=True,
+                **kwargs):
         x = xt 
         sigma = -1 * torch.log(1 - discrete_noise)
         if not is_embed:
             x = self.vocab_embed(x)
-        x = self.precond(x, continuous_noise=continuous_noise, embeds=embedding, reveal_mask=reveal_mask)
+        if precond:
+            x = self.precond(x, continuous_noise=continuous_noise, embeds=embedding, reveal_mask=reveal_mask)
 
         t_cond = F.silu(self.sigma_map(sigma))
         rotary_cos_sin = self.rotary_emb(x)
@@ -96,4 +105,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     
     def get_embedding(self, x): 
         return self.vocab_embed(x)
+    
+    def get_mask_embed(self):
+        return self.vocab_embed.embedding[self.mask_index]
     
