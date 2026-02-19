@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 
 
-class CANDI(Diffusion):
+class ContDiffOnehot(Diffusion):
     def __init__(self, config, tokenizer):
         self.mask_index = len(tokenizer)
         vocab_size = len(tokenizer) + 1
@@ -37,11 +37,6 @@ class CANDI(Diffusion):
         self.sigma_max = config.algo.sigma_max
         self.temp = config.algo.temp
         self.sampler = config.algo.sampler
-        self.use_percentile_scheduling = config.algo.use_percentile_scheduling
-
-
-    def ve_sde_noise_sched(self, t, sigma_min=0.01, sigma_max=10.0):
-        return sigma_min * (sigma_max / sigma_min) ** t
 
     def sample_t(self, n, accum_step):
         return super()._sample_t(n, accum_step)

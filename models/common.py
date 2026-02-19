@@ -1,4 +1,5 @@
 import math
+import pdb
 import typing
 
 import einops
@@ -463,7 +464,7 @@ class Preconditioning(nn.Module):
     def forward(self, x, continuous_noise, reveal_mask=None, embeds=None):
         c_in = 1 / (1 + continuous_noise ** 2) ** .5
         if reveal_mask is not None:
-            special = self.vocab_embed.embedding[self.masked_index].view(1, 1, -1).expand_as(x)
+            special = self.embed_table.embedding[self.masked_index].view(1, 1, -1).expand_as(x)
             mask = reveal_mask.unsqueeze(-1).float()
             coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff
             if embeds is not None: 
@@ -471,4 +472,4 @@ class Preconditioning(nn.Module):
             else: 
                 x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None])
             return x
-        return embeds * c_in[:, None, None]
+        return x * c_in[:, None, None]

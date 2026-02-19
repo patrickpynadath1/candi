@@ -1,4 +1,4 @@
-name: candi
+name: cont_diff_onehot
 backbone: cont_dit
 causal_attention: False
 parameterization: mean

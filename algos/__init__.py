@@ -6,3 +6,5 @@ from .sedd_absorb import *
 from .semicat import *
 from .d3pm_absorb import *
 from .candi import *
+from .cont_diff_onehot import *
+from .cont_diff_embed import *
