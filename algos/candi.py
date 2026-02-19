@@ -102,8 +102,7 @@ class CANDI(Diffusion):
             (batch_size, 1).
         """
         move_indices = torch.rand(*x.shape, device=x.device) < 1 - alpha_t
-        uniform_tensor = torch.randint(0, self.vocab_size, x.shape, device=x.device)
-        xt = torch.where(move_indices, uniform_tensor, x)
+        xt = torch.where(move_indices, self.mask_index, x)
         if self.ignore_bos:
             xt[:, 0] = x[:, 0]
         return xt

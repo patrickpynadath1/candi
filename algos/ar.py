@@ -1,13 +1,13 @@
 # torch.serialization.add_safe_globals([DictConfig])
 
 
-import trainer_base
+from .trainer_base import TrainerBase
 
 
 import torch
 
 
-class AR(trainer_base.TrainerBase):
+class AR(TrainerBase):
     def __init__(self, config, tokenizer):
         vocab_size = tokenizer.vocab_size
         if not hasattr(tokenizer, "mask_token") or tokenizer.mask_token is None:
