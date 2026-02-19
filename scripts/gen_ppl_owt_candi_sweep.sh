@@ -20,19 +20,15 @@ mixed_coeff=.5
 CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
   mode=sample_eval \
   loader.batch_size=16 \
-  loader.eval_batch_size=8 \
+  loader.eval_batch_size=128 \
   data=openwebtext-split \
   model=small \
   algo=candi \
-  sampling.num_sample_batches=16 \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/candi-50k-ckpt/checkpoints/last.ckpt \
-  model.length=1024 \
-  algo.top_k=100 \
-  algo.step_size=1 \
-  algo.use_cfg=false \
+  sampling.num_sample_batches=1 \
+  eval.checkpoint_path="/data/remote_cache/patrick/discrete_diffusion/lm1b/2026.02.17/213340/checkpoints/0-7500.ckpt" \
+  model.length=128 \
   algo.sampler=cached \
   algo.mixed_coeff=$mixed_coeff \
-  algo.is_greedy=true \
   +wandb.offline=true;
 
 
