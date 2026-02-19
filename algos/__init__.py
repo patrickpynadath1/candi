@@ -8,6 +8,7 @@ from .d3pm_absorb import *
 from .candi import *
 from .cont_diff_onehot import *
 from .cont_diff_embed import *
+from .cadd import *
 
 
 all_algos = {
@@ -22,4 +23,5 @@ all_algos = {
     "semicat": Semicat,
     "cont_diff_onehot": ContDiffOnehot,
     "cont_diff_embed": ContDiffEmbed,
+    "cadd": CADD,
 }
