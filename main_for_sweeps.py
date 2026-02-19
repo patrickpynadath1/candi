@@ -222,6 +222,10 @@ def main(config):
         diffusion_model = algos.CANDI
     elif config.algo.name == "semicat":
         diffusion_model = algos.Semicat
+    elif config.algo.name == "cont_diff_onehot":
+        diffusion_model = algos.ContDiffOnehot
+    elif config.algo.name == "cont_diff_embed":
+        diffusion_model = algos.ContDiffEmbed
 
     else:
         raise ValueError(f"Invalid algorithm name: {config.algo.name}")
