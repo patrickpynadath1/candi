@@ -95,7 +95,7 @@ class CADD(Diffusion):
 
     def prior_sample(self, *batch_dims):
         noise = torch.randn(
-            *batch_dims, self.vocab_size, dtype=torch.float32, device=self.device
+            *batch_dims, self.config.model.hidden_size, dtype=torch.float32, device=self.device
         ) 
         return noise
 
@@ -132,57 +132,20 @@ class CADD(Diffusion):
         x = prompt_onehots * prompt_mask.unsqueeze(-1) + (1 - prompt_mask).unsqueeze(-1) * x
         return x, prompt_mask
 
-    def generate_samples(self, **kwargs):
-        if self.sampler == 'cached':
-            return self.generate_samples_cache(**kwargs)
-        else:
-            return self.generate_samples_nocache(**kwargs)
-
+     # optimized function with cached embeddings
     @torch.no_grad()
-    def generate_samples_nocache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
-
-        if num_steps is None:
-            num_steps = self.config.sampling.steps
-
-        x = self.prior_sample(num_samples, self.num_tokens)
-
-
-        clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-
-        if prompt_tokens is not None and prompt_mask is not None:
-            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
-
-        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
-        dt = (1 - eps) / (num_steps)
-
-
-        self.prev_px0 = None
-        for i in range(num_steps):
-            t = timesteps[i]
-            s = timesteps[i+1]
-
-            x_cont, p_x0 = self._continuous_step(x, t, s, clean_mask=clean_mask, time_s=s)
-
-            x, clean_mask = self._discrete_step(x_cont,
-                                                p_x0, t, dt, prev_clean_mask=clean_mask)
-
-        final_tokens = x.argmax(dim=-1)
-        return final_tokens
-
-    # optimized function with cached embeddings
-    @torch.no_grad()
-    def generate_samples_cache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
+    def generate_samples(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
 
         xt_embeds = self.prior_sample(num_samples, self.num_tokens)
         if num_steps is None:
             num_steps = self.config.sampling.steps
 
-        clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device, dtype=torch.bool)
+        clean_mask = torch.zeros((num_samples, self.num_tokens), device=xt_embeds.device, dtype=torch.bool)
         if prompt_tokens is not None and prompt_mask is not None:
-            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
+            xt_embeds, clean_mask = self.generate_sample_prompt(prompt_tokens, xt_embeds, prompt_mask)
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / (num_steps)
-        xt_tokens = torch.full((num_samples, self.num_tokens), self.mask_index, device=x.device, dtype=torch.long)
+        xt_tokens = torch.full((num_samples, self.num_tokens), self.mask_index, device=xt_embeds.device, dtype=torch.long)
         for i in range(num_steps):
             t = timesteps[i]
             s = timesteps[i+1]
@@ -236,11 +199,11 @@ class CADD(Diffusion):
         cond_denoised = self.forward(xt=xt_embeds, 
                                      xt_tokens=xt_tokens, 
                                      discrete_noise=time_t_vec, 
-                                     is_embed=True, 
-                                     precond=False).double()
+                                     reveal_mask=clean_mask,
+                                     ).double()
         denoised = cond_denoised.exp()
         x0_hat_tokens = sample_categorical(denoised)
         x0_hat = self.backbone.get_embedding(x0_hat_tokens)
-        xt_embeds_new = xt_embeds + (dt_vec / (1 - time_t_vec)) * (x0_hat - xt_embeds)
+        xt_embeds_new = xt_embeds + (dt_vec / (1 - time_t_vec))[:, None, None] * (x0_hat - xt_embeds)
         xt_embeds_new[clean_mask] = xt_embeds[clean_mask]
         return xt_embeds_new, x0_hat_tokens
