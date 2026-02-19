@@ -19,7 +19,7 @@ class CADD(Diffusion):
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self._validate_configuration()
         self.save_hyperparameters()
-        self.sampler = config.algo.sampler
+        self.temp = 1.0
 
 
     def sample_t(self, n, accum_step):
@@ -56,10 +56,7 @@ class CADD(Diffusion):
         log_p_theta = torch.gather(
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
-        if self.pure_continuous:
-            nll = -1 * log_p_theta
-        else:
-            nll = log_p_theta * dalpha_t / (1 - alpha_t)
+        nll = log_p_theta * dalpha_t / (1 - alpha_t)
         return nll
 
 
@@ -85,11 +82,10 @@ class CADD(Diffusion):
         discrete_noise = (1 - alpha_t).squeeze()
         clean_embeds = self.backbone.get_embedding(x)
         noise = torch.randn_like(clean_embeds)
-        noisy_embeds = alpha_t[:, None, None] * clean_embeds + (1 - alpha_t)[:, None, None] * noise
+        noisy_embeds = alpha_t[:, :, None] * clean_embeds + (1 - alpha_t)[:, :, None] * noise
         mask_embed = self.backbone.get_mask_embed()
         noisy_embeds = noisy_embeds + mask_embed[None, None, :]
         xt = torch.where(reveal_mask[:, :, None] == 1, clean_embeds, noisy_embeds)
-
         return {
             'xt': xt,
             'reveal_mask': reveal_mask,
@@ -105,7 +101,7 @@ class CADD(Diffusion):
 
     def forward(self, **kwargs):
         with torch.cuda.amp.autocast(dtype=torch.float32):
-            model_output = self.backbone(**kwargs, precond=False)
+            model_output = self.backbone(**kwargs, precond=False, is_embed=True)
         return self._process_model_output(model_output=model_output, xt_tokens=kwargs['xt_tokens'], reveal_mask=kwargs['reveal_mask'])
 
     def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
