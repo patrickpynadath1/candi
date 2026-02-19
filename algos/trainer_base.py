@@ -68,7 +68,8 @@ class TrainerBase(L.LightningModule):
         self.parameterization = self.config.algo.parameterization
         if self.config.algo.backbone == "dit":
             self.backbone = models.dit.DIT(self.config, vocab_size=self.vocab_size)
-
+        elif self.config.algo.backbone == "dit_avg":
+            self.backbone = models.dit_avg.DIT_avg(self.config, vocab_size=self.vocab_size)
         elif self.config.algo.backbone == "cont_dit": 
             backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size, mixed_coeff=self.config.algo.mixed_coeff)
             self.backbone = backbone
