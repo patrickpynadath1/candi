@@ -473,3 +473,216 @@ class Preconditioning(nn.Module):
                 x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None])
             return x
         return x * c_in[:, None, None]
+
+
+
+class CrossAttentionEncoderBlock(nn.Module):
+    """Compresses normal sequence into a smaller latent sequence.
+    
+    Learnable latent queries cross-attend to the input sequence.
+    """
+    def __init__(self, dim, n_heads, n_latents, adaLN=False, cond_dim=None, mlp_ratio=4, dropout=0.1):
+        super().__init__()
+        self.n_heads = n_heads
+        self.adaLN = adaLN
+
+        # Learnable latent queries: (n_latents, dim)
+        self.latent_queries = nn.Parameter(torch.randn(n_latents, dim) * 0.02)
+
+        # Cross attention projections
+        self.norm_q = LayerNorm(dim)
+        self.norm_kv = LayerNorm(dim)
+        self.attn_q = nn.Linear(dim, dim, bias=False)
+        self.attn_kv = nn.Linear(dim, 2 * dim, bias=False)
+        self.attn_out = nn.Linear(dim, dim, bias=False)
+        self.dropout1 = nn.Dropout(dropout)
+
+        # MLP
+        self.norm2 = LayerNorm(dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, mlp_ratio * dim, bias=True),
+            nn.GELU(approximate="tanh"),
+            nn.Linear(mlp_ratio * dim, dim, bias=True),
+        )
+        self.dropout2 = nn.Dropout(dropout)
+        self.dropout = dropout
+
+        if self.adaLN:
+            # 6 modulation params: shift/scale/gate for cross-attn and mlp
+            self.adaLN_modulation = nn.Linear(cond_dim, 6 * dim)
+            self.adaLN_modulation.weight.data.zero_()
+            self.adaLN_modulation.bias.data.zero_()
+
+    def _get_bias_dropout_scale(self):
+        if self.training:
+            return bias_dropout_add_scale_fused_train
+        else:
+            return bias_dropout_add_scale_fused_inference
+
+    def _cross_attention(self, q, k, v):
+        """q: (b, s_q, h, d), k: (b, s_kv, h, d), v: (b, s_kv, h, d)"""
+        scale = q.shape[-1] ** -0.5
+        # (b, h, s_q, s_kv)
+        attn = torch.einsum("bqhd,bkhd->bhqk", q, k) * scale
+        attn = F.softmax(attn, dim=-1)
+        # (b, s_q, h, d)
+        out = torch.einsum("bhqk,bkhd->bqhd", attn, v)
+        return einops.rearrange(out, "b s h d -> b s (h d)")
+
+    def forward(self, x, c=None):
+        """
+        x: (b, s, dim) - normal sequence (keys/values)
+        c: (b, cond_dim) - conditioning (optional)
+        Returns: (b, n_latents, dim) - compressed latent
+        """
+        bias_dropout_scale_fn = self._get_bias_dropout_scale()
+        b = x.shape[0]
+
+        # Expand learnable queries to batch: (b, n_latents, dim)
+        latent = self.latent_queries.unsqueeze(0).expand(b, -1, -1)
+
+        latent_skip = latent
+
+        # Norms
+        q_in = self.norm_q(latent)
+        kv_in = self.norm_kv(x)
+
+        if self.adaLN:
+            (shift_ca, scale_ca, gate_ca,
+             shift_mlp, scale_mlp, gate_mlp) = self.adaLN_modulation(c)[:, None].chunk(6, dim=2)
+            q_in = modulate_fused(q_in, shift_ca, scale_ca)
+
+        # Project q from latent, k/v from input
+        q = einops.rearrange(self.attn_q(q_in), "b s (h d) -> b s h d", h=self.n_heads)
+        kv = einops.rearrange(self.attn_kv(kv_in), "b s (two h d) -> b s two h d", two=2, h=self.n_heads)
+        k, v = kv[:, :, 0], kv[:, :, 1]
+
+        attn_out = self._cross_attention(q, k, v)
+
+        if self.adaLN:
+            latent = bias_dropout_scale_fn(
+                self.attn_out(attn_out), None, gate_ca, latent_skip, self.dropout
+            )
+            latent = bias_dropout_scale_fn(
+                self.mlp(modulate_fused(self.norm2(latent), shift_mlp, scale_mlp)),
+                None, gate_mlp, latent, self.dropout
+            )
+        else:
+            scale = torch.ones(1, device=latent.device, dtype=latent.dtype)
+            latent = bias_dropout_scale_fn(
+                self.attn_out(attn_out), None, scale, latent_skip, self.dropout
+            )
+            latent = bias_dropout_scale_fn(
+                self.mlp(self.norm2(latent)), None, scale, latent, self.dropout
+            )
+
+        return latent
+
+
+class CrossAttentionDecoderBlock(nn.Module):
+    """Expands latent sequence back to normal sequence length.
+    
+    Learnable output queries cross-attend to the latent sequence.
+    """
+    def __init__(self, dim, n_heads, n_outputs, adaLN=False, cond_dim=None, mlp_ratio=4, dropout=0.1):
+        super().__init__()
+        self.n_heads = n_heads
+        self.adaLN = adaLN
+
+        # Learnable output queries: (n_outputs, dim) — n_outputs matches original seq len
+        self.output_queries = nn.Parameter(torch.randn(n_outputs, dim) * 0.02)
+
+        # Cross attention projections
+        self.norm_q = LayerNorm(dim)
+        self.norm_kv = LayerNorm(dim)
+        self.attn_q = nn.Linear(dim, dim, bias=False)
+        self.attn_kv = nn.Linear(dim, 2 * dim, bias=False)
+        self.attn_out = nn.Linear(dim, dim, bias=False)
+        self.dropout1 = nn.Dropout(dropout)
+
+        self.query_positions = nn.Embedding(n_outputs, dim)
+
+        # MLP
+        self.norm2 = LayerNorm(dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, mlp_ratio * dim, bias=True),
+            nn.GELU(approximate="tanh"),
+            nn.Linear(mlp_ratio * dim, dim, bias=True),
+        )
+        self.dropout2 = nn.Dropout(dropout)
+        self.dropout = dropout
+
+        if self.adaLN:
+            self.adaLN_modulation = nn.Linear(cond_dim, 6 * dim)
+            self.adaLN_modulation.weight.data.zero_()
+            self.adaLN_modulation.bias.data.zero_()
+
+    def _get_bias_dropout_scale(self):
+        if self.training:
+            return bias_dropout_add_scale_fused_train
+        else:
+            return bias_dropout_add_scale_fused_inference
+
+    def _cross_attention(self, q, k, v):
+        scale = q.shape[-1] ** -0.5
+        attn = torch.einsum("bqhd,bkhd->bhqk", q, k) * scale
+        attn = F.softmax(attn, dim=-1)
+        out = torch.einsum("bhqk,bkhd->bqhd", attn, v)
+        return einops.rearrange(out, "b s h d -> b s (h d)")
+
+    def forward(self, latent, c=None):
+        """
+        latent: (b, n_latents, dim) - compressed latent (keys/values)
+        c: (b, cond_dim) - conditioning (optional)
+        Returns: (b, n_outputs, dim) - expanded output
+        """
+        bias_dropout_scale_fn = self._get_bias_dropout_scale()
+        b = latent.shape[0]
+
+        # Expand learnable output queries: (b, n_outputs, dim)
+        out = self.output_queries.unsqueeze(0).expand(b, -1, -1)
+
+        out_skip = out
+
+        q_in = self.norm_q(out)
+        kv_in = self.norm_kv(latent)
+
+        if self.adaLN:
+            (shift_ca, scale_ca, gate_ca,
+             shift_mlp, scale_mlp, gate_mlp) = self.adaLN_modulation(c)[:, None].chunk(6, dim=2)
+            q_in = modulate_fused(q_in, shift_ca, scale_ca)
+
+        q = einops.rearrange(self.attn_q(q_in), "b s (h d) -> b s h d", h=self.n_heads)
+        kv = einops.rearrange(self.attn_kv(kv_in), "b s (two h d) -> b s two h d", two=2, h=self.n_heads)
+        k, v = kv[:, :, 0], kv[:, :, 1]
+
+        attn_out = self._cross_attention(q, k, v)
+
+        if self.adaLN:
+            out = bias_dropout_scale_fn(
+                self.attn_out(attn_out), None, gate_ca, out_skip, self.dropout
+            )
+            out = bias_dropout_scale_fn(
+                self.mlp(modulate_fused(self.norm2(out), shift_mlp, scale_mlp)),
+                None, gate_mlp, out, self.dropout
+            )
+        else:
+            scale = torch.ones(1, device=out.device, dtype=out.dtype)
+            out = bias_dropout_scale_fn(
+                self.attn_out(attn_out), None, scale, out_skip, self.dropout
+            )
+            out = bias_dropout_scale_fn(
+                self.mlp(self.norm2(out)), None, scale, out, self.dropout
+            )
+
+        return out
+
+class RMSNorm(nn.Module):
+    def __init__(self, dim: int, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(dim))
+
+    def forward(self, x):
+        rms = x.pow(2).mean(-1, keepdim=True).add(self.eps).rsqrt()
+        return x * rms * self.weight

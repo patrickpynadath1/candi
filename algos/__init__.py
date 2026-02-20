@@ -9,7 +9,8 @@ from .candi import *
 from .cont_diff_onehot import *
 from .cont_diff_embed import *
 from .cadd import *
-
+from .encoder_decoder_sphere import *
+from .encoder_decoder import *
 
 all_algos = {
     "ar": AR,
@@ -24,4 +25,6 @@ all_algos = {
     "cont_diff_onehot": ContDiffOnehot,
     "cont_diff_embed": ContDiffEmbed,
     "cadd": CADD,
+    "encoder_decoder_sphere": EncoderDecoderSphere,
+    "encoder_decoder": EncoderDecoder,
 }

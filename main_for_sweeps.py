@@ -132,7 +132,7 @@ def _generate_samples(model, config, logger, tokenizer):
 def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
     temps_to_use = torch.linspace(.1, 2.0, steps=30).tolist()
-    steps_to_use = [8, 16, 32, 64, 128]
+    steps_to_use = [1, 2, 4]
 
     model = _load_from_checkpoint(
         diffusion_model=diffusion_model, config=config, tokenizer=tokenizer

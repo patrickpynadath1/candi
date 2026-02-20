@@ -76,6 +76,12 @@ class TrainerBase(L.LightningModule):
         elif self.config.algo.backbone == "cfm_dit": 
             backbone = models.dit_cfm.CFMDit(self.config.model, vocab_size=self.vocab_size)
             self.backbone = backbone
+        elif self.config.algo.backbone == "encoder_decoder_sphere":
+            backbone = models.dit_encoder_decoder_sphere.EncoderDecoderSphere(self.config.model, vocab_size=self.vocab_size)
+            self.backbone = backbone
+        elif self.config.algo.backbone == "encoder_decoder":
+            backbone = models.dit_encoder_decoder.EncoderDecoder(self.config.model, vocab_size=self.vocab_size)
+            self.backbone = backbone
         elif self.config.algo.backbone == "dimamba":
             self.backbone = models.dimamba.DiMamba(
                 self.config,
