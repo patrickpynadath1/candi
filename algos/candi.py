@@ -40,6 +40,8 @@ class CANDI(Diffusion):
         self.is_embed = config.algo.is_embed
         self.use_percentile_scheduling = config.algo.use_percentile_scheduling
 
+        self.dropout_rate = config.algo.dropout_rate
+
 
     def sample_t(self, n, accum_step):
         return super()._sample_t(n, accum_step)
@@ -105,6 +107,12 @@ class CANDI(Diffusion):
         xt = torch.where(move_indices, self.mask_index, x)
         if self.ignore_bos:
             xt[:, 0] = x[:, 0]
+
+        # doing random dropout of noise -- so for some sequences, everything will be masked 
+
+        if self.dropout_rate > 0:
+            dropout_mask = torch.rand(x.shape[0], 1, device=x.device) < self.dropout_rate
+            xt = torch.where(dropout_mask, x, xt)
         return xt
 
     def q_xt(self, x, alpha_t):
