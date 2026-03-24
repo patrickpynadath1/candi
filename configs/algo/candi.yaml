@@ -17,3 +17,5 @@ pure_continuous: False
 sampler: cached
 is_embed: False 
 use_percentile_scheduling: True # only affects inference schedule
+cont_schedule_type: linear
+cont_schedule_target: r

@@ -10,7 +10,7 @@ from .algo_utils import (
 import utils
 import torch
 import torch.nn.functional as F
-
+import math
 
 class CANDI(Diffusion):
     def __init__(self, config, tokenizer):
@@ -40,15 +40,69 @@ class CANDI(Diffusion):
         self.is_embed = config.algo.is_embed
         self.use_percentile_scheduling = config.algo.use_percentile_scheduling
 
+        self.cont_schedule_target = config.algo.cont_schedule_target
+        self.cont_schedule_type = config.algo.cont_schedule_type
+
         self.dropout_rate = config.algo.dropout_rate
 
 
     def sample_t(self, n, accum_step):
         return super()._sample_t(n, accum_step)
 
-    def get_continuous_from_discrete_noise(self, discrete_noise):
+    def _linear_sigma_schedule(self, discrete_noise):
+        """Linear schedule directly in sigma space."""
+        return self.sigma_min + discrete_noise * (self.sigma_max - self.sigma_min)
+    
+    
+    def _cosine_sigma_schedule(self, discrete_noise):
+        """Cosine schedule directly in sigma space."""
+        cosine_interp = (1 - torch.cos(math.pi * discrete_noise)) / 2
+        return self.sigma_min + cosine_interp * (self.sigma_max - self.sigma_min)
+    
+    
+    def _geometric_sigma_schedule(self, discrete_noise):
+        """Geometric/exponential schedule directly in sigma space (Song et al. VE SDE)."""
+        return self.sigma_min * (self.sigma_max / self.sigma_min) ** discrete_noise
+    
+    
+    def _linear_r_schedule(self, discrete_noise):
+        """Linear schedule in r*(t) space, inverted to sigma via equation (6)."""
         target_percentile = discrete_noise * (self.max_percentile - self.min_percentile) + self.min_percentile
         return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
+    
+    
+    def _cosine_r_schedule(self, discrete_noise):
+        """Cosine schedule in r*(t) space, inverted to sigma via equation (6)."""
+        cosine_interp = (1 - torch.cos(math.pi * discrete_noise)) / 2
+        target_percentile = cosine_interp * (self.max_percentile - self.min_percentile) + self.min_percentile
+        return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
+    
+    
+    def _geometric_r_schedule(self, discrete_noise):
+        """Geometric schedule in r*(t) space, inverted to sigma via equation (6)."""
+        target_percentile = self.min_percentile * (self.max_percentile / self.min_percentile) ** discrete_noise
+        return sigma_from_time_vectorized(target_percentile, self.continuous_noise, self.discrete_noise)
+
+
+    def get_continuous_from_discrete_noise(self, discrete_noise):
+        if self.cont_schedule_target == 'sigma': 
+            if self.cont_schedule_type == 'linear':
+                return self._linear_sigma_schedule(discrete_noise)
+            elif self.cont_schedule_type == 'cosine':
+                return self._cosine_sigma_schedule(discrete_noise)
+            elif self.cont_schedule_type == 'geometric':
+                return self._geometric_sigma_schedule(discrete_noise)
+            else:
+                raise ValueError(f"Unknown cont_schedule_type: {self.cont_schedule_type}")
+        elif self.cont_schedule_target == 'r':
+            if self.cont_schedule_type == 'linear':
+                return self._linear_r_schedule(discrete_noise)
+            elif self.cont_schedule_type == 'cosine':
+                return self._cosine_r_schedule(discrete_noise)
+            elif self.cont_schedule_type == 'geometric':
+                return self._geometric_r_schedule(discrete_noise)
+            else:
+                raise ValueError(f"Unknown cont_schedule_type: {self.cont_schedule_type}")
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)
