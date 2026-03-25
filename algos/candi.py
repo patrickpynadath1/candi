@@ -43,7 +43,6 @@ class CANDI(Diffusion):
         self.cont_schedule_target = config.algo.cont_schedule_target
         self.cont_schedule_type = config.algo.cont_schedule_type
 
-        self.dropout_rate = config.algo.dropout_rate
 
 
     def sample_t(self, n, accum_step):
@@ -162,11 +161,6 @@ class CANDI(Diffusion):
         if self.ignore_bos:
             xt[:, 0] = x[:, 0]
 
-        # doing random dropout of noise -- so for some sequences, everything will be masked 
-
-        if self.dropout_rate > 0:
-            dropout_mask = torch.rand(x.shape[0], 1, device=x.device) < self.dropout_rate
-            xt = torch.where(dropout_mask, x, xt)
         return xt
 
     def q_xt(self, x, alpha_t):
