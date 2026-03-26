@@ -166,41 +166,17 @@ def compute_generative_perplexity(
 
 
 # ---------------------------------------------------------------------------
-# JSON loading helpers
-# ---------------------------------------------------------------------------
-
-def load_jsons_from_dir(directory: str) -> list[dict]:
-    """Return all JSON objects found in *.json files under `directory`."""
-    results = []
-    paths = sorted(Path(directory).glob("*.json"))
-    if not paths:
-        raise FileNotFoundError(f"No .json files found in {directory}")
-    for p in paths:
-        with open(p) as f:
-            data = json.load(f)
-        data["_source_file"] = str(p)
-        results.append(data)
-    print(f"Loaded {len(results)} JSON file(s) from {directory}")
-    return results
-
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def parse_args():
     p = argparse.ArgumentParser(description="Compute gen-PPL and entropy for saved samples.")
-    p.add_argument("--samples_dir",         required=True,  help="Directory containing *.json sample files")
+    p.add_argument("--samples_dir",         required=True,  help="Directory containing *.json and *.pt sample files")
     p.add_argument("--eval_model",          default="gpt2-large", help="HF model name/path used for perplexity eval (default: gpt2-large)")
     p.add_argument("--output_path",         default="metrics_results.json", help="Where to write the output JSON")
     p.add_argument("--eval_ppl_batch_size", type=int, default=1024)
     p.add_argument("--max_length",          type=int, default=128)
     p.add_argument("--device",              default="cuda" if torch.cuda.is_available() else "cpu")
-    p.add_argument("--gen_tokenizer",       default="gpt2",
-                   help="Tokenizer used to originally generate the samples (for entropy). "
-                        "Needed to re-encode text back to token ids. "
-                        "Defaults to gpt2.")
     return p.parse_args()
 
 
@@ -208,44 +184,45 @@ def main():
     args = parse_args()
 
     # ------------------------------------------------------------------ #
-    # 1. Load all JSON files
+    # 1. Discover all JSON files and find their paired .pt files
     # ------------------------------------------------------------------ #
-    json_objects = load_jsons_from_dir(args.samples_dir)
+    json_paths = sorted(Path(args.samples_dir).glob("*.json"))
+    if not json_paths:
+        raise FileNotFoundError(f"No .json files found in {args.samples_dir}")
+    print(f"Found {len(json_paths)} JSON file(s) in {args.samples_dir}")
 
     # ------------------------------------------------------------------ #
-    # 2. Set up generation tokenizer once (for entropy)
-    # ------------------------------------------------------------------ #
-    gen_tok_name = args.gen_tokenizer
-    print(f"Loading generation tokenizer: {gen_tok_name}")
-    gen_tokenizer = transformers.AutoTokenizer.from_pretrained(gen_tok_name)
-    if gen_tokenizer.pad_token is None:
-        gen_tokenizer.pad_token = gen_tokenizer.eos_token
-
-    # ------------------------------------------------------------------ #
-    # 3. Compute metrics per file, preserving steps/temp metadata
+    # 2. Compute metrics per file
     # ------------------------------------------------------------------ #
     all_results = []
 
-    for obj in json_objects:
-        source_file  = obj["_source_file"]
-        text_samples = obj.get("generated_seqs", [])
-        if not text_samples:
-            print(f"Skipping {source_file} — no 'generated_seqs' found.")
+    for json_path in json_paths:
+        pt_path = json_path.with_suffix(".pt")
+        if not pt_path.exists():
+            print(f"Skipping {json_path.name} — no matching .pt file found.")
             continue
 
+        # Load metadata + text samples from JSON
+        with open(json_path) as f:
+            obj = json.load(f)
+        text_samples = obj.get("generated_seqs", [])
         steps = obj.get("steps", None)
         temp  = obj.get("temperature", None)
-        print(f"\n--- {Path(source_file).name} | steps={steps} temp={temp} | n={len(text_samples)} ---")
 
-        # Entropy
-        token_id_tensors = []
-        for text in tqdm(text_samples, desc="Tokenizing for entropy", leave=False):
-            ids = gen_tokenizer(text, return_tensors="pt")["input_ids"].squeeze(0)
-            token_id_tensors.append(ids)
-        entropy = compute_entropy(token_id_tensors)
+        if not text_samples:
+            print(f"Skipping {json_path.name} — no 'generated_seqs' found.")
+            continue
+
+        print(f"\n--- {json_path.name} | steps={steps} temp={temp} | n={len(text_samples)} ---")
+
+        # Load raw token ids from .pt for entropy (exact match to original)
+        token_ids = torch.load(pt_path)  # shape: (N, seq_len)
+
+        # Entropy — pass each row as a 1-D tensor, exactly as record_entropy does
+        entropy = compute_entropy([token_ids[i] for i in range(token_ids.shape[0])])
         print(f"  entropy        = {entropy:.6f}")
 
-        # Generative perplexity
+        # Generative perplexity — uses decoded text + eval model
         gen_ppl = compute_generative_perplexity(
             text_samples            = text_samples,
             eval_model_name_or_path = args.eval_model,
@@ -256,7 +233,7 @@ def main():
         print(f"  generative_ppl = {gen_ppl:.4f}")
 
         all_results.append({
-            "source_file"   : source_file,
+            "source_file"   : str(json_path),
             "steps"         : steps,
             "temperature"   : temp,
             "num_samples"   : len(text_samples),
@@ -265,18 +242,17 @@ def main():
         })
 
     # ------------------------------------------------------------------ #
-    # 4. Sort by steps, then temperature
+    # 3. Sort by steps, then temperature
     # ------------------------------------------------------------------ #
     all_results.sort(key=lambda x: (x["steps"], x["temperature"]))
 
     # ------------------------------------------------------------------ #
-    # 5. Save all results
+    # 4. Save all results
     # ------------------------------------------------------------------ #
     output = {
-        "eval_model"   : args.eval_model,
-        "gen_tokenizer": gen_tok_name,
-        "samples_dir"  : args.samples_dir,
-        "results"      : all_results,
+        "eval_model" : args.eval_model,
+        "samples_dir": args.samples_dir,
+        "results"    : all_results,
     }
     with open(args.output_path, "w") as f:
         json.dump(output, f, indent=4)
