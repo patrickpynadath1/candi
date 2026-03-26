@@ -133,7 +133,7 @@ def _generate_samples(model, config, logger, tokenizer, compute_eval_metrics):
         res = {
             "generated_seqs": all_samples,
         }
-    return res
+    return res, samples.to("cpu")
 
 def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
@@ -154,7 +154,7 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
         for temp in temps_to_use:
             model.temp = temp
             model.metrics.reset()
-            res = _generate_samples(model, config, logger, tokenizer, compute_eval_metrics=compute_eval_metrics)
+            res, samples = _generate_samples(model, config, logger, tokenizer, compute_eval_metrics=compute_eval_metrics)
 
             res['steps'] = steps
             res['temperature'] = temp
@@ -164,7 +164,10 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
                 json.dump(res, f,
                     indent=4,
                 )
+            raw_tokens_path = samples_path.replace('.json', f'_steps{steps}_temp{temp:.3f}.pt')
+            torch.save(samples, raw_tokens_path)
             print("Samples saved at:", samples_path)
+            print("Raw token ids saved at:", raw_tokens_path)
             if compute_eval_metrics:
                 if config.data.train == 'text8': 
                     train_ds, valid_ds = dataloader.get_dataloaders(config, tokenizer)
