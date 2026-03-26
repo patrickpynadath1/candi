@@ -97,7 +97,7 @@ def _generate_samples(model, config, logger, tokenizer, compute_eval_metrics):
     print("Using single GPU for generation")
 
     # using compile 
-
+    samples_pt_list = []
     for _ in tqdm(range(config.sampling.num_sample_batches)):
         samples = model.restore_model_and_sample(num_steps=config.sampling.steps)
 
@@ -110,15 +110,16 @@ def _generate_samples(model, config, logger, tokenizer, compute_eval_metrics):
                 text_samples, config.model.length, model.device
             )
 
-            generative_ppl = 0.0
-            entropy = 0.0
-            model.metrics.record_entropy(samples)
+            # generative_ppl = 0.0
+            # entropy = 0.0
+            # model.metrics.record_entropy(samples)
     
         
-            device = torch.device('cuda:0')
-            model.metrics.record_generative_perplexity(text_samples, config.model.length, device)
+            # device = torch.device('cuda:0')
+            # model.metrics.record_generative_perplexity(text_samples, config.model.length, device)
 
         all_samples.extend(list(text_samples))
+        samples_pt_list.append(samples.cpu())
 
     if compute_eval_metrics:
         generative_ppl = model.metrics.gen_ppl.compute().item()
@@ -133,7 +134,7 @@ def _generate_samples(model, config, logger, tokenizer, compute_eval_metrics):
         res = {
             "generated_seqs": all_samples,
         }
-    return res, samples.to("cpu")
+    return res, torch.stack(samples_pt_list)
 
 def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
