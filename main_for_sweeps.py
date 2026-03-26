@@ -134,11 +134,11 @@ def _generate_samples(model, config, logger, tokenizer, compute_eval_metrics):
         res = {
             "generated_seqs": all_samples,
         }
-    return res, torch.stack(samples_pt_list)
+    return res, torch.concatenate(samples_pt_list, dim=0)
 
 def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
-    temps_to_use = torch.linspace(.1, 2.0, steps=30).tolist()
+    temps_to_use = torch.linspace(.6, 1.0, steps=17).tolist()
     steps_to_use = [8, 16, 32, 64, 128]
 
     model = _load_from_checkpoint(
@@ -165,7 +165,7 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
                 json.dump(res, f,
                     indent=4,
                 )
-            raw_tokens_path = samples_path.replace('.json', f'_steps{steps}_temp{temp:.3f}.pt')
+            raw_tokens_path = samples_path.replace('.json', f'.pt')
             torch.save(samples, raw_tokens_path)
             print("Samples saved at:", samples_path)
             print("Raw token ids saved at:", raw_tokens_path)
