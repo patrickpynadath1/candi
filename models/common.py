@@ -416,19 +416,20 @@ class EmbeddingLayerMixture_norm(nn.Module):
 
     def forward(self, x):
 
-        # Just for now 
+        # Keep the mask embedding as a special vector; continuous token mixtures use non-mask rows.
         normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
+        token_embeddings = normalized_embeddings[:-1]
         # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
         
         # normalized_embeddings = self.embedding[:-1]
 
         if x.ndim == 2:
-            return normalized_embeddings[x]
+            return token_embeddings[x]
         assert x.ndim == 3
         return torch.einsum(
             "blv,ve->ble",
             x.float(),
-            normalized_embeddings.float(),
+            token_embeddings.float(),
         ).to(x.dtype)
 
 

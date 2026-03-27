@@ -100,8 +100,8 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             logits = self.output_layer(x, c=t_cond)
 
         if ret_embedding:
-            return logits, x 
-        return logits
+            return logits[:, :, :-1], x 
+        return logits[:, :, :-1]
     
     def get_embedding(self, x): 
         return self.vocab_embed(x)

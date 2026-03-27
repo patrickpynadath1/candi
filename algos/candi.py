@@ -23,7 +23,7 @@ class CANDI(Diffusion):
         self.pure_continuous = config.algo.pure_continuous
 
         self.continuous_noise =torch.linspace(.2, 4.0, 1000)
-        self.discrete_noise = expected_rank(d=self.vocab_size, a=torch.tensor(1).to(self.device), sigma=self.continuous_noise)
+        self.discrete_noise = expected_rank(d=self.vocab_size-1, a=torch.tensor(1).to(self.device), sigma=self.continuous_noise)
 
         self.continuous_noise = torch.tensor(self.continuous_noise)
         self.discrete_noise = torch.tensor(self.discrete_noise)
@@ -157,7 +157,8 @@ class CANDI(Diffusion):
             (batch_size, 1).
         """
         move_indices = torch.rand(*x.shape, device=x.device) < 1 - alpha_t
-        xt = torch.where(move_indices, self.mask_index, x)
+        uniform_tensor = torch.randint(0, self.vocab_size, x.shape, device=x.device)
+        xt = torch.where(move_indices, uniform_tensor, x)
         if self.ignore_bos:
             xt[:, 0] = x[:, 0]
 
@@ -172,7 +173,7 @@ class CANDI(Diffusion):
         continuous_noise = self.get_continuous_from_discrete_noise(discrete_noise)
 
         # accounting for the mask token
-        onehot = F.one_hot(x, num_classes=self.vocab_size).float()
+        onehot = F.one_hot(x, num_classes=self.vocab_size-1).float()
 
 
         xt_cont = onehot + continuous_noise[:, None, None].to(x.device) * torch.randn_like(onehot, device=x.device)
@@ -188,7 +189,7 @@ class CANDI(Diffusion):
     def prior_sample(self, *batch_dims):
         sigma = self.get_continuous_from_discrete_noise(torch.tensor(.999).to(self.device))
         noise = torch.randn(
-            *batch_dims, self.vocab_size, dtype=torch.float32, device=self.device
+            *batch_dims, self.vocab_size-1, dtype=torch.float32, device=self.device
         )  * sigma
         return noise
 

@@ -60,10 +60,10 @@ def main():
     tokenizer = metrics.tokenizer  # Use the same tokenizer as Metrics for exact equivalence
 
     for json_path in json_paths:
-        pt_path = json_path.with_suffix(".pt")
-        if not pt_path.exists():
-            print(f"Skipping {json_path.name} — no matching .pt file found.")
-            continue
+        # pt_path = json_path.with_suffix(".pt")
+        # if not pt_path.exists():
+        #     print(f"Skipping {json_path.name} — no matching .pt file found.")
+        #     continue
 
         with open(json_path) as f:
             obj = json.load(f)
@@ -82,14 +82,14 @@ def main():
         metrics.reset()
 
         # Load raw token ids for entropy — exact same tensors as record_entropy received
-        token_ids = torch.load(pt_path)  # shape: (N, seq_len)
-        # token_ids = tokenizer.batch_encode_plus(
-        #     text_samples,
-        #     padding=True,
-        #     truncation=True,
-        #     max_length=args.max_length,
-        #     return_tensors="pt"
-        # )["input_ids"].to(args.device)
+        # token_ids = torch.load(pt_path)  # shape: (N, seq_len)
+        token_ids = tokenizer.batch_encode_plus(
+            text_samples,
+            padding=True,
+            truncation=True,
+            max_length=args.max_length,
+            return_tensors="pt"
+        )["input_ids"].to(args.device)
 
         # Entropy — identical call to generation script
         # for sample in range(token_ids.shape[0]): 
