@@ -8,6 +8,7 @@ from .common import (
     bias_dropout_add_scale_fused_inference,
     Preconditioning
 )
+from .registry import models
 import huggingface_hub
 import omegaconf
 import torch
@@ -23,6 +24,7 @@ torch._C._jit_override_can_fuse_on_gpu(True)
 
 
 # Assumes that the vocab size accounts for the mask token 
+@models.register("cont_dit")
 class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def __init__(self, config, vocab_size: int, mixed_coeff: float=.5, use_precond=True):
         super().__init__()
@@ -32,9 +34,9 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.adaLN = True
         self.config = config
         self.vocab_size = vocab_size
-        dim = config.hidden_size
+        dim = config.model.hidden_size
         self.dim=dim
-        cond_dim = config.cond_dim
+        cond_dim = config.model.cond_dim
         self.vocab_embed = EmbeddingLayerMixture_norm(dim,vocab_size)
         self.mask_index = vocab_size-1
         self.use_precond = use_precond
@@ -42,20 +44,20 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         if not self.causal:
             self.sigma_map = TimestepEmbedder(cond_dim)
-        self.rotary_emb = Rotary(dim // config.n_heads)
+        self.rotary_emb = Rotary(dim // config.model.n_heads)
         self.mixed_coeff = mixed_coeff
         self.precond = Preconditioning(self.vocab_embed, self.mixed_coeff)
 
 
 
         blocks = []
-        for _ in range(config.n_blocks):
+        for _ in range(config.model.n_blocks):
             block = DDiTBlock(
                 dim=dim,
-                n_heads=config.n_heads,
+                n_heads=config.model.n_heads,
                 cond_dim=cond_dim,
                 adaLN=self.adaLN,
-                dropout=config.dropout,
+                dropout=config.model.dropout,
             )
             blocks.append(block)
         self.blocks = nn.ModuleList(blocks)

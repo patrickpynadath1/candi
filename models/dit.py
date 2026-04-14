@@ -19,14 +19,14 @@ from .common import (
     bias_dropout_add_scale_fused_train,
     bias_dropout_add_scale_fused_inference,
 )
+from .registry import models
 # Flags required to enable jit fusion kernels
 torch._C._jit_set_profiling_mode(False)
 torch._C._jit_set_profiling_executor(False)
 torch._C._jit_override_can_fuse_on_cpu(True)
 torch._C._jit_override_can_fuse_on_gpu(True)
 
-
-
+@models.register("dit")
 class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def __init__(self, config, vocab_size: int):
         super().__init__()
