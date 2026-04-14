@@ -17,7 +17,7 @@ class Decoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
         self.causal = False
-        self.adaLN = True
+        self.adaLN = False
         self.config = config
         self.vocab_size = vocab_size
         dim = config.model.hidden_size
@@ -77,7 +77,7 @@ class Decoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                 generation_mode=False,
                 **kwargs):
 
-        t_cond = F.silu(self.sigma_map(sigma))
+        t_cond = None
         if generation_mode:
             x = input_latent
         else:

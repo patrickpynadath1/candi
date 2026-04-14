@@ -21,7 +21,7 @@ class Encoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
         self.causal = False
-        self.adaLN = True
+        self.adaLN = False
         self.config = config
         self.vocab_size = vocab_size
         dim = config.model.hidden_size
@@ -73,7 +73,7 @@ class Encoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                 sigma,
                 **kwargs):
 
-        t_cond = F.silu(self.sigma_map(sigma))
+        t_cond = None
         x = self.vocab_embed(input_tokens)
         register_latents = self._get_initialize_latents(x.shape[0], x.device)
         x = torch.cat([register_latents, x], dim=1)

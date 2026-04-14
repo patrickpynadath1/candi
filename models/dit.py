@@ -33,7 +33,7 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
         self.causal = config.algo.causal_attention
-        self.adaLN = not self.causal
+        self.adaLN = config.algo.time_conditioning
         self.config = config
         self.vocab_size = vocab_size
         dim = config.model.hidden_size
@@ -74,9 +74,9 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         else:
             return bias_dropout_add_scale_fused_inference
 
-    def forward(self, x, sigma):
+    def forward(self, x, sigma, get_logits=True):
         x = self.vocab_embed(x)
-        if self.causal:
+        if self.adaLN:
             t_cond = None
         else:
             t_cond = F.silu(self.sigma_map(sigma))
@@ -86,9 +86,15 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         with torch.cuda.amp.autocast(dtype=torch.bfloat16):
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
-            x = self.output_layer(x, c=t_cond)
-
+            if get_logits: 
+                x = self.output_layer(x, c=t_cond)
         return x
+    
+    def get_logits(self, h, sigma): 
+        if sigma is not None:
+            sigma = F.silu(self.sigma_map(sigma))
+        return self.output_layer(h, c=sigma)
+
     
     def get_embedding(self, x):
         return self.vocab_embed(x)

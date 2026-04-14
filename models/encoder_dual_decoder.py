@@ -22,7 +22,7 @@ class EncoderDecoderDual(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
         self.causal = False
-        self.adaLN = True
+        self.adaLN = False
         self.config = config
         self.vocab_size = vocab_size
         dim = config.model.model.hidden_size
