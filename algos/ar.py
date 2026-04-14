@@ -2,11 +2,12 @@
 
 
 from .trainer_base import TrainerBase
-
+from .registry import algo_registry
 
 import torch
 
 
+@algo_registry.register("ar")
 class AR(TrainerBase):
     def __init__(self, config, tokenizer):
         vocab_size = tokenizer.vocab_size

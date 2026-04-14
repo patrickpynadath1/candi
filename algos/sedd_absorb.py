@@ -1,9 +1,11 @@
 from .absorbing_state import AbsorbingState
+from .registry import algo_registry
 
 import numpy as np
 import torch
 
 
+@algo_registry.register("sedd_absorb")
 class SEDDAbsorb(AbsorbingState):
     def __init__(self, config, tokenizer):
         super().__init__(config, tokenizer)

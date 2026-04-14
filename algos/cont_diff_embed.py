@@ -2,16 +2,15 @@ from .diffusion import Diffusion
 from .algo_utils import (
     expected_rank, 
     sigma_from_time_vectorized, 
-    inference_sigmas, 
-    sample_categorical, 
     training_sigma_ve
     )
-
+from .registry import algo_registry
 import utils
 import torch
 import torch.nn.functional as F
 
 
+@algo_registry.register("cont_diff_embed")
 class ContDiffEmbed(Diffusion):
     def __init__(self, config, tokenizer):
         self.mask_index = len(tokenizer)

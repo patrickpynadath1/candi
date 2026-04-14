@@ -1,5 +1,5 @@
 from .duo import DUO
-
+from .registry import algo_registry
 
 import torch
 import torch.nn.functional as F
@@ -9,6 +9,7 @@ import copy
 import os
 
 
+@algo_registry.register("distillation")
 class Distillation(DUO):
     def __init__(self, config, tokenizer):
         super().__init__(config, tokenizer)

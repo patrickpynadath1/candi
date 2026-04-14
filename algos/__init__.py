@@ -1,30 +1,15 @@
-from .ar import *
-from .duo import *
-from .distillation import *
-from .mdlm import *
-from .sedd_absorb import *
-from .semicat import *
-from .d3pm_absorb import *
-from .candi import *
-from .cont_diff_onehot import *
-from .cont_diff_embed import *
-from .cadd import *
-from .encoder_decoder_sphere import *
-from .encoder_decoder import *
+from .registry import algo_registry
+import importlib, pkgutil
 
-all_algos = {
-    "ar": AR,
-    "mdlm": MDLM,
-    "duo_base": DUO_BASE,
-    "d3pm": D3PMAbsorb,
-    "sedd": SEDDAbsorb,
-    "duo": DUO,
-    "distillation": Distillation,
-    "candi": CANDI,
-    "semicat": Semicat,
-    "cont_diff_onehot": ContDiffOnehot,
-    "cont_diff_embed": ContDiffEmbed,
-    "cadd": CADD,
-    "encoder_decoder_sphere": EncoderDecoderSphere,
-    "encoder_decoder": EncoderDecoder,
-}
+IGNORE = {
+    "__init__", 
+    "registry", 
+    "absorbing_state", 
+    "algo_utils", 
+    "trainer_base", 
+    "uniform_state", 
+    }
+
+for _, name, _ in pkgutil.iter_modules(__path__):
+    if name not in IGNORE:
+        importlib.import_module(f".{name}", __name__)
