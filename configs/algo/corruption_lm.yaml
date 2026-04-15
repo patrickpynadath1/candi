@@ -1,0 +1,10 @@
+name: corruption_lm
+backbone: dit
+causal_attention: False
+parameterization: mean
+T: 0 # continuous time  
+discretize_start_time: 1.0
+time_conditioning: False
+corruption_max_t: 0.3
+corruption_type: masked # uniform or masked
+subs_masking: False

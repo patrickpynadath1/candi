@@ -9,3 +9,4 @@ scale_by_sigma: True
 dropout: 0.1
 tie_word_embeddings: False
 vocab_lookup: True
+k_register_latents: 64

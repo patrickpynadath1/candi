@@ -1,8 +1,11 @@
-name: encoder_decoder
+name: encoder_decoder_plain
 backbone: encoder_decoder
 causal_attention: False
 parameterization: mean
 T: 0 # continuous time  
 discretize_start_time: 1.0
-time_conditioning: true
-max_noise_angle: 85
+time_conditioning: False
+corruption_max_t: 0.3
+corruption_type: masked # uniform or masked
+smoothing_latent_noise: 0.7
+subs_masking: False

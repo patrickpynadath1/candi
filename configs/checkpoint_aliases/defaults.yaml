@@ -1,0 +1,11 @@
+# masked corruption, latents = 64 / 128, masked corruption rate = .3, smoothing = .7
+masked_encoder_decoder: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.14/120539/checkpoints/last.ckpt"
+
+# latent denoiser, goes with above checkpoint 
+latent_masked_ed_denoiser: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.14/182905/checkpoints/last.ckpt"
+
+# dit discrete noiser, like char level bert. masking = .3 of tokens, no smoothing 
+masked_denoiser: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.14/120122/checkpoints/last.ckpt"
+
+# latent denoiser going with the masked denoiser above 
+latent_masked_lm_denoiser: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.14/191722/checkpoints/last.ckpt"
