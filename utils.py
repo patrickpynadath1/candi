@@ -362,3 +362,28 @@ if __name__ == "__main__":
         vocab_size=args.vocab_size,
         log10_num_points=args.log10_num_points,
     )
+
+
+# helper function for loading auxilary models without 
+# hardcoding model classes or config settings 
+def get_aux_model(model_path, 
+                  algo_registry, 
+                  tokenizer, 
+                  with_grads=False): 
+    md_path = model_path 
+    sd = torch.load(md_path, map_location="cpu", weights_only=False)
+    model_config = sd['hyper_parameters']['config']
+    latent_model_name = model_config['algo']['name']
+    latent_model_cls = algo_registry.get(latent_model_name)
+    if latent_model_cls is None:
+        raise ValueError(f"Invalid latent model name: {latent_model_name}")
+    else: 
+        aux_model = latent_model_cls.load_from_checkpoint(
+            md_path, 
+            config=model_config,
+            tokenizer=tokenizer)
+        aux_model.eval()
+        if not with_grads:
+            for param in aux_model.parameters():
+                param.requires_grad = False
+        return aux_model
