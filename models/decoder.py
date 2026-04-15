@@ -75,6 +75,7 @@ class Decoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                 input_latent,
                 sigma,
                 generation_mode=False,
+                return_hr_vector=False,
                 **kwargs):
 
         t_cond = None
@@ -92,6 +93,9 @@ class Decoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
 
             logits = self.output_layer(x[:, self.k_register_latents:, :], c=t_cond)
+        if return_hr_vector:
+            return x[:, :self.k_register_latents, :], logits
+        else: 
             return logits
 
 

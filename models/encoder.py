@@ -79,7 +79,7 @@ class Encoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         x = torch.cat([register_latents, x], dim=1)
 
 
-        t_cond = F.silu(self.sigma_map(sigma))
+        # t_cond = F.silu(self.sigma_map(sigma))
         rotary_cos_sin = self.rotary_emb(x)
 
         with torch.cuda.amp.autocast(dtype=torch.bfloat16):
