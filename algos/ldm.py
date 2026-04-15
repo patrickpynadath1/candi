@@ -6,7 +6,7 @@ import torch
 from dataclasses import dataclass
 import copy
 from .encoder_decoder import EncoderDecoderPlain
-
+from utils import get_aux_model
 
 @dataclass
 class Loss:
@@ -20,6 +20,7 @@ class LDM(AbsorbingState):
     def __init__(self, config, tokenizer):
         super().__init__(config, tokenizer)
         self._validate_configuration()
+        self.latent_mode = config.algo.latent_mode
         self._initialize_encoder_decoder()
 
     def _validate_configuration(self):
@@ -27,16 +28,31 @@ class LDM(AbsorbingState):
         assert self.sampler == "ancestral_cache" or self.sampler == "posterior"
 
     def _initialize_encoder_decoder(self):
-        ed_path = self.config.algo.encoder_decoder_path
-        sd = torch.load(ed_path, map_location="cpu", weights_only=False)
-        ed_config = sd['hyper_parameters']['config']
-        self.encoder_decoder = EncoderDecoderPlain.load_from_checkpoint(
-            ed_path, 
-            config=ed_config,
-            tokenizer=self.tokenizer)
-        self.encoder_decoder.eval()
-        for param in self.encoder_decoder.parameters():
-            param.requires_grad = False
+        self.encoder_decoder = get_aux_model(self.config.algo.encoder_decoder_path,
+                                             algo_registry=algo_registry, 
+                                             tokenizer=self.tokenizer, 
+                                             with_grads=False)
+        return
+
+    def _get_latent(self, x0, valid_tokens):
+        with torch.no_grad():
+            if self.latent_mode == "encoder_decoder":
+                latent = self.encoder_decoder.backbone.encoder(input_tokens=x0, 
+                                                            sigma=None, 
+                                                            generation_mode=False)
+            else: 
+                latent = self.encoder_decoder.backbone(x0, 
+                                                    sigma=None, 
+                                                    get_logits=False)
+        return latent
+    
+    def _decode_latent(self, z): 
+        with torch.no_grad():
+            if self.latent_mode == "encoder_decoder":
+                logp_x0 = self.encoder_decoder.backbone.decode(input_latent=z, sigma=None)
+            else: 
+                logp_x0 = self.encoder_decoder.backbone.get_logits(z, sigma=None)
+        return logp_x0
 
     def _process_model_output(self, model_output, xt, sigma):
         del sigma
@@ -74,10 +90,8 @@ class LDM(AbsorbingState):
         elif self.encoder_decoder.device != self.device:
             self.encoder_decoder.to(self.device)
 
-        t = self._sample_t(x0.shape[0], current_accumulation_step) * .3
-        z_0 = self.encoder_decoder.backbone.encoder(input_tokens=x0, 
-                                                    sigma=torch.ones_like(t) * .001, 
-                                                    generation_mode=False).detach()
+        t = self._sample_t(x0.shape[0], current_accumulation_step)
+        z_0 = self._get_latent(x0, valid_tokens).detach()
 
         assert t.shape[0] == x0.shape[0]
         dalpha_t, alpha_t = self.noise(t)
@@ -85,7 +99,6 @@ class LDM(AbsorbingState):
         assert alpha_t.ndim == 2
         sigma = self._sigma_from_alphat(alpha_t)
 
-        # second loss: latent reconstruction
         z_t, z_1 = self.q_xt(z_0, alpha_t)
         pred_v = self.backbone(input_latent = z_t, 
                                sigma=sigma.squeeze(), 
@@ -101,7 +114,7 @@ class LDM(AbsorbingState):
     
     def _sample_latent_prior(self, batch_size):
         hidden_dim = self.config.model.hidden_size
-        return torch.randn(batch_size, self.config.model.k_register_latents, hidden_dim, device=self.device)
+        return torch.randn(batch_size, 128, hidden_dim, device=self.device)
     
     def _latent_fm_update(self, z, t, dt, d_cond=None, guidance_scale=2.0):
         _, alpha_t = self.noise(t)
@@ -151,7 +164,6 @@ class LDM(AbsorbingState):
             z = self._latent_fm_update(z, t_i, dt, d_cond=None)
         _, alpha_final = self.noise(t[-1].unsqueeze(0))
 
-        sigma_final = self._sigma_from_alphat(alpha_final).squeeze() * torch.ones(num_samples, device=self.device)
-        logp_x0 = self.encoder_decoder.backbone.decode(input_latent=z, sigma=sigma_final)
+        logp_x0 = self._decode_latent(z)
 
         return logp_x0.argmax(dim=-1)
