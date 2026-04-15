@@ -14,11 +14,9 @@ import torch
 import algos
 import dataloader as dataloader
 from text_metrics import evaluate_text_metrics
+from algos import algo_registry
 import utils
 import pdb
-# from lm_eval.models.huggingface import HFLM
-# from lm_eval import evaluator
-# from hugging_face_wrappers import DiffusionEvalWrapper, CandiEvalWrapper
 
 
 omegaconf.OmegaConf.register_new_resolver("cwd", os.getcwd)
@@ -140,7 +138,7 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
     # temps_to_use = torch.linspace(.6, 1.0, steps=17).tolist()
     # steps_to_use = [8, 16, 32, 64, 128]
-    steps_to_use = [16]
+    steps_to_use = [128]
     temps_to_use = [0.8]
 
     model = _load_from_checkpoint(
@@ -220,12 +218,12 @@ def main(config):
     logger = utils.get_logger(__name__)
     tokenizer = dataloader.get_tokenizer(config)
 
-    if config.algo.name in algos.all_algos:
-        diffusion_model = algos.all_algos[config.algo.name]
-    else:
+    algo_cls = algo_registry.get(config.algo.name)
+    if algo_cls is None:
         raise ValueError(f"Invalid algorithm name: {config.algo.name}")
+
     kwargs = {
-        "diffusion_model": diffusion_model,
+        "diffusion_model": algo_cls,
         "config": config,
         "tokenizer": tokenizer,
         "logger": logger,
