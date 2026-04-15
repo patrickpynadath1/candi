@@ -1,4 +1,5 @@
 import math
+import pdb
 import typing
 
 import einops
@@ -77,9 +78,9 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def forward(self, x, sigma, get_logits=True):
         x = self.vocab_embed(x)
         if self.adaLN:
-            t_cond = None
-        else:
             t_cond = F.silu(self.sigma_map(sigma))
+        else:
+            t_cond = None
 
         rotary_cos_sin = self.rotary_emb(x)
 

@@ -94,7 +94,7 @@ class Decoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
             logits = self.output_layer(x[:, self.k_register_latents:, :], c=t_cond)
         if return_hr_vector:
-            return x[:, :self.k_register_latents, :], logits
+            return x[:, self.k_register_latents:, :], logits
         else: 
             return logits
 

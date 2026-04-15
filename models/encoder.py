@@ -71,10 +71,15 @@ class Encoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def forward(self,
                 input_tokens,
                 sigma,
+                skip_embedding=False,
                 **kwargs):
 
         t_cond = None
-        x = self.vocab_embed(input_tokens)
+        if not skip_embedding:
+            x = self.vocab_embed(input_tokens)
+        else: 
+            # the naming is incorrect -- if skip embeds, the the input tokens are really hidden reps
+            x = input_tokens
         register_latents = self._get_initialize_latents(x.shape[0], x.device)
         x = torch.cat([register_latents, x], dim=1)
 
