@@ -5,7 +5,6 @@ import pdb
 import torch
 from dataclasses import dataclass
 import copy
-
 @dataclass
 class Loss:
     loss: torch.FloatTensor

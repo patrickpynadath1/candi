@@ -79,3 +79,39 @@ class MDLM(AbsorbingState):
             1 - masked_indices
         )
         return model_output.exp()
+
+    def validation_step(self, batch, batch_idx):
+
+        del batch_idx
+        losses = self._loss(batch["input_ids"], batch["attention_mask"])
+        # t, mean_nlls = self.unweighted_nlls(batch["input_ids"], batch["attention_mask"])
+        # if self.ce_time_pairs['t'] is None:
+        #     self.ce_time_pairs['t'] = t.cpu()
+        #     self.ce_time_pairs['ce'] = mean_nlls.cpu()
+        # else: 
+        #     self.ce_time_pairs['t'] = torch.cat((self.ce_time_pairs['t'], t.cpu()), dim=0)
+        #     self.ce_time_pairs['ce'] = torch.cat((self.ce_time_pairs['ce'], mean_nlls.cpu()), dim=0)
+        self.metrics.update_valid(losses.nlls, losses.prior_loss, losses.num_tokens)
+        return losses.loss
+    
+
+    def unweighted_nlls(self, x0, valid_tokens, current_accumulation_step=None, train_mode=False):
+        t = self._sample_t(x0.shape[0], current_accumulation_step)
+        assert t.shape[0] == x0.shape[0]
+
+
+        dalpha_t, alpha_t = self.noise(t)
+        alpha_t = alpha_t.unsqueeze(-1)
+        assert alpha_t.ndim == 2
+        sigma = self._sigma_from_alphat(alpha_t)
+
+        xt = self.q_xt(x0, alpha_t)
+
+        log_x_theta = self.forward(xt, sigma=sigma)
+        log_p_theta = torch.gather(
+            input=log_x_theta, dim=-1, index=x0[:, :, None]
+        ).squeeze(-1)
+        sum_nll = -1 * log_p_theta.sum(dim=-1)
+        valid_tokens = valid_tokens.sum(dim=-1)
+        mean_nlls = sum_nll / valid_tokens
+        return t, mean_nlls

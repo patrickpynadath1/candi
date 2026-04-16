@@ -1,11 +1,10 @@
-
 from .absorbing_state import AbsorbingState, sample_categorical
 from .registry import algo_registry
-import pdb
 import torch
+import torch.distributed as dist
 from dataclasses import dataclass
-import copy
 from utils import get_aux_model
+
 
 @dataclass
 class Loss:
@@ -33,7 +32,24 @@ class EncoderDecoderCosmos(AbsorbingState):
                                 algo_registry=algo_registry,
                                 tokenizer=self.tokenizer,
                                 with_grads=False)
+        self._initialize_decoder_embeddings_from_mlm()
         return
+
+    def _get_aux_embedding_table(self):
+        if hasattr(self.mlm, "backbone"):
+            backbone = self.mlm.backbone
+            if hasattr(backbone, "vocab_embed") and hasattr(backbone.vocab_embed, "embedding"):
+                return backbone.vocab_embed.embedding
+            if hasattr(backbone, "embedding") and torch.is_tensor(backbone.embedding):
+                return backbone.embedding
+
+        raise AttributeError(
+            "Could not locate an embedding table on the auxiliary MLM backbone."
+        )
+
+    def _initialize_decoder_embeddings_from_mlm(self):
+        embedding_table = self._get_aux_embedding_table()
+        self.backbone.decoder.initialize_embedding_from_table(embedding_table)
 
     def _validate_configuration(self):
         # ancestral sampling isn't desirable because it's slow
@@ -57,9 +73,107 @@ class EncoderDecoderCosmos(AbsorbingState):
         model_output[unmasked_indices] = self.neg_infinity
         model_output[unmasked_indices, xt[unmasked_indices]] = 0
         return model_output
-    
-    def _get_h0(self, x0): 
-        return self.mlm.backbone(x0, sigma=None, get_logits=False)
+
+    def _extract_hidden_representations(self, model_output):
+        if torch.is_tensor(model_output):
+            return model_output
+
+        if isinstance(model_output, (tuple, list)):
+            for item in model_output:
+                if torch.is_tensor(item):
+                    return item
+
+        if isinstance(model_output, dict):
+            for key in (
+                "last_hidden_state",
+                "hidden_states",
+                "hidden_state",
+                "features",
+                "encoder_hidden_states",
+            ):
+                value = model_output.get(key)
+                if torch.is_tensor(value):
+                    return value
+                if isinstance(value, (tuple, list)) and value and torch.is_tensor(value[-1]):
+                    return value[-1]
+
+        raise TypeError(
+            "Unable to extract MLM hidden representations from the auxiliary model output."
+        )
+
+    def _get_h0(self, x0):
+        if hasattr(self.mlm, "get_hidden_representations"):
+            return self.mlm.get_hidden_representations(x0)
+
+        if hasattr(self.mlm, "backbone") and hasattr(self.mlm.backbone, "get_hidden_representations"):
+            return self.mlm.backbone.get_hidden_representations(x0)
+
+        with torch.no_grad():
+            if hasattr(self.mlm, "backbone"):
+                try:
+                    model_output = self.mlm.backbone(x0, sigma=None, get_logits=False)
+                except TypeError:
+                    model_output = self.mlm.backbone(x0, sigma=None)
+            else:
+                model_output = self.mlm(x0)
+
+        return self._extract_hidden_representations(model_output)
+
+    @torch.no_grad()
+    def _compute_hidden_representation_stats(self):
+        val_dataloaders = self.trainer.val_dataloaders
+        if not isinstance(val_dataloaders, (list, tuple)):
+            val_dataloaders = [val_dataloaders]
+        if not val_dataloaders:
+            raise ValueError("Validation dataloader is required to compute hidden representation statistics.")
+
+        was_training = self.training
+        self.eval()
+        self.mlm.eval()
+
+        hidden_sum = None
+        hidden_sum_sq = None
+        hidden_count = torch.zeros(1, device=self.device, dtype=torch.float32)
+
+        for dataloader in val_dataloaders:
+            for batch in dataloader:
+                input_ids = batch["input_ids"].to(self.device)
+                attention_mask = batch["attention_mask"].to(self.device)
+
+                hidden = self._get_h0(input_ids).float()
+                mask = attention_mask.bool()
+                hidden = hidden[mask]
+
+                if hidden.numel() == 0:
+                    continue
+
+                if hidden_sum is None:
+                    hidden_dim = hidden.shape[-1]
+                    hidden_sum = torch.zeros(hidden_dim, device=self.device, dtype=torch.float32)
+                    hidden_sum_sq = torch.zeros(hidden_dim, device=self.device, dtype=torch.float32)
+
+                hidden_sum += hidden.sum(dim=0)
+                hidden_sum_sq += hidden.pow(2).sum(dim=0)
+                hidden_count += hidden.shape[0]
+
+        if hidden_sum is None or hidden_count.item() == 0:
+            raise ValueError("Could not compute hidden representation statistics from the validation loader.")
+
+        if dist.is_available() and dist.is_initialized():
+            dist.all_reduce(hidden_sum, op=dist.ReduceOp.SUM)
+            dist.all_reduce(hidden_sum_sq, op=dist.ReduceOp.SUM)
+            dist.all_reduce(hidden_count, op=dist.ReduceOp.SUM)
+
+        hidden_mean = hidden_sum / hidden_count
+        hidden_var = (hidden_sum_sq / hidden_count) - hidden_mean.pow(2)
+        hidden_std = hidden_var.clamp_min(1e-4).sqrt()
+
+        self.backbone.enc_normalizer.set_stats(hidden_mean, hidden_std)
+
+        if was_training:
+            self.train()
+
+        return hidden_mean, hidden_std
     
     # mention on page 5 in latent space augmentations
     def _apply_latent_dropout(self, z0): 
@@ -100,21 +214,33 @@ class EncoderDecoderCosmos(AbsorbingState):
 
     # This is where the main training step goes 
     def _loss(self, x0, valid_tokens, current_accumulation_step=None, train_mode=False):
+        del current_accumulation_step
+        del train_mode
         (x0, output_tokens, valid_tokens) = self._process_model_input(
             x0, valid_tokens
         )
+        del output_tokens
 
-        # getting smooth + dropped hr vector
+        # Match the reference trainer: hidden-state perturbations are part of the
+        # objective definition, not just a train-mode wrapper.
         h0 = self._get_h0(x0)
+        h0 = self.backbone.enc_normalizer.normalize(h0)
         h0_smooth = self._apply_hr_vector_smoothing(h0)
         h0_smooth_dropout = self._apply_hr_vector_dropout(h0_smooth)
 
-        # getting latent 
-        z0 = self.backbone.encoder(h0_smooth_dropout, sigma=None, skip_embedding=True)
+        # Match the original trainer call pattern for the Cosmos encoder.
+        z0 = self.backbone.encoder(
+            token_ids=x0,
+            mask_tokens=valid_tokens,
+            token_embeddings=h0_smooth_dropout,
+        )
         z0 = self._apply_latent_dropout(z0)
 
-        # getting logits + hidden representations 
-        h_hat, logits = self.backbone.decoder(input_latent=z0, sigma=None, return_hr_vector=True)
+        # Match the original trainer call pattern for the Cosmos decoder.
+        logits, h_hat = self.backbone.decoder(
+            encoder_latents=z0,
+            return_last_hidden_state=True,
+        )
 
         mse = self._get_mse(h_hat, h0, valid_tokens)
         ce = self._get_nll(logits, x0, valid_tokens)
@@ -156,6 +282,12 @@ class EncoderDecoderCosmos(AbsorbingState):
         self.log("grad_norm/encoder", ge_grad_norm)
         self.log("grad_norm/decoder", decoder_grad_norm)
 
+    def on_train_start(self):
+        super().on_train_start()
+
+        if not self.backbone.enc_normalizer.is_initialized:
+            self._compute_hidden_representation_stats()
+
     
     def training_step(self, batch, batch_idx):
 
@@ -163,13 +295,31 @@ class EncoderDecoderCosmos(AbsorbingState):
         losses = self._loss(
             batch["input_ids"],
             batch["attention_mask"],
-            0,
+            current_accumulation_step,
             train_mode=True,
         )
-        self.metrics.update_train(losses.loss, losses.token_reconstruction_loss, num_tokens=1)
+        self.metrics.update_train(
+            losses.loss,
+            losses.token_reconstruction_loss,
+            num_tokens=losses.num_tokens,
+        )
         self.log(
             name="trainer/loss",
             value=losses.loss.item(),
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
+        self.log(
+            name="trainer/mse_loss",
+            value=losses.mse_loss.item(),
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
+        self.log(
+            name="trainer/ce_loss",
+            value=losses.token_reconstruction_loss.item(),
             on_step=True,
             on_epoch=False,
             sync_dist=True,
@@ -179,7 +329,11 @@ class EncoderDecoderCosmos(AbsorbingState):
     def validation_step(self, batch, batch_idx):
         del batch_idx
         losses = self._loss(batch["input_ids"], batch["attention_mask"])
-        self.metrics.update_valid(losses.loss, losses.token_reconstruction_loss, num_tokens=1)
+        self.metrics.update_valid(
+            losses.loss,
+            losses.token_reconstruction_loss,
+            num_tokens=losses.num_tokens,
+        )
         return losses.loss 
    
 

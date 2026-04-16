@@ -37,9 +37,17 @@ class LDM(AbsorbingState):
     def _get_latent(self, x0, valid_tokens):
         with torch.no_grad():
             if self.latent_mode == "encoder_decoder":
-                latent = self.encoder_decoder.backbone.encoder(input_tokens=x0, 
-                                                            sigma=None, 
-                                                            generation_mode=False)
+                if self.config.algo.is_cosmos: 
+                    h0 = self.encoder_decoder._get_h0(x0)
+                    h0 = self.encoder_decoder.backbone.enc_normalizer.normalize(h0)
+                    latent = self.encoder_decoder.backbone.encoder(token_ids=x0, 
+                                                                mask_tokens=valid_tokens, 
+                                                                token_embeddings=h0)
+                    return latent 
+                else: 
+                    latent = self.encoder_decoder.backbone.encoder(input_tokens=x0, 
+                                                                sigma=None, 
+                                                                generation_mode=False)
             else: 
                 latent = self.encoder_decoder.backbone(x0, 
                                                     sigma=None, 
@@ -49,7 +57,10 @@ class LDM(AbsorbingState):
     def _decode_latent(self, z): 
         with torch.no_grad():
             if self.latent_mode == "encoder_decoder":
-                logp_x0 = self.encoder_decoder.backbone.decode(input_latent=z, sigma=None)
+                if self.config.algo.is_cosmos:
+                    logp_x0 = self.encoder_decoder.backbone.decoder(encoder_latents=z, return_last_hidden_state=False)
+                else: 
+                    logp_x0 = self.encoder_decoder.backbone.decode(input_latent=z, sigma=None)
             else: 
                 logp_x0 = self.encoder_decoder.backbone.get_logits(z, sigma=None)
         return logp_x0
@@ -114,7 +125,7 @@ class LDM(AbsorbingState):
     
     def _sample_latent_prior(self, batch_size):
         hidden_dim = self.config.model.hidden_size
-        return torch.randn(batch_size, 128, hidden_dim, device=self.device)
+        return torch.randn(batch_size, self.config.model.k_register_latents, hidden_dim, device=self.device)
     
     def _latent_fm_update(self, z, t, dt, d_cond=None, guidance_scale=2.0):
         _, alpha_t = self.noise(t)
