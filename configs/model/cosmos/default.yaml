@@ -1,0 +1,3 @@
+defaults: 
+  - /model/cosmos/encoder@encoder: default
+  - /model/cosmos/decoder@decoder: default

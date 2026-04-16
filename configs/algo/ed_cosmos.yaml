@@ -1,5 +1,5 @@
 name: encoder_decoder_cosmos
-backbone: encoder_decoder
+backbone: encoder_decoder_cosmos
 parameterization: subs
 time_conditioning: False
 T: 0  # 0 (continuous time) / 1000 

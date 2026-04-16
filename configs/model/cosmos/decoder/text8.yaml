@@ -1,0 +1,29 @@
+attention:
+  head_size: 32
+  num_heads: 8
+  probs_dropout: 0.
+  qk_norm: true
+  implementation: "flash_attention_2"
+
+embedding:
+  dim: 256
+  max_position_embeddings: 128
+  initializer_range: 0.02
+
+tokens:
+  vocab_size: null
+  mask_token_id: null
+
+hidden:
+  size: 256
+  dropout: 0.1
+  num_layers: 4
+  ff_mult: 4
+
+latent:
+  dim: 256
+  num_latents: 64
+
+normalization:
+  layer_eps: 1.0e-5
+

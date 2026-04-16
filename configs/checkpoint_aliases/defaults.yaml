@@ -9,3 +9,15 @@ masked_denoiser: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.14
 
 # latent denoiser going with the masked denoiser above 
 latent_masked_lm_denoiser: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.14/191722/checkpoints/last.ckpt"
+
+# cosmos based encoder decoder 
+cosmos_encoder_decoder: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.14/203735/checkpoints/last.ckpt"
+
+# cosmos based ldm 
+cosmos_ldm: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.15/063836/checkpoints/last.ckpt"
+
+# cosmos ed v2 
+
+cosmos_ed_v2: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.15/131525/checkpoints/last.ckpt"
+
+cosmos_ldm_v2: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.15/171810/checkpoints/last.ckpt"
