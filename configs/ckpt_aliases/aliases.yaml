@@ -1,3 +1,3 @@
 candi_base_t8: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.05.04/194815/checkpoints/best.ckpt"
-candi_.5_t8: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.05.04/200816/checkpoints/best.ckpt"
-candi_1.5_t8: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.05.04/201837/checkpoints/best.ckpt"
+candi_0_5_t8: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.05.04/200816/checkpoints/best.ckpt"
+candi_1_5_t8: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.05.04/201837/checkpoints/best.ckpt"

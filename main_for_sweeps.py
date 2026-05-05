@@ -15,6 +15,7 @@ import algos
 from algos import algo_registry
 import dataloader as dataloader
 from text_metrics import evaluate_text_metrics
+import numpy as np
 import utils
 import pdb
 # from lm_eval.models.huggingface import HFLM
@@ -140,9 +141,10 @@ def _generate_samples(model, config, logger, tokenizer, compute_eval_metrics):
 def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
     # temps_to_use = torch.linspace(.6, 1.0, steps=17).tolist()
-    # steps_to_use = [8, 16, 32, 64, 128]
-    steps_to_use = [16]
-    temps_to_use = [0.8]
+    steps_to_use = [32, 64, 128]
+    # steps_to_use = [64]
+    temps_to_use = np.linspace(0.05, 1.0, 11).tolist()
+    # temps_to_use = [.3]
 
     model = _load_from_checkpoint(
         diffusion_model=diffusion_model, config=config, tokenizer=tokenizer

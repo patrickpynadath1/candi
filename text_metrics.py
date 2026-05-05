@@ -180,7 +180,7 @@ def calculate_word_dictionary_match(
 
 
 def total_valid_words(
-    generated_texts: List[str], train_texts: List[str], n: int = 4
+    generated_texts: List[str], train_texts: List[str], n: int = 1
 ) -> float:
     """
     Calculate the ratio of words in generated text that appear in training vocabulary.
@@ -205,8 +205,8 @@ def total_valid_words(
     # Count word frequencies
     word_counts = Counter(tokens)
 
-    # Filter out 1-letter words
-    filtered_vocab = {word for word in word_counts if len(word) > 1}
+    # Filter out words shorter than n characters
+    filtered_vocab = {word for word in word_counts if len(word) > n}
 
     total = 0
     word_counts_total = []
@@ -418,6 +418,8 @@ def evaluate_text_metrics(
         "repetition_rate_3": calculate_repetition_rate(generated_texts, n=3),
         "repetition_rate_4": calculate_repetition_rate(generated_texts, n=4),
         "total_valid_words": total_valid_words(generated_texts, train_texts),
+        "total_valid_words_5": total_valid_words(generated_texts, train_texts, n=5),
+        "total_valid_words_6": total_valid_words(generated_texts, train_texts, n=6),
         "total_unique_words": total_unique_words(generated_texts, train_texts),
     }
     return metrics
