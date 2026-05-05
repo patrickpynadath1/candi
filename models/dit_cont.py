@@ -34,9 +34,9 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.adaLN = True
         self.config = config
         self.vocab_size = vocab_size
-        dim = config.hidden_size
+        dim = config.model.hidden_size
         self.dim=dim
-        cond_dim = config.cond_dim
+        cond_dim = config.model.cond_dim
         self.vocab_embed = EmbeddingLayerMixture_norm(dim,vocab_size)
         self.mask_index = vocab_size-1
         self.use_precond = use_precond
@@ -44,20 +44,20 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         if not self.causal:
             self.sigma_map = TimestepEmbedder(cond_dim)
-        self.rotary_emb = Rotary(dim // config.n_heads)
+        self.rotary_emb = Rotary(dim // config.model.n_heads)
         self.mixed_coeff = mixed_coeff
         self.precond = Preconditioning(self.vocab_embed, self.mixed_coeff)
 
 
 
         blocks = []
-        for _ in range(config.n_blocks):
+        for _ in range(config.model.n_blocks):
             block = DDiTBlock(
                 dim=dim,
-                n_heads=config.n_heads,
+                n_heads=config.model.n_heads,
                 cond_dim=cond_dim,
                 adaLN=self.adaLN,
-                dropout=config.dropout,
+                dropout=config.model.dropout,
             )
             blocks.append(block)
         self.blocks = nn.ModuleList(blocks)

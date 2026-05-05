@@ -1,5 +1,5 @@
 
-from .registry import models as model_registry
+from .registry import model_registry
 import importlib, pkgutil
 
 IGNORE = {

@@ -1,3 +1,3 @@
 import catalogue
 
-models = catalogue.create("hybrid-diff", "models")
+model_registry = catalogue.create("hybrid-diff", "models")
