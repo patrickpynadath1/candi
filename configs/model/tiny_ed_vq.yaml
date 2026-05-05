@@ -1,0 +1,17 @@
+name: tiny
+type: ddit
+hidden_size: 256
+cond_dim: 128
+length: 128
+n_blocks: 8
+n_heads: 8
+scale_by_sigma: True
+dropout: 0.1
+tie_word_embeddings: False
+vocab_lookup: True
+k_register_latents: 16
+
+layer_eps: 1.0e-5
+qk_norm: true
+ff_mult: 4
+layer_norm_eps: 1.0e-5

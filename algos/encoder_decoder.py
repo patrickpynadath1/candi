@@ -5,10 +5,15 @@ import pdb
 import torch
 from dataclasses import dataclass
 import copy
+import numpy as np
+
+
+
 @dataclass
 class Loss:
     loss: torch.FloatTensor
     token_reconstruction_loss: torch.FloatTensor
+    commitment_loss: torch.FloatTensor
     num_tokens: torch.FloatTensor
 
 @algo_registry.register("encoder_decoder_plain")
@@ -60,35 +65,65 @@ class EncoderDecoderPlain(AbsorbingState):
         else:
             tr_loss_mean = (token_reconstruction_loss * valid_tokens).sum() / valid_tokens.sum()
         return tr_loss_mean
+    
+    def _get_interp_coeff(self): 
+        if self.global_step < self.config.algo.vq_loss_start:
+            return 0 
+        elif self.global_step < self.config.algo.vq_loss_warmup + self.config.algo.vq_loss_start:
+            return (self.global_step - self.config.algo.vq_loss_start) / self.config.algo.vq_loss_warmup
+        else:
+            return 1.0
+    
 
-
-    # This is where the main training step goes 
     def _loss(self, x0, valid_tokens, current_accumulation_step=None, train_mode=False):
         (x0, output_tokens, valid_tokens) = self._process_model_input(
             x0, valid_tokens
         )
         t = torch.ones(x0.shape[0], device=x0.device) * self.corruption_max_t
         assert t.shape[0] == x0.shape[0]
-
-        dalpha_t, alpha_t = self.noise(t)
+        _, alpha_t = self.noise(t)
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
-        sigma = self._sigma_from_alphat(alpha_t)
         
         xt = self.q_xt(x0, alpha_t)
+        
+        # Shared encoder forward
+        input_latents = self.backbone.encode(input_tokens=x0, attention_mask=valid_tokens)
 
-        clean_sigma = torch.ones(x0.shape[0], device=self.device) * .001
-        latents = self.backbone.encoder(input_tokens=xt, sigma=clean_sigma, generation_mode=False)
-        small_peturb = latents + self.smoothing_latent_noise* torch.randn_like(latents)
-        logits_raw = self.backbone.decode(input_latent=small_peturb, sigma=clean_sigma)
 
-        tr_loss_mean = self._get_nll(logits_raw, x0, valid_tokens)
+        logits_ae = self.backbone.decode(input_latents)
 
+
+        recon_loss_ae = self._get_nll(logits_ae, x0, valid_tokens)
+        
+        
+        prefix = "train" if train_mode else "test"
+        self.log(f"{prefix}/loss", recon_loss_ae)
+        
         return Loss(
-            loss=tr_loss_mean,
-            token_reconstruction_loss=tr_loss_mean,
+            loss=recon_loss_ae,
+            token_reconstruction_loss=recon_loss_ae,
+            commitment_loss=0.0,
             num_tokens=valid_tokens.sum(),
         )
+    
+    def get_latent(self, x, return_toks=False): 
+        with torch.no_grad():
+            encoder_latents = self.backbone.encode(input_tokens=x, attention_mask=(x != self.mask_index).long())
+            quantized, indices, _ = self.backbone.vq(encoder_latents)
+        if return_toks:
+            return quantized, indices
+        return quantized
+    
+    def get_output(self, x, is_tok=False): 
+        if is_tok:
+            logits = self.backbone.decode(x)
+            return logits.argmax(dim=-1)
+        else:
+            quantized = self.backbone.vq(x)[0]
+            logits = self.backbone.decode(quantized)
+            return logits.argmax(dim=-1)
+    
 
     def q_xt_uniform(self, x, alpha_t):
         """Computes the noisy sample xt.
@@ -154,6 +189,13 @@ class EncoderDecoderPlain(AbsorbingState):
             on_epoch=False,
             sync_dist=True,
         )
+        # self.log(
+        #     name="trainer/commitment_loss",
+        #     value=losses.commitment_loss.item(),
+        #     on_step=True,
+        #     on_epoch=False,
+        #     sync_dist=True,
+        # )
         return losses.loss
 
     def validation_step(self, batch, batch_idx):

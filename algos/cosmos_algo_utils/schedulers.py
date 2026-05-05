@@ -25,6 +25,7 @@ class Tanh(Scheduler):
     def __init__(self, d=1):
         self.d = d
         self.t_thr = 0.95
+        print(f"Using Tanh scheduler with d={d} and t_thr={self.t_thr}")
 
     def beta_t(self, t):
         t = torch.clip(t, 0, self.t_thr)

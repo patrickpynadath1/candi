@@ -1,5 +1,5 @@
 """
-Compute generative perplexity and entropy for pre-generated samples stored in JSON files.
+Compute generative perplexity, generative BPC, and entropy for pre-generated samples stored in JSON files.
 Uses Metrics class directly from metrics.py for exact equivalence with the generation script.
 
 Usage:
@@ -23,9 +23,13 @@ from metrics import Metrics
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Compute gen-PPL and entropy for saved samples.")
+    p = argparse.ArgumentParser(description="Compute gen-PPL, gen-BPC, and entropy for saved samples.")
     p.add_argument("--samples_dir",         required=True,  help="Directory containing *.json and *.pt sample files")
     p.add_argument("--eval_model",          default="gpt2-large")
+    p.add_argument("--eval_model_source",   default="hf", choices=["hf", "local"])
+    p.add_argument("--local_eval_checkpoint_path", default=None)
+    p.add_argument("--local_eval_device",   default="cuda" if torch.cuda.is_available() else "cpu")
+    p.add_argument("--local_eval_context_size", type=int, default=None)
     p.add_argument("--output_path",         default="metrics_results.json")
     p.add_argument("--eval_ppl_batch_size", type=int, default=16)
     p.add_argument("--max_length",          type=int, default=1024)
@@ -50,6 +54,10 @@ def main():
     metrics = Metrics(
         gen_ppl_eval_model_name_or_path=args.eval_model,
         eval_ppl_batch_size=args.eval_ppl_batch_size,
+        eval_model_source=args.eval_model_source,
+        local_eval_checkpoint_path=args.local_eval_checkpoint_path,
+        local_eval_device=args.local_eval_device,
+        local_eval_context_size=args.local_eval_context_size,
     )
     metrics.to(args.device)
 
@@ -102,7 +110,9 @@ def main():
             text_samples, args.max_length, device=args.device
         )
         gen_ppl = metrics.gen_ppl.compute().item()
+        gen_bpc = metrics.gen_bpc.compute().item()
         print(f"  generative_ppl = {gen_ppl:.4f}")
+        print(f"  generative_bpc = {gen_bpc:.4f}")
 
         all_results.append({
             "source_file"   : str(json_path),
@@ -110,6 +120,7 @@ def main():
             "temperature"   : temp,
             "num_samples"   : len(text_samples),
             "generative_ppl": gen_ppl,
+            "generative_bpc": gen_bpc,
             "entropy"       : entropy,
         })
 

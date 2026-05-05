@@ -1,8 +1,11 @@
 from .absorbing_state import AbsorbingState, sample_categorical
 from .registry import algo_registry
 import torch
+from tqdm import tqdm
 import torch.distributed as dist
 from dataclasses import dataclass
+from omegaconf import open_dict
+import transformers
 from utils import get_aux_model
 
 
@@ -18,24 +21,91 @@ class Loss:
 @algo_registry.register("encoder_decoder_cosmos")
 class EncoderDecoderCosmos(AbsorbingState):
     def __init__(self, config, tokenizer):
+        self._configure_aux_hidden_dim(config)
         super().__init__(config, tokenizer)
+        self.masked_denoiser_source = config.algo.get("masked_denoiser_source", "local")
         self._validate_configuration()
         self.hr_vector_smoothing = config.algo.hr_vector_smoothing
         self.hr_vector_dropout = config.algo.hr_vector_dropout
         self.latent_feature_dropout = config.algo.latent_feature_dropout
+        self.use_raw_tokens = config.algo.use_raw_tokens
 
         # loading mlm 
         self._load_mlm()
 
+    @staticmethod
+    def _infer_local_aux_hidden_dim(model_path):
+        sd = torch.load(model_path, map_location="cpu", weights_only=False)
+        model_config = sd["hyper_parameters"]["config"]
+        model_cfg = model_config.get("model", {})
+
+        if "hidden_size" in model_cfg:
+            return int(model_cfg["hidden_size"])
+        if "encoder" in model_cfg and "embedding" in model_cfg["encoder"]:
+            return int(model_cfg["encoder"]["embedding"]["dim"])
+        if "encoder" in model_cfg and "hidden_size" in model_cfg["encoder"]:
+            return int(model_cfg["encoder"]["hidden_size"])
+
+        return None
+
+    @classmethod
+    def _configure_aux_hidden_dim(cls, config):
+        encoder_cfg = config.model.encoder
+        if encoder_cfg.get("aux_hidden_dim", None) is not None:
+            return
+
+        aux_hidden_dim = encoder_cfg.embedding.dim
+        masked_denoiser_source = config.algo.get("masked_denoiser_source", "local")
+        masked_denoiser_path = config.algo.masked_denoiser_path
+
+        if masked_denoiser_source == "hf":
+            hf_config = transformers.AutoConfig.from_pretrained(masked_denoiser_path)
+            aux_hidden_dim = int(hf_config.hidden_size)
+        elif masked_denoiser_source == "local":
+            inferred_hidden_dim = cls._infer_local_aux_hidden_dim(masked_denoiser_path)
+            if inferred_hidden_dim is not None:
+                aux_hidden_dim = inferred_hidden_dim
+        
+        with open_dict(encoder_cfg):
+            encoder_cfg.aux_hidden_dim = aux_hidden_dim
+
+    def _is_hf_mlm(self):
+        return self.masked_denoiser_source == "hf"
+
+    def _load_local_mlm(self):
+        return get_aux_model(
+            self.config.algo.masked_denoiser_path,
+            algo_registry=algo_registry,
+            tokenizer=self.tokenizer,
+            with_grads=False,
+        )
+
+    def _load_hf_mlm(self):
+        mlm = transformers.AutoModelForMaskedLM.from_pretrained(
+            self.config.algo.masked_denoiser_path
+        )
+        mlm.eval()
+        for param in mlm.parameters():
+            param.requires_grad = False
+        return mlm
+
     def _load_mlm(self): 
-        self.mlm = get_aux_model(self.config.algo.masked_denoiser_path, 
-                                algo_registry=algo_registry,
-                                tokenizer=self.tokenizer,
-                                with_grads=False)
+        if self._is_hf_mlm():
+            self.mlm = self._load_hf_mlm()
+        else:
+            self.mlm = self._load_local_mlm()
         self._initialize_decoder_embeddings_from_mlm()
         return
 
     def _get_aux_embedding_table(self):
+        if self._is_hf_mlm():
+            embedding_table = self.mlm.get_input_embeddings()
+            if embedding_table is None:
+                raise AttributeError(
+                    "Could not locate an input embedding table on the Hugging Face MLM."
+                )
+            return embedding_table
+
         if hasattr(self.mlm, "backbone"):
             backbone = self.mlm.backbone
             if hasattr(backbone, "vocab_embed") and hasattr(backbone.vocab_embed, "embedding"):
@@ -49,11 +119,17 @@ class EncoderDecoderCosmos(AbsorbingState):
 
     def _initialize_decoder_embeddings_from_mlm(self):
         embedding_table = self._get_aux_embedding_table()
+        if hasattr(self.backbone, "project_aux_embedding_table"):
+            embedding_table = self.backbone.project_aux_embedding_table(embedding_table)
         self.backbone.decoder.initialize_embedding_from_table(embedding_table)
 
     def _validate_configuration(self):
         # ancestral sampling isn't desirable because it's slow
         assert self.sampler == "ancestral_cache" or self.sampler == "posterior"
+        if self.masked_denoiser_source not in {"local", "hf"}:
+            raise ValueError(
+                "config.algo.masked_denoiser_source must be either 'local' or 'hf'."
+            )
 
     def _process_model_output(self, model_output, xt, sigma):
         del sigma
@@ -101,7 +177,26 @@ class EncoderDecoderCosmos(AbsorbingState):
             "Unable to extract MLM hidden representations from the auxiliary model output."
         )
 
-    def _get_h0(self, x0):
+    def _get_h0(self, x0, attention_mask=None):
+        if self.use_raw_tokens:
+            assert hasattr(self.backbone, "token_embedding"), "Backbone must have a token embedding layer to use raw tokens."
+            return self.backbone.token_embedding(x0)
+
+        if self._is_hf_mlm():
+            with torch.no_grad():
+                model_output = self.mlm(
+                    input_ids=x0,
+                    attention_mask=attention_mask,
+                    output_hidden_states=True,
+                    return_dict=True,
+                )
+            hidden_states = model_output.hidden_states
+            if hidden_states is None or len(hidden_states) == 0:
+                raise TypeError(
+                    "Hugging Face MLM did not return hidden states for encoder_decoder_cosmos."
+                )
+            return hidden_states[-1]
+
         if hasattr(self.mlm, "get_hidden_representations"):
             return self.mlm.get_hidden_representations(x0)
 
@@ -136,11 +231,14 @@ class EncoderDecoderCosmos(AbsorbingState):
         hidden_count = torch.zeros(1, device=self.device, dtype=torch.float32)
 
         for dataloader in val_dataloaders:
-            for batch in dataloader:
+            for batch in tqdm(dataloader):
                 input_ids = batch["input_ids"].to(self.device)
                 attention_mask = batch["attention_mask"].to(self.device)
 
-                hidden = self._get_h0(input_ids).float()
+                hidden = self._get_h0(input_ids, attention_mask=attention_mask)
+                if hasattr(self.backbone, "project_aux_features"):
+                    hidden = self.backbone.project_aux_features(hidden)
+                hidden = hidden.float()
                 mask = attention_mask.bool()
                 hidden = hidden[mask]
 
@@ -188,11 +286,39 @@ class EncoderDecoderCosmos(AbsorbingState):
         h_tilde = hr_vector * delta + ((1 - delta ** 2) ** .5) * torch.randn_like(hr_vector)
         return h_tilde
     
-    # formula from activate space perturbations, page 5 section 4.2.2 b 
-    def _apply_hr_vector_dropout(self, hr_vector): 
+    # Randomly zero whole activation vectors (token positions).
+    def _apply_hr_vector_dropout(self, hr_vector, valid_tokens=None): 
         dropout_mask = torch.rand(hr_vector.shape[:-1], device=hr_vector.device) > self.hr_vector_dropout
+        if valid_tokens is not None:
+            keep_mask = torch.logical_not(valid_tokens.bool())
+            dropout_mask = torch.logical_or(dropout_mask, keep_mask)
         hr_vector = hr_vector * dropout_mask.float()[..., None]
         return hr_vector
+
+    # Sample-level perturbation: apply corruption with p=0.3 and choose
+    # corruption type with p=0.5 (masking vs Gaussian smoothing).
+    def _apply_activation_perturbation(self, hr_vector, valid_tokens=None):
+        batch_size = hr_vector.shape[0]
+
+        # Per-sample gate for whether any activation corruption is applied.
+        apply_mask = (
+            torch.bernoulli(torch.full((batch_size, 1, 1), 0.3, device=hr_vector.device))
+            .bool()
+        )
+        # Per-sample choice of corruption type: True -> Gaussian, False -> masking.
+        gaussian_choice_mask = (
+            torch.bernoulli(torch.full((batch_size, 1, 1), 0.5, device=hr_vector.device))
+            .bool()
+        )
+
+        masked_corruption = self._apply_hr_vector_dropout(hr_vector, valid_tokens=valid_tokens)
+        gaussian_corruption = self._apply_hr_vector_smoothing(hr_vector)
+        chosen_corruption = torch.where(
+            gaussian_choice_mask,
+            gaussian_corruption,
+            masked_corruption,
+        )
+        return torch.where(apply_mask, chosen_corruption, hr_vector)
     
     # helper function for getting nlls 
     def _get_nll(self, raw_logits, x0, valid_tokens, weights = None):
@@ -223,16 +349,19 @@ class EncoderDecoderCosmos(AbsorbingState):
 
         # Match the reference trainer: hidden-state perturbations are part of the
         # objective definition, not just a train-mode wrapper.
-        h0 = self._get_h0(x0)
-        h0 = self.backbone.enc_normalizer.normalize(h0)
-        h0_smooth = self._apply_hr_vector_smoothing(h0)
-        h0_smooth_dropout = self._apply_hr_vector_dropout(h0_smooth)
+        h0 = self._get_h0(x0, attention_mask=valid_tokens)
+        h0_perturbed = self._apply_activation_perturbation(h0, valid_tokens=valid_tokens)
+
+        encoder_input = h0_perturbed
+        if hasattr(self.backbone, "project_aux_features"):
+            encoder_input = self.backbone.project_aux_features(encoder_input)
+        encoder_input = self.backbone.enc_normalizer.normalize(encoder_input)
 
         # Match the original trainer call pattern for the Cosmos encoder.
         z0 = self.backbone.encoder(
             token_ids=x0,
             mask_tokens=valid_tokens,
-            token_embeddings=h0_smooth_dropout,
+            token_embeddings=encoder_input,
         )
         z0 = self._apply_latent_dropout(z0)
 
@@ -241,6 +370,9 @@ class EncoderDecoderCosmos(AbsorbingState):
             encoder_latents=z0,
             return_last_hidden_state=True,
         )
+
+        if hasattr(self.backbone, "reconstruct_aux_features"):
+            h_hat = self.backbone.reconstruct_aux_features(h_hat)
 
         mse = self._get_mse(h_hat, h0, valid_tokens)
         ce = self._get_nll(logits, x0, valid_tokens)
@@ -251,7 +383,7 @@ class EncoderDecoderCosmos(AbsorbingState):
             mse_loss=mse,
             num_tokens=valid_tokens.sum(),
         )
-
+    
     def q_xt(self, x, alpha_t):
         """Computes the noisy sample xt.
 

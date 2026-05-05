@@ -1,6 +1,8 @@
 from tqdm import tqdm
 
+from collections import Counter
 import json
+import math
 import os
 
 from typing import List, Dict, Tuple
@@ -154,17 +156,21 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
         print(text_metrics)
     else: 
         generative_ppl = 0.0
+        generative_bpc = 0.0
         entropy = 0.0
         if not config.sampling.semi_ar:
             generative_ppl = model.metrics.gen_ppl.compute().item()
+            generative_bpc = model.metrics.gen_bpc.compute().item()
             entropy = model.metrics.sample_entropy.compute().item()
             print("Generative perplexity:", generative_ppl)
+            print("Generative BPC:", generative_bpc)
             print("Sample entropy:", entropy)
         samples_path = config.eval.generated_samples_path
         with fsspec.open(samples_path, "w") as f:
             json.dump(
                 {
                     "generative_ppl": generative_ppl,
+                    "generative_bpc": generative_bpc,
                     "entropy": entropy,
                     "generated_seqs": all_samples,
                 },
@@ -172,6 +178,77 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
                 indent=4,
             )
         print("Samples saved at:", samples_path)
+
+
+def _decode_batch_texts(input_ids, attention_mask, tokenizer):
+    texts = []
+    input_ids = input_ids.detach().cpu()
+    attention_mask = attention_mask.detach().cpu()
+    for sample_ids, sample_mask in zip(input_ids, attention_mask):
+        valid_ids = sample_ids[sample_mask.bool()].tolist()
+        text = tokenizer.decode(
+            valid_ids,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
+        )
+        texts.append(text)
+    return texts
+
+
+@torch.no_grad()
+def _compute_eval_metrics(model, valid_ds, tokenizer):
+    model.metrics.reset()
+    model._eval_mode()
+
+    total_nll = torch.zeros((), dtype=torch.float64, device=model.device)
+    total_tokens = torch.zeros((), dtype=torch.float64, device=model.device)
+    total_utf8_chars = torch.zeros((), dtype=torch.float64, device=model.device)
+
+    for batch in tqdm(valid_ds, desc="Evaluating"):
+        input_ids = batch["input_ids"].to(model.device)
+        attention_mask = batch["attention_mask"].to(model.device)
+
+        input_tokens, output_tokens, valid_tokens = model._process_model_input(
+            input_ids, attention_mask
+        )
+        token_nlls = model.nll(
+            input_tokens,
+            output_tokens,
+            None,
+            False,
+        )
+        if token_nlls.ndim != 2:
+            raise ValueError(
+                f"Expected per-token NLLs with shape [batch, seq], got {token_nlls.shape}."
+            )
+
+        sample_nlls = (token_nlls * valid_tokens).sum(dim=-1).to(torch.float64)
+        sample_token_counts = valid_tokens.sum(dim=-1).to(torch.float64)
+        sample_texts = _decode_batch_texts(input_ids, attention_mask, tokenizer)
+        sample_utf8_chars = torch.tensor(
+            [len(text.encode("utf-8")) for text in sample_texts],
+            dtype=torch.float64,
+            device=model.device,
+        )
+
+        total_nll += sample_nlls.sum()
+        total_tokens += sample_token_counts.sum()
+        total_utf8_chars += sample_utf8_chars.sum()
+
+    model._train_mode()
+
+    eval_nll = total_nll / total_tokens
+    eval_ppl = torch.exp(eval_nll)
+    eval_bpc = total_nll / (total_utf8_chars * math.log(2))
+
+    return {
+        "eval_nll": eval_nll.item(),
+        "eval_ppl": eval_ppl.item(),
+        "eval_bpc": eval_bpc.item(),
+        "total_nll": total_nll.item(),
+        "total_tokens": total_tokens.item(),
+        "total_utf8_chars": total_utf8_chars.item(),
+    }
 
 
 def _eval_ppl(diffusion_model, config, logger, tokenizer):
@@ -184,26 +261,127 @@ def _eval_ppl(diffusion_model, config, logger, tokenizer):
         logger.info("Disabling EMA.")
         model.ema = None
 
-    wandb_logger = None
-    if config.get("wandb", None) is not None:
-        wandb_logger = L.pytorch.loggers.WandbLogger(
-            config=omegaconf.OmegaConf.to_object(config), **config.wandb
-        )
-    callbacks = []
-    if "callbacks" in config:
-        for _, callback in config.callbacks.items():
-            callbacks.append(hydra.utils.instantiate(callback))
-    trainer = hydra.utils.instantiate(
-        config.trainer,
-        default_root_dir=os.getcwd(),
-        callbacks=callbacks,
-        strategy=hydra.utils.instantiate(config.strategy),
-        logger=wandb_logger,
-    )
     _, valid_ds = dataloader.get_dataloaders(
         config, tokenizer, skip_train=True, valid_seed=config.seed
     )
-    trainer.validate(model, valid_ds)
+    metrics = _compute_eval_metrics(model, valid_ds, tokenizer)
+
+    print("Eval NLL:", metrics["eval_nll"])
+    print("Eval PPL:", metrics["eval_ppl"])
+    print("Eval BPC:", metrics["eval_bpc"])
+    print("Total NLL:", metrics["total_nll"])
+    print("Total tokens:", metrics["total_tokens"])
+    print("Total UTF-8 chars:", metrics["total_utf8_chars"])
+
+
+def _token_entropy(sample: torch.Tensor) -> float:
+    _, counts = torch.unique(sample, return_counts=True, sorted=False)
+    probs = counts.to(torch.float64) / counts.sum()
+    return torch.special.entr(probs).sum().item()
+
+
+def _sample_token_counts(sample: torch.Tensor) -> Counter:
+    token_ids, counts = torch.unique(sample, return_counts=True, sorted=False)
+    return Counter(
+        {
+            int(token_id): int(count)
+            for token_id, count in zip(token_ids.tolist(), counts.tolist())
+        }
+    )
+
+
+def _iter_entropy_samples(batch, use_attention_mask=True):
+    input_ids = batch["input_ids"]
+    attention_mask = batch.get("attention_mask")
+
+    for idx, sample in enumerate(input_ids):
+        if use_attention_mask and attention_mask is not None:
+            sample = sample[attention_mask[idx].bool()]
+        yield sample
+
+
+def _compute_dataset_entropy(loader, max_batches=None, max_sequences=None, use_attention_mask=True):
+    mean_entropy = 0.0
+    m2 = 0.0
+    num_sequences = 0
+    token_counts = Counter()
+    total_tokens = 0
+
+    for batch_idx, batch in enumerate(tqdm(loader, desc="Computing entropy")):
+        if max_batches is not None and batch_idx >= max_batches:
+            break
+
+        for sample in _iter_entropy_samples(
+            batch, use_attention_mask=use_attention_mask
+        ):
+            entropy = _token_entropy(sample)
+            sample_counts = _sample_token_counts(sample)
+            num_sequences += 1
+            delta = entropy - mean_entropy
+            mean_entropy += delta / num_sequences
+            delta2 = entropy - mean_entropy
+            m2 += delta * delta2
+            token_counts.update(sample_counts)
+            total_tokens += int(sample.numel())
+            if max_sequences is not None and num_sequences >= max_sequences:
+                break
+
+        if max_sequences is not None and num_sequences >= max_sequences:
+            break
+
+    if num_sequences == 0:
+        raise ValueError("No samples were loaded from the selected split.")
+
+    if num_sequences > 1:
+        std_entropy = math.sqrt(m2 / (num_sequences - 1))
+    else:
+        std_entropy = 0.0
+
+    empirical_frequencies = {
+        str(token_id): count / total_tokens for token_id, count in token_counts.items()
+    }
+
+    return {
+        "entropy_mean": mean_entropy,
+        "entropy_std": std_entropy,
+        "num_sequences": num_sequences,
+        "total_tokens": total_tokens,
+        "token_counts": dict(token_counts),
+        "empirical_frequencies": empirical_frequencies,
+    }
+
+
+def _dataset_entropy(config, logger, tokenizer):
+    logger.info("Starting Dataset Entropy Eval.")
+    if hasattr(config.data, "vocab_file"):
+        new_vocab = json.load(open(f"{config.data.cache_dir}/{config.data.vocab_file}", "r"))
+        tokenizer.add_tokens(new_vocab)
+
+    _, valid_ds = dataloader.get_dataloaders(
+        config,
+        tokenizer,
+        skip_train=True,
+        valid_seed=config.seed,
+    )
+
+    print("Dataset entropy config:")
+    print("  data.valid:", config.data.valid)
+    print("  model.length:", config.model.length)
+    entropy_stats = _compute_dataset_entropy(
+        valid_ds,
+        use_attention_mask=True,
+    )
+    print("valid.num_sequences:", entropy_stats["num_sequences"])
+    print("valid.total_tokens:", entropy_stats["total_tokens"])
+    print("valid.entropy_mean:", entropy_stats["entropy_mean"])
+    print("valid.entropy_std:", entropy_stats["entropy_std"])
+
+    output_path = os.path.join(
+        config.checkpointing.save_dir, "dataset_entropy_stats.json"
+    )
+    with fsspec.open(output_path, "w") as f:
+        json.dump(entropy_stats, f, indent=4, sort_keys=True)
+    print("Dataset entropy stats saved at:", output_path)
 
 
 def _train(diffusion_model, config, logger, tokenizer):
@@ -278,6 +456,8 @@ def main(config):
         _generate_samples(**kwargs)
     elif config.mode == "ppl_eval":
         _eval_ppl(**kwargs)
+    elif config.mode == "dataset_entropy":
+        _dataset_entropy(config=config, logger=logger, tokenizer=tokenizer)
     else:
         _train(**kwargs)
 

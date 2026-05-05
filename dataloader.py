@@ -1,4 +1,5 @@
 import functools
+import hashlib
 import pdb
 import itertools
 import json
@@ -17,10 +18,41 @@ import requests
 import tokenizers
 import torch
 import transformers
+from tqdm.auto import tqdm
 
 import utils
 
 LOGGER = utils.get_logger(__name__)
+
+WIKIPEDIA_EN_CLEAN_DATASET_NAME = "wikipedia_en_clean"
+WIKIPEDIA_EN_CLEAN_HF_DATASET = "wikimedia/wikipedia"
+WIKIPEDIA_EN_CLEAN_HF_CONFIG = "20231101.en"
+WIKIPEDIA_EN_CLEAN_SHUFFLE_SEED = 1337
+WIKIPEDIA_EN_CLEAN_TRAIN_SPLIT = 0.98
+WIKIPEDIA_EN_CLEAN_VALID_SPLIT = 0.01
+WIKIPEDIA_EN_CLEAN_TRAIN_BYTE_CAP = 20 * 1024**3
+WIKIPEDIA_EN_CLEAN_NORMALIZATION = "text8_like_v1"
+
+
+def _get_tokenizer_cache_fingerprint(tokenizer):
+    digest = hashlib.sha256()
+    digest.update(tokenizer.__class__.__name__.encode("utf-8"))
+    digest.update(str(getattr(tokenizer, "name_or_path", "")).encode("utf-8"))
+    digest.update(str(tokenizer.vocab_size).encode("utf-8"))
+    digest.update(str(len(tokenizer)).encode("utf-8"))
+    digest.update(",".join(tokenizer.all_special_tokens).encode("utf-8"))
+    digest.update(",".join(map(str, tokenizer.all_special_ids)).encode("utf-8"))
+
+    # Include the realized vocabulary so tokenizer swaps or local tokenizer
+    # edits do not silently reuse an incompatible tokenized dataset cache.
+    vocab = tokenizer.get_vocab()
+    for token, index in sorted(vocab.items(), key=lambda item: (item[1], item[0])):
+        digest.update(token.encode("utf-8", errors="surrogatepass"))
+        digest.update(b"\0")
+        digest.update(str(index).encode("utf-8"))
+        digest.update(b"\n")
+
+    return digest.hexdigest()[:12]
 
 
 def wt_detokenizer(string):
@@ -181,6 +213,50 @@ def get_lambada_test_dataset():
     return dataset
 
 
+def get_text8_splits(cache_dir):
+    url = "http://mattmahoney.net/dc/text8.zip"
+    cache_dir = f"{cache_dir}/text8"
+    split_names = ["train", "validation", "test"]
+    raw_cache_dir = os.path.join(cache_dir, "raw_data")
+    if not all(
+        [
+            utils.fsspec_exists(os.path.join(raw_cache_dir, f"text8.{split}.txt"))
+            for split in split_names
+        ]
+    ):
+        if not utils.fsspec_exists(os.path.join(raw_cache_dir, "text8.zip")):
+            utils.fsspec_mkdirs(raw_cache_dir, exist_ok=True)
+            LOGGER.info("Downloading text8 from URL {}.".format(url))
+            with (
+                urllib.request.urlopen(url) as in_stream,
+                open(os.path.join(raw_cache_dir, "text8.zip"), "wb") as out_file,
+            ):
+                shutil.copyfileobj(in_stream, out_file)
+
+        with fsspec.open(os.path.join(raw_cache_dir, "text8.zip"), "rb") as f:
+            rawdata = zipfile.ZipFile(f).read("text8").decode("utf-8")
+
+        # Splits taken from D3PM codebase
+        splits = {
+            "train": rawdata[:90000000],
+            "validation": rawdata[90000000:95000000],
+            "test": rawdata[95000000:],
+        }
+
+        for split, data in splits.items():
+            _path = os.path.join(raw_cache_dir, f"text8.{split}.txt")
+            with fsspec.open(_path, "w") as f:
+                f.write(data)
+    else:
+        splits = {}
+        for split in split_names:
+            _path = os.path.join(raw_cache_dir, f"text8.{split}.txt")
+            with fsspec.open(_path, "r") as f:
+                splits[split] = f.read()
+
+    return splits
+
+
 def get_text8_dataset(cache_dir, max_seq_length=256, drop_last=True, crop_train=False):
     """Adapted from:
     https://github.com/google-research/google-research/blob/master/d3pm/text/datasets.py#L344
@@ -201,52 +277,18 @@ def get_text8_dataset(cache_dir, max_seq_length=256, drop_last=True, crop_train=
       dataset: dataset.DatasetDict, with keys 'train',
           'valid', 'test'.
     """
-    url = "http://mattmahoney.net/dc/text8.zip"
     if not crop_train:
         cache_dir = f"{cache_dir}/text8"
+        splits = None
     else:
         cache_dir = f"{cache_dir}/text8-crop-train"
+        splits = get_text8_splits(os.path.dirname(cache_dir))
     split_names = ["train", "validation", "test"]
     if not all(
         [utils.fsspec_exists(os.path.join(cache_dir, split)) for split in split_names]
     ):
-        # Check if raw data exists
-        raw_cache_dir = os.path.join(cache_dir, "raw_data")
-        if not all(
-            [
-                utils.fsspec_exists(os.path.join(raw_cache_dir, f"text8.{split}.txt"))
-                for split in split_names
-            ]
-        ):
-            if not utils.fsspec_exists(os.path.join(raw_cache_dir, "text8.zip")):
-                utils.fsspec_mkdirs(raw_cache_dir, exist_ok=True)
-                LOGGER.info("Downloading text8 from URL {}.".format(url))
-                with (
-                    urllib.request.urlopen(url) as in_stream,
-                    open(os.path.join(raw_cache_dir, "text8.zip"), "wb") as out_file,
-                ):
-                    shutil.copyfileobj(in_stream, out_file)
-
-            with fsspec.open(os.path.join(raw_cache_dir, "text8.zip"), "rb") as f:
-                rawdata = zipfile.ZipFile(f).read("text8").decode("utf-8")
-
-            # Splits taken from D3PM codebase
-            splits = {
-                "train": rawdata[:90000000],
-                "validation": rawdata[90000000:95000000],
-                "test": rawdata[95000000:],
-            }
-
-            for split, data in splits.items():
-                _path = os.path.join(raw_cache_dir, f"text8.{split}.txt")
-                with fsspec.open(_path, "w") as f:
-                    f.write(data)
-        else:
-            splits = {}
-            for split in split_names:
-                _path = os.path.join(raw_cache_dir, f"text8.{split}.txt")
-                with fsspec.open(_path, "r") as f:
-                    splits[split] = f.read()
+        if splits is None:
+            splits = get_text8_splits(os.path.dirname(cache_dir))
 
         # Chunk and save as datasets.DatasetDict
         def chunks(lst, n):
@@ -270,6 +312,213 @@ def get_text8_dataset(cache_dir, max_seq_length=256, drop_last=True, crop_train=
         dataset = datasets.load_from_disk(cache_dir)
 
     return dataset
+
+
+def get_tiny_shakespeare_splits(cache_dir):
+    url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+    dataset_cache_dir = os.path.join(cache_dir, "tiny_shakespeare")
+    raw_cache_dir = os.path.join(dataset_cache_dir, "raw_data")
+    split_names = ["train", "validation", "test"]
+
+    split_paths = {
+        split: os.path.join(raw_cache_dir, f"tiny_shakespeare.{split}.txt")
+        for split in split_names
+    }
+    if not all(utils.fsspec_exists(path) for path in split_paths.values()):
+        utils.fsspec_mkdirs(raw_cache_dir, exist_ok=True)
+        raw_path = os.path.join(raw_cache_dir, "input.txt")
+        if not utils.fsspec_exists(raw_path):
+            LOGGER.info("Downloading Tiny Shakespeare from URL {}.".format(url))
+            with (
+                urllib.request.urlopen(url) as in_stream,
+                fsspec.open(raw_path, "wb") as out_file,
+            ):
+                shutil.copyfileobj(in_stream, out_file)
+
+        with fsspec.open(raw_path, "r") as f:
+            rawdata = f.read()
+
+        total_length = len(rawdata)
+        train_end = int(total_length * 0.9)
+        validation_end = int(total_length * 0.95)
+        splits = {
+            "train": rawdata[:train_end],
+            "validation": rawdata[train_end:validation_end],
+            "test": rawdata[validation_end:],
+        }
+
+        for split, data in splits.items():
+            with fsspec.open(split_paths[split], "w") as f:
+                f.write(data)
+    else:
+        splits = {}
+        for split, path in split_paths.items():
+            with fsspec.open(path, "r") as f:
+                splits[split] = f.read()
+
+    return splits
+
+
+def get_tiny_shakespeare_dataset(cache_dir, max_seq_length=256, drop_last=True, crop_train=False):
+    del crop_train  # Tiny Shakespeare uses a single deterministic chunking path.
+    dataset_cache_dir = os.path.join(cache_dir, "tiny_shakespeare")
+    split_names = ["train", "validation", "test"]
+    if not all(
+        utils.fsspec_exists(os.path.join(dataset_cache_dir, split))
+        for split in split_names
+    ):
+        splits = get_tiny_shakespeare_splits(cache_dir)
+
+        def chunks(lst, n):
+            """Yield successive n-sized chunks from lst."""
+            for i in range(0, len(lst), n):
+                yield lst[i : i + n]
+
+        dataset_dict = {}
+        for split, text in splits.items():
+            chunked_text = list(chunks(text, max_seq_length))
+            if drop_last and chunked_text and len(chunked_text[-1]) < max_seq_length:
+                chunked_text = chunked_text[:-1]
+            dataset_dict[split] = datasets.Dataset.from_dict({"text": chunked_text})
+        dataset = datasets.DatasetDict(dataset_dict)
+        dataset.save_to_disk(dataset_cache_dir)
+    else:
+        dataset = datasets.load_from_disk(dataset_cache_dir)
+
+    return dataset
+
+
+def _get_wikipedia_en_clean_paths(cache_dir):
+    dataset_cache_dir = os.path.join(cache_dir, WIKIPEDIA_EN_CLEAN_DATASET_NAME)
+    split_dataset_dir = os.path.join(dataset_cache_dir, "article_splits")
+    return {
+        "dataset_cache_dir": dataset_cache_dir,
+        "split_dataset_dir": split_dataset_dir,
+        "metadata_path": os.path.join(dataset_cache_dir, "prep_metadata.json"),
+    }
+
+
+def normalize_text8_like(text):
+    text = text.lower()
+    text = re.sub(r"[^a-z]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def prepare_wikipedia_en_clean(cache_dir):
+    paths = _get_wikipedia_en_clean_paths(cache_dir)
+    if all(
+        utils.fsspec_exists(path)
+        for path in [paths["metadata_path"], paths["split_dataset_dir"]]
+    ):
+        with fsspec.open(paths["metadata_path"], "r") as f:
+            metadata = json.load(f)
+        if metadata.get("normalization") == WIKIPEDIA_EN_CLEAN_NORMALIZATION:
+            return metadata
+
+    if utils.fsspec_exists(paths["split_dataset_dir"]):
+        shutil.rmtree(paths["split_dataset_dir"])
+
+    dataset = datasets.load_dataset(
+        WIKIPEDIA_EN_CLEAN_HF_DATASET,
+        WIKIPEDIA_EN_CLEAN_HF_CONFIG,
+        split="train",
+        cache_dir=cache_dir,
+    )
+    dataset = dataset.shuffle(seed=WIKIPEDIA_EN_CLEAN_SHUFFLE_SEED)
+    total_articles = len(dataset)
+    train_count = int(total_articles * WIKIPEDIA_EN_CLEAN_TRAIN_SPLIT)
+    validation_count = int(total_articles * WIKIPEDIA_EN_CLEAN_VALID_SPLIT)
+    split_ranges = {
+        "train": (0, train_count),
+        "validation": (train_count, train_count + validation_count),
+        "test": (train_count + validation_count, total_articles),
+    }
+    split_metadata = {}
+    split_datasets = {}
+
+    def _normalize_examples(examples):
+        texts = [normalize_text8_like(text) for text in examples["text"]]
+        return {
+            "text": texts,
+            "byte_length": [len(text.encode("utf-8")) for text in texts],
+        }
+
+    for split, (start, end) in split_ranges.items():
+        split_source = dataset.select(range(start, end))
+        kept_indices = []
+        article_count = 0
+        raw_text_bytes = 0
+        for local_index, example in enumerate(
+            tqdm(
+                split_source,
+                desc=f"Scanning {split} articles",
+                unit="article",
+            )
+        ):
+            text = normalize_text8_like(example["text"])
+            if not text:
+                continue
+            byte_length = len(text.encode("utf-8"))
+            if (
+                split == "train"
+                and article_count > 0
+                and raw_text_bytes + byte_length > WIKIPEDIA_EN_CLEAN_TRAIN_BYTE_CAP
+            ):
+                break
+            kept_indices.append(local_index)
+            article_count += 1
+            raw_text_bytes += byte_length
+
+        subset = split_source.select(kept_indices)
+        subset = subset.map(
+            _normalize_examples,
+            batched=True,
+            remove_columns=subset.column_names,
+            desc=f"Adding byte lengths for {split}",
+        )
+        split_datasets[split] = subset
+
+        split_metadata[split] = {
+            "start_index": start,
+            "end_index": end,
+            "article_count": article_count,
+            "raw_text_bytes": raw_text_bytes,
+        }
+
+    dataset_dict = datasets.DatasetDict(split_datasets)
+    dataset_dict.save_to_disk(paths["split_dataset_dir"])
+
+    metadata = {
+        "dataset_name": WIKIPEDIA_EN_CLEAN_DATASET_NAME,
+        "hf_dataset": WIKIPEDIA_EN_CLEAN_HF_DATASET,
+        "hf_config": WIKIPEDIA_EN_CLEAN_HF_CONFIG,
+        "shuffle_seed": WIKIPEDIA_EN_CLEAN_SHUFFLE_SEED,
+        "train_split_ratio": WIKIPEDIA_EN_CLEAN_TRAIN_SPLIT,
+        "validation_split_ratio": WIKIPEDIA_EN_CLEAN_VALID_SPLIT,
+        "test_split_ratio": 1.0
+        - WIKIPEDIA_EN_CLEAN_TRAIN_SPLIT
+        - WIKIPEDIA_EN_CLEAN_VALID_SPLIT,
+        "train_byte_cap": WIKIPEDIA_EN_CLEAN_TRAIN_BYTE_CAP,
+        "normalization": WIKIPEDIA_EN_CLEAN_NORMALIZATION,
+        "source_total_articles": total_articles,
+        "splits": split_metadata,
+    }
+    with fsspec.open(paths["metadata_path"], "w") as f:
+        json.dump(metadata, f, indent=2)
+    return metadata
+
+
+def get_wikipedia_en_clean_dataset(cache_dir):
+    paths = _get_wikipedia_en_clean_paths(cache_dir)
+    prepare_wikipedia_en_clean(cache_dir)
+    return datasets.load_from_disk(paths["split_dataset_dir"])
+
+
+def get_article_limit_from_manifest(manifest_path):
+    with fsspec.open(manifest_path, "r") as f:
+        manifest = json.load(f)
+    return manifest["article_count_cutoff"]
 
 
 def get_algorithmic_creativity_dataset(cache_dir, tokenizer, max_seq_length=256, drop_last=True, crop_train=False):
@@ -338,19 +587,30 @@ def get_dataset(
     revision: Optional[str] = None,
     insert_eos=True,
     insert_special_tokens=True,
+    article_limit: Optional[int] = None,
 ):
+    tokenizer_tag = _get_tokenizer_cache_fingerprint(tokenizer)
     eos_tag = ""
     if not insert_eos:
         eos_tag = "_eosFalse"
     if not insert_special_tokens:
         eos_tag = "_specialFalse"
+    subset_tag = ""
+    if article_limit is not None:
+        subset_tag = f"_n{article_limit}"
 
     if dataset_name == "openwebtext-train":
         pass
     if wrap:
-        filename = f"{dataset_name}_{mode}_bs{block_size}_wrapped{eos_tag}.dat"
+        filename = (
+            f"{dataset_name}_{mode}_bs{block_size}_wrapped"
+            f"_tok{tokenizer_tag}{subset_tag}{eos_tag}.dat"
+        )
     else:
-        filename = f"{dataset_name}_{mode}_bs{block_size}_unwrapped{eos_tag}.dat"
+        filename = (
+            f"{dataset_name}_{mode}_bs{block_size}_unwrapped"
+            f"_tok{tokenizer_tag}{subset_tag}{eos_tag}.dat"
+        )
     _path = os.path.join(cache_dir, filename)
 
     if utils.fsspec_exists(_path):
@@ -385,6 +645,14 @@ def get_dataset(
         assert wrap
         assert revision is None
         dataset = get_text8_dataset(cache_dir, max_seq_length=block_size)
+    elif dataset_name == "tiny_shakespeare":
+        assert wrap
+        assert revision is None
+        dataset = get_tiny_shakespeare_dataset(cache_dir, max_seq_length=block_size)
+    elif dataset_name == WIKIPEDIA_EN_CLEAN_DATASET_NAME:
+        assert wrap
+        assert revision is None
+        dataset = get_wikipedia_en_clean_dataset(cache_dir)
     elif dataset_name == "text8-crop":
         assert revision is None
         dataset = get_text8_dataset(
@@ -447,6 +715,8 @@ def get_dataset(
         data = dataset
     else:
         data = dataset[mode]
+    if article_limit is not None and not streaming and mode == "train":
+        data = data.select(range(min(article_limit, len(data))))
 
     if dataset_name.startswith("wikitext"):
         detokenizer = wt_detokenizer
@@ -469,8 +739,12 @@ def get_dataset(
 
         return detok
 
-    EOS = tokenizer.encode(tokenizer.eos_token)[0]
-    BOS = tokenizer.encode(tokenizer.bos_token)[0]
+    BOS = tokenizer.bos_token_id
+    EOS = tokenizer.eos_token_id
+    if BOS is None or EOS is None:
+        raise ValueError(
+            f"Tokenizer must define bos/eos token ids for wrapped dataset processing: {tokenizer}"
+        )
 
     def preprocess_and_tokenize(example):
         if dataset_name == "ptb":
@@ -583,8 +857,13 @@ def get_dataset(
         eos=EOS,
         insert_special_tokens=insert_special_tokens,
     )
+    group_remove_columns = tokenized_dataset.column_names
     if streaming:
-        chunked_dataset = tokenized_dataset.map(group_texts, batched=True)
+        chunked_dataset = tokenized_dataset.map(
+            group_texts,
+            batched=True,
+            remove_columns=group_remove_columns,
+        )
     else:
         print("\n\n\n mapping dataset")
         chunked_dataset = tokenized_dataset.map(
@@ -592,6 +871,7 @@ def get_dataset(
             batched=True,
             num_proc=num_proc,
             batch_size=8,
+            remove_columns=group_remove_columns,
             load_from_cache_file=True,
             desc="Grouping",
         )
@@ -639,7 +919,6 @@ def get_tokenizer(config):
         tokenizer.eos_token = tokenizer.sep_token
     if tokenizer.pad_token is None:
         tokenizer.add_special_tokens({"pad_token": "[PAD]"})
-
     return tokenizer
 
 
@@ -682,6 +961,14 @@ def get_dataloaders(
     if skip_train:
         train_set = None
     else:
+        train_article_limit = None
+        if (
+            config.data.train == WIKIPEDIA_EN_CLEAN_DATASET_NAME
+            and hasattr(config.data, "train_cutoff_manifest")
+        ):
+            train_article_limit = get_article_limit_from_manifest(
+                config.data.train_cutoff_manifest
+            )
         train_set = get_dataset(
             config.data.train,
             tokenizer,
@@ -697,6 +984,7 @@ def get_dataloaders(
             block_size=config.model.length,
             streaming=config.data.streaming,
             revision=config.data.get("train_revision", None),
+            article_limit=train_article_limit,
         )
 
     if config.data.valid in ["text8", "lm1b", "ag_news"]:

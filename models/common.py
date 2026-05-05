@@ -687,3 +687,476 @@ class RMSNorm(nn.Module):
     def forward(self, x):
         rms = x.pow(2).mean(-1, keepdim=True).add(self.eps).rsqrt()
         return x * rms * self.weight
+
+
+class AbsolutePositionalEmbedding(nn.Module):
+    def __init__(self, dim: int, max_seq_len: int):
+        super().__init__()
+        self.scale = dim ** -0.5
+        self.max_seq_len = max_seq_len
+        self.emb = nn.Embedding(max_seq_len, dim)
+
+    def forward(self, x, pos=None):
+        seq_len = x.shape[1]
+        if seq_len > self.max_seq_len:
+            raise ValueError(
+                f"Sequence length {seq_len} exceeds maximum positional embedding size "
+                f"{self.max_seq_len}."
+            )
+        if pos is None:
+            pos = torch.arange(seq_len, device=x.device)
+        return self.emb(pos) * self.scale
+
+
+class FeedForwardNetwork(nn.Module):
+    def __init__(self, embedding_dim: int, mult: int = 4, dropout_p: float = 0.1):
+        super().__init__()
+        hidden_dim = int(embedding_dim * mult)
+        self.ffd = nn.Sequential(
+            LayerNorm(embedding_dim),
+            nn.Linear(embedding_dim, hidden_dim),
+            nn.GELU(approximate="tanh"),
+            nn.Dropout(dropout_p),
+            nn.Linear(hidden_dim, embedding_dim),
+        )
+
+    def forward(self, x):
+        return self.ffd(x)
+
+
+class MaskScale(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.scale_mlp = nn.Linear(1, 1, bias=True)
+
+    def forward(self, x, mask):
+        scale = self.scale_mlp(mask.unsqueeze(-1))
+        return x * (scale + 1)
+
+
+class LatentAttention(nn.Module):
+    """Cosmos-style latent bottleneck attention expressed with local primitives."""
+
+    def __init__(
+        self,
+        *,
+        embedding_dim: int,
+        latent_dim: int,
+        hidden_size: int,
+        num_heads: int,
+        head_dim: int,
+        dropout: float = 0.0,
+        qk_norm: bool = True,
+        layer_eps: float = 1e-6,
+        latents_first: bool = True,
+    ):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
+        self.head_dim = head_dim
+        self.dropout = dropout
+        self.latents_first = latents_first
+
+        self.norm_embeddings = RMSNorm(embedding_dim, eps=layer_eps)
+        self.norm_latents = RMSNorm(latent_dim, eps=layer_eps)
+
+        self.embeddings_to_kv = nn.Linear(embedding_dim, hidden_size * 2, bias=False)
+        self.latents_to_q = nn.Linear(latent_dim, hidden_size, bias=False)
+        self.latents_to_kv = nn.Linear(latent_dim, hidden_size * 2, bias=False)
+
+        if qk_norm:
+            self.query_norm = RMSNorm(head_dim, eps=layer_eps)
+            self.key_norm = RMSNorm(head_dim, eps=layer_eps)
+        else:
+            self.query_norm = nn.Identity()
+            self.key_norm = nn.Identity()
+
+        self.projector_latents = nn.Linear(hidden_size, latent_dim, bias=False)
+        self.proj_dropout = nn.Dropout(dropout)
+
+    def forward(
+        self,
+        hidden_state_of_embs,
+        hidden_state_of_latents,
+        mask_tokens,
+        mask_latents,
+    ):
+        batch_size = hidden_state_of_latents.shape[0]
+        query_len = hidden_state_of_latents.shape[1]
+
+        hidden_state_of_embs = self.norm_embeddings(hidden_state_of_embs)
+        hidden_state_of_latents = self.norm_latents(hidden_state_of_latents)
+
+        q = self.latents_to_q(hidden_state_of_latents)
+        kv_embeddings = self.embeddings_to_kv(hidden_state_of_embs)
+        kv_latents = self.latents_to_kv(hidden_state_of_latents)
+
+        if self.latents_first:
+            kv = torch.cat((kv_latents, kv_embeddings), dim=1)
+            mask = torch.cat((mask_latents, mask_tokens), dim=1)
+        else:
+            kv = torch.cat((kv_embeddings, kv_latents), dim=1)
+            mask = torch.cat((mask_tokens, mask_latents), dim=1)
+
+        k, v = kv.split(self.hidden_size, dim=2)
+
+        q = q.view(batch_size, q.shape[1], self.num_heads, self.head_dim).transpose(1, 2)
+        k = k.view(batch_size, k.shape[1], self.num_heads, self.head_dim).transpose(1, 2)
+        v = v.view(batch_size, v.shape[1], self.num_heads, self.head_dim).transpose(1, 2)
+
+        q = self.query_norm(q)
+        k = self.key_norm(k)
+
+        mask = mask[:, None, None, :].expand(-1, 1, query_len, -1)
+        mask = (1.0 - mask.to(q.dtype)) * torch.finfo(q.dtype).min
+
+        with torch.backends.cuda.sdp_kernel(
+            enable_flash=True,
+            enable_math=True,
+            enable_mem_efficient=True,
+        ):
+            y = F.scaled_dot_product_attention(
+                query=q,
+                key=k,
+                value=v,
+                attn_mask=mask,
+                dropout_p=self.dropout if self.training else 0.0,
+                is_causal=False,
+            )
+
+        y = y.transpose(1, 2).contiguous().view(batch_size, query_len, self.hidden_size)
+        return self.proj_dropout(self.projector_latents(y))
+
+
+class LatentEncoderBlock(nn.Module):
+    def __init__(
+        self,
+        *,
+        embedding_dim: int,
+        latent_dim: int,
+        hidden_size: int,
+        num_heads: int,
+        head_dim: int,
+        ff_mult: int = 4,
+        dropout: float = 0.1,
+        qk_norm: bool = True,
+        layer_eps: float = 1e-6,
+    ):
+        super().__init__()
+        self.latent_attn = LatentAttention(
+            embedding_dim=embedding_dim,
+            latent_dim=latent_dim,
+            hidden_size=hidden_size,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            dropout=dropout,
+            qk_norm=qk_norm,
+            layer_eps=layer_eps,
+            latents_first=True,
+        )
+        self.ffn_latent = FeedForwardNetwork(
+            embedding_dim=latent_dim,
+            mult=ff_mult,
+            dropout_p=dropout,
+        )
+
+    def forward(
+        self,
+        hidden_state_of_embs,
+        hidden_state_of_latents,
+        mask_tokens,
+        mask_latents,
+    ):
+        hidden_state_of_latents = hidden_state_of_latents + self.latent_attn(
+            hidden_state_of_embs=hidden_state_of_embs,
+            hidden_state_of_latents=hidden_state_of_latents,
+            mask_tokens=mask_tokens,
+            mask_latents=mask_latents,
+        )
+        hidden_state_of_latents = hidden_state_of_latents + self.ffn_latent(
+            hidden_state_of_latents
+        )
+        return hidden_state_of_latents
+
+
+class LatentDecoderBlock(nn.Module):
+    def __init__(
+        self,
+        *,
+        embedding_dim: int,
+        latent_dim: int,
+        hidden_size: int,
+        num_heads: int,
+        head_dim: int,
+        ff_mult: int = 4,
+        dropout: float = 0.1,
+        qk_norm: bool = True,
+        layer_eps: float = 1e-6,
+    ):
+        super().__init__()
+        self.latent_attn = LatentAttention(
+            embedding_dim=latent_dim,
+            latent_dim=embedding_dim,
+            hidden_size=hidden_size,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            dropout=dropout,
+            qk_norm=qk_norm,
+            layer_eps=layer_eps,
+            latents_first=False,
+        )
+        self.attn_scale = MaskScale()
+        self.ffn_latent = FeedForwardNetwork(
+            embedding_dim=embedding_dim,
+            mult=ff_mult,
+            dropout_p=dropout,
+        )
+        self.ffn_scale = MaskScale()
+
+    def forward(
+        self,
+        hidden_state_of_embs,
+        hidden_state_of_latents,
+        mask_tokens,
+        mask_latents,
+        mask_of_mask_tokens,
+    ):
+        hidden_state_of_embs_add = self.latent_attn(
+            hidden_state_of_embs=hidden_state_of_latents,
+            hidden_state_of_latents=hidden_state_of_embs,
+            mask_tokens=mask_latents,
+            mask_latents=mask_tokens,
+        )
+        hidden_state_of_embs = hidden_state_of_embs + self.attn_scale(
+            hidden_state_of_embs_add, mask_of_mask_tokens
+        )
+        hidden_state_of_embs = hidden_state_of_embs + self.ffn_scale(
+            self.ffn_latent(hidden_state_of_embs), mask_of_mask_tokens
+        )
+        return hidden_state_of_embs
+
+
+class LatentBottleneckEncoder(nn.Module):
+    def __init__(
+        self,
+        *,
+        embedding_dim: int,
+        latent_dim: int,
+        hidden_size: int,
+        num_layers: int,
+        num_latents: int,
+        num_heads: int,
+        head_dim: int,
+        max_position_embeddings: int,
+        ff_mult: int = 4,
+        dropout: float = 0.1,
+        layer_eps: float = 1e-6,
+        qk_norm: bool = True,
+        initializer_range: float = 0.02,
+    ):
+        super().__init__()
+        self.num_latents = num_latents
+        self.latent_dim = latent_dim
+
+        self.latents = nn.Parameter(torch.randn(num_latents, latent_dim))
+        nn.init.normal_(self.latents, std=initializer_range)
+
+        self.positional_emb = AbsolutePositionalEmbedding(
+            embedding_dim,
+            max(max_position_embeddings, num_latents),
+        )
+        self.latent_norm = RMSNorm(latent_dim, eps=layer_eps)
+        self.latent_layers = nn.ModuleList(
+            [
+                LatentEncoderBlock(
+                    embedding_dim=embedding_dim,
+                    latent_dim=latent_dim,
+                    hidden_size=hidden_size,
+                    num_heads=num_heads,
+                    head_dim=head_dim,
+                    ff_mult=ff_mult,
+                    dropout=dropout,
+                    qk_norm=qk_norm,
+                    layer_eps=layer_eps,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+        self.output_norm = RMSNorm(latent_dim, eps=layer_eps)
+
+    def forward(self, token_embeddings, mask_tokens=None):
+        if mask_tokens is None:
+            mask_tokens = torch.ones(
+                token_embeddings.shape[:2],
+                dtype=token_embeddings.dtype,
+                device=token_embeddings.device,
+            )
+        mask_latents = torch.ones(
+            (token_embeddings.shape[0], self.num_latents),
+            dtype=mask_tokens.dtype,
+            device=token_embeddings.device,
+        )
+
+        hidden_state_of_embs = token_embeddings + self.positional_emb(token_embeddings)
+        hidden_state_of_latents = self.latents.unsqueeze(0).expand(
+            token_embeddings.shape[0], -1, -1
+        )
+        hidden_state_of_latents = self.latent_norm(hidden_state_of_latents)
+
+        for layer in self.latent_layers:
+            hidden_state_of_latents = layer(
+                hidden_state_of_embs=hidden_state_of_embs,
+                hidden_state_of_latents=hidden_state_of_latents,
+                mask_tokens=mask_tokens,
+                mask_latents=mask_latents,
+            )
+
+        return self.output_norm(hidden_state_of_latents)
+
+
+class LatentBottleneckDecoder(nn.Module):
+    def __init__(
+        self,
+        *,
+        embedding_dim: int,
+        latent_dim: int,
+        hidden_size: int,
+        num_layers: int,
+        num_latents: int,
+        num_heads: int,
+        head_dim: int,
+        vocab_size: int,
+        max_seq_len: int,
+        mask_token_id: int,
+        ff_mult: int = 4,
+        dropout: float = 0.1,
+        layer_eps: float = 1e-6,
+        qk_norm: bool = True,
+        initializer_range: float = 0.02,
+    ):
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.latent_dim = latent_dim
+        self.max_seq_len = max_seq_len
+        self.mask_token_id = mask_token_id
+
+        self.positional_emb = AbsolutePositionalEmbedding(
+            embedding_dim,
+            max(max_seq_len, num_latents),
+        )
+        if embedding_dim != latent_dim:
+            self.positional_latent = AbsolutePositionalEmbedding(latent_dim, num_latents)
+        else:
+            self.positional_latent = None
+
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        nn.init.normal_(self.embedding.weight, std=initializer_range)
+        self.embedding.requires_grad_(False)
+
+        self.embedding_ffn = FeedForwardNetwork(
+            embedding_dim=embedding_dim,
+            mult=ff_mult,
+            dropout_p=dropout,
+        )
+        self.scale_embedding = MaskScale()
+        self.layers = nn.ModuleList(
+            [
+                LatentDecoderBlock(
+                    embedding_dim=embedding_dim,
+                    latent_dim=latent_dim,
+                    hidden_size=hidden_size,
+                    num_heads=num_heads,
+                    head_dim=head_dim,
+                    ff_mult=ff_mult,
+                    dropout=dropout,
+                    qk_norm=qk_norm,
+                    layer_eps=layer_eps,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+        self.lm_head = nn.Linear(embedding_dim, vocab_size, bias=False)
+
+    def initialize_embedding_from_table(self, embedding_table):
+        if isinstance(embedding_table, nn.Embedding):
+            weight = embedding_table.weight
+        elif isinstance(embedding_table, nn.Parameter):
+            weight = embedding_table
+        elif torch.is_tensor(embedding_table):
+            weight = embedding_table
+        elif hasattr(embedding_table, "embedding") and torch.is_tensor(
+            embedding_table.embedding
+        ):
+            weight = embedding_table.embedding
+        else:
+            raise TypeError("Unsupported embedding table type for decoder initialization.")
+
+        if weight.shape != self.embedding.weight.shape:
+            raise ValueError(
+                f"Embedding shape mismatch: expected {tuple(self.embedding.weight.shape)}, "
+                f"got {tuple(weight.shape)}."
+            )
+
+        with torch.no_grad():
+            self.embedding.weight.copy_(
+                weight.detach().to(
+                    device=self.embedding.weight.device,
+                    dtype=self.embedding.weight.dtype,
+                )
+            )
+
+        self.embedding.requires_grad_(False)
+
+    def forward(self, encoder_latents, masked_input_ids=None, return_last_hidden_state=False):
+        batch_size = encoder_latents.shape[0]
+        encoder_latents_mask = torch.ones(
+            encoder_latents.shape[:2],
+            dtype=encoder_latents.dtype,
+            device=encoder_latents.device,
+        )
+
+        if masked_input_ids is None:
+            masked_input_ids = torch.full(
+                (batch_size, self.max_seq_len),
+                self.mask_token_id,
+                dtype=torch.long,
+                device=encoder_latents.device,
+            )
+
+        tokens_mask = torch.ones(
+            masked_input_ids.shape,
+            dtype=encoder_latents.dtype,
+            device=encoder_latents.device,
+        )
+        mask_of_mask_tokens = (masked_input_ids == self.mask_token_id).float()
+
+        with torch.no_grad():
+            embedding = self.embedding(masked_input_ids)
+
+        hidden_state_of_decoder = self.scale_embedding(
+            self.embedding_ffn(embedding),
+            mask_of_mask_tokens,
+        ) + self.positional_emb(embedding)
+
+        if self.positional_latent is None:
+            hidden_state_of_encoder_latents = encoder_latents + self.positional_emb(
+                encoder_latents
+            )
+        else:
+            hidden_state_of_encoder_latents = encoder_latents + self.positional_latent(
+                encoder_latents
+            )
+
+        for layer in self.layers:
+            hidden_state_of_decoder = layer(
+                hidden_state_of_embs=hidden_state_of_decoder,
+                hidden_state_of_latents=hidden_state_of_encoder_latents,
+                mask_tokens=tokens_mask,
+                mask_latents=encoder_latents_mask,
+                mask_of_mask_tokens=mask_of_mask_tokens,
+            )
+
+        logits = self.lm_head(hidden_state_of_decoder)
+        if return_last_hidden_state:
+            return logits, hidden_state_of_decoder
+        return logits

@@ -104,9 +104,12 @@ def _generate_samples(model, config, logger, tokenizer, compute_eval_metrics):
 
         if compute_eval_metrics:
             model.metrics.record_entropy(samples)
-            model.metrics.record_generative_perplexity(
-                text_samples, config.model.length, model.device
-            )
+            if config.eval.compute_generative_perplexity:
+                model.metrics.record_generative_perplexity(
+                    text_samples,
+                    config.model.length,
+                    device=model.device,
+                )
 
             # generative_ppl = 0.0
             # entropy = 0.0
@@ -121,10 +124,12 @@ def _generate_samples(model, config, logger, tokenizer, compute_eval_metrics):
 
     if compute_eval_metrics:
         generative_ppl = model.metrics.gen_ppl.compute().item()
+        generative_bpc = model.metrics.gen_bpc.compute().item()
         entropy = model.metrics.sample_entropy.compute().item()
 
         res = {
                     "generative_ppl": generative_ppl,
+                    "generative_bpc": generative_bpc,
                     "entropy": entropy,
                     "generated_seqs": all_samples,
         }
@@ -138,8 +143,10 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
 
     # temps_to_use = torch.linspace(.6, 1.0, steps=17).tolist()
     # steps_to_use = [8, 16, 32, 64, 128]
-    steps_to_use = [128]
-    temps_to_use = [0.8]
+    # steps_to_use = [8, 16, 32, 64, 128]
+    steps_to_use = [100]
+    # temps_to_use = torch.linspace(.7, 1.1, steps=20).tolist()
+    temps_to_use = [1.0]
 
     model = _load_from_checkpoint(
         diffusion_model=diffusion_model, config=config, tokenizer=tokenizer
@@ -156,7 +163,6 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
             model.temp = temp
             model.metrics.reset()
             res, samples = _generate_samples(model, config, logger, tokenizer, compute_eval_metrics=compute_eval_metrics)
-
             res['steps'] = steps
             res['temperature'] = temp
             samples_path = config.eval.generated_samples_path
@@ -193,10 +199,12 @@ def _sweep(diffusion_model, config, tokenizer, logger, is_conditional=False):
                 else: 
                     cur_step_info[temp] = {
                         "perplexity": res["generative_ppl"],
+                        "bpc": res["generative_bpc"],
                         "entropy": res["entropy"],
                     }
                     print(f"Steps: {steps}, Temp: {temp}")
                     print("perplexity: ", res["generative_ppl"])
+                    print("bpc: ", res["generative_bpc"])
                     print("entropy: ", res["entropy"])
             total_metadata[steps] = cur_step_info
     
@@ -217,6 +225,9 @@ def main(config):
 
     logger = utils.get_logger(__name__)
     tokenizer = dataloader.get_tokenizer(config)
+    if hasattr(config.data, "vocab_file"):
+        new_vocab = json.load(open(f"{config.data.cache_dir}/{config.data.vocab_file}", "r"))
+        tokenizer.add_tokens(new_vocab)
 
     algo_cls = algo_registry.get(config.algo.name)
     if algo_cls is None:

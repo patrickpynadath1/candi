@@ -69,6 +69,7 @@ class TrainerBase(L.LightningModule):
         self.parameterization = self.config.algo.parameterization
 
         backbone_cls = model_registry.get(self.config.algo.backbone)
+        # import pdb; pdb.set_trace()
         if backbone_cls is not None:
             self.backbone = backbone_cls(self.config, vocab_size=self.vocab_size)
         else:
@@ -89,6 +90,14 @@ class TrainerBase(L.LightningModule):
         self.metrics = metrics.Metrics(
             gen_ppl_eval_model_name_or_path=self.config.eval.gen_ppl_eval_model_name_or_path,
             eval_ppl_batch_size=self.config.eval.perplexity_batch_size,
+            eval_model_source=self.config.eval.get("eval_model_source", "hf"),
+            local_eval_checkpoint_path=self.config.eval.get(
+                "local_eval_checkpoint_path", None
+            ),
+            local_eval_device=self.config.eval.get("local_eval_device", "cuda"),
+            local_eval_context_size=self.config.eval.get(
+                "local_eval_context_size", None
+            ),
         )
 
         if self.config.training.ema > 0:
@@ -362,6 +371,13 @@ class TrainerBase(L.LightningModule):
                         sync_dist=True,
                     )
                     self.log(
+                        "val/gen_bpc",
+                        self.metrics.gen_bpc.compute(),
+                        on_epoch=True,
+                        on_step=False,
+                        sync_dist=True,
+                    )
+                    self.log(
                         "val/sample_entropy",
                         self.metrics.sample_entropy.compute(),
                         on_epoch=True,
@@ -434,6 +450,4 @@ class TrainerBase(L.LightningModule):
         token_nll = nlls / num_tokens
 
         return Loss(loss=token_nll, nlls=nlls, prior_loss=0.0, num_tokens=num_tokens)
-
-
 

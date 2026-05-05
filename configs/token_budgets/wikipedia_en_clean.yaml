@@ -1,0 +1,5 @@
+wikipedia_en_clean_128: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/calibration/wikipedia_en_clean/bpe_vocab128.json"
+wikipedia_en_clean_256: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/calibration/wikipedia_en_clean/bpe_vocab256.json"
+wikipedia_en_clean_1024: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/calibration/wikipedia_en_clean/bpe_vocab1024.json"
+wikipedia_en_clean_8192: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/calibration/wikipedia_en_clean/bpe_vocab8192.json"
+wikipedia_en_clean_16384: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/calibration/wikipedia_en_clean/bpe_vocab16384.json"

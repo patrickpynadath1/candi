@@ -73,7 +73,6 @@ class Decoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     # def forward(self, x, discrete_noise):
     def forward(self,
                 input_latent,
-                sigma,
                 generation_mode=False,
                 return_hr_vector=False,
                 **kwargs):

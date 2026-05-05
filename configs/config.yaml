@@ -9,7 +9,7 @@ defaults:
   - /prior: none
   - /algo: candi 
 
-mode: train  # train / ppl_eval / sample_eval
+mode: train  # train / ppl_eval / sample_eval / dataset_entropy
 
 seed: 1
 scratch_dir:  /home/patrick/.cache/discrete_diffusion

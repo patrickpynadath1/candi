@@ -24,9 +24,12 @@ class CosmosLDM(Diffusion):
 
         self.encoder_decoder = None
         self.use_self_cond = config.algo.diffusion.use_self_cond
-
-        self.register_buffer("latent_mean", torch.empty(0), persistent=True)
-        self.register_buffer("latent_std", torch.empty(0), persistent=True)
+        latent_shape = (
+            config.model.k_register_latents,
+            config.model.hidden_size
+        )
+        self.register_buffer("latent_mean", torch.zeros(latent_shape), persistent=True)
+        self.register_buffer("latent_std", torch.ones(latent_shape), persistent=True)
         self.register_buffer("latent_stats_initialized", torch.tensor(False), persistent=True)
 
         self.dynamic = DynamicSDE(config)
@@ -58,18 +61,46 @@ class CosmosLDM(Diffusion):
     def _set_latent_stats(self, latent_mean, latent_std):
         latent_mean = latent_mean.detach().float()
         latent_std = latent_std.detach().float().clamp_min(1e-4)
-
-        if self.latent_mean.numel() == 0:
-            self.latent_mean = latent_mean
-            self.latent_std = latent_std
-        else:
-            self.latent_mean.copy_(latent_mean)
-            self.latent_std.copy_(latent_std)
+        self.latent_mean.copy_(latent_mean)
+        self.latent_std.copy_(latent_std)
         self.latent_stats_initialized.fill_(True)
 
     @property
     def has_latent_stats(self):
         return bool(self.latent_stats_initialized.item())
+
+    def _load_from_state_dict(
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
+    ):
+        stats_key = f"{prefix}latent_stats_initialized"
+        mean_key = f"{prefix}latent_mean"
+        std_key = f"{prefix}latent_std"
+
+        if stats_key not in state_dict:
+            has_stats = (
+                mean_key in state_dict
+                and std_key in state_dict
+                and state_dict[mean_key].numel() > 0
+                and state_dict[std_key].numel() > 0
+            )
+            state_dict[stats_key] = torch.tensor(has_stats)
+
+        super()._load_from_state_dict(
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
+        )
 
     @torch.no_grad()
     def _compute_latent_statistics(self):
@@ -271,7 +302,6 @@ class CosmosLDM(Diffusion):
             num_steps + 1,
             device=self.device,
         )
-
         z_mean = z_t
         for i in range(num_steps):
             t = timesteps[i] * torch.ones(num_samples, device=self.device)

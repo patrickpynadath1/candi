@@ -70,7 +70,6 @@ class Encoder(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     # def forward(self, x, discrete_noise):
     def forward(self,
                 input_tokens,
-                sigma,
                 skip_embedding=False,
                 **kwargs):
 

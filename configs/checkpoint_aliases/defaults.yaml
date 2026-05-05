@@ -21,3 +21,8 @@ cosmos_ldm: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.15/0638
 cosmos_ed_v2: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.15/131525/checkpoints/last.ckpt"
 
 cosmos_ldm_v2: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.15/171810/checkpoints/last.ckpt"
+
+cosmos_ldm_v3: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.16/075713/checkpoints/last.ckpt"
+
+cosmos_ldm_no_self_cond: "/data/remote_cache/patrick/discrete_diffusion/text8/2026.04.16/083550/checkpoints/last.ckpt"
+

@@ -7,7 +7,7 @@ attention:
 
 embedding:
   dim: 256
-  max_position_embeddings: 128
+  max_position_embeddings: ${model.k_register_latents}
   initializer_range: 0.02
 
 tokens:
@@ -22,7 +22,7 @@ hidden:
 
 latent:
   dim: 256
-  num_latents: 64
+  num_latents: ${model.k_register_latents}
 
 normalization:
   layer_eps: 1.0e-5
