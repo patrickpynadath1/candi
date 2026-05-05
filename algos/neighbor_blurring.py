@@ -50,7 +50,7 @@ def gaussian_position_kernel(
         )
 
     W = torch.softmax(logits, dim=-1)  # row-normalize
-
+    
     W_norm = W / W.diag().unsqueeze(-1)             # row i scaled so W[i, i] = 1
 
     return W_norm

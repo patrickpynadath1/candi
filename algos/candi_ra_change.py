@@ -23,6 +23,7 @@ class CANDI_RA_CHANGE(CANDI):
         self.spatial_blurring_sigma = config.algo.spatial_blurring.get("sigma", 0.5)
         self.include_neighbors = config.algo.spatial_blurring.get("include_neighbors", True)
         self._precompute_kernel(self.device)
+        self.temp = 1.0
 
     def _precompute_kernel(self, device): 
         # Precompute the kernel for neighbor blurring.
@@ -36,8 +37,8 @@ class CANDI_RA_CHANGE(CANDI):
         )
 
     def to(self, *args, **kwargs):
-        super().to(*args, **kwargs)
         self.kernel.to(*args, **kwargs)
+        return super().to(*args, **kwargs)
     
     # TODO: modify this to incorporate a convolution at the sequence level before noising 
     def q_xt(self, x, alpha_t):
@@ -70,7 +71,6 @@ class CANDI_RA_CHANGE(CANDI):
 
     @torch.no_grad()
     def generation_loop(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
-
         if num_steps is None:
             num_steps = self.config.sampling.steps
 
