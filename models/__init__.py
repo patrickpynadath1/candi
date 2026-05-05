@@ -1,6 +1,15 @@
-from . import dit
-from . import ema
-from . import dit_cont
-from . import dit_cfm
-from . import dit_encoder_decoder_sphere
-from . import dit_encoder_decoder
+
+from .registry import models as model_registry
+import importlib, pkgutil
+
+IGNORE = {
+    "__init__", 
+    "registry", 
+    "unit_test_attention", 
+    "common",
+    "cosmos",
+    }
+
+for _, name, _ in pkgutil.iter_modules(__path__):
+    if name not in IGNORE:
+        importlib.import_module(f".{name}", __name__)

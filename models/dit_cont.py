@@ -8,6 +8,7 @@ from .common import (
     bias_dropout_add_scale_fused_inference,
     Preconditioning
 )
+from .registry import model_registry
 import huggingface_hub
 import omegaconf
 import torch
@@ -23,6 +24,7 @@ torch._C._jit_override_can_fuse_on_gpu(True)
 
 
 # Assumes that the vocab size accounts for the mask token 
+@model_registry.register("dit_cont")
 class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def __init__(self, config, vocab_size: int, mixed_coeff: float=.5, use_precond=True):
         super().__init__()

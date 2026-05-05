@@ -12,6 +12,7 @@ import rich.syntax
 import rich.tree
 import torch
 import algos
+from algos import algo_registry
 import dataloader as dataloader
 from text_metrics import evaluate_text_metrics
 import utils
@@ -220,8 +221,9 @@ def main(config):
     logger = utils.get_logger(__name__)
     tokenizer = dataloader.get_tokenizer(config)
 
-    if config.algo.name in algos.all_algos:
-        diffusion_model = algos.all_algos[config.algo.name]
+    algo_cls = algo_registry.get(config.algo.name)
+    if algo_cls is not None:
+        diffusion_model = algo_cls
     else:
         raise ValueError(f"Invalid algorithm name: {config.algo.name}")
     kwargs = {
@@ -229,7 +231,7 @@ def main(config):
         "config": config,
         "tokenizer": tokenizer,
         "logger": logger,
-    }
+    }    
     _sweep(**kwargs, is_conditional=False)
 
 if __name__ == "__main__":

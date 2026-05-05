@@ -6,12 +6,14 @@ from .algo_utils import (
     sample_categorical, 
     training_sigma_ve
     )
+from .registry import algo_registry
 
 import utils
 import torch
 import torch.nn.functional as F
 import math
 
+@algo_registry.register("candi")
 class CANDI(Diffusion):
     def __init__(self, config, tokenizer):
         self.mask_index = len(tokenizer)

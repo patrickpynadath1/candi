@@ -1,5 +1,6 @@
 from .uniform_state import UniformState
 from .algo_utils import sample_categorical
+from .registry import algo_registry
 
 
 import fsspec
@@ -13,7 +14,7 @@ import torch.nn.functional as F
 
 import collections
 
-
+@algo_registry.register("duo")
 class DUO_BASE(UniformState):
     def __init__(self, config, tokenizer):
         self.temp = config.algo.get("temp", 1.0)

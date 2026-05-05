@@ -1,4 +1,5 @@
 from .diffusion import Diffusion
+from .registry import algo_registry
 
 import torch
 import torch.nn.functional as F
@@ -13,6 +14,7 @@ def _view_for(t: Tensor, other: Tensor) -> Tensor:
     return t.view(other.size(0), *((1,) * (other.ndim - 1)))
 
 
+@algo_registry.register("semicat")
 class Semicat(Diffusion):
     """Semi-categorical flow matching.
 

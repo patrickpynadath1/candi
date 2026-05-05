@@ -1,4 +1,5 @@
 # torch.serialization.add_safe_globals([DictConfig])
+from .registry import algo_registry
 
 
 from .trainer_base import TrainerBase
@@ -6,7 +7,7 @@ from .trainer_base import TrainerBase
 
 import torch
 
-
+@algo_registry.register("ar")
 class AR(TrainerBase):
     def __init__(self, config, tokenizer):
         vocab_size = tokenizer.vocab_size

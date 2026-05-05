@@ -8,6 +8,7 @@ from .common import (
     bias_dropout_add_scale_fused_train,
     bias_dropout_add_scale_fused_inference,
 )
+from .registry import model_registry
 
 
 import huggingface_hub
@@ -24,6 +25,7 @@ torch._C._jit_override_can_fuse_on_gpu(True)
 
 
 # Assumes that the vocab size accounts for the mask token 
+@model_registry.register("dit_cfm")
 class CFMDit(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def __init__(self, config, vocab_size: int):
         super().__init__()

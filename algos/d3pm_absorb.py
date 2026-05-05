@@ -1,8 +1,9 @@
 from .absorbing_state import AbsorbingState
+from .registry import algo_registry
 
 import torch
 
-
+@algo_registry.register("d3pm_absorb")
 class D3PMAbsorb(AbsorbingState):
     def __init__(self, config, tokenizer):
         super().__init__(config, tokenizer)

@@ -9,7 +9,7 @@ import transformers
 import dataloader
 import metrics
 import models
-
+from models import model_registry
 import time
 @dataclass
 class Loss:
@@ -66,32 +66,17 @@ class TrainerBase(L.LightningModule):
         self.sampler = self.config.sampling.predictor
         self.antithetic_sampling = self.config.training.antithetic_sampling
         self.parameterization = self.config.algo.parameterization
-        if self.config.algo.backbone == "dit":
-            self.backbone = models.dit.DIT(self.config, vocab_size=self.vocab_size)
-        elif self.config.algo.backbone == "dit_avg":
-            self.backbone = models.dit_avg.DIT_avg(self.config, vocab_size=self.vocab_size)
-        elif self.config.algo.backbone == "cont_dit": 
-            backbone = models.dit_cont.ContDIT(self.config.model, vocab_size=self.vocab_size, mixed_coeff=self.config.algo.mixed_coeff)
-            self.backbone = backbone
-        elif self.config.algo.backbone == "cfm_dit": 
-            backbone = models.dit_cfm.CFMDit(self.config.model, vocab_size=self.vocab_size)
-            self.backbone = backbone
-        elif self.config.algo.backbone == "encoder_decoder_sphere":
-            backbone = models.dit_encoder_decoder_sphere.EncoderDecoderSphere(self.config.model, vocab_size=self.vocab_size)
-            self.backbone = backbone
-        elif self.config.algo.backbone == "encoder_decoder":
-            backbone = models.dit_encoder_decoder.EncoderDecoder(self.config.model, vocab_size=self.vocab_size)
-            self.backbone = backbone
-        elif self.config.algo.backbone == "dimamba":
-            self.backbone = models.dimamba.DiMamba(
-                self.config,
-                vocab_size=self.vocab_size,
-                pad_token_id=self.tokenizer.pad_token_id,
-            )
-        elif self.config.algo.backbone == "hf_dit":
-            self.backbone = transformers.AutoModelForMaskedLM.from_pretrained(
-                config.eval.checkpoint_path, trust_remote_code=True
-            )
+        backbone_cls = model_registry.get(self.config.algo.backbone)
+        if backbone_cls is not None:
+            self.backbone = backbone_cls(self.config, vocab_size=self.vocab_size)
+        else:
+            if self.config.algo.backbone == "hf_dit":
+                self.backbone = transformers.AutoModelForMaskedLM.from_pretrained(
+                        config.eval.checkpoint_path, trust_remote_code=True
+                    )
+            else: 
+                raise ValueError(f"Backbone {self.config.algo.backbone} not found in registry and is not hf_dit.")
+
 
 
         self.T = self.config.algo.T
