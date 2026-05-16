@@ -670,6 +670,7 @@ dependencies = [
     { name = "evaluate" },
     { name = "flash-attn", marker = "python_full_version < '3.11'" },
     { name = "fsspec" },
+    { name = "gradient-moment" },
     { name = "huggingface-hub" },
     { name = "hydra-core" },
     { name = "lightning" },
@@ -706,6 +707,7 @@ requires-dist = [
     { name = "evaluate", specifier = ">=0.4.6" },
     { name = "flash-attn", url = "https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.5cxx11abiFALSE-cp310-cp310-linux_x86_64.whl" },
     { name = "fsspec", specifier = ">=2026.2.0" },
+    { name = "gradient-moment", editable = "../gradient-moment" },
     { name = "huggingface-hub", specifier = ">=1.15.0" },
     { name = "hydra-core", specifier = ">=1.3.2" },
     { name = "lightning", specifier = ">=2.6.1" },
@@ -988,6 +990,29 @@ sdist = { url = "https://files.pythonhosted.org/packages/33/f6/354ae6491228b5eb4
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/7a/1c6e3562dfd8950adbb11ffbc65d21e7c89d01a6e4f137fa981056de25c5/gitpython-3.1.50-py3-none-any.whl", hash = "sha256:d352abe2908d07355014abdd21ddf798c2a961469239afec4962e9da884858f9", size = 212507, upload-time = "2026-05-06T04:01:23.799Z" },
 ]
+
+[[package]]
+name = "gradient-moment"
+version = "0.2.0"
+source = { editable = "../gradient-moment" }
+dependencies = [
+    { name = "datasets" },
+    { name = "numpy" },
+    { name = "pytest" },
+    { name = "torch" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datasets", specifier = ">=4.8.5" },
+    { name = "gradient-moment", extras = ["test", "huggingface"], marker = "extra == 'dev'" },
+    { name = "numpy" },
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=7" },
+    { name = "torch", specifier = ">=2", index = "https://download.pytorch.org/whl/cu121" },
+    { name = "transformers", marker = "extra == 'huggingface'", specifier = ">=4.40,<5" },
+]
+provides-extras = ["huggingface", "test", "dev"]
 
 [[package]]
 name = "h11"
