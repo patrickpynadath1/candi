@@ -3,6 +3,7 @@ from .registry import algo_registry
 
 import torch
 
+@algo_registry.register("d3pm")
 @algo_registry.register("d3pm_absorb")
 class D3PMAbsorb(AbsorbingState):
     def __init__(self, config, tokenizer):

@@ -96,7 +96,9 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         t_cond = F.silu(self.sigma_map(sigma))
         rotary_cos_sin = self.rotary_emb(x)
 
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()
+        ):
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
             logits = self.output_layer(x, c=t_cond)
@@ -104,10 +106,9 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if ret_embedding:
             return logits[:, :, :-1], x 
         return logits[:, :, :-1]
-    
-    def get_embedding(self, x): 
+
+    def get_embedding(self, x):
         return self.vocab_embed(x)
-    
+
     def get_mask_embed(self):
         return self.vocab_embed.embedding[self.mask_index]
-    

@@ -43,6 +43,7 @@ def calculate_ngram_coverage(
         gen_ngrams.update(get_ngrams(text, n))
         ngram_coverage.append(
             len(gen_ngrams.intersection(train_ngrams)) / len(gen_ngrams)
+            if gen_ngrams else 0.0
         )
 
     return np.mean(ngram_coverage)
@@ -67,7 +68,12 @@ def unique_ngrams_per_sample(
         gen_ngrams = set()
         cur_ngrams = get_ngrams(text, n)
         gen_ngrams.update(get_ngrams(text, n))
-        unique_ratio = len(gen_ngrams) / len(cur_ngrams)
+        if word_based:
+            token_count = len(text.split())
+        else:
+            token_count = len(text)
+        total = max(0, token_count - n + 1)
+        unique_ratio = len(gen_ngrams) / total if total else 0.0
         unique_ngrams.append(unique_ratio)
     return np.mean(unique_ngrams)
 
@@ -93,7 +99,7 @@ def total_unique_ngrams(
         total_ngrams += len(cur_ngrams)
         gen_ngrams.update(get_ngrams(text, n))
 
-    unique_ratio = len(gen_ngrams) / total_ngrams
+    unique_ratio = len(gen_ngrams) / total_ngrams if total_ngrams else 0.0
     return unique_ratio
 
 
@@ -115,7 +121,10 @@ def calculate_char_distribution_metrics(
         all_chars = "".join(texts)
         total_chars = len(all_chars)
         freqs = Counter(all_chars)
-        return {char: count / total_chars for char, count in freqs.items()}
+        return (
+            {char: count / total_chars for char, count in freqs.items()}
+            if total_chars else {}
+        )
 
     train_freqs = get_char_freqs(train_texts)
     gen_freqs = get_char_freqs(generated_texts)
@@ -142,15 +151,7 @@ def calculate_word_dictionary_match(
     Returns:
         Ratio of matching words (0-1)
     """
-    train_words = set()
-    train_file = (
-        "/home/patrick/.cache/discrete_diffusion/text8/text8/raw_data/text8.test.txt"
-    )
-    # Split by whitespace into words
-    with open(train_file, "r") as f:
-        text = f.read().lower()  # Ensure it's lowercase like the dataset expects
-
-    tokens = text.split()
+    tokens = " ".join(train_texts).lower().split()
 
     # Count word frequencies
     word_counts = Counter(tokens)
@@ -169,12 +170,8 @@ def calculate_word_dictionary_match(
 
         gen_words = set(seen)
         matching_words = gen_words.intersection(filtered_vocab)
-        wc = len(matching_words) / counter
+        wc = len(matching_words) / counter if counter else 0.0
         word_counts_total.append(wc)
-
-    with open("/home/patrick/bd3lms/word_counts_total.txt", "w") as f:
-        for wc in word_counts_total:
-            f.write(f"{wc}\n")
 
     return np.mean(word_counts_total)
 
@@ -192,15 +189,7 @@ def total_valid_words(
     Returns:
         Ratio of matching words (0-1)
     """
-    train_words = set()
-    train_file = (
-        "/home/patrick/.cache/discrete_diffusion/text8/text8/raw_data/text8.test.txt"
-    )
-    # Split by whitespace into words
-    with open(train_file, "r") as f:
-        text = f.read().lower()  # Ensure it's lowercase like the dataset expects
-
-    tokens = text.split()
+    tokens = " ".join(train_texts).lower().split()
 
     # Count word frequencies
     word_counts = Counter(tokens)
@@ -217,7 +206,7 @@ def total_valid_words(
             seen.append(w)
             if w in filtered_vocab:
                 counter += 1
-        valid_pct = counter / len(seen)
+        valid_pct = counter / len(seen) if seen else 0.0
         word_counts_total.append(valid_pct)
     return np.mean(word_counts_total)
 
@@ -243,7 +232,7 @@ def total_unique_words(
         counter = 0
         for w in l.split():
             seen.append(w)
-        unique_pct = len(set(seen)) / len(seen)
+        unique_pct = len(set(seen)) / len(seen) if seen else 0.0
         word_counts_total.append(unique_pct)
     return np.mean(word_counts_total)
 

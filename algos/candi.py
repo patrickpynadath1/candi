@@ -224,8 +224,8 @@ class CANDI(Diffusion):
 
     def generate_sample_prompt(self, prompt_tokens, x, prompt_mask):
         prompt_onehots = torch.nn.functional.one_hot(prompt_tokens, x.size(-1)).float().to(x.device)
-
-        x = prompt_onehots * prompt_mask.unsqueeze(-1) + (1 - prompt_mask).unsqueeze(-1) * x
+        prompt_mask = prompt_mask.bool()
+        x = torch.where(prompt_mask.unsqueeze(-1), prompt_onehots, x)
         return x, prompt_mask
 
     def generate_samples(self, **kwargs):

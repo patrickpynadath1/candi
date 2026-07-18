@@ -203,7 +203,10 @@ class Semicat(Diffusion):
         else:
             raise ValueError(f"Unknown sampling method: {sampling_method}")
 
-        return x.argmax(dim=-1)
+        tokens = x.argmax(dim=-1)
+        if prompt_tokens is not None and prompt_mask is not None:
+            tokens = torch.where(prompt_mask.bool(), prompt_tokens, tokens)
+        return tokens
 
     def _sample_flow_map(
         self, x: Tensor, batch_size: int, steps: int

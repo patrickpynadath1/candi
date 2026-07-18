@@ -201,11 +201,12 @@ class Diffusion(TrainerBase):
         # Lightning auto-casting is not working in this method for some reason
         # TODO(subham): Test this method after refactoring.
         self._eval_mode()
-        (sampling_steps, samples, sequence_lengths) = self._semi_ar_sampler(
-            n_samples=self.config.loader.eval_batch_size,
-            stride_length=stride_length,
-            num_strides=num_strides,
-            dt=dt,
-        )
-        self._train_mode()
-        return sampling_steps, samples, sequence_lengths
+        try:
+            return self._semi_ar_sampler(
+                n_samples=self.config.loader.eval_batch_size,
+                stride_length=stride_length,
+                num_strides=num_strides,
+                dt=dt,
+            )
+        finally:
+            self._train_mode()

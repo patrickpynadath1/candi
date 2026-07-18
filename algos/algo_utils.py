@@ -2,12 +2,6 @@
 import torch
 from torch.distributions import Normal
 
-def sample_categorical(categorical_probs):
-    gumbel_norm = 1e-10 - (torch.rand_like(categorical_probs) + 1e-10).log()
-    return (categorical_probs / gumbel_norm).argmax(dim=-1)
-
-
-
 def sigma_from_time_vectorized(
     t: torch.Tensor, sigmas: torch.Tensor, errors: torch.Tensor
 ) -> torch.Tensor:
@@ -22,7 +16,7 @@ def sigma_from_time_vectorized(
     Returns:
         Tensor of interpolated σ values
     """
-    t = t.clamp(min=0.0, max=1.0)
+    t = t.clamp(min=errors[0].item(), max=errors[-1].item())
     t = t.to(sigmas.device)
 
     # Normalize ε ∈ [0, 1] to indices in [0, len(errors)-1]
@@ -136,7 +130,7 @@ def error_to_sigma(
     sigmas: torch.Tensor,
     errors: torch.Tensor
 ) -> torch.Tensor:
-    error_rates = error_rates.clamp(min=0.0, max=1.0)
+    error_rates = error_rates.clamp(min=errors[0].item(), max=errors[-1].item())
     
     # Find bracketing indices
     indices = torch.searchsorted(errors, error_rates, right=True).clamp(1, len(errors)-1)

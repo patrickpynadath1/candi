@@ -8,7 +8,6 @@ IGNORE = {
     "algo_utils", 
     "trainer_base", 
     "uniform_state", 
-    "cosmos_algo_utils",
     }
 
 for _, name, _ in pkgutil.iter_modules(__path__):

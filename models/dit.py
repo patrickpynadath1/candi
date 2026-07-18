@@ -84,7 +84,9 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         rotary_cos_sin = self.rotary_emb(x)
 
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()
+        ):
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
             if get_logits: 
@@ -108,7 +110,9 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         rotary_cos_sin = self.rotary_emb(x_emb)
 
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()
+        ):
             x = x_emb
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)

@@ -267,11 +267,10 @@ class Metrics:
     def _build_valid_tokens(self, samples, attn_mask):
         if self.tokenizer.eos_token_id is None:
             return attn_mask[..., 1:].to(dtype=torch.bool)
-        first_eos = (samples == self.tokenizer.eos_token_id).cumsum(-1) == 1
-        token_mask = samples != self.tokenizer.eos_token_id
-        valid_tokens = (first_eos[..., 1:] | token_mask[..., 1:]) & attn_mask[
-            ..., 1:
-        ].bool()
+        is_eos = samples == self.tokenizer.eos_token_id
+        eos_count = is_eos.cumsum(-1)
+        through_first_eos = (eos_count == 0) | (is_eos & (eos_count == 1))
+        valid_tokens = through_first_eos[..., 1:] & attn_mask[..., 1:].bool()
         return valid_tokens
 
     def _compute_utf8_lengths(self, samples, attn_mask):

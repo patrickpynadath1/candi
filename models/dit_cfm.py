@@ -69,8 +69,8 @@ class CFMDit(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             return bias_dropout_add_scale_fused_inference
         
 
-    
-    
+
+
     # clean mask: indicates which positions are clean with 1, which are corrupted with 0
     # def forward(self, x, discrete_noise):
     def forward(self, xt, sigma):
@@ -82,13 +82,14 @@ class CFMDit(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         rotary_cos_sin = self.rotary_emb(x)
 
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()
+        ):
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
             logits = self.output_layer(x, c=t_cond)
 
         return logits
-    
-    def get_embedding(self, x): 
+
+    def get_embedding(self, x):
         return self.vocab_embed(x)
-    

@@ -22,6 +22,15 @@ class ExponentialMovingAverage:
         self.shadow_params = [p.clone().detach() for p in parameters if p.requires_grad]
         self.collected_params = []
 
+    def _trainable_parameters(self, parameters):
+        parameters = [p for p in parameters if p.requires_grad]
+        if len(parameters) != len(self.shadow_params):
+            raise ValueError(
+                f"EMA parameter count mismatch: expected {len(self.shadow_params)}, "
+                f"got {len(parameters)}"
+            )
+        return parameters
+
     def move_shadow_params_to_device(self, device):
         self.shadow_params = [i.to(device) for i in self.shadow_params]
 
@@ -42,7 +51,7 @@ class ExponentialMovingAverage:
             decay = min(decay, (1 + self.num_updates) / (10 + self.num_updates))
         one_minus_decay = 1.0 - decay
         with torch.no_grad():
-            parameters = [p for p in parameters if p.requires_grad]
+            parameters = self._trainable_parameters(parameters)
             for s_param, param in zip(self.shadow_params, parameters):
                 s_param.sub_(one_minus_decay * (s_param - param))
 
@@ -54,7 +63,7 @@ class ExponentialMovingAverage:
             parameters: Iterable of `torch.nn.Parameter`; the parameters to be
                 updated with the stored moving averages.
         """
-        parameters = [p for p in parameters if p.requires_grad]
+        parameters = self._trainable_parameters(parameters)
         for s_param, param in zip(self.shadow_params, parameters):
             if param.requires_grad:
                 param.data.copy_(s_param.data)
@@ -67,7 +76,8 @@ class ExponentialMovingAverage:
             parameters: Iterable of `torch.nn.Parameter`; the parameters to be
                 temporarily stored.
         """
-        self.collected_params = [param.clone() for param in parameters]
+        parameters = self._trainable_parameters(parameters)
+        self.collected_params = [param.detach().clone() for param in parameters]
 
     def restore(self, parameters):
         """
@@ -81,17 +91,27 @@ class ExponentialMovingAverage:
             parameters: Iterable of `torch.nn.Parameter`; the parameters to be
                 updated with the stored parameters.
         """
+        parameters = self._trainable_parameters(parameters)
+        if len(self.collected_params) != len(parameters):
+            raise ValueError("EMA stored parameter count mismatch")
         for c_param, param in zip(self.collected_params, parameters):
             param.data.copy_(c_param.data)
+        self.collected_params = []
 
     def state_dict(self):
         return dict(
             decay=self.decay,
             num_updates=self.num_updates,
-            shadow_params=self.shadow_params,
+            shadow_params=[parameter.detach().clone() for parameter in self.shadow_params],
         )
 
     def load_state_dict(self, state_dict):
         self.decay = state_dict["decay"]
         self.num_updates = state_dict["num_updates"]
-        self.shadow_params = state_dict["shadow_params"]
+        shadow_params = state_dict["shadow_params"]
+        if len(shadow_params) != len(self.shadow_params):
+            raise ValueError(
+                f"EMA parameter count mismatch: expected {len(self.shadow_params)}, "
+                f"got {len(shadow_params)}"
+            )
+        self.shadow_params = [parameter.detach().clone() for parameter in shadow_params]

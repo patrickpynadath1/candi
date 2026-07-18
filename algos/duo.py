@@ -14,6 +14,7 @@ import torch.nn.functional as F
 import collections
 
 @algo_registry.register("duo")
+@algo_registry.register("duo_base")
 class DUO_BASE(UniformState):
     def __init__(self, config, tokenizer):
         self.temp = config.algo.get("temp", 1.0)

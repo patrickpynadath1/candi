@@ -46,6 +46,8 @@ def _get_tokenizer_cache_fingerprint(tokenizer):
     # Include the realized vocabulary so tokenizer swaps or local tokenizer
     # edits do not silently reuse an incompatible tokenized dataset cache.
     vocab = tokenizer.get_vocab()
+    if hasattr(tokenizer, "get_added_vocab"):
+        vocab = {**vocab, **tokenizer.get_added_vocab()}
     for token, index in sorted(vocab.items(), key=lambda item: (item[1], item[0])):
         digest.update(token.encode("utf-8", errors="surrogatepass"))
         digest.update(b"\0")
@@ -554,6 +556,8 @@ def _group_texts(examples, block_size, bos, eos, insert_special_tokens=True):
     # We could add padding if the model supported it instead of
     # this drop, you can customize this part to your needs.
     if insert_special_tokens:
+        if block_size <= 2:
+            raise ValueError("block_size must be greater than 2 when adding BOS/EOS")
         new_block_size = block_size - 2  # [BOS] and [EOS] to be added
     else:
         new_block_size = block_size
@@ -925,7 +929,8 @@ def get_tokenizer(config):
 def get_dataloaders(
     config, tokenizer, skip_train=False, skip_valid=False, valid_seed=None
 ):
-    num_gpus = torch.cuda.device_count()
+    # A CPU process is a single data-parallel worker for batch-size purposes.
+    num_gpus = max(1, torch.cuda.device_count())
     if config.trainer.accumulate_grad_batches > 1:
         # assert config.loader.global_batch_size == (
         #     config.loader.batch_size
@@ -1021,7 +1026,7 @@ def get_dataloaders(
             pin_memory=config.loader.pin_memory,
             shuffle=not config.data.streaming,
             drop_last=True,
-            persistent_workers=True,
+            persistent_workers=config.loader.num_workers > 0,
         )
         train_loader.tokenizer = tokenizer
     if skip_valid:
@@ -1066,7 +1071,7 @@ class RandomFaultTolerantSampler(torch.utils.data.RandomSampler):
         self.restarting = False
 
     def state_dict(self):
-        return {"random_state": self.generator.get_state(), "counter": self.counter}
+        return {"random_state": self.state, "counter": self.counter}
 
     def load_state_dict(self, state_dict):
         self.generator.set_state(state_dict.get("random_state"))

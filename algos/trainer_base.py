@@ -68,17 +68,13 @@ class TrainerBase(L.LightningModule):
         self.antithetic_sampling = self.config.training.antithetic_sampling
         self.parameterization = self.config.algo.parameterization
 
-        backbone_cls = model_registry.get(self.config.algo.backbone)
-        # import pdb; pdb.set_trace()
-        if backbone_cls is not None:
-            self.backbone = backbone_cls(self.config, vocab_size=self.vocab_size)
+        if self.config.algo.backbone == "hf_dit":
+            self.backbone = transformers.AutoModelForMaskedLM.from_pretrained(
+                config.eval.checkpoint_path, trust_remote_code=True
+            )
         else:
-            if self.config.algo.backbone == "hf_dit":
-                self.backbone = transformers.AutoModelForMaskedLM.from_pretrained(
-                        config.eval.checkpoint_path, trust_remote_code=True
-                    )
-            else: 
-                raise ValueError(f"Backbone {self.config.algo.backbone} not found in registry and is not hf_dit.")
+            backbone_cls = model_registry.get(self.config.algo.backbone)
+            self.backbone = backbone_cls(self.config, vocab_size=self.vocab_size)
 
         self.T = self.config.algo.T
         self.num_tokens = self.config.model.length
@@ -264,7 +260,7 @@ class TrainerBase(L.LightningModule):
                     pin_memory=self.config.loader.pin_memory,
                     sampler=dl_sampler,
                     shuffle=False,
-                    persistent_workers=True,
+            persistent_workers=self.config.loader.num_workers > 0,
                 )
             )
         self.trainer.fit_loop._combined_loader.flattened = updated_dls
@@ -329,7 +325,7 @@ class TrainerBase(L.LightningModule):
         self.metrics.update_valid(losses.nlls, losses.prior_loss, losses.num_tokens)
         return losses.loss
 
-    def on_validation_epoch_end(self):
+    def _validation_epoch_end(self):
         for k, v in self.metrics.valid_nlls.items():
             self.log(
                 name=k, value=v.compute(), on_step=False, on_epoch=True, sync_dist=True
@@ -384,7 +380,11 @@ class TrainerBase(L.LightningModule):
                         on_step=False,
                         sync_dist=True,
                     )
-        self._train_mode()
+    def on_validation_epoch_end(self):
+        try:
+            self._validation_epoch_end()
+        finally:
+            self._train_mode()
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -413,13 +413,14 @@ class TrainerBase(L.LightningModule):
         """Generate samples from the model."""
         # Lightning auto-casting is not working in this method for some reason
         self._eval_mode()
-        start = time.time()
-        samples = self.generate_samples(
-            num_samples=self.config.loader.eval_batch_size, num_steps=num_steps, eps=eps
-        )
-        end = time.time()
-        self._train_mode()
-        return samples
+        try:
+            return self.generate_samples(
+                num_samples=self.config.loader.eval_batch_size,
+                num_steps=num_steps,
+                eps=eps,
+            )
+        finally:
+            self._train_mode()
 
     def _process_model_input(self, x0, valid_tokens):
         raise NotImplementedError
@@ -442,12 +443,11 @@ class TrainerBase(L.LightningModule):
         )
         assert loss.ndim == 2
         if self.ignore_bos:
-            loss[:, 1:] = loss[:, 1:]
-            valid_tokens[:, 1:] = valid_tokens[:, 1:]
+            valid_tokens = valid_tokens.clone()
+            valid_tokens[:, 0] = 0
 
         nlls = (loss * valid_tokens).sum()
         num_tokens = valid_tokens.sum()
         token_nll = nlls / num_tokens
 
         return Loss(loss=token_nll, nlls=nlls, prior_loss=0.0, num_tokens=num_tokens)
-

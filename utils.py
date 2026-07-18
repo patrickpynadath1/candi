@@ -86,12 +86,15 @@ class LoggingContext:
 
 class GradientInspectionCallback(lightning.Callback):
     def __init__(self, num_grads_log):
-        self.num_grads_log = 10
+        if num_grads_log <= 0:
+            raise ValueError("num_grads_log must be positive")
+        self.num_grads_log = num_grads_log
 
     def on_before_optimizer_step(self, trainer, pl_module, optimizer):
         gradients = []
         for name, param in pl_module.backbone.blocks.named_parameters():
-            gradients.append(param.grad.view(-1))
+            if param.grad is not None:
+                gradients.append(param.grad.view(-1))
 
         if gradients:
             grads = torch.cat((gradients))
@@ -173,7 +176,7 @@ def top_k_top_p_filtering(
     if dim != -1:
         logits = torch.transpose(logits, dim, -1)
 
-    assert top_k < logits.size(dim)
+    assert top_k < logits.size(-1)
     if top_k > 0:
         # Remove all tokens with a probability less than
         # the last token of the top-k

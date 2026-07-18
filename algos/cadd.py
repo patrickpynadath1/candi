@@ -129,8 +129,8 @@ class CADD(Diffusion):
 
     def generate_sample_prompt(self, prompt_tokens, x, prompt_mask):
         prompt_onehots = torch.nn.functional.one_hot(prompt_tokens, x.size(-1)).float().to(x.device)
-
-        x = prompt_onehots * prompt_mask.unsqueeze(-1) + (1 - prompt_mask).unsqueeze(-1) * x
+        prompt_mask = prompt_mask.bool()
+        x = torch.where(prompt_mask.unsqueeze(-1), prompt_onehots, x)
         return x, prompt_mask
 
      # optimized function with cached embeddings
@@ -147,6 +147,8 @@ class CADD(Diffusion):
         timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
         dt = (1 - eps) / (num_steps)
         xt_tokens = torch.full((num_samples, self.num_tokens), self.mask_index, device=xt_embeds.device, dtype=torch.long)
+        if prompt_tokens is not None and prompt_mask is not None:
+            xt_tokens = torch.where(prompt_mask.bool(), prompt_tokens, xt_tokens)
         for i in range(num_steps):
             t = timesteps[i]
             s = timesteps[i+1]
