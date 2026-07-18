@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-algorithms=(mdlm ar mdlm_perm candi cadd duo cont_diff_embed cont_diff_onehot semicat)
+algorithms=(mdlm ar mdlm_perm candi cadd duo cont_diff_embed cont_diff_onehot semicat flm sfm)
 nfes=(16 32 64 128)
 temperatures=(0.7 0.85 1.0 1.15 1.3)
 gpus=(5 6 7)

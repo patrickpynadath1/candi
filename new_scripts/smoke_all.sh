@@ -2,7 +2,11 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-algorithms=(mdlm ar mdlm_perm candi cadd duo embedding_diffusion cont_diff_onehot semicat)
+if [[ $# -gt 0 ]]; then
+  algorithms=("$@")
+else
+  algorithms=(mdlm ar mdlm_perm candi cadd duo embedding_diffusion cont_diff_onehot semicat flm sfm)
+fi
 gpus=(5 6 7)
 smoke_root="${repo_root}/new_smoke_runs"
 mkdir -p "${smoke_root}"
@@ -11,6 +15,12 @@ run_smoke() {
   local gpu=$1
   local algorithm=$2
   local run_dir="${smoke_root}/${algorithm}"
+  local extra=()
+  if [[ "${algorithm}" == "flm" ]]; then
+    extra+=(model=tiny_flm model.length=128)
+  elif [[ "${algorithm}" == "sfm" ]]; then
+    extra+=(model=tiny_sphere_dit model.length=128)
+  fi
   mkdir -p "${run_dir}"
   CUDA_VISIBLE_DEVICES="${gpu}" "${repo_root}/.venv/bin/python" "${repo_root}/main.py" \
     --config-name=config_text8_frontier \
@@ -25,6 +35,7 @@ run_smoke() {
     checkpointing.resume_from_ckpt=false \
     "checkpointing.save_dir=${run_dir}" \
     "hydra.run.dir=${run_dir}" \
+    "${extra[@]}" \
     >"${run_dir}/smoke.log" 2>&1
 }
 

@@ -1,6 +1,6 @@
 # text8 tiny-DiT verification
 
-`run_all.sh` trains all nine algorithms for 20,000 optimizer steps on GPUs
+`run_all.sh` trains all eleven algorithms for 5,000 optimizer steps on GPUs
 5, 6, and 7, then evaluates 128 samples at each configured temperature/NFE
 point and writes the diversity/coherence frontiers under `new_results/`.
 

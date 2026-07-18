@@ -20,6 +20,13 @@ output_dir="${repo_root}/new_results/${algorithm}"
 output="${output_dir}/nfe_${nfe}_temp_${temperature}.json"
 mkdir -p "${output_dir}"
 
+extra=()
+if [[ "${algorithm}" == "flm" ]]; then
+  extra+=(model=tiny_flm model.length=128)
+elif [[ "${algorithm}" == "sfm" ]]; then
+  extra+=(model=tiny_sphere_dit model.length=128)
+fi
+
 CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/main.py" \
   --config-name=config_text8_frontier \
   mode=sample_eval \
@@ -27,7 +34,9 @@ CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/m
   "algo.temp=${temperature}" \
   "sampling.steps=${nfe}" \
   sampling.num_sample_batches=1 \
+  trainer.accumulate_grad_batches=1 \
   "eval.checkpoint_path=${checkpoint}" \
   "eval.generated_samples_path=${output}" \
   "hydra.run.dir=${repo_root}/new_eval_runs/${algorithm}/nfe_${nfe}_temp_${temperature}" \
-  wandb=null
+  wandb=null \
+  "${extra[@]}"

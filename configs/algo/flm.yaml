@@ -11,3 +11,4 @@ cap_value: null
 double_temb: false
 learnable_loss_weighting: false
 ignore_bos: false
+temp: 1.0

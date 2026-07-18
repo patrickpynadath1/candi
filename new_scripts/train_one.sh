@@ -15,6 +15,10 @@ mkdir -p "${run_dir}"
 extra=()
 if [[ "${algorithm}" == "candi" ]]; then
   extra+=(algo.max_percentile=0.4 algo.min_percentile=0.05)
+elif [[ "${algorithm}" == "flm" ]]; then
+  extra+=(model=tiny_flm model.length=128)
+elif [[ "${algorithm}" == "sfm" ]]; then
+  extra+=(model=tiny_sphere_dit model.length=128)
 fi
 
 CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/main.py" \
@@ -22,5 +26,5 @@ CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/m
   "algo=${algorithm}" \
   "checkpointing.save_dir=${run_dir}" \
   "hydra.run.dir=${run_dir}" \
-  "wandb.name=${algorithm}-tiny-dit-text8-20k" \
+  "wandb.name=${algorithm}-tiny-dit-text8-5k" \
   "${extra[@]}"

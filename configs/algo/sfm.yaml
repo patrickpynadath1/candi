@@ -10,3 +10,4 @@ slerp_precision: float64
 invert_time_convention: true
 renormalize_weights: false
 ignore_bos: false
+temp: 1.0

@@ -30,6 +30,7 @@ class SFM(Diffusion):
         )
         self.slerp_precision = getattr(config.algo, "slerp_precision", "float32")
         self.renormalize_weights = getattr(config.algo, "renormalize_weights", False)
+        self.temp = getattr(config.algo, "temp", 1.0)
         self.noise = get_noise(config)
         self._validate_configuration()
 
@@ -104,5 +105,7 @@ class SFM(Diffusion):
 
     def sampling_logits(self, x, t):
         alpha = self.sampling_alpha(t)
-        sigma = self._sigma_from_alphat(alpha).expand(x.shape[0], 1)
-        return self.forward(x, sigma)
+        sigma = self._sigma_from_alphat(alpha).reshape(-1, 1)
+        if sigma.shape[0] == 1:
+            sigma = sigma.expand(x.shape[0], 1)
+        return self.forward(x, sigma) / self.temp

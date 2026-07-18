@@ -20,6 +20,7 @@ class FLM(TrainerBase):
         self.t_min = config.algo.t_min
         self.t_max = config.algo.t_max
         self.cap_value = getattr(config.algo, "cap_value", None)
+        self.temp = getattr(config.algo, "temp", 1.0)
         a2g, g2a = build_luts(self.vocab_size)
         self.register_buffer("lut_a2g", a2g)
         self.register_buffer("lut_g2a", g2a)
@@ -90,4 +91,4 @@ class FLM(TrainerBase):
         return self.alpha_to_gamma(t)
 
     def sampling_logits(self, x, t):
-        return self.forward(x, t)
+        return self.forward(x, t) / self.temp

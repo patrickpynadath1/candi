@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-algorithms=(mdlm ar mdlm_perm candi cadd duo embedding_diffusion cont_diff_onehot semicat)
+algorithms=(mdlm ar mdlm_perm candi cadd duo embedding_diffusion cont_diff_onehot semicat flm sfm)
 gpus=(5 6 7)
 mkdir -p "${repo_root}/new_runs"
 pids=()
