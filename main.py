@@ -18,6 +18,7 @@ import utils
 import algos
 from algos import algo_registry
 from text_metrics import evaluate_text_metrics
+from tasks.evaluation import evaluate_gsm8k, evaluate_sudoku
 
 
 omegaconf.OmegaConf.register_new_resolver("cwd", os.getcwd)
@@ -468,6 +469,10 @@ def main(config):
     }
     if config.mode == "sample_eval":
         _generate_samples(**kwargs)
+    elif config.mode == "sudoku_eval":
+        evaluate_sudoku(load_checkpoint=_load_from_checkpoint, **kwargs)
+    elif config.mode == "gsm8k_eval":
+        evaluate_gsm8k(load_checkpoint=_load_from_checkpoint, **kwargs)
     elif config.mode == "ppl_eval":
         _eval_ppl(**kwargs)
     elif config.mode == "dataset_entropy":

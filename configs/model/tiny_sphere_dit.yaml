@@ -1,0 +1,12 @@
+name: tiny-sphere-dit
+type: sphere_dit
+hidden_size: 512
+cond_dim: 128
+length: 180
+n_blocks: 8
+n_heads: 8
+dropout: 0.1
+init: ngpt
+eps: 1.0e-6
+learn_temperature_scaling: false
+pretrained_ckpt_path: null

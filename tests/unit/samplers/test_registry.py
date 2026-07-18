@@ -28,6 +28,8 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "semicat_dopri5",
         "semicat_euler",
         "semicat_flow_map",
+        "flm_euler",
+        "sfm",
     }
 
 

@@ -1,0 +1,14 @@
+train: tiny_gsm
+valid: tiny_gsm
+tokenizer_name_or_path: HuggingFaceTB/SmolLM-135M
+cache_dir: ${hydra:runtime.cwd}/data_cache
+wrap: false
+streaming: false
+insert_train_eos: true
+insert_valid_eos: true
+separator: "\n"
+train_on_prompt: false
+train_on_pad: true
+val_ratio: 0.01
+val_seed: 42
+filter_too_long: true

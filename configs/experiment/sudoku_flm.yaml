@@ -1,0 +1,12 @@
+# @package _global_
+defaults:
+  - override /data: sudoku
+  - override /model: tiny_flm
+  - override /algo: flm
+loader:
+  global_batch_size: 256
+trainer:
+  max_steps: 20000
+  val_check_interval: 20000
+eval:
+  generate_samples: false

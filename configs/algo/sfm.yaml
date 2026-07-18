@@ -1,0 +1,12 @@
+name: sfm
+backbone: sphere_dit
+parameterization: mean
+time_conditioning: true
+causal_attention: false
+loss_type: ce
+T: 0
+eps: 1.0e-6
+slerp_precision: float64
+invert_time_convention: true
+renormalize_weights: false
+ignore_bos: false
