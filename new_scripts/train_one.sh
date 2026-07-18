@@ -17,7 +17,7 @@ if [[ "${algorithm}" == "candi" ]]; then
   extra+=(algo.max_percentile=0.4 algo.min_percentile=0.05)
 fi
 
-CUDA_VISIBLE_DEVICES="${gpu_id}" uv run python "${repo_root}/main.py" \
+CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/main.py" \
   --config-name=config_text8_frontier \
   "algo=${algorithm}" \
   "checkpointing.save_dir=${run_dir}" \

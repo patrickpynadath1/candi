@@ -3,6 +3,8 @@
 .hf_cache
 test/
 outputs/
+new_runs/
+new_smoke_runs/
 wandb/
 watch_folder/
 notes.md

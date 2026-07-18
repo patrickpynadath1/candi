@@ -20,7 +20,7 @@ output_dir="${repo_root}/new_results/${algorithm}"
 output="${output_dir}/nfe_${nfe}_temp_${temperature}.json"
 mkdir -p "${output_dir}"
 
-CUDA_VISIBLE_DEVICES="${gpu_id}" uv run python "${repo_root}/main.py" \
+CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/main.py" \
   --config-name=config_text8_frontier \
   mode=sample_eval \
   "algo=${config_algorithm}" \

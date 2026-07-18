@@ -31,4 +31,4 @@ for algorithm in "${algorithms[@]}"; do
 done
 for pid in "${pids[@]}"; do wait "${pid}"; done
 
-uv run python "${repo_root}/new_scripts/aggregate_frontiers.py"
+"${repo_root}/.venv/bin/python" "${repo_root}/new_scripts/aggregate_frontiers.py"
