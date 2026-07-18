@@ -38,6 +38,17 @@ class Semicat(Diffusion):
     def _validate_configuration(self):
         return
 
+    def _backbone_logits(self, x: Tensor, sigma: Tensor) -> Tensor:
+        """Run the shared ContDIT while retaining simple test backbones."""
+        if hasattr(self.backbone, "reserve_mask_embedding"):
+            return self.backbone(
+                x,
+                sigma,
+                reveal_mask=None,
+                precond=False,
+            )
+        return self.backbone(x, sigma)
+
     # ------------------------------------------------------------------
     # Prior
     # ------------------------------------------------------------------
@@ -107,7 +118,7 @@ class Semicat(Diffusion):
         # the original semicat convention where both time args are t
         # for the VFM (non-distillation) case.
         sigma = self._sigma_from_time(t)
-        x1_pred = self.backbone(xt, sigma)
+        x1_pred = self._backbone_logits(xt, sigma)
 
         # Cross-entropy loss per token
         # x1_pred: (B, L, V), x1: (B, L)
@@ -141,7 +152,7 @@ class Semicat(Diffusion):
         v(xt, t) = (softmax(net(xt, t, t)) - xt) / (1 - t)
         """
         sigma = self._sigma_from_time(t)
-        x1_logits = self.backbone(xt, sigma)
+        x1_logits = self._backbone_logits(xt, sigma)
         dr = (x1_logits / self.temp).softmax(dim=-1) - xt
         scale = 1.0 / (1.0 - _view_for(t, xt) + 1e-8)
         return dr * scale
@@ -161,7 +172,7 @@ class Semicat(Diffusion):
         """
         dt = (t - s) / (1.0 - s + 1e-8)
         sigma_s = self._sigma_from_time(s)
-        diff = (self.backbone(x, sigma_s) / self.temp).softmax(dim=-1) - x
+        diff = (self._backbone_logits(x, sigma_s) / self.temp).softmax(dim=-1) - x
         return x + _view_for(dt, x) * diff
 
     def sample_semicat_flow_map(self, *args, **kwargs):
