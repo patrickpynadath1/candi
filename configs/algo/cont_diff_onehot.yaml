@@ -14,5 +14,4 @@ sigma_min: .01
 sigma_max: 2.0
 temp: 1.0
 pure_continuous: True
-sampler: normal
-is_embed: False 
+is_embed: False

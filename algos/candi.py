@@ -3,8 +3,7 @@ from .algo_utils import (
     expected_rank, 
     sigma_from_time_vectorized, 
     inference_sigmas, 
-    sample_categorical, 
-    training_sigma_ve
+    sample_categorical,
     )
 from .registry import algo_registry
 
@@ -15,6 +14,15 @@ import math
 
 @algo_registry.register("candi")
 class CANDI(Diffusion):
+    default_sampler = "candi_cached"
+    supported_samplers = frozenset({"candi", "candi_cached"})
+    sampling_family = "candi"
+    sampling_capabilities = frozenset({
+        "continuous_prior", "continuous_schedule",
+        "candi_continuous_transition", "candi_discrete_transition",
+        "embedding_projection", "candi_cached_continuous_transition",
+        "candi_cached_discrete_transition",
+    })
     def __init__(self, config, tokenizer):
         self.mask_index = len(tokenizer)
         vocab_size = len(tokenizer) + 1
@@ -38,7 +46,6 @@ class CANDI(Diffusion):
         self.sigma_min = config.algo.sigma_min
         self.sigma_max = config.algo.sigma_max
         self.temp = config.algo.temp
-        self.sampler = config.algo.sampler
         self.is_embed = config.algo.is_embed
         self.use_percentile_scheduling = config.algo.use_percentile_scheduling
 
@@ -228,94 +235,27 @@ class CANDI(Diffusion):
         x = torch.where(prompt_mask.unsqueeze(-1), prompt_onehots, x)
         return x, prompt_mask
 
-    def generate_samples(self, **kwargs):
-        if self.sampler == 'cached':
-            return self.generate_samples_cache(**kwargs)
-        else:
-            return self.generate_samples_nocache(**kwargs)
-
-    @torch.no_grad()
-    def generate_samples_nocache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
-
-        if num_steps is None:
-            num_steps = self.config.sampling.steps
-
-        x = self.prior_sample(num_samples, self.num_tokens)
-
-
-        clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device)
-
-        if prompt_tokens is not None and prompt_mask is not None:
-            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
-
-        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
+    def sampling_continuous_schedule(self, timesteps, steps):
         if self.use_percentile_scheduling:
-            continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
-        else:
-            continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
-        dt = (1 - eps) / (num_steps)
+            return self.get_continuous_from_discrete_noise(timesteps)
+        return inference_sigmas(steps + 1, self.sigma_min, self.sigma_max).to(
+            self.device
+        )
 
-        self.max_sigma = continuous_noise.max().item()
+    def sampling_embeddings(self, x):
+        return self.backbone.get_embedding(x)
 
-        self.prev_px0 = None
-        for i in range(num_steps):
-            t = timesteps[i]
-            s = timesteps[i+1]
+    def sample_candi_continuous_transition(self, *args, **kwargs):
+        return self._continuous_step(*args, **kwargs)
 
-            sigma_s = continuous_noise[i]
-            sigma_t = continuous_noise[i+1]
+    def sample_candi_discrete_transition(self, *args, **kwargs):
+        return self._discrete_step(*args, **kwargs)
 
-            x_cont, p_x0 = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s)
+    def sample_candi_cached_continuous_transition(self, *args, **kwargs):
+        return self._continuous_step_cache(*args, **kwargs)
 
-            x, clean_mask = self._discrete_step(x_cont,
-                                                p_x0, t, dt, prev_clean_mask=clean_mask)
-
-        final_tokens = x.argmax(dim=-1)
-        return final_tokens
-
-    # optimized function with cached embeddings
-    @torch.no_grad()
-    def generate_samples_cache(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
-
-        x = self.prior_sample(num_samples, self.num_tokens)
-        if num_steps is None:
-            num_steps = self.config.sampling.steps
-
-        embedding_cache = self.backbone.get_embedding(x)
-        clean_mask = torch.zeros((num_samples, self.num_tokens), device=x.device, dtype=torch.bool)
-        if prompt_tokens is not None and prompt_mask is not None:
-            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
-        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
-        if self.use_percentile_scheduling:
-            continuous_noise = self.get_continuous_from_discrete_noise(timesteps)
-        else:
-            continuous_noise = inference_sigmas(num_steps+1, self.sigma_min, self.sigma_max)
-        dt = (1 - eps) / (num_steps)
-
-        self.max_sigma = continuous_noise.max().item()
-
-
-        # convert to tokens
-        x = x.argmax(dim=-1)
-        for i in range(num_steps):
-            t = timesteps[i]
-            s = timesteps[i+1]
-
-            sigma_s = continuous_noise[i]
-            sigma_t = continuous_noise[i+1]
-
-            embedding_cache, x0_hat = self._continuous_step_cache(x, t,
-                                                                sigma_s=sigma_s,
-                                                                sigma_t=sigma_t,
-                                                                clean_mask=clean_mask.float(),
-                                                                time_s=s,
-                                                                embedding_cache=embedding_cache,
-                                                                is_first=(i==0))
-
-            x, clean_mask = self._discrete_step_optimized(x0_hat, x, t, dt,
-                                                        prev_clean_mask=clean_mask,
-                                                    noise_removal_step=False)
-        return x
+    def sample_candi_cached_discrete_transition(self, *args, **kwargs):
+        return self._discrete_step_optimized(*args, **kwargs)
 
     def _discrete_step_optimized(self, x0_hat, xt, t, dt, prev_clean_mask, noise_removal_step=False):
 

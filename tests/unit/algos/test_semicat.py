@@ -72,9 +72,8 @@ def test_semicat_sampling_preserves_prompt(monkeypatch):
     )
     monkeypatch.setattr(Semicat, "device", property(lambda _self: torch.device("cpu")), raising=False)
     model.prior_sample = lambda *_shape: torch.zeros(1, 3, 4)
-    model._sample_flow_map = lambda x, *_args: x
+    model.sample_semicat_flow_map = lambda x, *_args: x
     prompt = torch.tensor([[2, 1, 3]])
     mask = torch.tensor([[1, 0, 1]])
     result = model.generate_samples(1, prompt_tokens=prompt, prompt_mask=mask)
     assert torch.equal(result[mask.bool()], prompt[mask.bool()])
-

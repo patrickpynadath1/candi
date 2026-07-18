@@ -1,19 +1,19 @@
 from .diffusion import Diffusion
-from .algo_utils import (
-    expected_rank, 
-    sigma_from_time_vectorized, 
-    inference_sigmas, 
-    sample_categorical, 
-    training_sigma_ve
-    )
+from .algo_utils import sample_categorical
 from .registry import algo_registry
 import utils
 import torch
-import torch.nn.functional as F
 
 
 @algo_registry.register("cadd")
 class CADD(Diffusion):
+    default_sampler = "cadd"
+    supported_samplers = frozenset({"cadd"})
+    sampling_family = "cadd"
+    sampling_capabilities = frozenset({
+        "continuous_prior", "cadd_continuous_transition",
+        "cadd_discrete_transition",
+    })
     def __init__(self, config, tokenizer):
         self.mask_index = len(tokenizer)
         vocab_size = len(tokenizer) + 1
@@ -133,40 +133,11 @@ class CADD(Diffusion):
         x = torch.where(prompt_mask.unsqueeze(-1), prompt_onehots, x)
         return x, prompt_mask
 
-     # optimized function with cached embeddings
-    @torch.no_grad()
-    def generate_samples(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
+    def sample_cadd_continuous_transition(self, **kwargs):
+        return self._continuous_step(**kwargs)
 
-        xt_embeds = self.prior_sample(num_samples, self.num_tokens)
-        if num_steps is None:
-            num_steps = self.config.sampling.steps
-
-        clean_mask = torch.zeros((num_samples, self.num_tokens), device=xt_embeds.device, dtype=torch.bool)
-        if prompt_tokens is not None and prompt_mask is not None:
-            xt_embeds, clean_mask = self.generate_sample_prompt(prompt_tokens, xt_embeds, prompt_mask)
-        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
-        dt = (1 - eps) / (num_steps)
-        xt_tokens = torch.full((num_samples, self.num_tokens), self.mask_index, device=xt_embeds.device, dtype=torch.long)
-        if prompt_tokens is not None and prompt_mask is not None:
-            xt_tokens = torch.where(prompt_mask.bool(), prompt_tokens, xt_tokens)
-        for i in range(num_steps):
-            t = timesteps[i]
-            s = timesteps[i+1]
-
-            xt_embeds, x0_hat_tokens = self._continuous_step(xt_embeds=xt_embeds,
-                                                            xt_tokens=xt_tokens, 
-                                                            time_t=t, 
-                                                            time_s=s, 
-                                                            clean_mask=clean_mask)
-
-            xt_embeds, xt_tokens, clean_mask = self._discrete_step_optimized(x0_hat_tokens=x0_hat_tokens,
-                                                                            xt_tokens=xt_tokens,
-                                                                            xt_embeds=xt_embeds,
-                                                                            t=t,
-                                                                            dt=dt,
-                                                                            prev_clean_mask=clean_mask,
-                                                                            noise_removal_step=(i==num_steps-1))
-        return xt_tokens
+    def sample_cadd_discrete_transition(self, **kwargs):
+        return self._discrete_step_optimized(**kwargs)
 
     def _discrete_step_optimized(self, x0_hat_tokens, xt_tokens, xt_embeds, t, dt, prev_clean_mask, noise_removal_step=False):
 

@@ -14,7 +14,6 @@ sigma_min: .01
 sigma_max: 2.0
 temp: 1.0
 pure_continuous: False
-sampler: cached
 is_embed: False 
 use_percentile_scheduling: True # only affects inference schedule
 cont_schedule_type: linear

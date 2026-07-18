@@ -7,11 +7,16 @@ from .algo_utils import (
 from .registry import algo_registry
 import utils
 import torch
-import torch.nn.functional as F
 
 
 @algo_registry.register("cont_diff_embed")
 class ContDiffEmbed(Diffusion):
+    default_sampler = "continuous_embedding"
+    supported_samplers = frozenset({"continuous_embedding"})
+    sampling_family = "continuous_embedding"
+    sampling_capabilities = frozenset({
+        "continuous_prior", "continuous_schedule", "continuous_transition",
+    })
     def __init__(self, config, tokenizer):
         self.mask_index = len(tokenizer)
 
@@ -36,7 +41,6 @@ class ContDiffEmbed(Diffusion):
         self.sigma_min = config.algo.sigma_min
         self.sigma_max = config.algo.sigma_max
         self.temp = config.algo.temp
-        self.sampler = config.algo.sampler
 
     def ve_sde_noise_sched(self, t, sigma_min=0.01, sigma_max=10.0):
         return sigma_min * (sigma_max / sigma_min) ** t
@@ -135,29 +139,11 @@ class ContDiffEmbed(Diffusion):
         x = prompt_onehots * prompt_mask.unsqueeze(-1) + (1 - prompt_mask).unsqueeze(-1) * x
         return x, prompt_mask
 
-    def generate_samples(self, num_samples, num_steps=None, eps=1e-5, prompt_tokens=None, prompt_mask=None):
-        if num_steps is None:
-            num_steps = self.config.sampling.steps
-        x = self.prior_sample(num_samples, self.num_tokens)
-        if prompt_tokens is not None and prompt_mask is not None:
-            x, clean_mask = self.generate_sample_prompt(prompt_tokens, x, prompt_mask)
-        timesteps = torch.linspace(.999, eps, num_steps + 1, device=self.device)
-        continuous_noise = self.get_continuous_noise_sched_pure_cont(timesteps)
+    def sampling_continuous_schedule(self, timesteps):
+        return self.get_continuous_noise_sched_pure_cont(timesteps)
 
-        self.max_sigma = continuous_noise.max().item()
-
-        for i in range(num_steps):
-            t = timesteps[i]
-            s = timesteps[i+1]
-
-            sigma_s = continuous_noise[i]
-            sigma_t = continuous_noise[i+1]
-
-            new_x, denoised = self._continuous_step(x, t, sigma_s=sigma_s, sigma_t=sigma_t, clean_mask=clean_mask, time_s=s, is_embed=self.is_embed)
-            x = new_x
-
-        final_tokens = denoised.argmax(dim=-1)
-        return final_tokens
+    def sample_continuous_transition(self, **kwargs):
+        return self._continuous_step(is_embed=True, **kwargs)
 
     @torch.no_grad()
     def _continuous_step(

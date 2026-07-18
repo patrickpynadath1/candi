@@ -147,14 +147,17 @@ def test_staggered_score_does_not_mutate_input():
     assert torch.isfinite(result).all()
 
 
-def test_semi_ar_restore_propagates_exception_and_restores_mode():
+def test_semi_ar_restore_propagates_exception_and_restores_mode(monkeypatch):
     model = _bare(Diffusion)
     model.config = SimpleNamespace(loader=SimpleNamespace(eval_batch_size=2))
     events = []
     model._eval_mode = lambda: events.append("eval")
     model._train_mode = lambda: events.append("train")
-    model._semi_ar_sampler = lambda **_kwargs: (_ for _ in ()).throw(
-        RuntimeError("semi-ar failed")
+    monkeypatch.setattr(
+        "algos.diffusion.run_sampler",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("semi-ar failed")
+        ),
     )
     with pytest.raises(RuntimeError, match="semi-ar failed"):
         model.restore_model_and_semi_ar_sample(2, 3)

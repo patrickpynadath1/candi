@@ -3,9 +3,6 @@ from .registry import algo_registry
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from typing import Literal, cast
-from torchdiffeq import odeint
-import pdb
 
 
 def _view_for(t: Tensor, other: Tensor) -> Tensor:
@@ -15,6 +12,14 @@ def _view_for(t: Tensor, other: Tensor) -> Tensor:
 
 @algo_registry.register("semicat")
 class Semicat(Diffusion):
+    default_sampler = "semicat_flow_map"
+    supported_samplers = frozenset({
+        "semicat_flow_map", "semicat_euler", "semicat_dopri5",
+    })
+    sampling_family = "semicat"
+    sampling_capabilities = frozenset({
+        "continuous_prior", "semicat_flow_map", "semicat_vector_field",
+    })
     """Semi-categorical flow matching.
 
     Gaussian prior -> linear interpolation -> cross-entropy on x1.
@@ -28,7 +33,6 @@ class Semicat(Diffusion):
         self._validate_configuration()
 
         self.label_smoothing = config.algo.get("label_smoothing", 0.0)
-        self.sampling_method = config.algo.get("sampling_method", "flow_map")
         self.temp = config.algo.get("temp", 1.0)
 
     def _validate_configuration(self):
@@ -160,91 +164,14 @@ class Semicat(Diffusion):
         diff = (self.backbone(x, sigma_s) / self.temp).softmax(dim=-1) - x
         return x + _view_for(dt, x) * diff
 
-    # ------------------------------------------------------------------
-    # Sampling
-    # ------------------------------------------------------------------
-    @torch.no_grad()
-    def generate_samples(
-        self,
-        num_samples: int,
-        num_steps: int = None,
-        sampling_method: str = None,
-        prompt_tokens: Tensor = None,
-        prompt_mask: Tensor = None,
-        **kwargs,
-    ) -> Tensor:
-        """Generate token sequences.
+    def sample_semicat_flow_map(self, *args, **kwargs):
+        return self._flow_map_step(*args, **kwargs)
 
-        Args:
-            num_samples: Batch size.
-            num_steps: Number of integration steps (default from config).
-            sampling_method: "flow_map", "euler", or "dopri5".
-                Defaults to self.sampling_method.
-            prompt_tokens: Optional prompt token ids for conditional gen.
-            prompt_mask: Binary mask (1 = keep prompt token).
-        Returns:
-            Token ids of shape (B, L).
-        """
-        if num_steps is None:
-            num_steps = self.config.sampling.steps
-        if sampling_method is None:
-            sampling_method = self.sampling_method
-
-        B = num_samples
-        L = self.num_tokens
-        x = self.prior_sample(B, L)
-
-        if sampling_method == "flow_map":
-            x = self._sample_flow_map(x, B, num_steps)
-        elif sampling_method == "euler":
-            x = self._sample_euler(x, B, num_steps)
-        elif sampling_method == "dopri5":
-            x = self._sample_dopri5(x, B, **kwargs)
-        else:
-            raise ValueError(f"Unknown sampling method: {sampling_method}")
-
-        tokens = x.argmax(dim=-1)
-        if prompt_tokens is not None and prompt_mask is not None:
-            tokens = torch.where(prompt_mask.bool(), prompt_tokens, tokens)
-        return tokens
-
-    def _sample_flow_map(
-        self, x: Tensor, batch_size: int, steps: int
-    ) -> Tensor:
-        """Sample via iterated flow map x_{s,t}."""
-        ts = torch.linspace(0.0, 1.0, steps + 1, device=self.device)
-        for s, t in zip(ts[:-1], ts[1:]):
-            x = self._flow_map_step(
-                x,
-                s.expand(batch_size),
-                t.expand(batch_size),
-            )
-        return x
-
-    def _sample_euler(
-        self, x: Tensor, batch_size: int, steps: int
-    ) -> Tensor:
-        """Sample via Euler integration of the vector field."""
-        ts = torch.linspace(0.0, 1.0, steps + 1, device=self.device)
-        for s, t in zip(ts[:-1], ts[1:]):
-            s_broad = _view_for(s.expand(batch_size), x)
-            v = self._vector_field(x, s_broad.view(-1))
-            x = x + (t - s) * v
-        return x
-
-    def _sample_dopri5(self, x: Tensor, batch_size: int, **ode_kwargs) -> Tensor:
-        """Sample via adaptive dopri5 ODE solver."""
-        x = cast(
-            Tensor,
-            odeint(
-                func=self._vector_field,
-                y0=x,
-                t=torch.tensor([0.0, 1.0], device=self.device),
-                method="dopri5",
-                **ode_kwargs,
-            )[-1],
-        )
-        return x
+    def sample_semicat_vector_field(self, t, x):
+        # torchdiffeq uses (t, state); fixed-step sampling uses the same order.
+        if t.ndim == 0:
+            t = t.expand(x.shape[0])
+        return self._vector_field(x, t)
 
     # ------------------------------------------------------------------
     # API compatibility stubs

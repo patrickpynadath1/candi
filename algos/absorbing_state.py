@@ -7,6 +7,16 @@ import torch.nn.functional as F
 
 
 class AbsorbingState(Diffusion):
+    sampling_family = "absorbing_diffusion"
+    supported_samplers = frozenset({
+        "ancestral", "ancestral_cache", "analytic", "semi_ar",
+    })
+    sampling_capabilities = Diffusion.sampling_capabilities | {
+        "ancestral_transition",
+        "analytic_transition",
+        "denoiser_transition",
+        "zero_time_denoise",
+    }
     def __init__(self, config, tokenizer):
         self.temp = config.algo.get("temp", 1.0)
         # NOTE: Ideally, we should do

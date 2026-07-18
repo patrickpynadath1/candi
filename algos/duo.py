@@ -16,6 +16,11 @@ import collections
 @algo_registry.register("duo")
 @algo_registry.register("duo_base")
 class DUO_BASE(UniformState):
+    supported_samplers = frozenset({"ancestral", "ancestral_cache", "semi_ar"})
+    sampling_capabilities = UniformState.sampling_capabilities | {
+        "ancestral_transition",
+        "zero_time_denoise",
+    }
     def __init__(self, config, tokenizer):
         self.temp = config.algo.get("temp", 1.0)
         super().__init__(config, tokenizer)

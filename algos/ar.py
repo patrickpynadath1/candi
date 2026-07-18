@@ -4,11 +4,12 @@
 from .trainer_base import TrainerBase
 from .registry import algo_registry
 
-import torch
-
-
 @algo_registry.register("ar")
 class AR(TrainerBase):
+    default_sampler = "ar"
+    supported_samplers = frozenset({"ar"})
+    sampling_family = "autoregressive"
+    sampling_capabilities = frozenset({"next_token_logits"})
     def __init__(self, config, tokenizer):
         vocab_size = tokenizer.vocab_size
         if not hasattr(tokenizer, "mask_token") or tokenizer.mask_token is None:
@@ -39,35 +40,10 @@ class AR(TrainerBase):
         output = output.log_softmax(-1)
         return -output.gather(-1, output_tokens[:, :, None])[:, :, 0]
 
-    def generate_samples(self, num_samples, prompt_mask=None, prompt_tokens=None, **kwargs):
-        # precompute token buffer
-        num_pred_tokens = self.num_tokens - 1
-        x = torch.zeros(
-            (num_samples, num_pred_tokens + 1), dtype=torch.long, device=self.device
-        )
-
-        if prompt_mask is not None and prompt_tokens is not None:
-            x = (prompt_mask * prompt_tokens + (1 - prompt_mask) * x).long()
-            start = prompt_mask.sum(1).max().long().item() - 1
-        else:
-            start = 0
-            x[:, 0] = self.tokenizer.bos_token_id
-        # precompute noise
-        noise = (
-            torch.distributions.Gumbel(0, 1)
-            .sample((num_samples, num_pred_tokens, self.vocab_size))
-            .to(self.device)
-        )
-        if self.config.sampling.use_float64:
-            noise = noise.to(torch.float64)
-        for i in range(start, num_pred_tokens):
-            output = self.backbone(x[:, : i + 1], None)
-            output[:, :, self.mask_index] = self.neg_infinity
-            output = output / self.temp
-            output = output.log_softmax(-1)
-            y = (output[:, -1, :] + noise[:, i, :]).argmax(-1)
-            x[:, i + 1] = y
-        return x
+    def next_token_logits(self, tokens):
+        logits = self.backbone(tokens, None)
+        logits[:, :, self.mask_index] = self.neg_infinity
+        return logits
 
     def _process_sigma(self, sigma):
         del sigma

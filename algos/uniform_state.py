@@ -5,6 +5,7 @@ import torch
 
 
 class UniformState(Diffusion):
+    sampling_family = "uniform_diffusion"
     def _validate_configuration(self):
         super()._validate_configuration()
         assert self.time_conditioning

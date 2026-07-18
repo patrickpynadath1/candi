@@ -1,5 +1,4 @@
 import itertools
-import pdb
 from dataclasses import dataclass
 import hydra.utils
 import lightning as L
@@ -10,7 +9,8 @@ import dataloader
 import metrics
 from models import model_registry
 from models.ema import ExponentialMovingAverage
-import time
+
+from samplers import SamplingRequest, create_sampler, run_sampler
 
 @dataclass
 class Loss:
@@ -41,6 +41,8 @@ def _unsqueeze(x, reference):
 
 
 class TrainerBase(L.LightningModule):
+    default_sampler = None
+    supported_samplers = frozenset()
     def __init__(
         self, config, tokenizer: transformers.PreTrainedTokenizer, vocab_size=None
     ):
@@ -64,7 +66,6 @@ class TrainerBase(L.LightningModule):
         else:
             self.vocab_size = vocab_size
 
-        self.sampler = self.config.sampling.predictor
         self.antithetic_sampling = self.config.training.antithetic_sampling
         self.parameterization = self.config.algo.parameterization
 
@@ -406,8 +407,35 @@ class TrainerBase(L.LightningModule):
         }
         return [optimizer], [scheduler_dict]
 
-    def generate_samples(self, num_samples, num_steps, eps):
-        raise NotImplementedError
+    def generate_samples(
+        self, num_samples, num_steps=None, eps=1e-5,
+        prompt_tokens=None, prompt_mask=None, **options
+    ):
+        configured = getattr(self.config.sampling, "predictor", None)
+        sampler_name = (
+            configured if configured in self.supported_samplers else self.default_sampler
+        )
+        legacy_method = options.pop(
+            "sampling_method", getattr(self, "sampling_method", None)
+        )
+        if legacy_method is not None and self.sampling_family == "semicat":
+            sampler_name = f"semicat_{legacy_method}"
+            if sampler_name not in self.supported_samplers:
+                raise ValueError(f"Unknown sampling method: {legacy_method}")
+        sampler = create_sampler(self.config, default=sampler_name)
+        result = run_sampler(
+            sampler,
+            self,
+            SamplingRequest(
+                num_samples=num_samples,
+                num_steps=num_steps,
+                eps=eps,
+                prompt_tokens=prompt_tokens,
+                prompt_mask=prompt_mask,
+                options=options,
+            ),
+        )
+        return result.samples
 
     def restore_model_and_sample(self, num_steps, eps=1e-5):
         """Generate samples from the model."""
