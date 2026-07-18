@@ -459,6 +459,7 @@ class TrainerBase(L.LightningModule):
         output_tokens,
         current_accumulation_step=None,
         train_mode=False,
+        valid_tokens=None,
     ):
         raise NotImplementedError
 
@@ -467,7 +468,8 @@ class TrainerBase(L.LightningModule):
             x0, valid_tokens
         )
         loss = self.nll(
-            input_tokens, output_tokens, current_accumulation_step, train_mode
+            input_tokens, output_tokens, current_accumulation_step, train_mode,
+            valid_tokens=valid_tokens,
         )
         assert loss.ndim == 2
         if self.ignore_bos:

@@ -87,7 +87,9 @@ class Distillation(DUO):
         n = self.global_step // self.update_teacher_every
         return 2**n / self.T
 
-    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=None):
+    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=None,
+            valid_tokens=None):
+        del valid_tokens
         del output_tokens, train_mode
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         dt = self._compute_dt()

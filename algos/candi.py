@@ -173,12 +173,15 @@ class CANDI(Diffusion):
 
         return xt
 
-    def q_xt(self, x, alpha_t):
+    def q_xt(self, x, alpha_t, valid_tokens=None):
 
         disc_xt = self.discrete_noising(x, alpha_t)
+        if valid_tokens is not None:
+            disc_xt = torch.where(valid_tokens.bool(), disc_xt, x)
         reveal_mask = (disc_xt == x).float()
 
-        discrete_noise = (1 - alpha_t).squeeze()
+        # Keep the batch dimension even for single-example evaluation.
+        discrete_noise = (1 - alpha_t).reshape(-1)
         continuous_noise = self.get_continuous_from_discrete_noise(discrete_noise)
 
         # accounting for the mask token
@@ -207,7 +210,8 @@ class CANDI(Diffusion):
             model_output = self.backbone(**kwargs)
         return self._process_model_output(model_output=model_output, xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask'])
 
-    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
+    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False,
+            valid_tokens=None):
         del output_tokens
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         assert t.shape[0] == x0.shape[0]
@@ -215,7 +219,7 @@ class CANDI(Diffusion):
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
 
-        noisy_output = self.q_xt(x0, alpha_t)
+        noisy_output = self.q_xt(x0, alpha_t, valid_tokens=valid_tokens)
         log_x_theta = self.forward(**noisy_output)
 
         utils.print_nans(log_x_theta, "model_output")

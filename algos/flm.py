@@ -72,11 +72,12 @@ class FLM(TrainerBase):
         output_tokens,
         current_accumulation_step=None,
         train_mode=False,
+        valid_tokens=None,
     ):
         del output_tokens, train_mode
         t = self.sample_t(input_tokens.shape[0], current_accumulation_step)
         gamma = self.alpha_to_gamma(t)
-        xt, target = self.corrupt(input_tokens, gamma)
+        xt, target = self.corrupt(input_tokens, gamma, valid_tokens=valid_tokens)
         loss = -(target * self.forward(xt, t)).sum(-1)
         weighting = getattr(self.backbone, "learnable_loss_weighting", None)
         if weighting is not None:

@@ -67,7 +67,8 @@ class Diffusion(TrainerBase):
     def nll_per_token(self, model_output, xt, x0, alpha_t, dalpha_t, low_var):
         raise NotImplementedError
 
-    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
+    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False,
+            valid_tokens=None):
         del output_tokens
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         assert t.shape[0] == x0.shape[0]
@@ -82,7 +83,7 @@ class Diffusion(TrainerBase):
         assert alpha_t.ndim == 2
         sigma = self._sigma_from_alphat(alpha_t)
 
-        xt = self.q_xt(x0, alpha_t)
+        xt = self.q_xt(x0, alpha_t, valid_tokens=valid_tokens)
 
         log_x_theta = self.forward(xt, sigma=sigma)
         utils.print_nans(log_x_theta, "model_output")

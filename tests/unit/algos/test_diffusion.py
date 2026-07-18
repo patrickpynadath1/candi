@@ -79,7 +79,8 @@ def test_sigma_from_alpha_and_discrete_time_nll_flow():
     observed = {}
     model._sample_t = lambda *_args: torch.tensor([0.31, 0.74])
     model.noise = lambda t: (-torch.ones_like(t), 1 - 0.5 * t)
-    def q_xt(x, alpha):
+    def q_xt(x, alpha, valid_tokens=None):
+        observed["valid_tokens"] = valid_tokens
         observed["alpha"] = alpha
         return x
 
@@ -97,6 +98,18 @@ def test_sigma_from_alpha_and_discrete_time_nll_flow():
     expected_alpha = (1 - 0.5 * expected_t).unsqueeze(-1)
     assert torch.allclose(result, expected_alpha.expand(-1, 3))
     assert torch.allclose(observed["sigma"], -torch.log(expected_alpha))
+
+
+@pytest.mark.parametrize("cls, attrs", [
+    (UniformState, {"vocab_size": 7}),
+    (AbsorbingState, {"mask_index": 7}),
+])
+def test_q_xt_never_corrupts_conditional_prompt(cls, attrs):
+    model = _bare(cls, ignore_bos=False, **attrs)
+    tokens = torch.tensor([[1, 2, 3, 4]])
+    valid = torch.tensor([[0, 0, 1, 1]])
+    noisy = model.q_xt(tokens, torch.zeros(1, 1), valid_tokens=valid)
+    assert torch.equal(noisy[:, :2], tokens[:, :2])
 
 
 def test_uniform_q_xt_endpoints_and_bos_preservation():

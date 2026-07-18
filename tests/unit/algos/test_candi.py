@@ -75,6 +75,19 @@ def test_candi_q_xt_shapes_and_finite_values():
     assert torch.isfinite(result["xt"]).all()
 
 
+def test_candi_q_xt_keeps_prompt_as_clean_onehot():
+    model = _bare(
+        CANDI, vocab_size=5, ignore_bos=False, sigma_min=0.1, sigma_max=1.0,
+        cont_schedule_target="sigma", cont_schedule_type="linear",
+    )
+    tokens = torch.tensor([[0, 1, 2, 3]])
+    valid = torch.tensor([[0, 0, 1, 1]])
+    result = model.q_xt(tokens, torch.zeros(1, 1), valid_tokens=valid)
+    expected = torch.nn.functional.one_hot(tokens[:, :2], 4).float()
+    assert torch.equal(result["xt"][:, :2], expected)
+    assert torch.equal(result["reveal_mask"][:, :2], torch.ones(1, 2))
+
+
 def test_candi_rejects_unknown_schedule():
     model = _bare(
         CANDI, cont_schedule_target="sigma", cont_schedule_type="unknown"

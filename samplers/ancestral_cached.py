@@ -28,7 +28,8 @@ class CachedAncestralSampler(Sampler):
         for i in range(steps):
             t = times[i] * torch.ones(x.shape[0], 1, device=model.device)
             cache, x_next = model.sample_ancestral_transition(
-                x=x, t=t, dt=dt, p_x0=cache
+                x=x, t=t, dt=dt, p_x0=cache,
+                prompt_mask=request.prompt_mask,
             )
             if not torch.allclose(x_next, x) or model.time_conditioning:
                 cache = None

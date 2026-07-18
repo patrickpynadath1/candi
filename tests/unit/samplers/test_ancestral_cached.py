@@ -16,6 +16,7 @@ class CachedModel(ModelBase):
 
     def __init__(self):
         self.seen_caches = []
+        self.seen_prompt_masks = []
 
     def prior_sample(self, batch, length):
         return torch.zeros(batch, length, dtype=torch.long)
@@ -23,8 +24,9 @@ class CachedModel(ModelBase):
     def noise(self, time):
         return None, time
 
-    def sample_ancestral_transition(self, *, x, p_x0, **_kwargs):
+    def sample_ancestral_transition(self, *, x, p_x0, prompt_mask=None, **_kwargs):
         self.seen_caches.append(p_x0)
+        self.seen_prompt_masks.append(prompt_mask)
         return "cached-probs", x
 
 
@@ -50,3 +52,18 @@ def test_invalidates_cache_for_time_conditioned_models():
     )
 
     assert model.seen_caches == [None, None]
+
+
+def test_passes_prompt_mask_to_every_cached_transition():
+    model = CachedModel()
+    prompt_mask = torch.tensor([[True, False, True]])
+    prompt_tokens = torch.tensor([[2, 0, 3]])
+    run_sampler(
+        CachedAncestralSampler("none"), model,
+        SamplingRequest(
+            num_samples=1, num_steps=3, prompt_tokens=prompt_tokens,
+            prompt_mask=prompt_mask,
+        ),
+    )
+    assert len(model.seen_prompt_masks) == 3
+    assert all(torch.equal(mask, prompt_mask) for mask in model.seen_prompt_masks)

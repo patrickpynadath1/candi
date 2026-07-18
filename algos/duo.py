@@ -247,10 +247,14 @@ class DUO(DUO_BASE):
         epsilon = torch.randn(x.shape, dtype=torch.float32, device=self.device)
         return alpha_t * x + sigma_t * epsilon
 
-    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
+    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False,
+            valid_tokens=None):
         use_true_nll = self.global_step > self.curriculum_end or not train_mode
         if use_true_nll:
-            return super().nll(x0, output_tokens, current_accumulation_step)
+            return super().nll(
+                x0, output_tokens, current_accumulation_step, train_mode,
+                valid_tokens=valid_tokens,
+            )
         del output_tokens
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         gamma_t = self.gamma_min + t * (self.gamma_max - self.gamma_min)
@@ -267,6 +271,10 @@ class DUO(DUO_BASE):
 
         x0_one_hot = F.one_hot(x0, self.vocab_size)
         xt = self._q_xt_gaussian(x0_one_hot, gamma_t)
+        if valid_tokens is not None:
+            xt = torch.where(
+                valid_tokens.bool().unsqueeze(-1), xt, x0_one_hot.float()
+            )
         xt = xt * self._compute_gumbel_tau_inverse()
         xt_usdm = xt.argmax(-1)
         log_x_theta = self.forward(xt, sigma=sigma)

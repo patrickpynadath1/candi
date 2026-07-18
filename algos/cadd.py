@@ -76,7 +76,7 @@ class CADD(Diffusion):
             xt[:, 0] = x[:, 0]
         return xt
 
-    def q_xt(self, x, alpha_t):
+    def q_xt(self, x, alpha_t, valid_tokens=None):
 
         disc_xt = self.discrete_noising(x, alpha_t)
         reveal_mask = (disc_xt == x).float()
@@ -87,6 +87,8 @@ class CADD(Diffusion):
         mask_embed = self.backbone.get_mask_embed()
         noisy_embeds = noisy_embeds + mask_embed[None, None, :]
         xt = torch.where(reveal_mask[:, :, None] == 1, clean_embeds, noisy_embeds)
+        if valid_tokens is not None:
+            xt = torch.where(valid_tokens.bool().unsqueeze(-1), xt, clean_embeds)
         return {
             'xt': xt,
             'reveal_mask': reveal_mask,
@@ -105,7 +107,8 @@ class CADD(Diffusion):
             model_output = self.backbone(**kwargs, precond=False, is_embed=True)
         return self._process_model_output(model_output=model_output, xt_tokens=kwargs['xt_tokens'], reveal_mask=kwargs['reveal_mask'])
 
-    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
+    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False,
+            valid_tokens=None):
         del output_tokens
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         assert t.shape[0] == x0.shape[0]
@@ -113,7 +116,7 @@ class CADD(Diffusion):
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
 
-        noisy_output = self.q_xt(x0, alpha_t)
+        noisy_output = self.q_xt(x0, alpha_t, valid_tokens=valid_tokens)
         log_x_theta = self.forward(**noisy_output)
 
         utils.print_nans(log_x_theta, "model_output")
