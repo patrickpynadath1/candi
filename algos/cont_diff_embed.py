@@ -105,12 +105,18 @@ class ContDiffEmbed(Diffusion):
     def prior_sample(self, *batch_dims):
         sigma_max = self.sigma_max
         noise = torch.randn(
-            *batch_dims, self.backbone.config.hidden_size, dtype=torch.float32, device=self.device) * sigma_max
+            *batch_dims,
+            self.backbone.config.model.hidden_size,
+            dtype=torch.float32,
+            device=self.device,
+        ) * sigma_max
         return noise
 
     def forward(self, **kwargs):
+        kwargs["reveal_mask"] = None
+        kwargs["is_embed"] = True
         with torch.cuda.amp.autocast(dtype=torch.float32):
-            model_output = self.backbone(**kwargs, reveal_mask=None, is_embed=True)
+            model_output = self.backbone(**kwargs)
         return self._process_model_output(model_output=model_output)
 
     def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):

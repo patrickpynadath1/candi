@@ -20,7 +20,7 @@ class CADD(Diffusion):
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self._validate_configuration()
         self.save_hyperparameters()
-        self.temp = 1.0
+        self.temp = config.algo.get("temp", 1.0)
 
 
     def sample_t(self, n, accum_step):

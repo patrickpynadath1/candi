@@ -1,0 +1,14 @@
+name: semicat
+backbone: cont_dit
+causal_attention: false
+parameterization: mean
+time_conditioning: true
+T: 0
+temp: 1.0
+label_smoothing: 0.0
+
+# Compatibility fields used by the shared diffusion trainer.
+discretize_start_time: 1.0
+step_size: 1.0
+sigma_min: 0.01
+sigma_max: 2.0

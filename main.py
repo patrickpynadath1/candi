@@ -152,8 +152,22 @@ def _generate_samples(diffusion_model, config, logger, tokenizer):
                 for text in train_texts:
                     f.write(f"{text}\n")
         text_metrics = evaluate_text_metrics(all_samples, train_texts)
-        
         print(text_metrics)
+        samples_path = config.eval.generated_samples_path
+        with fsspec.open(samples_path, "w") as f:
+            json.dump(
+                {
+                    "algorithm": config.algo.name,
+                    "steps": config.sampling.steps,
+                    "temperature": config.algo.get("temp", 1.0),
+                    "num_samples": len(all_samples),
+                    "metrics": text_metrics,
+                    "generated_seqs": all_samples,
+                },
+                f,
+                indent=2,
+            )
+        print("Samples and text8 metrics saved at:", samples_path)
     else: 
         generative_ppl = 0.0
         generative_bpc = 0.0

@@ -12,10 +12,12 @@ from models.dit_cont import ContDIT
 from models.registry import models
 
 
-def _config(*, causal=False, time_conditioning=True):
+def _config(*, causal=False, time_conditioning=True, reserve_mask_embedding=True):
     return SimpleNamespace(
         algo=SimpleNamespace(
-            causal_attention=causal, time_conditioning=time_conditioning
+            causal_attention=causal,
+            time_conditioning=time_conditioning,
+            reserve_mask_embedding=reserve_mask_embedding,
         ),
         model=SimpleNamespace(
             hidden_size=8,
@@ -57,3 +59,25 @@ def test_cont_dit_mask_embedding_is_last_vocabulary_row():
     model = ContDIT(_config(), vocab_size=6)
     assert torch.equal(model.get_mask_embed(), model.vocab_embed.embedding[-1])
 
+
+def test_cont_dit_without_mask_uses_final_token_and_returns_all_logits():
+    model = ContDIT(
+        _config(reserve_mask_embedding=False),
+        vocab_size=35,
+    )
+    tokens = torch.tensor([[0, 34]])
+    noise = torch.tensor([0.2])
+
+    embeddings = model.get_embedding(tokens)
+    logits = model(
+        embeddings,
+        discrete_noise=noise,
+        reveal_mask=None,
+        is_embed=True,
+        precond=False,
+    )
+
+    assert embeddings.shape == (1, 2, 8)
+    assert logits.shape == (1, 2, 35)
+    with pytest.raises(RuntimeError, match="no reserved mask embedding"):
+        model.get_mask_embed()

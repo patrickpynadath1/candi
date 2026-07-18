@@ -536,17 +536,21 @@ class EmbeddingLayer(nn.Module):
 # instead of doing vocab lookup,
 # does weighted average
 class EmbeddingLayerMixture_norm(nn.Module):
-    def __init__(self, dim, vocab_dim):
+    def __init__(self, dim, vocab_dim, reserve_mask_embedding=True):
         super().__init__()
         self.dim = dim
+        self.reserve_mask_embedding = reserve_mask_embedding
         self.embedding = nn.Parameter(torch.empty((vocab_dim, dim)))
         torch.nn.init.kaiming_uniform_(self.embedding, a=math.sqrt(5))
 
     def forward(self, x):
 
-        # Keep the mask embedding as a special vector; continuous token mixtures use non-mask rows.
         normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
-        token_embeddings = normalized_embeddings[:-1]
+        token_embeddings = (
+            normalized_embeddings[:-1]
+            if self.reserve_mask_embedding
+            else normalized_embeddings
+        )
         # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
 
         # normalized_embeddings = self.embedding[:-1]

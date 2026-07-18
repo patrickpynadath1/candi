@@ -34,11 +34,18 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.adaLN = True
         self.config = config
         self.vocab_size = vocab_size
+        self.reserve_mask_embedding = getattr(
+            config.algo, "reserve_mask_embedding", True
+        )
         dim = config.model.hidden_size
         self.dim=dim
         cond_dim = config.model.cond_dim
-        self.vocab_embed = EmbeddingLayerMixture_norm(dim,vocab_size)
-        self.mask_index = vocab_size-1
+        self.vocab_embed = EmbeddingLayerMixture_norm(
+            dim,
+            vocab_size,
+            reserve_mask_embedding=self.reserve_mask_embedding,
+        )
+        self.mask_index = vocab_size - 1 if self.reserve_mask_embedding else None
         self.use_precond = use_precond
 
 
@@ -103,12 +110,17 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
             logits = self.output_layer(x, c=t_cond)
 
+        data_logits = (
+            logits[:, :, :-1] if self.reserve_mask_embedding else logits
+        )
         if ret_embedding:
-            return logits[:, :, :-1], x 
-        return logits[:, :, :-1]
+            return data_logits, x
+        return data_logits
 
     def get_embedding(self, x):
         return self.vocab_embed(x)
 
     def get_mask_embed(self):
+        if not self.reserve_mask_embedding:
+            raise RuntimeError("This ContDIT has no reserved mask embedding.")
         return self.vocab_embed.embedding[self.mask_index]
