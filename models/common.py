@@ -1,6 +1,7 @@
 import math
 import pdb
 import typing
+from dataclasses import dataclass
 
 import einops
 import flash_attn
@@ -101,6 +102,78 @@ class Rotary(torch.nn.Module):
             self.sin_cached[:, :, 2, :, :].fill_(0.0)
 
         return self.cos_cached, self.sin_cached
+
+
+class PositionRotary(torch.nn.Module):
+    """RoPE values for explicit, potentially batch-specific positions."""
+
+    def __init__(self, dim, base=10_000):
+        super().__init__()
+        if dim % 2:
+            raise ValueError("rotary head dimension must be even")
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer("inv_freq", inv_freq)
+
+    def forward(self, position_ids):
+        if position_ids.ndim == 1:
+            position_ids = position_ids.unsqueeze(0)
+        if position_ids.ndim != 2:
+            raise ValueError("position_ids must have shape [batch, sequence]")
+        frequencies = torch.einsum(
+            "bs,d->bsd", position_ids.to(self.inv_freq.dtype), self.inv_freq
+        )
+        embedding = torch.cat((frequencies, frequencies), dim=-1)
+        return embedding.cos().unsqueeze(2), embedding.sin().unsqueeze(2)
+
+
+def apply_rotary_positions(x, rotary_cos_sin):
+    """Apply explicit-position RoPE to a [batch, sequence, heads, dim] tensor."""
+    cos, sin = rotary_cos_sin
+    return x * cos.to(dtype=x.dtype) + rotate_half(x) * sin.to(dtype=x.dtype)
+
+
+@dataclass
+class LayerKVCache:
+    keys: torch.Tensor
+    values: torch.Tensor
+    length: int = 0
+
+    @classmethod
+    def allocate(cls, batch, capacity, heads, head_dim, *, device, dtype):
+        shape = (batch, capacity, heads, head_dim)
+        return cls(
+            torch.empty(shape, device=device, dtype=dtype),
+            torch.empty(shape, device=device, dtype=dtype),
+        )
+
+    @property
+    def capacity(self):
+        return self.keys.shape[1]
+
+    def append(self, keys, values):
+        if keys.shape != values.shape:
+            raise ValueError("cached keys and values must have matching shapes")
+        if keys.shape[0] != self.keys.shape[0] or keys.shape[2:] != self.keys.shape[2:]:
+            raise ValueError("new key/value shape is incompatible with the cache")
+        end = self.length + keys.shape[1]
+        if end > self.capacity:
+            raise ValueError(f"KV cache capacity exceeded: {end} > {self.capacity}")
+        self.keys[:, self.length : end].copy_(keys)
+        self.values[:, self.length : end].copy_(values)
+        self.length = end
+        return self.keys[:, :end], self.values[:, :end]
+
+
+@dataclass
+class TransformerKVCache:
+    layers: list[LayerKVCache]
+
+    @property
+    def length(self):
+        lengths = {layer.length for layer in self.layers}
+        if len(lengths) != 1:
+            raise RuntimeError("transformer KV-cache layers have inconsistent lengths")
+        return next(iter(lengths))
 
 
 def rotate_half(x):
@@ -304,6 +377,60 @@ class DDiTBlockCausal(nn.Module):
         x = bias_dropout_scale_fn(self.mlp(self.norm2(x)), None, scale, x, self.dropout)
         return x
 
+    def forward_positioned(
+        self,
+        x,
+        query_rotary,
+        key_rotary,
+        cache: LayerKVCache | None = None,
+    ):
+        """Causal attention with decoupled positions and an optional KV cache."""
+        bias_dropout_scale_fn = self._get_bias_dropout_scale()
+        x_skip = x
+        normalized = self.norm1(x)
+        qkv = einops.rearrange(
+            self.attn_qkv(normalized),
+            "b s (three h d) -> b s three h d",
+            three=3,
+            h=self.n_heads,
+        )
+        q, k, v = qkv.unbind(dim=2)
+        q = apply_rotary_positions(q, query_rotary)
+        k = apply_rotary_positions(k, key_rotary)
+
+        if cache is None:
+            attended = F.scaled_dot_product_attention(
+                q.transpose(1, 2),
+                k.transpose(1, 2),
+                v.transpose(1, 2),
+                is_causal=True,
+                dropout_p=0.0,
+            )
+        else:
+            cached_length = cache.length
+            all_k, all_v = cache.append(k, v)
+            new_length = q.shape[1]
+            total_length = all_k.shape[1]
+            query_index = torch.arange(new_length, device=q.device)[:, None]
+            key_index = torch.arange(total_length, device=q.device)[None, :]
+            causal_mask = key_index <= cached_length + query_index
+            attended = F.scaled_dot_product_attention(
+                q.transpose(1, 2),
+                all_k.transpose(1, 2),
+                all_v.transpose(1, 2),
+                attn_mask=causal_mask,
+                is_causal=False,
+                dropout_p=0.0,
+            )
+        attended = einops.rearrange(attended.transpose(1, 2), "b s h d -> b s (h d)")
+        scale = torch.ones(1, device=x.device, dtype=x.dtype)
+        x = bias_dropout_scale_fn(
+            self.attn_out(attended), None, scale, x_skip, self.dropout
+        )
+        return bias_dropout_scale_fn(
+            self.mlp(self.norm2(x)), None, scale, x, self.dropout
+        )
+
 
 class DDiTBlock(nn.Module):
     def __init__(self, dim, n_heads, adaLN, cond_dim=None, mlp_ratio=4, dropout=0.1):
@@ -406,11 +533,9 @@ class EmbeddingLayer(nn.Module):
         ).to(x.dtype)
 
 
-    
-# instead of doing vocab lookup, 
+# instead of doing vocab lookup,
 # does weighted average
 class EmbeddingLayerMixture_norm(nn.Module):
-
     def __init__(self, dim, vocab_dim):
         super().__init__()
         self.dim = dim
@@ -423,7 +548,7 @@ class EmbeddingLayerMixture_norm(nn.Module):
         normalized_embeddings = F.normalize(self.embedding, p=2, dim=-1)
         token_embeddings = normalized_embeddings[:-1]
         # normalized_embeddings = normalized_embeddings * math.sqrt(self.dim)
-        
+
         # normalized_embeddings = self.embedding[:-1]
 
         if x.ndim == 2:
@@ -466,14 +591,27 @@ class Preconditioning(nn.Module):
         self.masked_index = masked_index
 
     def forward(self, x, continuous_noise, reveal_mask=None, embeds=None):
-        c_in = 1 / (1 + continuous_noise ** 2) ** .5
+        c_in = 1 / (1 + continuous_noise**2) ** 0.5
         if reveal_mask is not None:
-            special = self.embed_table.embedding[self.masked_index].view(1, 1, -1).expand_as(x)
+            special = (
+                self.embed_table.embedding[self.masked_index]
+                .view(1, 1, -1)
+                .expand_as(x)
+            )
             mask = reveal_mask.unsqueeze(-1).float()
-            coeffs = torch.ones(mask.size(0), device=mask.device)[:, None, None] * self.mixed_coeff
-            if embeds is not None: 
-                x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * embeds * c_in[:, None, None]) 
-            else: 
-                x = x * mask + (1 - mask) * (coeffs * special / special.norm(dim=-1, keepdim=True)+ (1 - coeffs) * x * c_in[:, None, None])
+            coeffs = (
+                torch.ones(mask.size(0), device=mask.device)[:, None, None]
+                * self.mixed_coeff
+            )
+            if embeds is not None:
+                x = x * mask + (1 - mask) * (
+                    coeffs * special / special.norm(dim=-1, keepdim=True)
+                    + (1 - coeffs) * embeds * c_in[:, None, None]
+                )
+            else:
+                x = x * mask + (1 - mask) * (
+                    coeffs * special / special.norm(dim=-1, keepdim=True)
+                    + (1 - coeffs) * x * c_in[:, None, None]
+                )
             return x
         return x * c_in[:, None, None]

@@ -17,6 +17,9 @@ runner validates both the declaration and the methods before generation.
 | Sampler | Compatible family | Key required operations |
 | --- | --- | --- |
 | `ar` | `autoregressive` | `next_token_logits` |
+| `ar_cached` | `autoregressive` | cached next-token logits and causal KV cache |
+| `permuted_ar` | `permuted_autoregressive` | cached logits with decoupled query/key positions |
+| `permuted_ar_uncached` | `permuted_autoregressive` | full-context logits with decoupled query/key positions |
 | `ancestral`, `ancestral_cache` | absorbing/uniform diffusion | prior, noise schedule, ancestral transition |
 | `analytic` | absorbing/uniform diffusion | prior, noise schedule, analytic transition |
 | `continuous_onehot` | continuous one-hot | prior, inference schedule, continuous transition |

@@ -19,14 +19,26 @@ def test_each_concrete_sampler_has_its_own_module():
     samplers_dir = Path(__file__).parents[3] / "samplers"
     excluded = {"base.py", "capabilities.py", "registry.py", "runner.py", "utils.py"}
     implementation_files = {
-        path.name for path in samplers_dir.glob("*.py")
+        path.name
+        for path in samplers_dir.glob("*.py")
         if path.name not in excluded and path.name != "__init__.py"
     }
 
     assert implementation_files == {
-        "analytic.py", "ancestral.py", "ancestral_cached.py",
-        "autoregressive.py", "cadd.py", "candi.py", "candi_cached.py",
-        "continuous_embedding.py", "continuous_onehot.py",
-        "semi_autoregressive.py", "semicat_dopri5.py", "semicat_euler.py",
+        "analytic.py",
+        "ancestral.py",
+        "ancestral_cached.py",
+        "autoregressive.py",
+        "autoregressive_cached.py",
+        "cadd.py",
+        "candi.py",
+        "candi_cached.py",
+        "continuous_embedding.py",
+        "continuous_onehot.py",
+        "permuted_autoregressive.py",
+        "permuted_autoregressive_uncached.py",
+        "semi_autoregressive.py",
+        "semicat_dopri5.py",
+        "semicat_euler.py",
         "semicat_flow_map.py",
     }

@@ -1,15 +1,23 @@
 # torch.serialization.add_safe_globals([DictConfig])
 
+import torch
 
 from .trainer_base import TrainerBase
 from .registry import algo_registry
 
+
 @algo_registry.register("ar")
 class AR(TrainerBase):
     default_sampler = "ar"
-    supported_samplers = frozenset({"ar"})
+    supported_samplers = frozenset({"ar", "ar_cached"})
     sampling_family = "autoregressive"
-    sampling_capabilities = frozenset({"next_token_logits"})
+    sampling_capabilities = frozenset(
+        {
+            "next_token_logits",
+            "cached_next_token_logits",
+        }
+    )
+
     def __init__(self, config, tokenizer):
         vocab_size = tokenizer.vocab_size
         if not hasattr(tokenizer, "mask_token") or tokenizer.mask_token is None:
@@ -44,6 +52,27 @@ class AR(TrainerBase):
         logits = self.backbone(tokens, None)
         logits[:, :, self.mask_index] = self.neg_infinity
         return logits
+
+    def next_token_logits_cached(self, tokens, cache=None, position_ids=None):
+        if not hasattr(self.backbone, "forward_positioned"):
+            raise TypeError("the configured backbone does not support KV caching")
+        if position_ids is None:
+            start = 0 if cache is None else cache.length
+            position_ids = torch.arange(
+                start, start + tokens.shape[1], device=tokens.device
+            ).expand(tokens.shape[0], -1)
+        if cache is None:
+            cache = self.backbone.allocate_kv_cache(
+                tokens.shape[0], self.num_tokens, device=tokens.device
+            )
+        logits, cache = self.backbone.forward_positioned(
+            tokens,
+            key_position_ids=position_ids,
+            query_position_ids=position_ids,
+            cache=cache,
+        )
+        logits[:, :, self.mask_index] = self.neg_infinity
+        return logits, cache
 
     def _process_sigma(self, sigma):
         del sigma

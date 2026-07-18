@@ -12,9 +12,22 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
     )
 
     assert set(sampler_registry.names()) == {
-        "analytic", "ancestral", "ancestral_cache", "ar", "cadd", "candi",
-        "candi_cached", "continuous_embedding", "continuous_onehot", "semi_ar",
-        "semicat_dopri5", "semicat_euler", "semicat_flow_map",
+        "analytic",
+        "ancestral",
+        "ancestral_cache",
+        "ar",
+        "ar_cached",
+        "cadd",
+        "candi",
+        "candi_cached",
+        "continuous_embedding",
+        "continuous_onehot",
+        "semi_ar",
+        "permuted_ar",
+        "permuted_ar_uncached",
+        "semicat_dopri5",
+        "semicat_euler",
+        "semicat_flow_map",
     }
 
 

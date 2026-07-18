@@ -15,6 +15,7 @@ class SamplerRegistry:
                 raise ValueError(f"Sampler already registered: {name}")
             self._factories[name] = factory
             return factory
+
         return decorator
 
     def create(self, name: str, config) -> Sampler:
@@ -42,11 +43,14 @@ def create_sampler(config, *, default: str | None = None) -> Sampler:
         ancestral,
         ancestral_cached,
         autoregressive,
+        autoregressive_cached,
         cadd,
         candi,
         candi_cached,
         continuous_embedding,
         continuous_onehot,
+        permuted_autoregressive,
+        permuted_autoregressive_uncached,
         semi_autoregressive,
         semicat_dopri5,
         semicat_euler,

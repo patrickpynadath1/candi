@@ -2,6 +2,9 @@
 
 CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     "next_token_logits": ("next_token_logits",),
+    "cached_next_token_logits": ("next_token_logits_cached",),
+    "permuted_logits": ("permuted_logits",),
+    "cached_permuted_logits": ("permuted_logits_cached",),
     "discrete_prior": ("prior_sample",),
     "continuous_prior": ("prior_sample",),
     "noise_schedule": ("noise",),
@@ -20,9 +23,7 @@ CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     "candi_cached_continuous_transition": (
         "sample_candi_cached_continuous_transition",
     ),
-    "candi_cached_discrete_transition": (
-        "sample_candi_cached_discrete_transition",
-    ),
+    "candi_cached_discrete_transition": ("sample_candi_cached_discrete_transition",),
     "semicat_flow_map": ("sample_semicat_flow_map",),
     "semicat_vector_field": ("sample_semicat_vector_field",),
 }
