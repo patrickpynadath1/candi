@@ -4,6 +4,7 @@ import torch
 
 from .base import Sampler, SamplerSpec, SamplingRequest, SamplingResult
 from .registry import sampler_registry
+from .utils import autoregressive_prompt_length
 
 
 class CachedAutoregressiveSampler(Sampler):
@@ -25,18 +26,12 @@ class CachedAutoregressiveSampler(Sampler):
             dtype=torch.long,
             device=model.device,
         )
-        if request.prompt_mask is not None and request.prompt_tokens is not None:
-            prompt_lengths = request.prompt_mask.bool().sum(dim=1)
-            if not torch.equal(
-                prompt_lengths, prompt_lengths[:1].expand_as(prompt_lengths)
-            ):
-                raise ValueError(
-                    "cached AR requires equal prompt lengths within a batch"
-                )
+        prompt_length = autoregressive_prompt_length(request)
+        if prompt_length is not None:
             samples = torch.where(
                 request.prompt_mask.bool(), request.prompt_tokens, samples
             )
-            start = int(prompt_lengths[0].item()) - 1
+            start = max(prompt_length - 1, 0)
         else:
             start = 0
             samples[:, 0] = model.tokenizer.bos_token_id

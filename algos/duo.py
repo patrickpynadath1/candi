@@ -13,7 +13,6 @@ import torch.nn.functional as F
 
 import collections
 
-@algo_registry.register("duo")
 @algo_registry.register("duo_base")
 class DUO_BASE(UniformState):
     supported_samplers = frozenset({"ancestral", "ancestral_cache", "semi_ar"})
@@ -174,11 +173,18 @@ class Integral(torch.autograd.Function):
         return ctx.grad_pt * grad_output, None
 
 
+@algo_registry.register("duo")
 class DUO(DUO_BASE):
     def __init__(self, config, tokenizer):
         super().__init__(config, tokenizer)
         with fsspec.open(self.config.algo.integral_cache_path, "rb") as f:
             self.integral_cache = pickle.load(f)
+        cache_vocab_size = self.integral_cache.get("vocab_size")
+        if cache_vocab_size is not None and cache_vocab_size != self.vocab_size:
+            raise ValueError(
+                "integral cache vocabulary mismatch: "
+                f"cache has {cache_vocab_size}, model has {self.vocab_size}"
+            )
         self.integral_cache["pt"] = torch.from_numpy(self.integral_cache["pt"])
         self.integral_cache["grad_pt"] = torch.from_numpy(
             self.integral_cache["grad_pt"]
@@ -190,7 +196,7 @@ class DUO(DUO_BASE):
         self.curriculum_start = self.config.algo.curriculum_start
         self.curriculum_end = self.config.algo.curriculum_end
         self.loss_type = self.config.algo.loss_type
-        self.temp = config.algo.temp
+        self.temp = config.algo.get("temp", 1.0)
         self._validate_configuration()
 
     def to(self, *args, **kwargs):

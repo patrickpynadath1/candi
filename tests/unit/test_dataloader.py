@@ -169,6 +169,42 @@ def test_distributed_sampler_partitions_without_overlap():
     assert set(left).isdisjoint(right)
 
 
+def test_distributed_sampler_non_even_dataset_covers_all_examples_with_minimal_padding():
+    dataset = list(range(7))
+    partitions = [
+        list(
+            dataloader.FaultTolerantDistributedSampler(
+                dataset, num_replicas=3, rank=rank, shuffle=False
+            )
+        )
+        for rank in range(3)
+    ]
+    flattened = [index for partition in partitions for index in partition]
+
+    assert [len(partition) for partition in partitions] == [3, 3, 3]
+    assert set(flattened) == set(dataset)
+    assert len(flattened) - len(set(flattened)) == 2
+
+
+def test_distributed_sampler_drop_last_has_no_cross_rank_duplicates():
+    dataset = list(range(7))
+    partitions = [
+        list(
+            dataloader.FaultTolerantDistributedSampler(
+                dataset,
+                num_replicas=3,
+                rank=rank,
+                shuffle=False,
+                drop_last=True,
+            )
+        )
+        for rank in range(3)
+    ]
+    flattened = [index for partition in partitions for index in partition]
+    assert len(flattened) == 6
+    assert len(set(flattened)) == 6
+
+
 def test_distributed_sampler_resume_and_epoch_are_deterministic():
     dataset = list(range(12))
     sampler = dataloader.FaultTolerantDistributedSampler(

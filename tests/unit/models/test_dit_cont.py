@@ -23,7 +23,7 @@ def _config(*, causal=False, time_conditioning=True, reserve_mask_embedding=True
             hidden_size=8,
             cond_dim=8,
             n_heads=2,
-            n_blocks=0,
+            n_blocks=1,
             dropout=0.0,
             scale_by_sigma=False,
         ),
@@ -53,6 +53,7 @@ def test_cont_dit_token_and_embedding_paths():
     assert token_logits.shape == (2, 3, 5)
     assert embedding_logits.shape == token_logits.shape
     assert torch.isfinite(token_logits).all()
+    assert torch.allclose(token_logits, embedding_logits)
 
 
 def test_cont_dit_mask_embedding_is_last_vocabulary_row():

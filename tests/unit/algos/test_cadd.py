@@ -52,6 +52,30 @@ def test_cadd_discrete_noising_and_q_xt_shapes():
     assert torch.isfinite(result["xt"]).all()
 
 
+def test_cadd_mask_frequency_matches_requested_transition():
+    torch.manual_seed(7)
+    alpha = 0.7
+    model = _bare(CADD, mask_index=4, ignore_bos=False)
+    tokens = torch.zeros(40_000, 1, dtype=torch.long)
+    noisy = model.discrete_noising(tokens, torch.tensor([[alpha]]))
+    assert noisy.eq(model.mask_index).float().mean().item() == pytest.approx(
+        1 - alpha, abs=0.01
+    )
+
+
+def test_cadd_nll_matches_independent_formula():
+    model = _bare(CADD)
+    probabilities = torch.tensor([[[0.2, 0.7, 0.1], [0.6, 0.3, 0.1]]])
+    targets = torch.tensor([[1, 0]])
+    alpha = torch.tensor([[0.6]])
+    derivative = torch.tensor([[-0.8]])
+    result = model.nll_per_token(
+        probabilities.log(), targets, alpha, derivative, reveal_mask=None
+    )
+    expected = torch.tensor([[0.7, 0.6]]).log() * derivative / (1 - alpha)
+    assert torch.allclose(result, expected)
+
+
 def test_cadd_prompt_injection_preserves_prompt_embeddings():
     model = _bare(CADD)
     x = torch.randn(1, 3, 4)

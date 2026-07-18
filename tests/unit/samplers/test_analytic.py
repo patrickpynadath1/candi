@@ -47,3 +47,14 @@ def test_ancestral_noise_removal_uses_denoiser_capability():
 
     assert torch.equal(result.samples, torch.full((1, 3), 11))
     assert result.metadata["nfe"] == 2
+
+
+def test_analytic_transitions_and_final_denoising_cannot_overwrite_prompt():
+    request = SamplingRequest(
+        num_samples=1,
+        num_steps=2,
+        prompt_tokens=torch.tensor([[3, 0, 2]]),
+        prompt_mask=torch.tensor([[1, 0, 1]]),
+    )
+    result = run_sampler(AnalyticSampler("ancestral"), AnalyticModel(), request)
+    assert result.samples.tolist() == [[3, 12, 2]]

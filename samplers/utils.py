@@ -43,6 +43,24 @@ def preserve_prompt(tokens, request):
     return torch.where(request.prompt_mask.bool(), request.prompt_tokens, tokens)
 
 
+def autoregressive_prompt_length(request, *, require_equal=True):
+    """Validate that an AR prompt is a contiguous prefix and return its length."""
+    if request.prompt_tokens is None and request.prompt_mask is None:
+        return None
+    if request.prompt_tokens is None or request.prompt_mask is None:
+        raise ValueError("prompt_tokens and prompt_mask must be provided together")
+    if request.prompt_tokens.shape != request.prompt_mask.shape:
+        raise ValueError("prompt tokens and mask must have matching shapes")
+    mask = request.prompt_mask.bool()
+    lengths = mask.sum(dim=1)
+    positions = torch.arange(mask.shape[1], device=mask.device)[None, :]
+    if not torch.equal(mask, positions < lengths[:, None]):
+        raise ValueError("autoregressive prompts must be contiguous prefixes")
+    if require_equal and not torch.equal(lengths, lengths[:1].expand_as(lengths)):
+        raise ValueError("autoregressive sampling requires equal prompt lengths")
+    return int(lengths[0].item())
+
+
 def run_continuous_diffusion(model, request):
     steps, times = continuous_time_grid(model, request)
     x, clean = inject_onehot_prompt(

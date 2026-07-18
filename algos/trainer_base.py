@@ -21,6 +21,8 @@ class Loss:
 
 
 class LogLinear(torch.nn.Module):
+    type = "log-linear"
+
     def __init__(self):
         super().__init__()
         self.eps = 1e-3  # To be consistent with SEDD: https://github.com/louaaron/Score-Entropy-Discrete-Diffusion/blob/0605786da5ccb5747545e26d66fdf477187598b6/noise_lib.py#L56
@@ -279,7 +281,9 @@ class TrainerBase(L.LightningModule):
 
     def forward(self, xt, sigma):
         sigma = self._process_sigma(sigma)
-        with torch.cuda.amp.autocast(dtype=torch.float32):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.float32, enabled=torch.cuda.is_available()
+        ):
             model_output = self.backbone(xt, sigma)
         return self._process_model_output(model_output=model_output, xt=xt, sigma=sigma)
 

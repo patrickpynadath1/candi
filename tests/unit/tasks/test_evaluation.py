@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 
 import datasets
+import pytest
 import torch
 
 from tasks import evaluation
@@ -67,3 +68,44 @@ def test_gsm8k_can_score_existing_predictions(tmp_path):
     result = evaluation.evaluate_gsm8k(None, config, None, None, Logger())
     assert result["accuracy"] == 0.5
     assert (output / "results.json").exists()
+
+
+def test_gsm8k_bootstrap_is_seeded_and_empty_inputs_are_defined(tmp_path):
+    predictions = [
+        {
+            "prompt": str(index),
+            "response_ground_truth": f"#### {index}",
+            "response": f"answer: {index if index < 3 else -1}",
+        }
+        for index in range(5)
+    ]
+    input_path = tmp_path / "predictions.json"
+    input_path.write_text(json.dumps(predictions))
+
+    def run(output_dir, source=input_path):
+        config = SimpleNamespace(
+            gsm8k=SimpleNamespace(
+                input_file=str(source),
+                output_dir=str(output_dir),
+                scoring="numeric",
+                timeout=1.0,
+                bootstrap_size=200,
+            ),
+            seed=17,
+        )
+        return evaluation.evaluate_gsm8k(None, config, None, None, Logger())
+
+    first = run(tmp_path / "first")
+    second = run(tmp_path / "second")
+    assert first["accuracy"] == pytest.approx(0.6)
+    assert first["accuracy_se"] > 0
+    assert first["accuracy_ci_lo"] <= first["accuracy"] <= first["accuracy_ci_hi"]
+    assert first["accuracy_se"] == second["accuracy_se"]
+    assert first["accuracy_ci_lo"] == second["accuracy_ci_lo"]
+    assert first["accuracy_ci_hi"] == second["accuracy_ci_hi"]
+
+    empty_path = tmp_path / "empty.json"
+    empty_path.write_text("[]")
+    empty = run(tmp_path / "empty-output", empty_path)
+    assert empty["accuracy"] == 0.0
+    assert empty["num_total"] == 0

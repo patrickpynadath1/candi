@@ -101,7 +101,9 @@ class CADD(Diffusion):
         return noise
 
     def forward(self, **kwargs):
-        with torch.cuda.amp.autocast(dtype=torch.float32):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.float32, enabled=torch.cuda.is_available()
+        ):
             model_output = self.backbone(**kwargs, precond=False, is_embed=True)
         return self._process_model_output(model_output=model_output, xt_tokens=kwargs['xt_tokens'], reveal_mask=kwargs['reveal_mask'])
 

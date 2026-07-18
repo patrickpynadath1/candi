@@ -15,6 +15,13 @@ def test_numeric_gsm8k_scoring():
     assert not score_response("answer: 17", answer)
 
 
+def test_numeric_scoring_handles_signs_decimals_commas_and_last_answer():
+    assert numeric_answer("estimate 1,000; final answer is -$1,234.50") == -1234.5
+    assert numeric_answer("answer: 2 then corrected answer: 3.25") == 3.25
+    assert gold_answer("work\n#### $12,345") == 12345
+    assert score_response("result = 0.333", "#### 0.3334")
+
+
 def test_code_scoring_runs_in_subprocess():
     response = "```python\ndef simple_math_problem():\n    return 6 * 7\n```"
     assert extract_code(response).startswith("def simple_math_problem")
@@ -29,3 +36,16 @@ def test_code_scoring_rejects_imports_and_timeouts():
     looping = "def simple_math_problem():\n    while True:\n        pass"
     assert code_answer(blocked, timeout=1) is None
     assert code_answer(looping, timeout=0.2) is None
+
+
+def test_code_scoring_blocks_indirect_imports_and_private_attribute_access():
+    indirect_import = (
+        "def simple_math_problem():\n"
+        "    return __import__('os').getcwd()"
+    )
+    private_attribute = (
+        "def simple_math_problem():\n"
+        "    return (1).__class__"
+    )
+    assert code_answer(indirect_import, timeout=1) is None
+    assert code_answer(private_attribute, timeout=1) is None

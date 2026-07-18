@@ -55,3 +55,54 @@ def test_distillation_dt_schedule(linear, step, expected, monkeypatch):
     monkeypatch.setattr(Distillation, "trainer", property(lambda self: self._test_trainer))
     assert model._compute_dt() == pytest.approx(expected)
 
+
+@pytest.mark.parametrize("teacher_ema", [False, True])
+def test_distillation_teacher_update_uses_configured_student_source(
+    teacher_ema, monkeypatch
+):
+    model = _bare(
+        Distillation,
+        backbone=torch.nn.Linear(2, 2, bias=False),
+        teacher=torch.nn.Linear(2, 2, bias=False),
+        teacher_ema=teacher_ema,
+        update_teacher_every=2,
+    )
+    model._test_step = 4
+    monkeypatch.setattr(
+        Distillation,
+        "global_step",
+        property(lambda self: self._test_step),
+        raising=False,
+    )
+    model.backbone.weight.data.fill_(3.0)
+    model.teacher.weight.data.zero_()
+
+    if teacher_ema:
+        model.ema = SimpleNamespace(
+            copy_to=lambda parameters: [parameter.data.fill_(7.0) for parameter in parameters]
+        )
+    model._maybe_update_teacher_weights()
+
+    expected = 7.0 if teacher_ema else 3.0
+    assert torch.equal(model.teacher.weight, torch.full_like(model.teacher.weight, expected))
+
+
+def test_distillation_teacher_is_not_updated_between_refresh_steps(monkeypatch):
+    model = _bare(
+        Distillation,
+        backbone=torch.nn.Linear(2, 2, bias=False),
+        teacher=torch.nn.Linear(2, 2, bias=False),
+        teacher_ema=False,
+        update_teacher_every=3,
+    )
+    model._test_step = 2
+    monkeypatch.setattr(
+        Distillation,
+        "global_step",
+        property(lambda self: self._test_step),
+        raising=False,
+    )
+    model.backbone.weight.data.fill_(5.0)
+    original = model.teacher.weight.detach().clone()
+    model._maybe_update_teacher_weights()
+    assert torch.equal(model.teacher.weight, original)

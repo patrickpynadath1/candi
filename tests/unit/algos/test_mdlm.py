@@ -51,3 +51,18 @@ def test_mdlm_score_is_finite_nonnegative_and_preserves_shape():
     assert torch.all(score >= 0)
     assert score[0, 1, 1] == pytest.approx(1.0)
 
+
+def test_mdlm_score_matches_masked_and_observed_state_formula():
+    model = _bare(MDLM, mask_index=2, neg_infinity=-1e6)
+    probabilities = torch.tensor([[[0.2, 0.8, 0.0], [0.6, 0.4, 0.0]]])
+    model.forward = lambda x, _sigma: probabilities.clamp_min(1e-30).log()
+    tokens = torch.tensor([[2, 1]])
+    sigma = torch.tensor([[torch.log(torch.tensor(3.0))]])
+
+    score = model._get_score(tokens, sigma)
+
+    # k = exp(-sigma) / (1-exp(-sigma)) = 1/2.
+    assert torch.allclose(score[0, 0], torch.tensor([0.1, 0.4, 1.0]))
+    assert score[0, 1, 1] == pytest.approx(1.0)
+    assert score[0, 1, 2] == pytest.approx(2.0)
+    assert score[0, 1, 0] == pytest.approx(0.0)

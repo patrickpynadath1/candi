@@ -34,9 +34,6 @@ class ContDiffOnehot(Diffusion):
             sigma=self.continuous_noise,
         )
 
-        self.continuous_noise = torch.tensor(self.continuous_noise)
-        self.discrete_noise = torch.tensor(self.discrete_noise)
-
         self.step_size = config.algo.step_size
 
         self.min_percentile = config.algo.min_percentile
@@ -113,7 +110,9 @@ class ContDiffOnehot(Diffusion):
         return noise
 
     def forward(self, **kwargs):
-        with torch.cuda.amp.autocast(dtype=torch.float32):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.float32, enabled=torch.cuda.is_available()
+        ):
             model_output = self.backbone(**kwargs, reveal_mask=None)
         return self._process_model_output(model_output=model_output)
 
