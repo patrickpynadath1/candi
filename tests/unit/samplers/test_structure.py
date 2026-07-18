@@ -28,5 +28,6 @@ def test_each_concrete_sampler_has_its_own_module():
         "autoregressive.py", "cadd.py", "candi.py", "candi_cached.py",
         "continuous_embedding.py", "continuous_onehot.py",
         "semi_autoregressive.py", "semicat_dopri5.py", "semicat_euler.py",
-        "semicat_flow_map.py",
-    }
+            "semicat_flow_map.py",
+            "flm_euler.py", "sfm.py",
+        }

@@ -1,0 +1,8 @@
+type: log-linear
+eps: 1.0e-3
+alpha_min: null
+alpha_max: null
+adaptive: true
+adaptive_n_grid: 1000
+adaptive_uniform_mix: 1.0e-3
+adaptive_ema: 0.0

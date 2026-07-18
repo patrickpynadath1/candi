@@ -7,6 +7,7 @@ IGNORE = {
     "registry", 
     "unit_test_attention", 
     "common",
+    "sphere_checkpoint",
     }
 
 for _, name, _ in pkgutil.iter_modules(__path__):

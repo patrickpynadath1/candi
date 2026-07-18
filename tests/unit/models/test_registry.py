@@ -9,6 +9,9 @@ from catalogue import RegistryError
 from models.dit import DIT
 from models.dit_cfm import CFMDit
 from models.dit_cont import ContDIT
+from models.flm_dit import FLMDIT
+from models.sphere_arch import SphereArch
+from models.sphere_dit import SphereDiT
 from models.registry import models
 
 
@@ -32,7 +35,9 @@ def _config(*, causal=False, time_conditioning=True):
 
 @pytest.mark.parametrize(
     ("name", "expected"),
-    [("dit", DIT), ("cont_dit", ContDIT), ("cfm_dit", CFMDit)],
+    [("dit", DIT), ("cont_dit", ContDIT), ("cfm_dit", CFMDit),
+     ("flm_dit", FLMDIT), ("sphere_dit", SphereDiT),
+     ("sphere_arch", SphereArch)],
 )
 def test_active_backbones_are_registered(name, expected):
     assert models.get(name) is expected
@@ -41,4 +46,3 @@ def test_active_backbones_are_registered(name, expected):
 def test_unknown_backbone_lookup_raises_descriptive_error():
     with pytest.raises(RegistryError, match="does_not_exist"):
         models.get("does_not_exist")
-

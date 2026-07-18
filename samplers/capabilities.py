@@ -25,4 +25,11 @@ CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     ),
     "semicat_flow_map": ("sample_semicat_flow_map",),
     "semicat_vector_field": ("sample_semicat_vector_field",),
+    "flm_prior": ("prior_sample",),
+    "flm_time_map": ("sampling_gamma",),
+    "flm_logits": ("sampling_logits",),
+    "spherical_prior": ("prior_sample",),
+    "spherical_schedule": ("sampling_alpha",),
+    "spherical_embeddings": ("sampling_embeddings",),
+    "spherical_logits": ("sampling_logits",),
 }

@@ -15,6 +15,7 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "analytic", "ancestral", "ancestral_cache", "ar", "cadd", "candi",
         "candi_cached", "continuous_embedding", "continuous_onehot", "semi_ar",
         "semicat_dopri5", "semicat_euler", "semicat_flow_map",
+        "flm_euler", "sfm",
     }
 
 

@@ -51,6 +51,8 @@ def create_sampler(config, *, default: str | None = None) -> Sampler:
         semicat_dopri5,
         semicat_euler,
         semicat_flow_map,
+        flm_euler,
+        sfm,
     )
 
     predictor = default or getattr(config.sampling, "predictor", None)
