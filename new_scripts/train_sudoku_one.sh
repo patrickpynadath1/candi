@@ -20,4 +20,5 @@ CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/m
   checkpointing.resume_from_ckpt=false \
   "checkpointing.save_dir=${run_dir}" \
   callbacks.checkpoint_every_n_steps.every_n_train_steps=5000 \
+  +trainer.check_val_every_n_epoch=null \
   "hydra.run.dir=${run_dir}"
