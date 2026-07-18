@@ -9,7 +9,18 @@ defaults:
   - /prior: none
   - /algo: candi 
 
-mode: train  # train / ppl_eval / sample_eval / dataset_entropy
+mode: train  # train / ppl_eval / sample_eval / dataset_entropy / sudoku_eval / gsm8k_eval
+
+sudoku:
+  output_dir: ${cwd:}/sudoku_eval
+  batch_size: 64
+
+gsm8k:
+  input_file: null
+  output_dir: ${cwd:}/gsm8k_eval
+  scoring: numeric  # numeric (safe default) / code (isolated subprocess)
+  timeout: 3.0
+  bootstrap_size: 1
 
 seed: 1
 scratch_dir:  /home/patrick/.cache/discrete_diffusion

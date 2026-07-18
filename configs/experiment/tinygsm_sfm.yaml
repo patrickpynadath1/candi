@@ -1,0 +1,19 @@
+# @package _global_
+defaults:
+  - override /data: tiny-gsm
+  - override /model: small_sphere_arch
+  - override /algo: sfm
+  - override /noise: log-linear-adaptive
+model:
+  length: 512
+  normalize_input_embed: true
+algo:
+  invert_time_convention: false
+  renormalize_weights: true
+loader:
+  global_batch_size: 512
+trainer:
+  max_steps: 250000
+  val_check_interval: 10000
+eval:
+  generate_samples: false

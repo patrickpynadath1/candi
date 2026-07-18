@@ -1,0 +1,14 @@
+# @package _global_
+defaults:
+  - override /data: tiny-gsm
+  - override /model: small
+  - override /algo: mdlm
+model:
+  length: 512
+loader:
+  global_batch_size: 512
+trainer:
+  max_steps: 250000
+  val_check_interval: 10000
+eval:
+  generate_samples: false

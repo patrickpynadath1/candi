@@ -21,6 +21,7 @@ import transformers
 from tqdm.auto import tqdm
 
 import utils
+from tasks import get_task_dataset, is_task_dataset
 
 LOGGER = utils.get_logger(__name__)
 
@@ -889,7 +890,11 @@ def get_dataset(
 
 
 def get_tokenizer(config):
-    if config.data.tokenizer_name_or_path == "text8":
+    if config.data.tokenizer_name_or_path == "sudoku":
+        from tasks.sudoku import SudokuTokenizer
+
+        tokenizer = SudokuTokenizer()
+    elif config.data.tokenizer_name_or_path == "text8":
         tokenizer = Text8Tokenizer()
     elif config.data.tokenizer_name_or_path == "bert-base-uncased":
         tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
@@ -974,23 +979,26 @@ def get_dataloaders(
             train_article_limit = get_article_limit_from_manifest(
                 config.data.train_cutoff_manifest
             )
-        train_set = get_dataset(
-            config.data.train,
-            tokenizer,
-            mode="train",
-            wrap=config.data.wrap,
-            insert_eos=True
-            if not hasattr(config.data, "insert_train_eos")
-            else config.data.insert_train_eos,
-            insert_special_tokens=True
-            if not hasattr(config.data, "insert_train_special")
-            else config.data.insert_train_special,
-            cache_dir=config.data.cache_dir,
-            block_size=config.model.length,
-            streaming=config.data.streaming,
-            revision=config.data.get("train_revision", None),
-            article_limit=train_article_limit,
-        )
+        if is_task_dataset(config.data.train):
+            train_set = get_task_dataset(config, tokenizer, "train")
+        else:
+            train_set = get_dataset(
+                config.data.train,
+                tokenizer,
+                mode="train",
+                wrap=config.data.wrap,
+                insert_eos=True
+                if not hasattr(config.data, "insert_train_eos")
+                else config.data.insert_train_eos,
+                insert_special_tokens=True
+                if not hasattr(config.data, "insert_train_special")
+                else config.data.insert_train_special,
+                cache_dir=config.data.cache_dir,
+                block_size=config.model.length,
+                streaming=config.data.streaming,
+                revision=config.data.get("train_revision", None),
+                article_limit=train_article_limit,
+            )
 
     if config.data.valid in ["text8", "lm1b", "ag_news"]:
         validation_split = "test"
@@ -999,22 +1007,25 @@ def get_dataloaders(
     if skip_valid:
         valid_set = None
     else:
-        valid_set = get_dataset(
-            config.data.valid,
-            tokenizer,
-            wrap=config.data.wrap,
-            insert_eos=True
-            if not hasattr(config.data, "insert_valid_eos")
-            else config.data.insert_valid_eos,
-            insert_special_tokens=True
-            if not hasattr(config.data, "insert_valid_special")
-            else config.data.insert_valid_special,
-            mode=validation_split,
-            cache_dir=config.data.cache_dir,
-            block_size=config.model.length,
-            streaming=config.data.streaming,
-            revision=config.data.get("valid_revision", None),
-        )
+        if is_task_dataset(config.data.valid):
+            valid_set = get_task_dataset(config, tokenizer, "validation")
+        else:
+            valid_set = get_dataset(
+                config.data.valid,
+                tokenizer,
+                wrap=config.data.wrap,
+                insert_eos=True
+                if not hasattr(config.data, "insert_valid_eos")
+                else config.data.insert_valid_eos,
+                insert_special_tokens=True
+                if not hasattr(config.data, "insert_valid_special")
+                else config.data.insert_valid_special,
+                mode=validation_split,
+                cache_dir=config.data.cache_dir,
+                block_size=config.model.length,
+                streaming=config.data.streaming,
+                revision=config.data.get("valid_revision", None),
+            )
 
     if skip_train:
         train_loader = None
