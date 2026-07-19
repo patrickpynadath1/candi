@@ -83,6 +83,10 @@ class CANDI(Diffusion):
     def sample_t(self, n, accum_step):
         return super()._sample_t(n, accum_step)
 
+    @staticmethod
+    def _shuffle_factorized_time(t):
+        return t[torch.randperm(t.shape[0], device=t.device)]
+
     def _linear_sigma_schedule(self, discrete_noise):
         """Linear schedule directly in sigma space."""
         return self.sigma_min + discrete_noise * (self.sigma_max - self.sigma_min)
@@ -275,6 +279,11 @@ class CANDI(Diffusion):
         rank_noise = None
         if self.factorized_adaptive_schedule:
             rank_t = self._sample_t(x0.shape[0], current_accumulation_step)
+            # Both antithetic draws are internally sorted by batch index. Pairing
+            # them directly produces a diagonal band rather than a 2D design.
+            # Randomly permuting one marginal preserves its stratification while
+            # yielding Latin-hypercube coverage of the corruption plane.
+            rank_t = self._shuffle_factorized_time(rank_t)
             _, rank_alpha = self.continuous_rank_schedule(rank_t)
             rank_noise = 1 - rank_alpha
         else:

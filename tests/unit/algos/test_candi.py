@@ -141,6 +141,14 @@ def test_candi_q_xt_accepts_independent_rank_degradation():
     )
 
 
+def test_factorized_time_shuffle_preserves_marginal_but_breaks_pairing():
+    values = torch.arange(32)
+    torch.manual_seed(7)
+    shuffled = CANDI._shuffle_factorized_time(values)
+    assert torch.equal(shuffled.sort().values, values)
+    assert not torch.equal(shuffled, values)
+
+
 def test_candi_q_xt_keeps_prompt_as_clean_onehot():
     model = _bare(
         CANDI, vocab_size=5, ignore_bos=False, sigma_min=0.1, sigma_max=1.0,
