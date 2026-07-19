@@ -7,7 +7,7 @@ from .algo_utils import (
     )
 from .registry import algo_registry
 from .noise_schedules import get_noise
-from .candi_adaptive import JointLossSurface, build_curve
+from .candi_adaptive import JointLossSurface, build_curve, joint_surface_svg
 
 import utils
 import json
@@ -343,6 +343,9 @@ class CANDI(Diffusion):
         (output_dir / f"step_{step:06d}.json").write_text(
             json.dumps(snapshot, indent=2, allow_nan=True)
         )
+        svg = joint_surface_svg(snapshot)
+        svg_path = output_dir / f"step_{step:06d}.svg"
+        svg_path.write_text(svg)
         try:
             import wandb
 
@@ -378,6 +381,9 @@ class CANDI(Diffusion):
             experiment.log(
                 {
                     "joint_loss/surface_and_vector_field": table,
+                    "joint_loss/heatmap_vector_field": wandb.Html(
+                        svg, inject=False
+                    ),
                     "joint_loss/observed_cells": sum(
                         value > 0
                         for row in snapshot["count"]

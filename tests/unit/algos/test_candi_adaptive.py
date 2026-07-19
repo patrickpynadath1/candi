@@ -7,6 +7,7 @@ from algos.candi_adaptive import (
     JointLossSurface,
     PowerCurve,
     SequentialCurve,
+    joint_surface_svg,
 )
 
 
@@ -48,6 +49,10 @@ def test_joint_loss_surface_tracks_2d_statistics_and_gradients():
     assert np.asarray(snapshot["grad_discrete"]).shape == (4, 4)
     assert np.asarray(snapshot["grad_continuous"]).shape == (4, 4)
     assert np.asarray(snapshot["reliable"]).any()
+    rendered = joint_surface_svg(snapshot, size=300, arrow_stride=2)
+    assert rendered.startswith("<svg")
+    assert "discrete corruption d" in rendered
+    assert "continuous degradation c" in rendered
 
 
 def test_bezier_rejects_nonmonotone_controls():
