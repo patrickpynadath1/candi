@@ -31,7 +31,12 @@ esac
 mkdir -p "${output_dir}"
 extra=()
 if [[ "${algorithm}" == "sfm" ]]; then
-  extra+=(sampling.noise_removal=greedy +sampling.velocity=exact +sampling.top_k_velocity=-1)
+  extra+=(
+    noise.eps=1e-3
+    sampling.noise_removal=greedy
+    +sampling.velocity=exact
+    +sampling.top_k_velocity=-1
+  )
 fi
 
 CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/main.py" \
