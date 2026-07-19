@@ -79,6 +79,7 @@ class Diffusion(TrainerBase):
             t += 1 / self.T
 
         dalpha_t, alpha_t = self.noise(t)
+        dalpha_t = dalpha_t.unsqueeze(-1)
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
         sigma = self._sigma_from_alphat(alpha_t)
@@ -87,7 +88,7 @@ class Diffusion(TrainerBase):
 
         log_x_theta = self.forward(xt, sigma=sigma)
         utils.print_nans(log_x_theta, "model_output")
-        return self.nll_per_token(
+        loss = self.nll_per_token(
             log_x_theta=log_x_theta,
             xt=xt,
             x0=x0,
@@ -95,6 +96,8 @@ class Diffusion(TrainerBase):
             dalpha_t=dalpha_t,
             low_var=train_mode and self.loss_type == "low_var",
         )
+        self._record_time_loss(t, loss, valid_tokens, train_mode)
+        return loss
 
     def _get_score(self, **kwargs):
         del kwargs

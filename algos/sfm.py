@@ -82,10 +82,7 @@ class SFM(Diffusion):
         xt = self.q_xt(input_tokens, alpha, valid_tokens=valid_tokens)
         sigma = self._sigma_from_alphat(alpha)
         loss = self.nll_per_token(self.forward(xt, sigma), input_tokens)
-        if train_mode:
-            self.noise.record_time_loss_pair(
-                t, loss.detach().mean(-1), int(self.global_step)
-            )
+        self._record_time_loss(t, loss, valid_tokens, train_mode)
         return loss
 
     def optimizer_step(self, *args, **kwargs):

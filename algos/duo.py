@@ -256,9 +256,15 @@ class DUO(DUO_BASE):
                 valid_tokens=valid_tokens,
             )
         del output_tokens
-        t = self._sample_t(x0.shape[0], current_accumulation_step)
+        schedule_t = self._sample_t(x0.shape[0], current_accumulation_step)
+        # DUO's curriculum is parameterized noise-low to noise-high, whereas
+        # alpha(t) is clean-high to clean-low.
+        schedule_dalpha, schedule_alpha = self.noise(schedule_t)
+        t = 1 - schedule_alpha
         gamma_t = self.gamma_min + t * (self.gamma_max - self.gamma_min)
-        gamma_t_prime = self.gamma_max - self.gamma_min
+        gamma_t_prime = (
+            (self.gamma_max - self.gamma_min) * -schedule_dalpha
+        )
         usdm_alpha_t = self._gamma_to_alphat(gamma_t)
         T = 1000
         usdm_dalpha_t = (
@@ -279,7 +285,7 @@ class DUO(DUO_BASE):
         xt_usdm = xt.argmax(-1)
         log_x_theta = self.forward(xt, sigma=sigma)
 
-        return self.nll_per_token(
+        loss = self.nll_per_token(
             log_x_theta=log_x_theta,
             xt=xt_usdm,
             x0=x0,
@@ -287,3 +293,5 @@ class DUO(DUO_BASE):
             dalpha_t=usdm_dalpha_t,
             low_var=False,
         )
+        self._record_time_loss(schedule_t, loss, valid_tokens, train_mode)
+        return loss

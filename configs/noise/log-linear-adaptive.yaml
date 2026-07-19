@@ -12,3 +12,4 @@ adaptive_ridge_alpha: 1.0e-3
 adaptive_uniform_mix: 1.0e-3
 adaptive_warmup_steps: 1000
 adaptive_ema: 0.9
+adaptive_snapshot_dir: ${checkpointing.save_dir}/schedule_snapshots

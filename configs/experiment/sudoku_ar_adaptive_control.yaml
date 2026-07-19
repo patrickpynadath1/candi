@@ -1,0 +1,11 @@
+# @package _global_
+# AR has no diffusion time; this is the matched non-adaptive control.
+defaults:
+  - override /data: sudoku
+  - override /model: tiny
+  - override /algo: ar
+  - override /noise: log-linear
+model: {length: 180, hidden_size: 512}
+loader: {global_batch_size: 256}
+trainer: {max_steps: 20000, val_check_interval: 20000, check_val_every_n_epoch: null}
+eval: {generate_samples: false}

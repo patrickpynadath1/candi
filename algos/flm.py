@@ -58,6 +58,10 @@ class FLM(TrainerBase):
             u = (u / n + torch.arange(n, device=self.device) / n) % 1
         return self.t_min + (self.t_max - self.t_min) * u
 
+    def path_alpha(self, path_time):
+        """Map noise-to-clean solver time onto the shared clean-to-noise path."""
+        return self.noise(1 - path_time)[1]
+
     def corrupt(self, x0, gamma, valid_tokens=None):
         target = F.one_hot(x0, self.vocab_size).float()
         g = gamma[:, None, None]
@@ -74,22 +78,24 @@ class FLM(TrainerBase):
         train_mode=False,
         valid_tokens=None,
     ):
-        del output_tokens, train_mode
-        t = self.sample_t(input_tokens.shape[0], current_accumulation_step)
-        gamma = self.alpha_to_gamma(t)
+        del output_tokens
+        schedule_t = self.sample_t(input_tokens.shape[0], current_accumulation_step)
+        alpha = self.noise(schedule_t)[1]
+        gamma = self.alpha_to_gamma(alpha)
         xt, target = self.corrupt(input_tokens, gamma, valid_tokens=valid_tokens)
-        loss = -(target * self.forward(xt, t)).sum(-1)
+        loss = -(target * self.forward(xt, alpha)).sum(-1)
         weighting = getattr(self.backbone, "learnable_loss_weighting", None)
         if weighting is not None:
-            w = weighting(t).unsqueeze(-1)
+            w = weighting(alpha).unsqueeze(-1)
             loss = torch.exp(-w) * loss + w
+        self._record_time_loss(schedule_t, loss, valid_tokens, train_mode)
         return loss
 
     def prior_sample(self, num_samples, length):
         return torch.randn(num_samples, length, self.vocab_size, device=self.device)
 
     def sampling_gamma(self, t):
-        return self.alpha_to_gamma(t)
+        return self.alpha_to_gamma(self.path_alpha(t))
 
     def sampling_logits(self, x, t):
-        return self.forward(x, t) / self.temp
+        return self.forward(x, self.path_alpha(t)) / self.temp

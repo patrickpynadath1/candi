@@ -216,6 +216,7 @@ class CANDI(Diffusion):
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         assert t.shape[0] == x0.shape[0]
         dalpha_t, alpha_t = self.noise(t)
+        dalpha_t = dalpha_t.unsqueeze(-1)
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
 
@@ -223,7 +224,7 @@ class CANDI(Diffusion):
         log_x_theta = self.forward(**noisy_output)
 
         utils.print_nans(log_x_theta, "model_output")
-        return self.nll_per_token(
+        loss = self.nll_per_token(
             log_x_theta=log_x_theta,
             alpha_t=alpha_t,
             dalpha_t=dalpha_t,
@@ -231,6 +232,8 @@ class CANDI(Diffusion):
             low_var=train_mode,
             **noisy_output,
         )
+        self._record_time_loss(t, loss, valid_tokens, train_mode)
+        return loss
 
 
     def generate_sample_prompt(self, prompt_tokens, x, prompt_mask):

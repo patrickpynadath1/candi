@@ -86,6 +86,9 @@ class AdaptiveSchedule(NoiseSchedule):
         self.register_buffer("has_schedule", torch.tensor(False))
         self.register_buffer("ema_alpha_vals", torch.zeros(n_grid, dtype=torch.float64))
         self.register_buffer("refit_count", torch.tensor(0, dtype=torch.long))
+        self.register_buffer("last_refit_step", torch.tensor(-1, dtype=torch.long))
+        self.register_buffer("loss_profile", torch.zeros(n_grid, dtype=torch.float64))
+        self.register_buffer("sampling_density", torch.zeros(n_grid, dtype=torch.float64))
         self._grid = np.linspace(0, 1, n_grid)
         self._alpha_spline = None
         self._dalpha_spline = None
@@ -109,8 +112,13 @@ class AdaptiveSchedule(NoiseSchedule):
             self.loss_buf[: n - first] = loss_val[first:]
         self.buf_pos.fill_(end % self.buffer_size)
         buffer_full = end >= self.buffer_size or self.has_schedule.item()
-        if buffer_full and step % self.refit_every == 0:
+        if (
+            buffer_full
+            and step % self.refit_every == 0
+            and step != self.last_refit_step.item()
+        ):
             self._refit()
+            self.last_refit_step.fill_(step)
 
     def _refit(self):
         model = make_pipeline(
@@ -128,6 +136,8 @@ class AdaptiveSchedule(NoiseSchedule):
         smooth_loss = model.predict(self._grid.reshape(-1, 1))
         importance = np.maximum(np.gradient(smooth_loss, self._grid), 0)
         importance = (1 - self.uniform_mix) * importance + self.uniform_mix
+        self.loss_profile.copy_(torch.from_numpy(smooth_loss))
+        self.sampling_density.copy_(torch.from_numpy(importance / importance.sum()))
         cdf = np.cumsum(importance)
         cdf /= cdf[-1]
         remapped_t = PchipInterpolator(cdf, self._grid)(self._grid)
@@ -152,6 +162,15 @@ class AdaptiveSchedule(NoiseSchedule):
         return result
 
     def _evaluate(self, spline, base_fn, t):
+        if spline is None and self.has_schedule.item():
+            alpha = self.alpha_vals.cpu().numpy()
+            self._alpha_spline = PchipInterpolator(self._grid, alpha)
+            self._dalpha_spline = self._alpha_spline.derivative()
+            spline = (
+                self._alpha_spline
+                if base_fn.__name__ == "alpha_t"
+                else self._dalpha_spline
+            )
         if spline is None:
             return base_fn(t)
         values = spline(t.detach().cpu().numpy())
@@ -162,6 +181,22 @@ class AdaptiveSchedule(NoiseSchedule):
 
     def alpha_prime_t(self, t):
         return self._evaluate(self._dalpha_spline, self.base.alpha_prime_t, t)
+
+    def snapshot(self):
+        grid = torch.as_tensor(self._grid, dtype=torch.float64)
+        base_alpha = self.base.alpha_t(grid).detach().cpu()
+        alpha = self.alpha_t(grid).detach().cpu()
+        dalpha = self.alpha_prime_t(grid).detach().cpu()
+        return {
+            "refit_count": int(self.refit_count.item()),
+            "step": int(self.last_refit_step.item()),
+            "grid": grid.tolist(),
+            "base_alpha": base_alpha.tolist(),
+            "alpha": alpha.tolist(),
+            "dalpha_dt": dalpha.tolist(),
+            "loss_profile": self.loss_profile.detach().cpu().tolist(),
+            "sampling_density": self.sampling_density.detach().cpu().tolist(),
+        }
 
 
 def get_noise(config):
