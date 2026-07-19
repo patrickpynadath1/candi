@@ -142,7 +142,7 @@ class DUO_BASE(UniformState):
         # to handle conditional generation for inputs / infilling tasks
         if prompt_mask is not None:
             # expects the original x to have the prompt tokens where prompt_mask = 1
-            xs = (xs * (1 - prompt_mask) + x * prompt_mask).long()
+            xs = torch.where(prompt_mask.bool(), x, xs)
         return None, xs
 
 

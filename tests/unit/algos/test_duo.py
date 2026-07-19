@@ -68,7 +68,7 @@ def test_duo_ancestral_update_preserves_prompt(monkeypatch):
         torch.full_like(kwargs["xt"], 2), 3
     ).float()
     tokens = torch.tensor([[1, 0, 1]])
-    prompt_mask = torch.tensor([[1, 0, 1]])
+    prompt_mask = torch.tensor([[True, False, True]])
     _, updated = model._ancestral_update(
         tokens, torch.tensor([[0.8]]), 0.2, prompt_mask=prompt_mask
     )
@@ -106,4 +106,3 @@ def test_duo_gumbel_temperature_curriculum(step, expected, monkeypatch):
         DUO, "global_step", property(lambda self: self._test_step), raising=False
     )
     assert model._compute_gumbel_tau_inverse() == pytest.approx(expected)
-
