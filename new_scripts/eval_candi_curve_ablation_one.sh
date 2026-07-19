@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -lt 4 ]]; then
+if [[ $# -lt 3 ]]; then
   echo "usage: $0 GPU_ID RUN_NAME EXPERIMENT [OVERRIDES ...]" >&2
   exit 2
 fi
