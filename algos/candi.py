@@ -69,8 +69,11 @@ class CANDI(Diffusion):
             raise ValueError("joint_loss_probe requires factorized_adaptive_schedule")
         if self.joint_loss_probe:
             self.joint_loss_surface = JointLossSurface(
-                bins=config.algo.get("joint_loss_bins", 16),
-                smoothing_sigma=config.algo.get("joint_loss_smoothing_sigma", 1.0),
+                bins=config.algo.get("joint_loss_bins", 100),
+                smoothing_sigma=config.algo.get("joint_loss_smoothing_sigma", 3.0),
+                min_effective_count=config.algo.get(
+                    "joint_loss_min_effective_count", 5.0
+                ),
             )
         self.joint_loss_log_every = config.algo.get("joint_loss_log_every", 500)
         self._last_joint_loss_log_step = -1
@@ -355,6 +358,8 @@ class CANDI(Diffusion):
                         snapshot["grad_discrete"][i][j],
                         snapshot["grad_continuous"][i][j],
                         snapshot["gradient_magnitude"][i][j],
+                        snapshot["smoothed_effective_count"][i][j],
+                        snapshot["reliable"][i][j],
                     ])
             table = wandb.Table(
                 columns=[
@@ -365,6 +370,8 @@ class CANDI(Diffusion):
                     "grad_discrete",
                     "grad_continuous",
                     "gradient_magnitude",
+                    "smoothed_effective_count",
+                    "reliable",
                 ],
                 data=rows,
             )

@@ -6,7 +6,9 @@ noise:
   adaptive_warmup_steps: 500
 algo:
   joint_loss_probe: true
-  joint_loss_bins: 16
+  joint_loss_bins: 100
+  joint_loss_smoothing_sigma: 3.0
+  joint_loss_min_effective_count: 5.0
   joint_loss_log_every: 500
 trainer:
   max_steps: 5000

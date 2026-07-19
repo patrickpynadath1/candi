@@ -35,7 +35,7 @@ def test_corruption_curves_are_monotone_with_exact_endpoints(curve):
 
 
 def test_joint_loss_surface_tracks_2d_statistics_and_gradients():
-    surface = JointLossSurface(bins=4, smoothing_sigma=0.5)
+    surface = JointLossSurface(bins=4, smoothing_sigma=0.5, min_effective_count=0.01)
     discrete = torch.tensor([0.1, 0.1, 0.6, 0.9])
     continuous = torch.tensor([0.1, 0.1, 0.6, 0.9])
     loss = discrete + 2 * continuous
@@ -47,6 +47,7 @@ def test_joint_loss_surface_tracks_2d_statistics_and_gradients():
     assert np.asarray(snapshot["smoothed_loss"]).shape == (4, 4)
     assert np.asarray(snapshot["grad_discrete"]).shape == (4, 4)
     assert np.asarray(snapshot["grad_continuous"]).shape == (4, 4)
+    assert np.asarray(snapshot["reliable"]).any()
 
 
 def test_bezier_rejects_nonmonotone_controls():

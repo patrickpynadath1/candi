@@ -134,10 +134,11 @@ def build_curve(config):
 class JointLossSurface(torch.nn.Module):
     """Checkpointable 2D loss statistics for independently sampled noise axes."""
 
-    def __init__(self, bins=16, smoothing_sigma=1.0):
+    def __init__(self, bins=100, smoothing_sigma=3.0, min_effective_count=5.0):
         super().__init__()
         self.bins = int(bins)
         self.smoothing_sigma = float(smoothing_sigma)
+        self.min_effective_count = float(min_effective_count)
         shape = (self.bins, self.bins)
         self.register_buffer("count", torch.zeros(shape, dtype=torch.float64))
         self.register_buffer("loss_sum", torch.zeros(shape, dtype=torch.float64))
@@ -171,11 +172,19 @@ class JointLossSurface(torch.nn.Module):
             where=count > 0,
         )
         variance = np.maximum(second - np.square(np.nan_to_num(mean)), 0)
-        # Fill empty cells from the global observed mean before smoothing. Counts
-        # remain available so consumers can distinguish measured and imputed cells.
-        fill = np.nanmean(mean) if np.isfinite(mean).any() else 0.0
-        filled = np.nan_to_num(mean, nan=fill)
-        smooth = gaussian_filter(filled, self.smoothing_sigma, mode="nearest")
+        # Nadaraya-Watson smoothing: sparse and empty cells contribute in
+        # proportion to their evidence instead of being filled as observations.
+        weighted_loss = np.nan_to_num(mean) * count
+        smooth_weight = gaussian_filter(count, self.smoothing_sigma, mode="nearest")
+        smooth_sum = gaussian_filter(
+            weighted_loss, self.smoothing_sigma, mode="nearest"
+        )
+        smooth = np.divide(
+            smooth_sum,
+            smooth_weight,
+            out=np.zeros_like(smooth_sum),
+            where=smooth_weight > 1e-12,
+        )
         spacing = 1 / self.bins
         grad_d, grad_c = np.gradient(smooth, spacing, spacing)
         centers = ((np.arange(self.bins) + 0.5) / self.bins).tolist()
@@ -185,6 +194,11 @@ class JointLossSurface(torch.nn.Module):
             "count": count.tolist(),
             "mean_loss": mean.tolist(),
             "variance": variance.tolist(),
+            "standard_error": np.sqrt(
+                np.divide(variance, count, out=np.zeros_like(variance), where=count > 0)
+            ).tolist(),
+            "smoothed_effective_count": smooth_weight.tolist(),
+            "reliable": (smooth_weight >= self.min_effective_count).tolist(),
             "smoothed_loss": smooth.tolist(),
             "grad_discrete": grad_d.tolist(),
             "grad_continuous": grad_c.tolist(),

@@ -29,6 +29,7 @@ curve_discrete_center: 0.7
 curve_continuous_center: 0.3
 curve_sharpness: 10.0
 joint_loss_probe: false
-joint_loss_bins: 16
-joint_loss_smoothing_sigma: 1.0
+joint_loss_bins: 100
+joint_loss_smoothing_sigma: 3.0
+joint_loss_min_effective_count: 5.0
 joint_loss_log_every: 500
