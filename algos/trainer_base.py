@@ -11,7 +11,7 @@ import dataloader
 import metrics
 from models import model_registry
 from models.ema import ExponentialMovingAverage
-from .noise_schedules import LogLinear, get_noise
+from .noise_schedules import LogLinear as LogLinear, get_noise
 
 from samplers import SamplingRequest, create_sampler, run_sampler
 
@@ -349,7 +349,9 @@ class TrainerBase(L.LightningModule):
 
     def forward(self, xt, sigma):
         sigma = self._process_sigma(sigma)
-        with torch.cuda.amp.autocast(dtype=torch.float32):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.float32, enabled=torch.cuda.is_available()
+        ):
             model_output = self.backbone(xt, sigma)
         return self._process_model_output(model_output=model_output, xt=xt, sigma=sigma)
 

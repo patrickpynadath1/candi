@@ -39,6 +39,17 @@ def test_update_without_counter_uses_configured_decay():
     assert ema.shadow_params[0].item() == pytest.approx(2.5)
 
 
+def test_multiple_updates_match_iterated_ema_recurrence():
+    parameter = _parameter([0.0])
+    ema = ExponentialMovingAverage([parameter], decay=0.75, use_num_updates=False)
+    expected = 0.0
+    for value in (4.0, -2.0, 10.0):
+        parameter.data.fill_(value)
+        ema.update([parameter])
+        expected = 0.75 * expected + 0.25 * value
+        assert ema.shadow_params[0].item() == pytest.approx(expected)
+
+
 def test_store_copy_to_restore_is_symmetric_and_clears_store():
     parameter = _parameter([1.0, 2.0])
     ema = ExponentialMovingAverage([parameter], decay=0.9)

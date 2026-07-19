@@ -9,6 +9,7 @@ from models.common import (
     EmbeddingLayerMixture_norm,
     Preconditioning,
     PositionRotary,
+    apply_rotary_positions,
     LayerKVCache,
     Rotary,
     TimestepEmbedder,
@@ -56,6 +57,17 @@ def test_position_rotary_supports_batch_specific_positions():
     assert cos.shape == sin.shape == (2, 3, 1, 4)
     assert torch.allclose(cos[0, 0], cos[1, 2])
     assert not torch.allclose(cos[0, 1], cos[1, 0])
+
+
+def test_position_rotary_preserves_norm_and_zero_position_is_identity():
+    torch.manual_seed(3)
+    values = torch.randn(2, 3, 2, 4)
+    positions = torch.tensor([[0, 1, 9], [4, 0, 2]])
+    rotated = apply_rotary_positions(values, PositionRotary(4)(positions))
+
+    assert torch.allclose(rotated.norm(dim=-1), values.norm(dim=-1), atol=1e-6)
+    assert torch.allclose(rotated[0, 0], values[0, 0])
+    assert torch.allclose(rotated[1, 1], values[1, 1])
 
 
 def test_layer_kv_cache_appends_and_checks_capacity():
@@ -115,11 +127,16 @@ def test_causal_block_forward_backward():
     assert torch.isfinite(hidden.grad).all()
 
 
-def test_final_layer_shape_and_conditioning():
+def test_final_layer_conditioning_changes_output_when_path_is_open():
+    torch.manual_seed(4)
     layer = DDiTFinalLayer(hidden_size=8, out_channels=5, cond_dim=8, adaLN=True)
-    result = layer(torch.randn(2, 3, 8), torch.randn(2, 8))
-    assert result.shape == (2, 3, 5)
-    assert torch.equal(result, torch.zeros_like(result))
+    torch.nn.init.normal_(layer.linear.weight)
+    torch.nn.init.normal_(layer.adaLN_modulation.weight)
+    hidden = torch.randn(1, 3, 8)
+    first = layer(hidden, torch.zeros(1, 8))
+    second = layer(hidden, torch.ones(1, 8))
+    assert first.shape == (1, 3, 5)
+    assert not torch.allclose(first, second)
 
 
 def test_preconditioning_clean_positions_and_noisy_mixture():

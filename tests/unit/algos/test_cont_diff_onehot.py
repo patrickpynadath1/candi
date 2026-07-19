@@ -54,3 +54,17 @@ def test_onehot_diffusion_q_xt_shape_and_finite_values():
     result = model.q_xt(tokens, torch.tensor([[0.8], [0.4]]))
     assert result["xt"].shape == (2, 2, 4)
     assert torch.isfinite(result["xt"]).all()
+
+
+def test_onehot_forward_process_has_requested_mean_and_standard_deviation():
+    torch.manual_seed(6)
+    sigma = 0.7
+    model = _bare(ContDiffOnehot, data_vocab_size=4)
+    model.get_continuous_from_discrete_noise = lambda time: torch.full_like(time, sigma)
+    tokens = torch.zeros(40_000, 1, dtype=torch.long)
+
+    noisy = model.q_xt(tokens, torch.full((tokens.shape[0], 1), 0.5))["xt"]
+    residual = noisy - torch.nn.functional.one_hot(tokens, 4).float()
+
+    assert residual.mean().item() == pytest.approx(0.0, abs=0.01)
+    assert residual.std().item() == pytest.approx(sigma, abs=0.01)

@@ -36,9 +36,6 @@ class CANDI(Diffusion):
         self.continuous_noise =torch.linspace(.2, 4.0, 1000)
         self.discrete_noise = expected_rank(d=self.vocab_size-1, a=torch.tensor(1).to(self.device), sigma=self.continuous_noise)
 
-        self.continuous_noise = torch.tensor(self.continuous_noise)
-        self.discrete_noise = torch.tensor(self.discrete_noise)
-
         self.step_size = config.algo.step_size
 
         self.min_percentile = config.algo.min_percentile
@@ -226,7 +223,9 @@ class CANDI(Diffusion):
         return noise
 
     def forward(self, **kwargs):
-        with torch.cuda.amp.autocast(dtype=torch.float32):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.float32, enabled=torch.cuda.is_available()
+        ):
             model_output = self.backbone(**kwargs)
         return self._process_model_output(model_output=model_output, xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask'])
 

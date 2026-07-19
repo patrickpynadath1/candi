@@ -56,6 +56,48 @@ def test_candi_discrete_noising_endpoints_and_bos():
     assert noisy.min() >= 0 and noisy.max() < 5
 
 
+def test_candi_discrete_noising_matches_uniform_transition_probability():
+    torch.manual_seed(5)
+    vocab_size = 5
+    alpha = 0.65
+    model = _bare(CANDI, vocab_size=vocab_size, ignore_bos=False)
+    tokens = torch.zeros(50_000, 1, dtype=torch.long)
+
+    noisy = model.discrete_noising(tokens, torch.tensor([[alpha]]))
+
+    # A corrupted token is drawn uniformly and can coincidentally equal x0.
+    expected_unchanged = alpha + (1 - alpha) / vocab_size
+    observed_unchanged = noisy.eq(tokens).float().mean().item()
+    assert observed_unchanged == pytest.approx(expected_unchanged, abs=0.01)
+    frequencies = torch.bincount(noisy.flatten(), minlength=vocab_size).float()
+    frequencies /= noisy.numel()
+    assert torch.allclose(
+        frequencies[1:],
+        torch.full((vocab_size - 1,), (1 - alpha) / vocab_size),
+        atol=0.01,
+    )
+
+
+@pytest.mark.parametrize("pure_continuous", [False, True])
+def test_candi_nll_matches_independent_formula(pure_continuous):
+    model = _bare(CANDI, pure_continuous=pure_continuous)
+    probabilities = torch.tensor([[[0.2, 0.7, 0.1], [0.6, 0.3, 0.1]]])
+    targets = torch.tensor([[1, 0]])
+    alpha = torch.tensor([[0.6]])
+    derivative = torch.tensor([[-0.8]])
+
+    result = model.nll_per_token(
+        probabilities.log(), targets, alpha, derivative, reveal_mask=None
+    )
+    selected_log_probability = torch.tensor([[0.7, 0.6]]).log()
+    expected = (
+        -selected_log_probability
+        if pure_continuous
+        else selected_log_probability * derivative / (1 - alpha)
+    )
+    assert torch.allclose(result, expected)
+
+
 def test_candi_q_xt_shapes_and_finite_values():
     model = _bare(
         CANDI,

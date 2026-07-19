@@ -39,6 +39,25 @@ def test_sudoku_metrics_distinguish_exact_and_valid():
     assert not metrics["exact"] and not metrics["valid_grid"]
 
 
+def test_sudoku_metrics_reject_malformed_and_out_of_range_grids():
+    _, solution = generate_grids(1, "easy", 11)[0]
+    tokenizer = SudokuTokenizer()
+    encoded = torch.tensor(
+        encode_example(solution, solution, tokenizer)[0][tokenizer.prompt_len :]
+    )
+
+    malformed = sudoku_metrics(encoded[:-1], encoded[:-1])
+    assert malformed["exact"]
+    assert not malformed["valid_grid"]
+    assert malformed["valid_rows"] == 0.0
+
+    invalid_token = encoded.clone()
+    invalid_token[0] = 0
+    invalid = sudoku_metrics(invalid_token, encoded)
+    assert not invalid["exact"]
+    assert not invalid["valid_grid"]
+
+
 def test_sudoku_tokenizer_contract():
     tokenizer = SudokuTokenizer()
     assert len(tokenizer) == 12

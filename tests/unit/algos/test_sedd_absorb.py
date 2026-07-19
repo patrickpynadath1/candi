@@ -33,3 +33,15 @@ def test_sedd_output_sets_observed_token_score_to_one():
     assert torch.equal(observed, torch.zeros_like(observed))
     assert torch.isfinite(result).all()
 
+
+def test_sedd_output_applies_exact_noise_and_vocabulary_scaling():
+    model = _bare(SEDDAbsorb)
+    tokens = torch.tensor([[0]])
+    raw = torch.tensor([[[3.0, 4.0, 5.0]]])
+    sigma = torch.tensor([torch.log(torch.tensor(2.0))])
+    result = model._process_model_output(raw, tokens, sigma)
+
+    # exp(sigma)-1 = 1 and there are vocab_size-1 alternative states.
+    assert result[0, 0, 0] == 0
+    assert result[0, 0, 1] == pytest.approx(4.0 - torch.log(torch.tensor(2.0)).item())
+    assert result[0, 0, 2] == pytest.approx(5.0 - torch.log(torch.tensor(2.0)).item())

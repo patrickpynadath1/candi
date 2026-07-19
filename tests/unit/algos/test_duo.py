@@ -20,7 +20,7 @@ def _bare(cls, **attrs):
 
 
 
-def test_duo_posterior_has_valid_shape_and_finite_values():
+def test_duo_posterior_is_a_probability_distribution():
     model = _bare(
         DUO_BASE,
         vocab_size=3,
@@ -35,6 +35,30 @@ def test_duo_posterior_has_valid_shape_and_finite_values():
     )
     assert posterior.shape == (1, 2, 3)
     assert torch.isfinite(posterior).all()
+    assert torch.all(posterior >= 0)
+    assert torch.allclose(posterior.sum(-1), torch.ones(1, 2))
+
+
+def test_duo_posterior_moves_toward_model_prediction_when_more_noise_is_removed():
+    model = _bare(
+        DUO_BASE,
+        vocab_size=3,
+        config=SimpleNamespace(sampling=SimpleNamespace(use_float64=False)),
+    )
+    model._device = torch.device("cpu")
+    model._dtype = torch.float32
+    prediction = torch.tensor([[[0.05, 0.15, 0.80]]])
+    observed = torch.tensor([[0]])
+
+    short_step = model._compute_posterior(
+        prediction, observed, torch.tensor([[0.6]]), torch.tensor([[0.5]])
+    )
+    long_step = model._compute_posterior(
+        prediction, observed, torch.tensor([[0.9]]), torch.tensor([[0.5]])
+    )
+
+    assert long_step[0, 0, 2] > short_step[0, 0, 2]
+    assert long_step[0, 0, 0] < short_step[0, 0, 0]
 
 
 def test_duo_model_output_is_normalized():

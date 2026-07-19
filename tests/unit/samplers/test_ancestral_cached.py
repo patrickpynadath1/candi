@@ -42,6 +42,22 @@ def test_reuses_cache_when_tokens_and_conditioning_are_unchanged():
     assert result.metadata["nfe"] == 2
 
 
+def test_cached_ancestral_forwards_prompt_mask_on_every_transition():
+    model = CachedModel()
+    mask = torch.tensor([[1, 0, 1]])
+    run_sampler(
+        CachedAncestralSampler("none"),
+        model,
+        SamplingRequest(
+            num_samples=1,
+            num_steps=2,
+            prompt_tokens=torch.tensor([[3, 0, 2]]),
+            prompt_mask=mask,
+        ),
+    )
+    assert all(torch.equal(seen, mask) for seen in model.seen_prompt_masks)
+
+
 def test_invalidates_cache_for_time_conditioned_models():
     model = CachedModel()
     model.time_conditioning = True

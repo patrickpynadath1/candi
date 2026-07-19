@@ -252,6 +252,36 @@ def test_save_checkpoint_corrects_loop_counts_and_saves_sampler(monkeypatch):
     assert "ema" in checkpoint
 
 
+def test_checkpoint_hooks_round_trip_ema_and_resume_position(monkeypatch):
+    source = _bare_trainer(ema=True)
+    source.ema.shadow_params[0].fill_(8.0)
+    source.ema.shadow_params[1].fill_(9.0)
+    source._test_trainer = SimpleNamespace(
+        accumulate_grad_batches=2,
+        train_dataloader=SimpleNamespace(
+            sampler=SimpleNamespace(state_dict=lambda: {})
+        ),
+    )
+    monkeypatch.setattr(
+        TrainerBase, "trainer", property(lambda self: self._test_trainer)
+    )
+    checkpoint = _checkpoint_for_save(total_steps=7, current_steps=4)
+    checkpoint["loops"]["fit_loop"]["epoch_progress"] = {
+        "current": {"completed": 3}
+    }
+    source.on_save_checkpoint(checkpoint)
+
+    restored = _bare_trainer(ema=True)
+    restored.ema.shadow_params[0].zero_()
+    restored.ema.shadow_params[1].zero_()
+    restored.on_load_checkpoint(checkpoint)
+
+    assert restored.fast_forward_epochs == 3
+    assert restored.fast_forward_batches == 8
+    assert restored.ema.shadow_params[0].item() == pytest.approx(8.0)
+    assert restored.ema.shadow_params[1].item() == pytest.approx(9.0)
+
+
 def test_train_start_replaces_loader_with_cpu_safe_sampler(monkeypatch):
     trainer = _bare_trainer()
     trainer.config.loader = SimpleNamespace(

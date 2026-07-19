@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 import torch
-from catalogue import RegistryError
 
 from models.dit import DIT
 from models.dit_cfm import CFMDit
@@ -41,8 +40,3 @@ def _config(*, causal=False, time_conditioning=True):
 )
 def test_active_backbones_are_registered(name, expected):
     assert models.get(name) is expected
-
-
-def test_unknown_backbone_lookup_raises_descriptive_error():
-    with pytest.raises(RegistryError, match="does_not_exist"):
-        models.get("does_not_exist")

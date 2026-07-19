@@ -4,6 +4,7 @@ import torch
 
 from .base import Sampler, SamplerSpec, SamplingRequest, SamplingResult
 from .registry import sampler_registry
+from .utils import autoregressive_prompt_length
 
 
 class AutoregressiveSampler(Sampler):
@@ -25,9 +26,10 @@ class AutoregressiveSampler(Sampler):
             device=model.device,
         )
 
-        if request.prompt_mask is not None and request.prompt_tokens is not None:
+        prompt_length = autoregressive_prompt_length(request)
+        if prompt_length is not None:
             x = torch.where(request.prompt_mask.bool(), request.prompt_tokens, x)
-            start = int(request.prompt_mask.sum(1).max().item()) - 1
+            start = max(prompt_length - 1, 0)
         else:
             start = 0
             x[:, 0] = model.tokenizer.bos_token_id

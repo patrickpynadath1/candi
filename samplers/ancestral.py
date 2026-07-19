@@ -2,7 +2,12 @@ import torch
 
 from .base import Sampler, SamplerSpec, SamplingResult
 from .registry import sampler_registry
-from .utils import apply_token_offset, diffusion_time_grid, inject_token_prompt
+from .utils import (
+    apply_token_offset,
+    diffusion_time_grid,
+    inject_token_prompt,
+    preserve_prompt,
+)
 
 
 class AncestralSampler(Sampler):
@@ -39,6 +44,7 @@ class AncestralSampler(Sampler):
             nfe += 1
         elif self.noise_removal == "greedy":
             x = model.sample_greedy_denoise(x=x, t=t0)
+            x = preserve_prompt(x, request)
             nfe += 1
         return SamplingResult(apply_token_offset(model, x), {"nfe": nfe})
 

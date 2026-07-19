@@ -1,4 +1,3 @@
-import pdb
 from .common import (
     EmbeddingLayerMixture_norm,
     TimestepEmbedder,
@@ -28,7 +27,7 @@ torch._C._jit_override_can_fuse_on_gpu(True)
 class CFMDit(nn.Module, huggingface_hub.PyTorchModelHubMixin):
     def __init__(self, config, vocab_size: int):
         super().__init__()
-        if type(config) == dict:
+        if isinstance(config, dict):
             config = omegaconf.OmegaConf.create(config)
         self.causal = False
         self.adaLN = True
@@ -37,7 +36,11 @@ class CFMDit(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         dim = config.model.hidden_size
         self.dim=dim
         cond_dim = config.model.cond_dim
-        self.vocab_embed = EmbeddingLayerMixture_norm(dim,vocab_size)
+        # CFM states span every data-vocabulary coordinate; unlike masked
+        # continuous diffusion there is no reserved final embedding row.
+        self.vocab_embed = EmbeddingLayerMixture_norm(
+            dim, vocab_size, reserve_mask_embedding=False
+        )
 
 
         if not self.causal:

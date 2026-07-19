@@ -17,6 +17,8 @@ class NoiseSchedule(torch.nn.Module):
 
 
 class LogLinear(NoiseSchedule):
+    type = "log-linear"
+
     def __init__(self, eps=1e-3):
         super().__init__()
         self.eps = eps

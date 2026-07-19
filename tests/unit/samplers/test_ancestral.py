@@ -53,3 +53,14 @@ def test_greedy_noise_removal_is_an_explicit_extra_evaluation():
 
     assert torch.equal(result.samples, torch.full((1, 3), 6))
     assert result.metadata["nfe"] == 2
+
+
+def test_greedy_noise_removal_cannot_overwrite_prompt():
+    request = SamplingRequest(
+        num_samples=1,
+        num_steps=1,
+        prompt_tokens=torch.tensor([[3, 0, 2]]),
+        prompt_mask=torch.tensor([[1, 0, 1]]),
+    )
+    result = run_sampler(AncestralSampler("greedy"), AncestralModel(), request)
+    assert result.samples.tolist() == [[3, 6, 2]]

@@ -52,7 +52,9 @@ class Distillation(DUO):
         self._maybe_update_teacher_weights()
 
         sigma = self._process_sigma(sigma)
-        with torch.cuda.amp.autocast(dtype=torch.float32):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.float32, enabled=torch.cuda.is_available()
+        ):
             model_output = self.teacher(xt, sigma)
         logits = self._process_model_output(
             model_output=model_output, xt=xt, sigma=sigma

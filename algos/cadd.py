@@ -103,7 +103,9 @@ class CADD(Diffusion):
         return noise
 
     def forward(self, **kwargs):
-        with torch.cuda.amp.autocast(dtype=torch.float32):
+        with torch.amp.autocast(
+            "cuda", dtype=torch.float32, enabled=torch.cuda.is_available()
+        ):
             model_output = self.backbone(**kwargs, precond=False, is_embed=True)
         return self._process_model_output(model_output=model_output, xt_tokens=kwargs['xt_tokens'], reveal_mask=kwargs['reveal_mask'])
 
@@ -113,6 +115,7 @@ class CADD(Diffusion):
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         assert t.shape[0] == x0.shape[0]
         dalpha_t, alpha_t = self.noise(t)
+        dalpha_t = dalpha_t.unsqueeze(-1)
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
 
@@ -120,7 +123,7 @@ class CADD(Diffusion):
         log_x_theta = self.forward(**noisy_output)
 
         utils.print_nans(log_x_theta, "model_output")
-        return self.nll_per_token(
+        loss = self.nll_per_token(
             log_x_theta=log_x_theta,
             alpha_t=alpha_t,
             dalpha_t=dalpha_t,
@@ -128,6 +131,8 @@ class CADD(Diffusion):
             low_var=train_mode,
             **noisy_output,
         )
+        self._record_time_loss(t, loss, valid_tokens, train_mode)
+        return loss
 
 
     def generate_sample_prompt(self, prompt_tokens, x, prompt_mask):
