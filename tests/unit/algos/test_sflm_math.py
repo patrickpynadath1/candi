@@ -1,7 +1,12 @@
 import torch
 
 from algos.flm_utils import alpha_to_gamma, build_luts, gamma_to_alpha
-from algos.noise_schedules import CosineSquared, LogLinear, TruncatedSchedule
+from algos.noise_schedules import (
+    AdaptiveSchedule,
+    CosineSquared,
+    LogLinear,
+    TruncatedSchedule,
+)
 from algos.spherical_utils import exp_map, log_map, slerp, sphere_normalize
 
 
@@ -37,3 +42,65 @@ def test_noise_schedule_endpoints_and_truncation():
     assert torch.allclose(
         trunc.alpha_t(torch.tensor([0.0, 1.0])), torch.tensor([0.8, 0.2]), atol=1e-5
     )
+
+
+def test_adaptive_schedule_refits_and_restores_spline():
+    schedule = AdaptiveSchedule(
+        TruncatedSchedule(LogLinear(), 0.001, 0.093),
+        buffer_size=8,
+        refit_every=1,
+        n_grid=32,
+        n_knots=4,
+        spline_degree=2,
+        ridge_alpha=1e-3,
+        uniform_mix=1e-3,
+        max_steps=10,
+        warmup_steps=0,
+        ema=0.9,
+    )
+    t = torch.linspace(0, 1, 8)
+    schedule.record_time_loss_pair(t, t.square(), step=1)
+    assert schedule.has_schedule
+    snapshot = schedule.snapshot()
+    assert snapshot["refit_count"] == 1
+    assert len(snapshot["sampling_density"]) == 32
+    assert abs(sum(snapshot["sampling_density"]) - 1) < 1e-6
+    schedule.record_time_loss_pair(t, t.square(), step=1)
+    assert schedule.refit_count.item() == 1
+    alpha = schedule.alpha_t(t)
+    assert torch.isfinite(alpha).all()
+    assert torch.all(alpha[:-1] >= alpha[1:])
+
+    restored = AdaptiveSchedule(
+        TruncatedSchedule(LogLinear(), 0.001, 0.093),
+        buffer_size=8,
+        refit_every=1,
+        n_grid=32,
+        n_knots=4,
+        spline_degree=2,
+        ridge_alpha=1e-3,
+        uniform_mix=1e-3,
+        max_steps=10,
+        warmup_steps=0,
+        ema=0.9,
+    )
+    restored.load_state_dict(schedule.state_dict())
+    assert torch.allclose(restored.alpha_t(t), alpha)
+
+    # Lightning recursively loads child buffers without calling the child's
+    # load_state_dict override. Evaluation must still reconstruct the spline.
+    recursively_restored = AdaptiveSchedule(
+        TruncatedSchedule(LogLinear(), 0.001, 0.093),
+        buffer_size=8,
+        refit_every=1,
+        n_grid=32,
+        n_knots=4,
+        spline_degree=2,
+        ridge_alpha=1e-3,
+        uniform_mix=1e-3,
+        max_steps=10,
+        warmup_steps=0,
+        ema=0.9,
+    )
+    torch.nn.Module.load_state_dict(recursively_restored, schedule.state_dict())
+    assert torch.allclose(recursively_restored.alpha_t(t), alpha)

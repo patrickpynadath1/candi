@@ -84,7 +84,7 @@ class ContDiffEmbed(Diffusion):
         nll = -1 * log_p_theta
         return nll
 
-    def q_xt(self, x, alpha_t):
+    def q_xt(self, x, alpha_t, valid_tokens=None):
         t = (1 - alpha_t).squeeze()
         continuous_noise = self.get_continuous_from_discrete_noise(t)
 
@@ -92,6 +92,8 @@ class ContDiffEmbed(Diffusion):
         sigma = self.get_continuous_from_discrete_noise(t).squeeze()
         noise = torch.randn_like(clean_embeddings, device=x.device) * sigma[:, None, None]
         xt = clean_embeddings + noise
+        if valid_tokens is not None:
+            xt = torch.where(valid_tokens.bool().unsqueeze(-1), xt, clean_embeddings)
 
         return {
             'xt': xt,
@@ -118,7 +120,8 @@ class ContDiffEmbed(Diffusion):
             model_output = self.backbone(**kwargs)
         return self._process_model_output(model_output=model_output)
 
-    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
+    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False,
+            valid_tokens=None):
         del output_tokens
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         assert t.shape[0] == x0.shape[0]
@@ -126,7 +129,7 @@ class ContDiffEmbed(Diffusion):
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
 
-        noisy_output = self.q_xt(x0, alpha_t)
+        noisy_output = self.q_xt(x0, alpha_t, valid_tokens=valid_tokens)
         log_x_theta = self.forward(**noisy_output)
 
         utils.print_nans(log_x_theta, "model_output")

@@ -52,7 +52,7 @@ def test_unsqueeze_appends_singleton_dimensions(value_shape, reference_shape, ex
 def test_loss_masks_invalid_tokens_and_aggregates():
     trainer = _bare_trainer()
     trainer._process_model_input = lambda x, valid: (x, x, valid)
-    trainer.nll = lambda *_args: torch.tensor([[1.0, 2.0, 100.0], [4.0, 5.0, 6.0]])
+    trainer.nll = lambda *_args, **_kwargs: torch.tensor([[1.0, 2.0, 100.0], [4.0, 5.0, 6.0]])
     valid = torch.tensor([[1, 1, 0], [0, 1, 1]], dtype=torch.float32)
 
     result = trainer._loss(torch.zeros(2, 3, dtype=torch.long), valid)
@@ -66,7 +66,7 @@ def test_loss_masks_invalid_tokens_and_aggregates():
 def test_loss_ignores_bos_without_mutating_attention_mask():
     trainer = _bare_trainer(ignore_bos=True)
     trainer._process_model_input = lambda x, valid: (x, x, valid)
-    trainer.nll = lambda *_args: torch.tensor([[100.0, 2.0, 3.0]])
+    trainer.nll = lambda *_args, **_kwargs: torch.tensor([[100.0, 2.0, 3.0]])
     valid = torch.ones(1, 3)
 
     result = trainer._loss(torch.zeros(1, 3, dtype=torch.long), valid)
@@ -79,7 +79,7 @@ def test_loss_ignores_bos_without_mutating_attention_mask():
 def test_loss_rejects_invalid_nll_shape():
     trainer = _bare_trainer()
     trainer._process_model_input = lambda x, valid: (x, x, valid)
-    trainer.nll = lambda *_args: torch.ones(2)
+    trainer.nll = lambda *_args, **_kwargs: torch.ones(2)
 
     with pytest.raises(AssertionError):
         trainer._loss(torch.zeros(2, 3, dtype=torch.long), torch.ones(2, 3))

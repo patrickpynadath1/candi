@@ -85,7 +85,7 @@ class Semicat(Diffusion):
     # Training loss (VFM cross-entropy)
     # ------------------------------------------------------------------
     def nll(self, x0_tokens, output_tokens, current_accumulation_step=None,
-            train_mode=False):
+            train_mode=False, valid_tokens=None):
         """Compute the flow-matching cross-entropy loss.
 
         This replaces the standard nll interface. We ignore output_tokens
@@ -113,6 +113,9 @@ class Semicat(Diffusion):
 
         # Interpolate
         xt = self._interpolate(x0, x1, t_broad)
+        if valid_tokens is not None:
+            clean = F.one_hot(x1, self.vocab_size).float()
+            xt = torch.where(valid_tokens.bool().unsqueeze(-1), xt, clean)
 
         # Predict clean tokens — network receives (xt, t, t) following
         # the original semicat convention where both time args are t

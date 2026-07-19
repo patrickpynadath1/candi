@@ -1,5 +1,7 @@
 import itertools
+import json
 from dataclasses import dataclass
+from pathlib import Path
 import hydra.utils
 import lightning as L
 import torch
@@ -9,6 +11,7 @@ import dataloader
 import metrics
 from models import model_registry
 from models.ema import ExponentialMovingAverage
+from .noise_schedules import LogLinear as LogLinear, get_noise
 
 from samplers import SamplingRequest, create_sampler, run_sampler
 
@@ -20,19 +23,6 @@ class Loss:
     num_tokens: torch.FloatTensor
 
 
-class LogLinear(torch.nn.Module):
-    type = "log-linear"
-
-    def __init__(self):
-        super().__init__()
-        self.eps = 1e-3  # To be consistent with SEDD: https://github.com/louaaron/Score-Entropy-Discrete-Diffusion/blob/0605786da5ccb5747545e26d66fdf477187598b6/noise_lib.py#L56
-
-    def forward(self, t):
-        t = (1 - self.eps) * t
-        alpha_t = 1 - t
-        dalpha_t = -(1 - self.eps)
-        return dalpha_t, alpha_t
-    
 def sample_categorical(categorical_probs):
     gumbel_norm = 1e-10 - (torch.rand_like(categorical_probs) + 1e-10).log()
     return (categorical_probs / gumbel_norm).argmax(dim=-1)
@@ -83,8 +73,9 @@ class TrainerBase(L.LightningModule):
         self.num_tokens = self.config.model.length
         self.softplus = torch.nn.Softplus()
         self.p_nucleus = self.config.sampling.p_nucleus
-        # Noise Schedule
-        self.noise = LogLinear()
+        # All time-conditioned algorithms use the configured path schedule.
+        self.noise = get_noise(config)
+        self._last_logged_schedule_refit = 0
 
         self.metrics = metrics.Metrics(
             gen_ppl_eval_model_name_or_path=self.config.eval.gen_ppl_eval_model_name_or_path,
@@ -272,6 +263,75 @@ class TrainerBase(L.LightningModule):
         super().optimizer_step(*args, **kwargs)
         if self.ema:
             self.ema.update(self._get_parameters())
+
+    def _record_time_loss(self, t, token_loss, valid_tokens, train_mode):
+        if not train_mode or not hasattr(self.noise, "record_time_loss_pair"):
+            return
+        if valid_tokens is None:
+            per_example = token_loss.detach().mean(-1)
+        else:
+            weights = valid_tokens.to(token_loss)
+            per_example = (token_loss.detach() * weights).sum(-1) / weights.sum(
+                -1
+            ).clamp_min(1)
+        self.noise.record_time_loss_pair(t.detach(), per_example, int(self.global_step))
+        self._log_adaptive_schedule()
+
+    def _log_adaptive_schedule(self):
+        snapshot_fn = getattr(self.noise, "snapshot", None)
+        if snapshot_fn is None:
+            return
+        refit = int(getattr(self.noise, "refit_count").item())
+        if refit <= self._last_logged_schedule_refit or self.global_rank != 0:
+            return
+        self._last_logged_schedule_refit = refit
+        snapshot = snapshot_fn()
+        output_dir = Path(
+            getattr(
+                self.config.noise,
+                "adaptive_snapshot_dir",
+                Path(self.config.checkpointing.save_dir) / "schedule_snapshots",
+            )
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        step = int(self.global_step)
+        (output_dir / f"step_{step:06d}.json").write_text(
+            json.dumps(snapshot, indent=2)
+        )
+        try:
+            import wandb
+
+            experiment = self.logger.experiment
+            plot = wandb.plot.line_series(
+                xs=snapshot["grid"],
+                ys=[
+                    snapshot["base_alpha"],
+                    snapshot["alpha"],
+                    snapshot["sampling_density"],
+                ],
+                keys=["base_alpha", "adaptive_alpha", "sampling_density"],
+                title=f"Adaptive schedule at step {step}",
+                xname="t",
+            )
+            dynamics_plot = wandb.plot.line_series(
+                xs=snapshot["grid"],
+                ys=[snapshot["loss_profile"], snapshot["dalpha_dt"]],
+                keys=["smoothed_loss", "dalpha_dt"],
+                title=f"Adaptive schedule dynamics at step {step}",
+                xname="t",
+            )
+            experiment.log(
+                {
+                    "schedule/profile": plot,
+                    "schedule/dynamics": dynamics_plot,
+                    "schedule/refit_count": refit,
+                    "schedule/alpha_min": min(snapshot["alpha"]),
+                    "schedule/alpha_max": max(snapshot["alpha"]),
+                },
+                step=step,
+            )
+        except (AttributeError, RuntimeError, TypeError):
+            pass
 
     def _process_sigma(self, sigma):
         raise NotImplementedError
@@ -463,6 +523,7 @@ class TrainerBase(L.LightningModule):
         output_tokens,
         current_accumulation_step=None,
         train_mode=False,
+        valid_tokens=None,
     ):
         raise NotImplementedError
 
@@ -471,7 +532,8 @@ class TrainerBase(L.LightningModule):
             x0, valid_tokens
         )
         loss = self.nll(
-            input_tokens, output_tokens, current_accumulation_step, train_mode
+            input_tokens, output_tokens, current_accumulation_step, train_mode,
+            valid_tokens=valid_tokens,
         )
         assert loss.ndim == 2
         if self.ignore_bos:

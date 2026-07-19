@@ -13,7 +13,7 @@ class UniformState(Diffusion):
         if self.config.algo.name != "distillation":
             assert self.T == 0
 
-    def q_xt(self, x, alpha_t):
+    def q_xt(self, x, alpha_t, valid_tokens=None):
         """Computes the noisy sample xt.
 
         Args:
@@ -25,6 +25,8 @@ class UniformState(Diffusion):
         move_indices = torch.rand(*x.shape, device=x.device) < 1 - alpha_t
         uniform_tensor = torch.randint(0, self.vocab_size, x.shape, device=x.device)
         xt = torch.where(move_indices, uniform_tensor, x)
+        if valid_tokens is not None:
+            xt = torch.where(valid_tokens.bool(), xt, x)
         if self.ignore_bos:
             xt[:, 0] = x[:, 0]
         return xt

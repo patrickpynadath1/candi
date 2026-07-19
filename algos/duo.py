@@ -141,7 +141,7 @@ class DUO_BASE(UniformState):
         # to handle conditional generation for inputs / infilling tasks
         if prompt_mask is not None:
             # expects the original x to have the prompt tokens where prompt_mask = 1
-            xs = (xs * (1 - prompt_mask) + x * prompt_mask).long()
+            xs = torch.where(prompt_mask.bool(), x, xs)
         return None, xs
 
 
@@ -253,14 +253,24 @@ class DUO(DUO_BASE):
         epsilon = torch.randn(x.shape, dtype=torch.float32, device=self.device)
         return alpha_t * x + sigma_t * epsilon
 
-    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False):
+    def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False,
+            valid_tokens=None):
         use_true_nll = self.global_step > self.curriculum_end or not train_mode
         if use_true_nll:
-            return super().nll(x0, output_tokens, current_accumulation_step)
+            return super().nll(
+                x0, output_tokens, current_accumulation_step, train_mode,
+                valid_tokens=valid_tokens,
+            )
         del output_tokens
-        t = self._sample_t(x0.shape[0], current_accumulation_step)
+        schedule_t = self._sample_t(x0.shape[0], current_accumulation_step)
+        # DUO's curriculum is parameterized noise-low to noise-high, whereas
+        # alpha(t) is clean-high to clean-low.
+        schedule_dalpha, schedule_alpha = self.noise(schedule_t)
+        t = 1 - schedule_alpha
         gamma_t = self.gamma_min + t * (self.gamma_max - self.gamma_min)
-        gamma_t_prime = self.gamma_max - self.gamma_min
+        gamma_t_prime = (
+            (self.gamma_max - self.gamma_min) * -schedule_dalpha
+        )
         usdm_alpha_t = self._gamma_to_alphat(gamma_t)
         T = 1000
         usdm_dalpha_t = (
@@ -273,11 +283,15 @@ class DUO(DUO_BASE):
 
         x0_one_hot = F.one_hot(x0, self.vocab_size)
         xt = self._q_xt_gaussian(x0_one_hot, gamma_t)
+        if valid_tokens is not None:
+            xt = torch.where(
+                valid_tokens.bool().unsqueeze(-1), xt, x0_one_hot.float()
+            )
         xt = xt * self._compute_gumbel_tau_inverse()
         xt_usdm = xt.argmax(-1)
         log_x_theta = self.forward(xt, sigma=sigma)
 
-        return self.nll_per_token(
+        loss = self.nll_per_token(
             log_x_theta=log_x_theta,
             xt=xt_usdm,
             x0=x0,
@@ -285,3 +299,5 @@ class DUO(DUO_BASE):
             dalpha_t=usdm_dalpha_t,
             low_var=False,
         )
+        self._record_time_loss(schedule_t, loss, valid_tokens, train_mode)
+        return loss

@@ -49,15 +49,19 @@ class SFM(Diffusion):
     def forward(self, xt, sigma):
         return self._process_model_output(self.backbone(xt, self._process_sigma(sigma)))
 
-    def q_xt(self, x, alpha_t):
+    def q_xt(self, x, alpha_t, valid_tokens=None):
         clean = self.backbone.get_sphere_embeddings(x)
         noisy = sphere_normalize(torch.randn_like(clean), self.eps)
         amount = alpha_t if self.invert_time_convention else 1 - alpha_t
         if self.slerp_precision == "float64":
-            return slerp(clean.double(), noisy.double(), amount.double(), self.eps).to(
+            xt = slerp(clean.double(), noisy.double(), amount.double(), self.eps).to(
                 clean.dtype
             )
-        return slerp(clean, noisy, amount, self.eps)
+        else:
+            xt = slerp(clean, noisy, amount, self.eps)
+        if valid_tokens is not None:
+            xt = torch.where(valid_tokens.bool().unsqueeze(-1), xt, clean)
+        return xt
 
     def nll_per_token(self, log_x_theta, x0, **kwargs):
         del kwargs
@@ -69,18 +73,16 @@ class SFM(Diffusion):
         output_tokens,
         current_accumulation_step=None,
         train_mode=False,
+        valid_tokens=None,
     ):
         del output_tokens
         t = self._sample_t(input_tokens.shape[0], current_accumulation_step)
         _, alpha = self.noise(t)
         alpha = alpha.unsqueeze(-1)
-        xt = self.q_xt(input_tokens, alpha)
+        xt = self.q_xt(input_tokens, alpha, valid_tokens=valid_tokens)
         sigma = self._sigma_from_alphat(alpha)
         loss = self.nll_per_token(self.forward(xt, sigma), input_tokens)
-        if train_mode:
-            self.noise.record_time_loss_pair(
-                t, loss.detach().mean(-1), int(self.global_step)
-            )
+        self._record_time_loss(t, loss, valid_tokens, train_mode)
         return loss
 
     def optimizer_step(self, *args, **kwargs):

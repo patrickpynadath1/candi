@@ -19,6 +19,13 @@ __pycache__/
 # C extensions
 *.so
 
+# results
+new_eval_results/
+new_eval_runs/
+new_results/
+new_sudoku_runs/
+data_cache/
+
 # Distribution / packaging
 .Python
 build/

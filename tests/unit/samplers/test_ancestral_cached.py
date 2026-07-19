@@ -68,3 +68,18 @@ def test_invalidates_cache_for_time_conditioned_models():
     )
 
     assert model.seen_caches == [None, None]
+
+
+def test_passes_prompt_mask_to_every_cached_transition():
+    model = CachedModel()
+    prompt_mask = torch.tensor([[True, False, True]])
+    prompt_tokens = torch.tensor([[2, 0, 3]])
+    run_sampler(
+        CachedAncestralSampler("none"), model,
+        SamplingRequest(
+            num_samples=1, num_steps=3, prompt_tokens=prompt_tokens,
+            prompt_mask=prompt_mask,
+        ),
+    )
+    assert len(model.seen_prompt_masks) == 3
+    assert all(torch.equal(mask, prompt_mask) for mask in model.seen_prompt_masks)

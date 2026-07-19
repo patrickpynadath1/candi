@@ -5,6 +5,7 @@ defaults:
   - override /algo: mdlm
 model:
   length: 180
+  hidden_size: 512
 loader:
   global_batch_size: 256
 trainer:

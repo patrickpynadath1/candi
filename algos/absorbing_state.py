@@ -50,7 +50,7 @@ class AbsorbingState(Diffusion):
         if self.subs_masking:
             assert self.parameterization == "mean"
 
-    def q_xt(self, x, alpha_t):
+    def q_xt(self, x, alpha_t, valid_tokens=None):
         """Computes the noisy sample xt.
 
         Args:
@@ -60,6 +60,8 @@ class AbsorbingState(Diffusion):
         """
         move_indices = torch.rand(*x.shape, device=x.device) < 1 - alpha_t
         xt = torch.where(move_indices, self.mask_index, x)
+        if valid_tokens is not None:
+            xt = torch.where(valid_tokens.bool(), xt, x)
         if self.ignore_bos:
             xt[:, 0] = x[:, 0]
         return xt
