@@ -14,6 +14,7 @@ CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     "greedy_denoise": ("sample_greedy_denoise",),
     "zero_time_denoise": ("sample_zero_time_denoise",),
     "continuous_schedule": ("sampling_continuous_schedule",),
+    "candi_discrete_schedule": ("sampling_discrete_schedule",),
     "continuous_transition": ("sample_continuous_transition",),
     "embedding_projection": ("sampling_embeddings",),
     "cadd_continuous_transition": ("sample_cadd_continuous_transition",),

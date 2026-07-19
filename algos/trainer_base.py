@@ -75,7 +75,7 @@ class TrainerBase(L.LightningModule):
         self.p_nucleus = self.config.sampling.p_nucleus
         # All time-conditioned algorithms use the configured path schedule.
         self.noise = get_noise(config)
-        self._last_logged_schedule_refit = 0
+        self._last_logged_schedule_refit = {}
 
         self.metrics = metrics.Metrics(
             gen_ppl_eval_model_name_or_path=self.config.eval.gen_ppl_eval_model_name_or_path,
@@ -264,8 +264,12 @@ class TrainerBase(L.LightningModule):
         if self.ema:
             self.ema.update(self._get_parameters())
 
-    def _record_time_loss(self, t, token_loss, valid_tokens, train_mode):
-        if not train_mode or not hasattr(self.noise, "record_time_loss_pair"):
+    def _record_time_loss(
+        self, t, token_loss, valid_tokens, train_mode,
+        schedule=None, schedule_name="schedule",
+    ):
+        schedule = self.noise if schedule is None else schedule
+        if not train_mode or not hasattr(schedule, "record_time_loss_pair"):
             return
         if valid_tokens is None:
             per_example = token_loss.detach().mean(-1)
@@ -274,17 +278,19 @@ class TrainerBase(L.LightningModule):
             per_example = (token_loss.detach() * weights).sum(-1) / weights.sum(
                 -1
             ).clamp_min(1)
-        self.noise.record_time_loss_pair(t.detach(), per_example, int(self.global_step))
-        self._log_adaptive_schedule()
+        schedule.record_time_loss_pair(t.detach(), per_example, int(self.global_step))
+        self._log_adaptive_schedule(schedule, schedule_name)
 
-    def _log_adaptive_schedule(self):
-        snapshot_fn = getattr(self.noise, "snapshot", None)
+    def _log_adaptive_schedule(self, schedule=None, schedule_name="schedule"):
+        schedule = self.noise if schedule is None else schedule
+        snapshot_fn = getattr(schedule, "snapshot", None)
         if snapshot_fn is None:
             return
-        refit = int(getattr(self.noise, "refit_count").item())
-        if refit <= self._last_logged_schedule_refit or self.global_rank != 0:
+        refit = int(getattr(schedule, "refit_count").item())
+        last_refit = self._last_logged_schedule_refit.get(schedule_name, 0)
+        if refit <= last_refit or self.global_rank != 0:
             return
-        self._last_logged_schedule_refit = refit
+        self._last_logged_schedule_refit[schedule_name] = refit
         snapshot = snapshot_fn()
         output_dir = Path(
             getattr(
@@ -293,6 +299,8 @@ class TrainerBase(L.LightningModule):
                 Path(self.config.checkpointing.save_dir) / "schedule_snapshots",
             )
         )
+        if schedule_name != "schedule":
+            output_dir = output_dir / schedule_name
         output_dir.mkdir(parents=True, exist_ok=True)
         step = int(self.global_step)
         (output_dir / f"step_{step:06d}.json").write_text(
@@ -322,11 +330,11 @@ class TrainerBase(L.LightningModule):
             )
             experiment.log(
                 {
-                    "schedule/profile": plot,
-                    "schedule/dynamics": dynamics_plot,
-                    "schedule/refit_count": refit,
-                    "schedule/alpha_min": min(snapshot["alpha"]),
-                    "schedule/alpha_max": max(snapshot["alpha"]),
+                    f"{schedule_name}/profile": plot,
+                    f"{schedule_name}/dynamics": dynamics_plot,
+                    f"{schedule_name}/refit_count": refit,
+                    f"{schedule_name}/alpha_min": min(snapshot["alpha"]),
+                    f"{schedule_name}/alpha_max": max(snapshot["alpha"]),
                 },
                 step=step,
             )

@@ -75,6 +75,30 @@ def test_candi_q_xt_shapes_and_finite_values():
     assert torch.isfinite(result["xt"]).all()
 
 
+def test_candi_q_xt_accepts_independent_rank_degradation():
+    model = _bare(
+        CANDI,
+        vocab_size=5,
+        ignore_bos=False,
+        sigma_min=0.1,
+        sigma_max=1.0,
+        cont_schedule_target="sigma",
+        cont_schedule_type="linear",
+    )
+    tokens = torch.tensor([[0, 1], [2, 3]])
+    rank_noise = torch.tensor([0.2, 0.8])
+    result = model.q_xt(
+        tokens,
+        torch.tensor([[0.9], [0.6]]),
+        continuous_discrete_noise=rank_noise,
+    )
+    assert torch.allclose(result["discrete_noise"], torch.tensor([0.1, 0.4]))
+    assert torch.equal(result["rank_noise"], rank_noise)
+    assert torch.allclose(
+        result["continuous_noise"], torch.tensor([0.28, 0.82])
+    )
+
+
 def test_candi_q_xt_keeps_prompt_as_clean_onehot():
     model = _bare(
         CANDI, vocab_size=5, ignore_bos=False, sigma_min=0.1, sigma_max=1.0,

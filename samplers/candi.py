@@ -8,7 +8,7 @@ class CANDISampler(Sampler):
         name="candi",
         compatible_families=frozenset({"candi"}),
         required_capabilities=frozenset({
-            "continuous_prior", "continuous_schedule",
+            "continuous_prior", "continuous_schedule", "candi_discrete_schedule",
             "candi_continuous_transition", "candi_discrete_transition",
         }),
     )
@@ -19,14 +19,18 @@ class CANDISampler(Sampler):
             model.prior_sample(request.num_samples, model.num_tokens), request
         )
         sigmas = model.sampling_continuous_schedule(times, steps)
-        dt = (1 - request.eps) / steps
+        discrete_times = model.sampling_discrete_schedule(times)
         for i in range(steps):
             continuous, clean_probs = model.sample_candi_continuous_transition(
-                x, times[i], sigma_s=sigmas[i], sigma_t=sigmas[i + 1],
-                clean_mask=clean, time_s=times[i + 1],
+                x, discrete_times[i], sigma_s=sigmas[i], sigma_t=sigmas[i + 1],
+                clean_mask=clean, time_s=discrete_times[i + 1],
             )
             x, clean = model.sample_candi_discrete_transition(
-                continuous, clean_probs, times[i], dt, prev_clean_mask=clean
+                continuous,
+                clean_probs,
+                discrete_times[i],
+                discrete_times[i] - discrete_times[i + 1],
+                prev_clean_mask=clean,
             )
         return SamplingResult(x.argmax(-1), {"nfe": steps})
 

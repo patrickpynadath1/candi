@@ -10,7 +10,7 @@ from .helpers import ModelBase, onehot_prior
 class CANDIModel(ModelBase):
     sampling_family = "candi"
     sampling_capabilities = frozenset({
-        "continuous_prior", "continuous_schedule",
+        "continuous_prior", "continuous_schedule", "candi_discrete_schedule",
         "candi_continuous_transition", "candi_discrete_transition",
     })
 
@@ -19,6 +19,9 @@ class CANDIModel(ModelBase):
 
     def sampling_continuous_schedule(self, times, steps):
         assert len(times) == steps + 1
+        return times
+
+    def sampling_discrete_schedule(self, times):
         return times
 
     def sample_candi_continuous_transition(self, x, *_args, **_kwargs):

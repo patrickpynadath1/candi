@@ -10,7 +10,8 @@ from .helpers import ModelBase, onehot_prior
 class CachedCANDIModel(ModelBase):
     sampling_family = "candi"
     sampling_capabilities = frozenset({
-        "continuous_prior", "continuous_schedule", "embedding_projection",
+        "continuous_prior", "continuous_schedule", "candi_discrete_schedule",
+        "embedding_projection",
         "candi_cached_continuous_transition",
         "candi_cached_discrete_transition",
     })
@@ -23,6 +24,9 @@ class CachedCANDIModel(ModelBase):
         return onehot_prior(batch, length)
 
     def sampling_continuous_schedule(self, times, _steps):
+        return times
+
+    def sampling_discrete_schedule(self, times):
         return times
 
     def sampling_embeddings(self, probabilities):

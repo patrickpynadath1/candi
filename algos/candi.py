@@ -6,6 +6,7 @@ from .algo_utils import (
     sample_categorical,
     )
 from .registry import algo_registry
+from .noise_schedules import get_noise
 
 import utils
 import torch
@@ -18,7 +19,7 @@ class CANDI(Diffusion):
     supported_samplers = frozenset({"candi", "candi_cached"})
     sampling_family = "candi"
     sampling_capabilities = frozenset({
-        "continuous_prior", "continuous_schedule",
+        "continuous_prior", "continuous_schedule", "candi_discrete_schedule",
         "candi_continuous_transition", "candi_discrete_transition",
         "embedding_projection", "candi_cached_continuous_transition",
         "candi_cached_discrete_transition",
@@ -51,6 +52,17 @@ class CANDI(Diffusion):
 
         self.cont_schedule_target = config.algo.cont_schedule_target
         self.cont_schedule_type = config.algo.cont_schedule_type
+        self.factorized_adaptive_schedule = config.algo.get(
+            "factorized_adaptive_schedule", False
+        )
+        if self.factorized_adaptive_schedule:
+            if not config.noise.get("adaptive", False):
+                raise ValueError(
+                    "CANDI's factorized schedule requires noise.adaptive=true"
+                )
+            # The primary schedule controls discrete corruption. This second,
+            # independently fitted schedule controls continuous rank degradation.
+            self.continuous_rank_schedule = get_noise(config)
 
 
 
@@ -173,7 +185,9 @@ class CANDI(Diffusion):
 
         return xt
 
-    def q_xt(self, x, alpha_t, valid_tokens=None):
+    def q_xt(
+        self, x, alpha_t, valid_tokens=None, continuous_discrete_noise=None
+    ):
 
         disc_xt = self.discrete_noising(x, alpha_t)
         if valid_tokens is not None:
@@ -182,7 +196,12 @@ class CANDI(Diffusion):
 
         # Keep the batch dimension even for single-example evaluation.
         discrete_noise = (1 - alpha_t).reshape(-1)
-        continuous_noise = self.get_continuous_from_discrete_noise(discrete_noise)
+        rank_noise = (
+            discrete_noise
+            if continuous_discrete_noise is None
+            else continuous_discrete_noise.reshape(-1)
+        )
+        continuous_noise = self.get_continuous_from_discrete_noise(rank_noise)
 
         # accounting for the mask token
         onehot = F.one_hot(x, num_classes=self.vocab_size-1).float()
@@ -195,6 +214,7 @@ class CANDI(Diffusion):
             'xt': xt,
             'reveal_mask': reveal_mask,
             'discrete_noise': discrete_noise,
+            'rank_noise': rank_noise,
             'continuous_noise': continuous_noise
         }
 
@@ -220,7 +240,18 @@ class CANDI(Diffusion):
         alpha_t = alpha_t.unsqueeze(-1)
         assert alpha_t.ndim == 2
 
-        noisy_output = self.q_xt(x0, alpha_t, valid_tokens=valid_tokens)
+        rank_t = None
+        rank_noise = None
+        if self.factorized_adaptive_schedule:
+            rank_t = self._sample_t(x0.shape[0], current_accumulation_step)
+            _, rank_alpha = self.continuous_rank_schedule(rank_t)
+            rank_noise = 1 - rank_alpha
+        noisy_output = self.q_xt(
+            x0,
+            alpha_t,
+            valid_tokens=valid_tokens,
+            continuous_discrete_noise=rank_noise,
+        )
         log_x_theta = self.forward(**noisy_output)
 
         utils.print_nans(log_x_theta, "model_output")
@@ -232,7 +263,21 @@ class CANDI(Diffusion):
             low_var=train_mode,
             **noisy_output,
         )
-        self._record_time_loss(t, loss, valid_tokens, train_mode)
+        schedule_name = (
+            "schedule/discrete" if self.factorized_adaptive_schedule else "schedule"
+        )
+        self._record_time_loss(
+            t, loss, valid_tokens, train_mode, schedule_name=schedule_name
+        )
+        if rank_t is not None:
+            self._record_time_loss(
+                rank_t,
+                loss,
+                valid_tokens,
+                train_mode,
+                schedule=self.continuous_rank_schedule,
+                schedule_name="schedule/continuous_rank",
+            )
         return loss
 
 
@@ -243,11 +288,21 @@ class CANDI(Diffusion):
         return x, prompt_mask
 
     def sampling_continuous_schedule(self, timesteps, steps):
+        rank_schedule = (
+            self.continuous_rank_schedule
+            if self.factorized_adaptive_schedule
+            else self.noise
+        )
+        rank_noise = 1 - rank_schedule.alpha_t(timesteps)
         if self.use_percentile_scheduling:
-            return self.get_continuous_from_discrete_noise(timesteps)
+            return self.get_continuous_from_discrete_noise(rank_noise)
         return inference_sigmas(steps + 1, self.sigma_min, self.sigma_max).to(
             self.device
         )
+
+    def sampling_discrete_schedule(self, timesteps):
+        """Return actual discrete-noise levels for a base solver-time grid."""
+        return 1 - self.noise.alpha_t(timesteps)
 
     def sampling_embeddings(self, x):
         return self.backbone.get_embedding(x)
