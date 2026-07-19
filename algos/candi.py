@@ -68,12 +68,21 @@ class CANDI(Diffusion):
         if self.joint_loss_probe and not self.factorized_adaptive_schedule:
             raise ValueError("joint_loss_probe requires factorized_adaptive_schedule")
         if self.joint_loss_probe:
-            self.joint_loss_surface = JointLossSurface(
-                bins=config.algo.get("joint_loss_bins", 100),
-                smoothing_sigma=config.algo.get("joint_loss_smoothing_sigma", 3.0),
-                min_effective_count=config.algo.get(
+            surface_kwargs = {
+                "bins": config.algo.get("joint_loss_bins", 100),
+                "smoothing_sigma": config.algo.get(
+                    "joint_loss_smoothing_sigma", 3.0
+                ),
+                "min_effective_count": config.algo.get(
                     "joint_loss_min_effective_count", 5.0
                 ),
+            }
+            # Keep prediction difficulty separate from the importance-weighted
+            # likelihood integrand. The former drives adaptive statistics; the
+            # latter remains available to diagnose optimization pressure.
+            self.joint_raw_ce_surface = JointLossSurface(**surface_kwargs)
+            self.joint_weighted_objective_surface = JointLossSurface(
+                **surface_kwargs
             )
         self.joint_loss_log_every = config.algo.get("joint_loss_log_every", 500)
         self._last_joint_loss_log_step = -1
@@ -84,8 +93,13 @@ class CANDI(Diffusion):
         return super()._sample_t(n, accum_step)
 
     @staticmethod
-    def _shuffle_factorized_time(t):
-        return t[torch.randperm(t.shape[0], device=t.device)]
+    def _sample_factorized_time(n, device, eps=0.0):
+        """Independent full-range stratification for the second noise axis."""
+        values = (
+            torch.arange(n, device=device) + torch.rand(n, device=device)
+        ) / n
+        values = values[torch.randperm(n, device=device)]
+        return eps + (1 - eps) * values
 
     def _linear_sigma_schedule(self, discrete_noise):
         """Linear schedule directly in sigma space."""
@@ -176,14 +190,18 @@ class CANDI(Diffusion):
                      **kwargs):
 
 
+        raw_ce = self.raw_ce_per_token(log_x_theta, x0_tokens)
+        if self.pure_continuous:
+            return raw_ce
+        return -raw_ce * dalpha_t / (1 - alpha_t)
+
+    @staticmethod
+    def raw_ce_per_token(log_x_theta, x0_tokens):
+        """Unweighted denoising cross-entropy at each sequence position."""
         log_p_theta = torch.gather(
             input=log_x_theta, dim=-1, index=x0_tokens[:, :, None]
         ).squeeze(-1)
-        if self.pure_continuous:
-            nll = -1 * log_p_theta
-        else:
-            nll = log_p_theta * dalpha_t / (1 - alpha_t)
-        return nll
+        return -log_p_theta
 
 
     def discrete_noising(self, x, alpha_t):
@@ -278,12 +296,13 @@ class CANDI(Diffusion):
         rank_t = None
         rank_noise = None
         if self.factorized_adaptive_schedule:
-            rank_t = self._sample_t(x0.shape[0], current_accumulation_step)
-            # Both antithetic draws are internally sorted by batch index. Pairing
-            # them directly produces a diagonal band rather than a 2D design.
-            # Randomly permuting one marginal preserves its stratification while
-            # yielding Latin-hypercube coverage of the corruption plane.
-            rank_t = self._shuffle_factorized_time(rank_t)
+            # The discrete antithetic draw is partitioned by gradient-
+            # accumulation step. Reusing that partition for rank time confines
+            # each microbatch to one diagonal block. Instead, stratify the rank
+            # marginal over its full range on every microbatch, then permute it.
+            rank_t = self._sample_factorized_time(
+                x0.shape[0], x0.device, self.sampling_eps
+            )
             _, rank_alpha = self.continuous_rank_schedule(rank_t)
             rank_noise = 1 - rank_alpha
         else:
@@ -305,29 +324,37 @@ class CANDI(Diffusion):
             low_var=train_mode,
             **noisy_output,
         )
+        raw_ce = self.raw_ce_per_token(log_x_theta, x0)
+        adaptive_loss = raw_ce if self.factorized_adaptive_schedule else loss
         schedule_name = (
             "schedule/discrete" if self.factorized_adaptive_schedule else "schedule"
         )
         self._record_time_loss(
-            t, loss, valid_tokens, train_mode, schedule_name=schedule_name
+            t, adaptive_loss, valid_tokens, train_mode, schedule_name=schedule_name
         )
         if rank_t is not None:
             self._record_time_loss(
                 rank_t,
-                loss,
+                raw_ce,
                 valid_tokens,
                 train_mode,
                 schedule=self.continuous_rank_schedule,
                 schedule_name="schedule/continuous_rank",
             )
         if train_mode and self.joint_loss_probe:
-            per_example = self._per_example_loss(loss, valid_tokens)
-            self.joint_loss_surface.record(
+            raw_ce_per_example = self._per_example_loss(raw_ce, valid_tokens)
+            weighted_per_example = self._per_example_loss(loss, valid_tokens)
+            self.joint_raw_ce_surface.record(
                 noisy_output["discrete_noise"],
                 noisy_output["rank_noise"],
-                per_example,
+                raw_ce_per_example,
             )
-            self._log_joint_loss_surface()
+            self.joint_weighted_objective_surface.record(
+                noisy_output["discrete_noise"],
+                noisy_output["rank_noise"],
+                weighted_per_example,
+            )
+            self._log_joint_loss_surfaces()
         return loss
 
     @staticmethod
@@ -337,7 +364,7 @@ class CANDI(Diffusion):
         weights = valid_tokens.to(loss)
         return (loss.detach() * weights).sum(-1) / weights.sum(-1).clamp_min(1)
 
-    def _log_joint_loss_surface(self):
+    def _log_joint_loss_surfaces(self):
         step = int(self.global_step)
         if (
             self.global_rank != 0
@@ -346,61 +373,65 @@ class CANDI(Diffusion):
         ):
             return
         self._last_joint_loss_log_step = step
-        snapshot = self.joint_loss_surface.snapshot()
         output_dir = Path(self.config.checkpointing.save_dir) / "joint_loss_surfaces"
         output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / f"step_{step:06d}.json").write_text(
-            json.dumps(snapshot, indent=2, allow_nan=True)
-        )
-        svg = joint_surface_svg(snapshot)
-        svg_path = output_dir / f"step_{step:06d}.svg"
-        svg_path.write_text(svg)
+        surfaces = {
+            "raw_ce": self.joint_raw_ce_surface,
+            "weighted_objective": self.joint_weighted_objective_surface,
+        }
+        snapshots = {}
+        for name, surface in surfaces.items():
+            snapshot = surface.snapshot()
+            snapshots[name] = snapshot
+            (output_dir / f"{name}_step_{step:06d}.json").write_text(
+                json.dumps(snapshot, indent=2, allow_nan=True)
+            )
+            (output_dir / f"{name}_step_{step:06d}.svg").write_text(
+                joint_surface_svg(snapshot, metric_name=name.replace("_", " "))
+            )
         try:
             import wandb
 
             experiment = self.logger.experiment
-            rows = []
-            for i, discrete in enumerate(snapshot["centers"]):
-                for j, continuous in enumerate(snapshot["centers"]):
-                    rows.append([
-                        discrete,
-                        continuous,
-                        snapshot["count"][i][j],
-                        snapshot["smoothed_loss"][i][j],
-                        snapshot["grad_discrete"][i][j],
-                        snapshot["grad_continuous"][i][j],
-                        snapshot["gradient_magnitude"][i][j],
-                        snapshot["smoothed_effective_count"][i][j],
-                        snapshot["reliable"][i][j],
-                    ])
-            table = wandb.Table(
-                columns=[
-                    "discrete",
-                    "continuous",
-                    "count",
-                    "smoothed_loss",
-                    "grad_discrete",
-                    "grad_continuous",
-                    "gradient_magnitude",
-                    "smoothed_effective_count",
-                    "reliable",
-                ],
-                data=rows,
-            )
-            experiment.log(
-                {
-                    "joint_loss/surface_and_vector_field": table,
-                    "joint_loss/heatmap_vector_field": wandb.Html(
-                        svg, inject=False
-                    ),
-                    "joint_loss/observed_cells": sum(
+            payload = {}
+            for name, snapshot in snapshots.items():
+                rows = []
+                for i, discrete in enumerate(snapshot["centers"]):
+                    for j, continuous in enumerate(snapshot["centers"]):
+                        rows.append([
+                            discrete,
+                            continuous,
+                            snapshot["count"][i][j],
+                            snapshot["smoothed_loss"][i][j],
+                            snapshot["grad_discrete"][i][j],
+                            snapshot["grad_continuous"][i][j],
+                            snapshot["gradient_magnitude"][i][j],
+                            snapshot["smoothed_effective_count"][i][j],
+                            snapshot["reliable"][i][j],
+                        ])
+                table = wandb.Table(
+                    columns=[
+                        "discrete", "continuous", "count", "smoothed_loss",
+                        "grad_discrete", "grad_continuous",
+                        "gradient_magnitude", "smoothed_effective_count",
+                        "reliable",
+                    ],
+                    data=rows,
+                )
+                namespace = f"joint_loss/{name}"
+                svg = joint_surface_svg(
+                    snapshot, metric_name=name.replace("_", " ")
+                )
+                payload[f"{namespace}/surface_and_vector_field"] = table
+                payload[f"{namespace}/heatmap_vector_field"] = wandb.Html(
+                    svg, inject=False
+                )
+                payload[f"{namespace}/observed_cells"] = sum(
                         value > 0
                         for row in snapshot["count"]
                         for value in row
-                    ),
-                },
-                step=step,
-            )
+                    )
+            experiment.log(payload, step=step)
         except (AttributeError, RuntimeError, TypeError):
             pass
 

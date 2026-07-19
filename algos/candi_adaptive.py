@@ -7,7 +7,7 @@ import torch
 from scipy.ndimage import gaussian_filter
 
 
-def joint_surface_svg(snapshot, size=700, arrow_stride=10):
+def joint_surface_svg(snapshot, size=700, arrow_stride=10, metric_name="loss"):
     """Render a dependency-free SVG heatmap with a subsampled vector field."""
     loss = np.asarray(snapshot["smoothed_loss"], dtype=float)
     grad_d = np.asarray(snapshot["grad_discrete"], dtype=float)
@@ -37,7 +37,7 @@ def joint_surface_svg(snapshot, size=700, arrow_stride=10):
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 {size} {size}">',
         '<rect width="100%" height="100%" fill="white"/>',
         '<style>text{font-family:sans-serif;fill:#172033}.axis{stroke:#172033;stroke-width:2}</style>',
-        f'<text x="{size/2}" y="28" text-anchor="middle" font-size="20" font-weight="bold">Smoothed loss and gradient field</text>',
+        f'<text x="{size/2}" y="28" text-anchor="middle" font-size="20" font-weight="bold">Smoothed {metric_name} and gradient field</text>',
     ]
     for i in range(bins):
         for j in range(bins):
@@ -81,7 +81,7 @@ def joint_surface_svg(snapshot, size=700, arrow_stride=10):
         f'<text x="{right}" y="{bottom+20}" text-anchor="middle" font-size="12">1</text>',
         f'<text x="{margin-12}" y="{bottom+4}" text-anchor="end" font-size="12">0</text>',
         f'<text x="{margin-12}" y="{margin+4}" text-anchor="end" font-size="12">1</text>',
-        f'<text x="{right}" y="42" text-anchor="end" font-size="12">loss range {lo:.3g} – {hi:.3g}; faded = low confidence</text>',
+        f'<text x="{right}" y="42" text-anchor="end" font-size="12">{metric_name} range {lo:.3g} – {hi:.3g}; faded = low confidence</text>',
         '</svg>',
     ])
     return "".join(parts)

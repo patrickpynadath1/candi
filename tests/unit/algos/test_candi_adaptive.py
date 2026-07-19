@@ -53,6 +53,10 @@ def test_joint_loss_surface_tracks_2d_statistics_and_gradients():
     assert rendered.startswith("<svg")
     assert "discrete corruption d" in rendered
     assert "continuous degradation c" in rendered
+    labeled = joint_surface_svg(
+        snapshot, size=300, arrow_stride=2, metric_name="raw ce"
+    )
+    assert "Smoothed raw ce and gradient field" in labeled
 
 
 def test_bezier_rejects_nonmonotone_controls():
