@@ -1,6 +1,11 @@
 """Composable diffusion schedules, including S-FLM adaptive remapping."""
 
+import numpy as np
 import torch
+from scipy.interpolate import PchipInterpolator
+from sklearn.linear_model import Ridge
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import SplineTransformer
 
 
 class NoiseSchedule(torch.nn.Module):
@@ -57,54 +62,106 @@ class TruncatedSchedule(NoiseSchedule):
 
 
 class AdaptiveSchedule(NoiseSchedule):
-    """Checkpointable loss-gradient importance remapping on a fixed grid."""
+    """Buffered spline refitting from the official S-FLM implementation."""
 
-    def __init__(self, base, n_grid=1000, uniform_mix=1e-3, ema=0.0):
+    def __init__(
+        self, base, buffer_size, refit_every, n_grid, n_knots,
+        spline_degree, ridge_alpha, uniform_mix, max_steps, warmup_steps,
+        ema,
+    ):
         super().__init__()
-        self.base, self.uniform_mix, self.ema = base, uniform_mix, ema
-        self.register_buffer("grid", torch.linspace(0, 1, n_grid))
-        self.register_buffer("mapped_t", torch.linspace(0, 1, n_grid))
-        self.register_buffer("loss_sum", torch.zeros(n_grid))
-        self.register_buffer("loss_count", torch.zeros(n_grid))
+        self.base = base
+        self.buffer_size = buffer_size
+        self.refit_every = refit_every
+        self.n_knots = n_knots
+        self.spline_degree = spline_degree
+        self.ridge_alpha = ridge_alpha
+        self.uniform_mix = uniform_mix
+        self.warmup_steps = warmup_steps
+        self.ema = ema
+        self.register_buffer("t_buf", torch.zeros(buffer_size, dtype=torch.float64))
+        self.register_buffer("loss_buf", torch.zeros(buffer_size, dtype=torch.float64))
+        self.register_buffer("buf_pos", torch.tensor(0, dtype=torch.long))
+        self.register_buffer("alpha_vals", torch.zeros(n_grid, dtype=torch.float64))
+        self.register_buffer("has_schedule", torch.tensor(False))
+        self.register_buffer("ema_alpha_vals", torch.zeros(n_grid, dtype=torch.float64))
+        self.register_buffer("refit_count", torch.tensor(0, dtype=torch.long))
+        self._grid = np.linspace(0, 1, n_grid)
+        self._alpha_spline = None
+        self._dalpha_spline = None
 
-    def record_time_loss_pair(self, t, loss, step=None):
-        del step
-        idx = (
-            (t.detach() * (self.grid.numel() - 1))
-            .long()
-            .clamp(0, self.grid.numel() - 1)
+    def record_time_loss_pair(self, t, loss, step):
+        if step < self.warmup_steps:
+            return
+        n = len(t)
+        pos = self.buf_pos.item()
+        end = pos + n
+        t_val = t.detach().to(self.t_buf)
+        loss_val = loss.detach().to(self.loss_buf)
+        if end <= self.buffer_size:
+            self.t_buf[pos:end] = t_val
+            self.loss_buf[pos:end] = loss_val
+        else:
+            first = self.buffer_size - pos
+            self.t_buf[pos:] = t_val[:first]
+            self.loss_buf[pos:] = loss_val[:first]
+            self.t_buf[: n - first] = t_val[first:]
+            self.loss_buf[: n - first] = loss_val[first:]
+        self.buf_pos.fill_(end % self.buffer_size)
+        buffer_full = end >= self.buffer_size or self.has_schedule.item()
+        if buffer_full and step % self.refit_every == 0:
+            self._refit()
+
+    def _refit(self):
+        model = make_pipeline(
+            SplineTransformer(
+                n_knots=self.n_knots,
+                degree=self.spline_degree,
+                extrapolation="continue",
+            ),
+            Ridge(alpha=self.ridge_alpha),
         )
-        self.loss_sum.scatter_add_(
-            0, idx.cpu().to(self.loss_sum.device), loss.detach().cpu().to(self.loss_sum)
+        model.fit(
+            self.t_buf.cpu().numpy().reshape(-1, 1),
+            self.loss_buf.cpu().numpy(),
         )
-        self.loss_count.scatter_add_(
-            0,
-            idx.cpu().to(self.loss_count.device),
-            torch.ones_like(loss.detach().cpu()).to(self.loss_count),
-        )
-        means = self.loss_sum / self.loss_count.clamp_min(1)
-        grad = torch.relu(torch.diff(means, prepend=means[:1])) + self.uniform_mix
-        cdf = torch.cumsum(grad, 0)
+        smooth_loss = model.predict(self._grid.reshape(-1, 1))
+        importance = np.maximum(np.gradient(smooth_loss, self._grid), 0)
+        importance = (1 - self.uniform_mix) * importance + self.uniform_mix
+        cdf = np.cumsum(importance)
         cdf /= cdf[-1]
-        remapped = torch.searchsorted(cdf, self.grid).float() / (self.grid.numel() - 1)
-        self.mapped_t.lerp_(remapped, 1 - self.ema)
+        remapped_t = PchipInterpolator(cdf, self._grid)(self._grid)
+        alpha = self.base.alpha_t(torch.as_tensor(remapped_t)).cpu().numpy()
+        alpha_tensor = torch.from_numpy(alpha).to(self.ema_alpha_vals)
+        self.refit_count += 1
+        if self.ema > 0:
+            self.ema_alpha_vals.mul_(self.ema).add_(alpha_tensor, alpha=1 - self.ema)
+            correction = 1 - self.ema ** self.refit_count.item()
+            alpha = (self.ema_alpha_vals / correction).cpu().numpy()
+        self._alpha_spline = PchipInterpolator(self._grid, alpha)
+        self._dalpha_spline = self._alpha_spline.derivative()
+        self.alpha_vals.copy_(torch.from_numpy(alpha))
+        self.has_schedule.fill_(True)
 
-    def _map(self, t):
-        pos = t.clamp(0, 1) * (self.grid.numel() - 1)
-        lo = pos.long().clamp_max(self.grid.numel() - 2)
-        frac = pos - lo
-        mapped = self.mapped_t.to(t.device)
-        return mapped[lo] + frac * (mapped[lo + 1] - mapped[lo])
+    def load_state_dict(self, state_dict, strict=True, *args, **kwargs):
+        result = super().load_state_dict(state_dict, strict=strict, *args, **kwargs)
+        if self.has_schedule.item():
+            alpha = self.alpha_vals.cpu().numpy()
+            self._alpha_spline = PchipInterpolator(self._grid, alpha)
+            self._dalpha_spline = self._alpha_spline.derivative()
+        return result
+
+    def _evaluate(self, spline, base_fn, t):
+        if spline is None:
+            return base_fn(t)
+        values = spline(t.detach().cpu().numpy())
+        return torch.as_tensor(values, dtype=t.dtype, device=t.device)
 
     def alpha_t(self, t):
-        return self.base.alpha_t(self._map(t))
+        return self._evaluate(self._alpha_spline, self.base.alpha_t, t)
 
     def alpha_prime_t(self, t):
-        # Stable finite difference includes the derivative of the learned map.
-        h = 1e-4
-        return (
-            self.alpha_t((t + h).clamp_max(1)) - self.alpha_t((t - h).clamp_min(0))
-        ) / (2 * h)
+        return self._evaluate(self._dalpha_spline, self.base.alpha_prime_t, t)
 
 
 def get_noise(config):
@@ -132,6 +189,16 @@ def get_noise(config):
         base = TruncatedSchedule(base, lo, hi, cfg.eps)
     if getattr(cfg, "adaptive", False):
         base = AdaptiveSchedule(
-            base, cfg.adaptive_n_grid, cfg.adaptive_uniform_mix, cfg.adaptive_ema
+            base=base,
+            buffer_size=cfg.adaptive_buffer_size,
+            refit_every=cfg.adaptive_refit_every,
+            n_grid=cfg.adaptive_n_grid,
+            n_knots=cfg.adaptive_n_knots,
+            spline_degree=cfg.adaptive_spline_degree,
+            ridge_alpha=cfg.adaptive_ridge_alpha,
+            uniform_mix=cfg.adaptive_uniform_mix,
+            max_steps=config.trainer.max_steps,
+            warmup_steps=cfg.adaptive_warmup_steps,
+            ema=cfg.adaptive_ema,
         )
     return base

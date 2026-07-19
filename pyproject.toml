@@ -20,6 +20,7 @@ dependencies = [
     "requests>=2.34.2",
     "rich>=15.0.0",
     "scipy>=1.15.3",
+    "scikit-learn>=1.7.0",
     "tokenizers>=0.22.2",
     "torch>=2.5.1",
     "torchdiffeq>=0.2.5",
