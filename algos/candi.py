@@ -7,8 +7,11 @@ from .algo_utils import (
     )
 from .registry import algo_registry
 from .noise_schedules import get_noise
+from .candi_adaptive import JointLossSurface, build_curve
 
 import utils
+import json
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 import math
@@ -49,6 +52,7 @@ class CANDI(Diffusion):
 
         self.cont_schedule_target = config.algo.cont_schedule_target
         self.cont_schedule_type = config.algo.cont_schedule_type
+        self.corruption_curve = build_curve(config)
         self.factorized_adaptive_schedule = config.algo.get(
             "factorized_adaptive_schedule", False
         )
@@ -60,6 +64,16 @@ class CANDI(Diffusion):
             # The primary schedule controls discrete corruption. This second,
             # independently fitted schedule controls continuous rank degradation.
             self.continuous_rank_schedule = get_noise(config)
+        self.joint_loss_probe = config.algo.get("joint_loss_probe", False)
+        if self.joint_loss_probe and not self.factorized_adaptive_schedule:
+            raise ValueError("joint_loss_probe requires factorized_adaptive_schedule")
+        if self.joint_loss_probe:
+            self.joint_loss_surface = JointLossSurface(
+                bins=config.algo.get("joint_loss_bins", 16),
+                smoothing_sigma=config.algo.get("joint_loss_smoothing_sigma", 1.0),
+            )
+        self.joint_loss_log_every = config.algo.get("joint_loss_log_every", 500)
+        self._last_joint_loss_log_step = -1
 
 
 
@@ -234,9 +248,24 @@ class CANDI(Diffusion):
         del output_tokens
         t = self._sample_t(x0.shape[0], current_accumulation_step)
         assert t.shape[0] == x0.shape[0]
-        dalpha_t, alpha_t = self.noise(t)
-        dalpha_t = dalpha_t.unsqueeze(-1)
-        alpha_t = alpha_t.unsqueeze(-1)
+        path_dalpha, path_alpha = self.noise(t)
+        path_noise = 1 - path_alpha
+
+        if self.factorized_adaptive_schedule:
+            discrete_noise = path_noise
+            continuous_curve_noise = None
+            discrete_dalpha = path_dalpha
+        else:
+            (
+                discrete_noise,
+                continuous_curve_noise,
+                discrete_derivative,
+                _,
+            ) = self.corruption_curve(path_noise)
+            # alpha_d(t) = 1 - d(1 - alpha_path(t)).
+            discrete_dalpha = path_dalpha * discrete_derivative
+        alpha_t = (1 - discrete_noise).unsqueeze(-1)
+        dalpha_t = discrete_dalpha.unsqueeze(-1)
         assert alpha_t.ndim == 2
 
         rank_t = None
@@ -245,6 +274,8 @@ class CANDI(Diffusion):
             rank_t = self._sample_t(x0.shape[0], current_accumulation_step)
             _, rank_alpha = self.continuous_rank_schedule(rank_t)
             rank_noise = 1 - rank_alpha
+        else:
+            rank_noise = continuous_curve_noise
         noisy_output = self.q_xt(
             x0,
             alpha_t,
@@ -277,7 +308,79 @@ class CANDI(Diffusion):
                 schedule=self.continuous_rank_schedule,
                 schedule_name="schedule/continuous_rank",
             )
+        if train_mode and self.joint_loss_probe:
+            per_example = self._per_example_loss(loss, valid_tokens)
+            self.joint_loss_surface.record(
+                noisy_output["discrete_noise"],
+                noisy_output["rank_noise"],
+                per_example,
+            )
+            self._log_joint_loss_surface()
         return loss
+
+    @staticmethod
+    def _per_example_loss(loss, valid_tokens):
+        if valid_tokens is None:
+            return loss.detach().mean(-1)
+        weights = valid_tokens.to(loss)
+        return (loss.detach() * weights).sum(-1) / weights.sum(-1).clamp_min(1)
+
+    def _log_joint_loss_surface(self):
+        step = int(self.global_step)
+        if (
+            self.global_rank != 0
+            or step == self._last_joint_loss_log_step
+            or step % self.joint_loss_log_every != 0
+        ):
+            return
+        self._last_joint_loss_log_step = step
+        snapshot = self.joint_loss_surface.snapshot()
+        output_dir = Path(self.config.checkpointing.save_dir) / "joint_loss_surfaces"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / f"step_{step:06d}.json").write_text(
+            json.dumps(snapshot, indent=2, allow_nan=True)
+        )
+        try:
+            import wandb
+
+            experiment = self.logger.experiment
+            rows = []
+            for i, discrete in enumerate(snapshot["centers"]):
+                for j, continuous in enumerate(snapshot["centers"]):
+                    rows.append([
+                        discrete,
+                        continuous,
+                        snapshot["count"][i][j],
+                        snapshot["smoothed_loss"][i][j],
+                        snapshot["grad_discrete"][i][j],
+                        snapshot["grad_continuous"][i][j],
+                        snapshot["gradient_magnitude"][i][j],
+                    ])
+            table = wandb.Table(
+                columns=[
+                    "discrete",
+                    "continuous",
+                    "count",
+                    "smoothed_loss",
+                    "grad_discrete",
+                    "grad_continuous",
+                    "gradient_magnitude",
+                ],
+                data=rows,
+            )
+            experiment.log(
+                {
+                    "joint_loss/surface_and_vector_field": table,
+                    "joint_loss/observed_cells": sum(
+                        value > 0
+                        for row in snapshot["count"]
+                        for value in row
+                    ),
+                },
+                step=step,
+            )
+        except (AttributeError, RuntimeError, TypeError):
+            pass
 
 
     def generate_sample_prompt(self, prompt_tokens, x, prompt_mask):
@@ -287,12 +390,11 @@ class CANDI(Diffusion):
         return x, prompt_mask
 
     def sampling_continuous_schedule(self, timesteps, steps):
-        rank_schedule = (
-            self.continuous_rank_schedule
-            if self.factorized_adaptive_schedule
-            else self.noise
-        )
-        rank_noise = 1 - rank_schedule.alpha_t(timesteps)
+        path_noise = 1 - self.noise.alpha_t(timesteps)
+        if self.factorized_adaptive_schedule:
+            rank_noise = 1 - self.continuous_rank_schedule.alpha_t(timesteps)
+        else:
+            _, rank_noise, _, _ = self.corruption_curve(path_noise)
         if self.use_percentile_scheduling:
             return self.get_continuous_from_discrete_noise(rank_noise)
         return inference_sigmas(steps + 1, self.sigma_min, self.sigma_max).to(
@@ -301,7 +403,11 @@ class CANDI(Diffusion):
 
     def sampling_discrete_schedule(self, timesteps):
         """Return actual discrete-noise levels for a base solver-time grid."""
-        return 1 - self.noise.alpha_t(timesteps)
+        path_noise = 1 - self.noise.alpha_t(timesteps)
+        if self.factorized_adaptive_schedule:
+            return path_noise
+        discrete_noise, _, _, _ = self.corruption_curve(path_noise)
+        return discrete_noise
 
     def sampling_embeddings(self, x):
         return self.backbone.get_embedding(x)

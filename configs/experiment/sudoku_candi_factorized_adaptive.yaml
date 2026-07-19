@@ -4,3 +4,4 @@ defaults:
 
 algo:
   factorized_adaptive_schedule: true
+  joint_loss_probe: true

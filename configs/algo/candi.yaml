@@ -19,3 +19,16 @@ use_percentile_scheduling: True # only affects inference schedule
 cont_schedule_type: linear
 cont_schedule_target: r
 factorized_adaptive_schedule: false
+curve_type: linear
+curve_orientation: linear
+curve_power: 1.0
+curve_linear_mix: 0.01
+curve_control_1: [0.333333, 0.333333]
+curve_control_2: [0.666667, 0.666667]
+curve_discrete_center: 0.7
+curve_continuous_center: 0.3
+curve_sharpness: 10.0
+joint_loss_probe: false
+joint_loss_bins: 16
+joint_loss_smoothing_sigma: 1.0
+joint_loss_log_every: 500
