@@ -7,9 +7,18 @@ import torch
 from scipy.ndimage import gaussian_filter
 
 
-def joint_surface_svg(snapshot, size=700, arrow_stride=10, metric_name="loss"):
-    """Render a dependency-free SVG heatmap with a subsampled vector field."""
-    loss = np.asarray(snapshot["smoothed_loss"], dtype=float)
+def joint_surface_svg(
+    snapshot,
+    size=700,
+    arrow_stride=10,
+    metric_name="loss",
+    smoothed=True,
+    confidence_shading=True,
+):
+    """Render raw or smoothed 2D loss statistics as a dependency-free SVG."""
+    field_name = "smoothed_loss" if smoothed else "mean_loss"
+    loss = np.asarray(snapshot[field_name], dtype=float)
+    observed = np.asarray(snapshot["count"], dtype=float) > 0
     grad_d = np.asarray(snapshot["grad_discrete"], dtype=float)
     grad_c = np.asarray(snapshot["grad_continuous"], dtype=float)
     reliable = np.asarray(snapshot["reliable"], dtype=bool)
@@ -17,7 +26,8 @@ def joint_surface_svg(snapshot, size=700, arrow_stride=10, metric_name="loss"):
     margin = 60
     plot = size - 2 * margin
     cell = plot / bins
-    trusted = loss[reliable]
+    display_mask = reliable if smoothed and confidence_shading else np.isfinite(loss)
+    trusted = loss[display_mask]
     lo = float(np.percentile(trusted, 2)) if trusted.size else float(loss.min())
     hi = float(np.percentile(trusted, 98)) if trusted.size else float(loss.max())
     scale = max(hi - lo, 1e-12)
@@ -37,39 +47,48 @@ def joint_surface_svg(snapshot, size=700, arrow_stride=10, metric_name="loss"):
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 {size} {size}">',
         '<rect width="100%" height="100%" fill="white"/>',
         '<style>text{font-family:sans-serif;fill:#172033}.axis{stroke:#172033;stroke-width:2}</style>',
-        f'<text x="{size/2}" y="28" text-anchor="middle" font-size="20" font-weight="bold">Smoothed {metric_name} and gradient field</text>',
+        f'<text x="{size/2}" y="28" text-anchor="middle" font-size="20" font-weight="bold">{"Smoothed" if smoothed else "Raw"} {metric_name}{" and gradient field" if smoothed else " cell means"}</text>',
     ]
     for i in range(bins):
         for j in range(bins):
             x = margin + (i * cell)
             y = margin + ((bins - 1 - j) * cell)
-            opacity = 1.0 if reliable[i, j] else 0.25
+            if not smoothed and not observed[i, j]:
+                fill = "#e5e7eb"
+            else:
+                fill = color(loss[i, j])
+            opacity = (
+                0.25
+                if smoothed and confidence_shading and not reliable[i, j]
+                else 1.0
+            )
             parts.append(
-                f'<rect x="{x:.2f}" y="{y:.2f}" width="{cell+0.2:.2f}" height="{cell+0.2:.2f}" fill="{color(loss[i,j])}" opacity="{opacity}"/>'
+                f'<rect x="{x:.2f}" y="{y:.2f}" width="{cell+0.2:.2f}" height="{cell+0.2:.2f}" fill="{fill}" opacity="{opacity}"/>'
             )
     # Normalize every displayed arrow independently: direction is the message;
     # magnitude remains available in the table and JSON.
     arrow_length = cell * arrow_stride * 0.32
-    for i in range(arrow_stride // 2, bins, arrow_stride):
-        for j in range(arrow_stride // 2, bins, arrow_stride):
-            if not reliable[i, j]:
-                continue
-            gx, gy = grad_d[i, j], grad_c[i, j]
-            norm = float(np.hypot(gx, gy))
-            if norm <= 1e-12:
-                continue
-            x = margin + (i + 0.5) * cell
-            y = margin + (bins - j - 0.5) * cell
-            dx = arrow_length * gx / norm
-            dy = -arrow_length * gy / norm
-            x2, y2 = x + dx, y + dy
-            parts.append(f'<line x1="{x:.2f}" y1="{y:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" stroke="white" stroke-width="2.2"/>')
-            # Open chevron arrowhead avoids renderer-dependent filled markers.
-            angle = np.arctan2(dy, dx)
-            for offset in (-0.55, 0.55):
-                hx = x2 - 7 * np.cos(angle + offset)
-                hy = y2 - 7 * np.sin(angle + offset)
-                parts.append(f'<line x1="{x2:.2f}" y1="{y2:.2f}" x2="{hx:.2f}" y2="{hy:.2f}" stroke="white" stroke-width="2.2"/>')
+    if smoothed:
+        for i in range(arrow_stride // 2, bins, arrow_stride):
+            for j in range(arrow_stride // 2, bins, arrow_stride):
+                if confidence_shading and not reliable[i, j]:
+                    continue
+                gx, gy = grad_d[i, j], grad_c[i, j]
+                norm = float(np.hypot(gx, gy))
+                if norm <= 1e-12:
+                    continue
+                x = margin + (i + 0.5) * cell
+                y = margin + (bins - j - 0.5) * cell
+                dx = arrow_length * gx / norm
+                dy = -arrow_length * gy / norm
+                x2, y2 = x + dx, y + dy
+                parts.append(f'<line x1="{x:.2f}" y1="{y:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" stroke="white" stroke-width="2.2"/>')
+                # Open chevron arrowhead avoids renderer-dependent filled markers.
+                angle = np.arctan2(dy, dx)
+                for offset in (-0.55, 0.55):
+                    hx = x2 - 7 * np.cos(angle + offset)
+                    hy = y2 - 7 * np.sin(angle + offset)
+                    parts.append(f'<line x1="{x2:.2f}" y1="{y2:.2f}" x2="{hx:.2f}" y2="{hy:.2f}" stroke="white" stroke-width="2.2"/>')
     right = margin + plot
     bottom = margin + plot
     parts.extend([
@@ -81,7 +100,7 @@ def joint_surface_svg(snapshot, size=700, arrow_stride=10, metric_name="loss"):
         f'<text x="{right}" y="{bottom+20}" text-anchor="middle" font-size="12">1</text>',
         f'<text x="{margin-12}" y="{bottom+4}" text-anchor="end" font-size="12">0</text>',
         f'<text x="{margin-12}" y="{margin+4}" text-anchor="end" font-size="12">1</text>',
-        f'<text x="{right}" y="42" text-anchor="end" font-size="12">{metric_name} range {lo:.3g} – {hi:.3g}; faded = low confidence</text>',
+        f'<text x="{right}" y="42" text-anchor="end" font-size="12">{metric_name} range {lo:.3g} – {hi:.3g}{"; faded = low confidence" if smoothed and confidence_shading else ""}</text>',
         '</svg>',
     ])
     return "".join(parts)

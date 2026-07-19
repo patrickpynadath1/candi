@@ -57,6 +57,18 @@ def test_joint_loss_surface_tracks_2d_statistics_and_gradients():
         snapshot, size=300, arrow_stride=2, metric_name="raw ce"
     )
     assert "Smoothed raw ce and gradient field" in labeled
+    raw = joint_surface_svg(
+        snapshot, size=300, arrow_stride=2, metric_name="raw ce",
+        smoothed=False, confidence_shading=False,
+    )
+    assert "Raw raw ce cell means" in raw
+    assert "faded = low confidence" not in raw
+    smoothed = joint_surface_svg(
+        snapshot, size=300, arrow_stride=2, metric_name="raw ce",
+        confidence_shading=False,
+    )
+    assert "Smoothed raw ce and gradient field" in smoothed
+    assert "faded = low confidence" not in smoothed
 
 
 def test_bezier_rejects_nonmonotone_controls():

@@ -368,6 +368,7 @@ class CANDI(Diffusion):
         step = int(self.global_step)
         if (
             self.global_rank != 0
+            or step == 0
             or step == self._last_joint_loss_log_step
             or step % self.joint_loss_log_every != 0
         ):
@@ -386,9 +387,25 @@ class CANDI(Diffusion):
             (output_dir / f"{name}_step_{step:06d}.json").write_text(
                 json.dumps(snapshot, indent=2, allow_nan=True)
             )
-            (output_dir / f"{name}_step_{step:06d}.svg").write_text(
-                joint_surface_svg(snapshot, metric_name=name.replace("_", " "))
-            )
+            metric_name = name.replace("_", " ")
+            renderings = {
+                "raw": joint_surface_svg(
+                    snapshot, metric_name=metric_name, smoothed=False,
+                    confidence_shading=False,
+                ),
+                "smoothed": joint_surface_svg(
+                    snapshot, metric_name=metric_name,
+                    confidence_shading=False,
+                ),
+                "smoothed_confidence": joint_surface_svg(
+                    snapshot, metric_name=metric_name,
+                    confidence_shading=True,
+                ),
+            }
+            for view_name, svg in renderings.items():
+                (output_dir / f"{name}_{view_name}_step_{step:06d}.svg").write_text(
+                    svg
+                )
         try:
             import wandb
 
@@ -419,13 +436,26 @@ class CANDI(Diffusion):
                     data=rows,
                 )
                 namespace = f"joint_loss/{name}"
-                svg = joint_surface_svg(
-                    snapshot, metric_name=name.replace("_", " ")
-                )
                 payload[f"{namespace}/surface_and_vector_field"] = table
-                payload[f"{namespace}/heatmap_vector_field"] = wandb.Html(
-                    svg, inject=False
-                )
+                metric_name = name.replace("_", " ")
+                views = {
+                    "heatmap_raw": joint_surface_svg(
+                        snapshot, metric_name=metric_name, smoothed=False,
+                        confidence_shading=False,
+                    ),
+                    "heatmap_smoothed": joint_surface_svg(
+                        snapshot, metric_name=metric_name,
+                        confidence_shading=False,
+                    ),
+                    "heatmap_smoothed_confidence": joint_surface_svg(
+                        snapshot, metric_name=metric_name,
+                        confidence_shading=True,
+                    ),
+                }
+                for view_name, svg in views.items():
+                    payload[f"{namespace}/{view_name}"] = wandb.Html(
+                        svg, inject=False
+                    )
                 payload[f"{namespace}/observed_cells"] = sum(
                         value > 0
                         for row in snapshot["count"]
