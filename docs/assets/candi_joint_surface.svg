@@ -5,7 +5,10 @@
       <stop offset="0.68" stop-color="#66c2a4"/><stop offset="1" stop-color="#e34a33"/>
     </linearGradient>
     <filter id="blur"><feGaussianBlur stdDeviation="5"/></filter>
-    <marker id="arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7z" fill="#172033"/></marker>
+    <marker id="arrow" viewBox="0 0 8 8" markerWidth="8" markerHeight="8"
+            refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0L8 4L0 8" fill="none" stroke="#172033" stroke-width="1.5"/>
+    </marker>
   </defs>
   <style>
     text { font-family: sans-serif; fill: #172033; }

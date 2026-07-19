@@ -26,9 +26,9 @@ We describe a corruption state as `(d, c)`:
 
 A curve is a monotone map
 
-\[
+$$
 C(s)=(d(s),c(s)),\qquad s\in[0,1].
-\]
+$$
 
 Training moves from clean to noisy as `s` increases; generation follows the same path in reverse.
 
@@ -38,9 +38,9 @@ Training moves from clean to noisy as `s` increases; generation follows the same
 
 Curve geometry and traversal are intentionally separate:
 
-\[
+$$
 t \xrightarrow{g} s \xrightarrow{C} (d,c).
-\]
+$$
 
 - A **fixed** run uses the ordinary nearly linear path time.
 - An **adaptive** run learns the monotone remapping `g(t)` from loss observations while keeping `C(s)` fixed.
@@ -62,27 +62,27 @@ Each raw cell tracks:
 
 The smoothed surface is a count-weighted Gaussian estimate:
 
-\[
+$$
 \widetilde L=
 \frac{G_\sigma*(N\widehat L)}{G_\sigma*N+\epsilon},
 \qquad \sigma=3\text{ grid cells}.
-\]
+$$
 
 This prevents empty cells from acting like real global-mean observations. Cells also receive an effective-count reliability flag; the current threshold is `5.0` smoothed observations.
 
 From the surface we compute
 
-\[
+$$
 \nabla \widetilde L(d,c)=
 \left(\frac{\partial \widetilde L}{\partial d},
 \frac{\partial \widetilde L}{\partial c}\right).
-\]
+$$
 
 For any candidate curve, the directional loss change is
 
-\[
+$$
 \frac{dL_C}{ds}=\nabla\widetilde L(C(s))^\top C'(s).
-\]
+$$
 
 This lets us visualize where a curve crosses rapidly changing regions and motivates a traversal that approximately equalizes `|dL_C/ds|`.
 
@@ -104,9 +104,9 @@ At inference, the factorized marginals are coupled by equal quantiles. This is a
 
 Before 1% linear regularization:
 
-\[
+$$
 d=s^p,\qquad c=1-(1-s)^p.
-\]
+$$
 
 | Run | Power | Interpretation |
 |---|---:|---|
@@ -116,9 +116,9 @@ d=s^p,\qquad c=1-(1-s)^p.
 
 ### Discrete-first power curves
 
-\[
+$$
 d=1-(1-s)^p,\qquad c=s^p.
-\]
+$$
 
 | Run | Power | Interpretation |
 |---|---:|---|
