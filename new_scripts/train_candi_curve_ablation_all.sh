@@ -10,7 +10,7 @@ gpus=(5 6 7)
 specs=(
   "legacy_fixed|sudoku_candi_curve_5k|algo.curve_type=linear algo.curve_orientation=linear"
   "linear_adaptive|sudoku_candi_curve_adaptive_5k|algo.curve_type=linear algo.curve_orientation=linear"
-  "factorized_joint|sudoku_candi_factorized_probe_5k|"
+  "factorized_joint_raw_ce|sudoku_candi_factorized_probe_5k|"
   "continuous_first_p2|sudoku_candi_curve_5k|algo.curve_type=power algo.curve_orientation=continuous_first algo.curve_power=2"
   "continuous_first_p4|sudoku_candi_curve_5k|algo.curve_type=power algo.curve_orientation=continuous_first algo.curve_power=4"
   "continuous_first_p8|sudoku_candi_curve_5k|algo.curve_type=power algo.curve_orientation=continuous_first algo.curve_power=8"
