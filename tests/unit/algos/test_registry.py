@@ -1,20 +1,25 @@
 from pathlib import Path
 
 import pytest
-from omegaconf import OmegaConf
+from hydra import compose, initialize_config_dir
+
+import main  # noqa: F401 -- registers config resolvers
 
 from algos import algo_registry
 from models import model_registry
 
 
-CONFIG_DIR = Path(__file__).resolve().parents[3] / "configs" / "algo"
+CONFIG_ROOT = Path(__file__).resolve().parents[3] / "configs"
+CONFIG_DIR = CONFIG_ROOT / "algo"
 
 
 @pytest.mark.parametrize("config_path", sorted(CONFIG_DIR.glob("*.yaml")), ids=lambda path: path.stem)
 def test_algorithm_configs_resolve_registered_algorithm_and_backbone(config_path):
-    config = OmegaConf.load(config_path)
-    assert algo_registry.get(config.name) is not None
-    assert model_registry.get(config.backbone) is not None
+    # Compose through Hydra so config-group defaults/inheritance are tested.
+    with initialize_config_dir(config_dir=str(CONFIG_ROOT), version_base=None):
+        config = compose(config_name="config", overrides=[f"algo={config_path.stem}"])
+    assert algo_registry.get(config.algo.name) is not None
+    assert model_registry.get(config.algo.backbone) is not None
 
 
 @pytest.mark.parametrize(

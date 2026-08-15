@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from algos.candi import CANDI
 from algos.candi_ra_change import CANDIRAChange
 from algos.neighbor_blurring import blend_positions, gaussian_position_kernel
 
@@ -57,3 +58,27 @@ def test_spatial_kernel_is_a_registered_buffer():
     model = _bare()
     model.register_buffer("spatial_kernel", gaussian_position_kernel(3, 0.5))
     assert "spatial_kernel" in dict(model.named_buffers())
+
+
+def test_zero_bandwidth_q_xt_matches_base_candi_exactly():
+    tokens = torch.tensor([[0, 1, 2], [2, 1, 0]])
+    alpha = torch.tensor([[0.7], [0.3]])
+    common = {
+        "vocab_size": 4,
+        "ignore_bos": False,
+        "get_continuous_from_discrete_noise": lambda noise: torch.zeros_like(noise),
+    }
+    base = object.__new__(CANDI)
+    torch.nn.Module.__init__(base)
+    blurred = _bare(spatial_kernel=gaussian_position_kernel(3, 0), **common)
+    for name, value in common.items():
+        setattr(base, name, value)
+
+    torch.manual_seed(17)
+    expected = base.q_xt(tokens, alpha)
+    torch.manual_seed(17)
+    actual = blurred.q_xt(tokens, alpha)
+
+    assert expected.keys() == actual.keys()
+    for key in expected:
+        assert torch.equal(expected[key], actual[key])

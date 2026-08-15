@@ -8,6 +8,7 @@ from algos.cont_diff_embed import ContDiffEmbed
 from algos.cont_diff_onehot import ContDiffOnehot
 from algos.d3pm_absorb import D3PMAbsorb
 from algos.distillation import Distillation
+from algos.noise_schedules import LogLinear
 from algos.sedd_absorb import SEDDAbsorb
 from algos.semicat import Semicat, _view_for
 
@@ -46,7 +47,15 @@ def test_semicat_nll_shape_finite_and_backward():
         def forward(self, x, _sigma):
             return self.linear(x)
 
-    model = _bare(Semicat, backbone=Backbone(), vocab_size=4, label_smoothing=0.1)
+    model = _bare(
+        Semicat,
+        backbone=Backbone(),
+        vocab_size=4,
+        label_smoothing=0.1,
+        antithetic_sampling=False,
+        sampling_eps=0.0,
+        noise=LogLinear(eps=0.0),
+    )
     loss = model.nll(torch.tensor([[0, 1, 2], [3, 2, 1]]), None)
     assert loss.shape == (2, 3)
     assert torch.isfinite(loss).all()

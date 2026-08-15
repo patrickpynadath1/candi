@@ -1,24 +1,8 @@
-name: candi_ra_change
-backbone: cont_dit
-causal_attention: false
-parameterization: mean
-T: 0
-discretize_start_time: 1.0
-time_conditioning: true
-step_size: 1.0
-mixed_coeff: 0.5
-max_percentile: .25
-min_percentile: .01
+defaults:
+  - candi
+  - _self_
 
-sigma_min: .01
-sigma_max: 2.0
-temp: 1.0
-pure_continuous: false
-is_embed: false
-use_percentile_scheduling: true
-cont_schedule_type: linear
-cont_schedule_target: r
-factorized_adaptive_schedule: false
+name: candi_ra_change
 
 spatial_blurring:
   bandwidth: 0.5

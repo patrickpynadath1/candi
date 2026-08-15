@@ -131,7 +131,7 @@ class ContDiffOnehot(Diffusion):
         log_x_theta = self.forward(**noisy_output)
 
         utils.print_nans(log_x_theta, "model_output")
-        return self.nll_per_token(
+        loss = self.nll_per_token(
             log_x_theta=log_x_theta,
             alpha_t=alpha_t,
             dalpha_t=dalpha_t,
@@ -139,6 +139,8 @@ class ContDiffOnehot(Diffusion):
             low_var=train_mode,
             **noisy_output,
         )
+        self._record_time_loss(t, loss, valid_tokens, train_mode)
+        return loss
 
 
     def generate_sample_prompt(self, prompt_tokens, x, prompt_mask):

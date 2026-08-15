@@ -8,6 +8,7 @@ from algos.noise_schedules import (
     TruncatedSchedule,
 )
 from algos.spherical_utils import exp_map, log_map, slerp, sphere_normalize
+from algos.trainer_base import TrainerBase
 
 
 def test_spherical_maps_round_trip():
@@ -42,6 +43,22 @@ def test_noise_schedule_endpoints_and_truncation():
     assert torch.allclose(
         trunc.alpha_t(torch.tensor([0.0, 1.0])), torch.tensor([0.8, 0.2]), atol=1e-5
     )
+    assert trunc.type == "log-linear"
+
+
+def test_normalized_path_time_preserves_base_geometry_and_truncated_endpoints():
+    model = object.__new__(TrainerBase)
+    torch.nn.Module.__init__(model)
+    t = torch.linspace(0, 1, 11)
+
+    model.noise = LogLinear(eps=1e-3)
+    assert torch.allclose(model._schedule_path_time(t), t, atol=1e-6)
+
+    model.noise = TruncatedSchedule(LogLinear(), 0.2, 0.8)
+    mapped = model._schedule_path_time(t)
+    assert mapped[0] == 0
+    assert mapped[-1] == 1
+    assert torch.all(mapped[1:] >= mapped[:-1])
 
 
 def test_adaptive_schedule_refits_and_restores_spline():

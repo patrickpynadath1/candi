@@ -64,6 +64,11 @@ ALGORITHM_CONFIGS = [
     ),
 ]
 
+TIME_CONDITIONED_CONFIGS = [
+    entry for entry in ALGORITHM_CONFIGS
+    if entry[0] not in {"ar", "mdlm_perm"}
+]
+
 
 def _compose_tiny(algo, *extra_overrides):
     overrides = [
@@ -150,3 +155,85 @@ def test_shipping_algorithm_runs_real_loss_and_backward(algo, overrides):
         assert model.teacher is not None
         assert all(parameter.grad is None for parameter in model.teacher.parameters())
     assert any(torch.count_nonzero(gradient) > 0 for gradient in gradients)
+
+
+@pytest.mark.parametrize(("algo", "overrides"), TIME_CONDITIONED_CONFIGS)
+def test_time_conditioned_algorithm_reports_adaptive_statistic(algo, overrides):
+    """Every scheduled objective must report the time/statistic pair it used."""
+    adaptive_overrides = [
+        *overrides,
+        "noise=log-linear-adaptive",
+        "noise.adaptive_buffer_size=2",
+        "noise.adaptive_refit_every=1",
+        "noise.adaptive_warmup_steps=0",
+        "noise.adaptive_n_grid=32",
+        "noise.adaptive_n_knots=4",
+        "noise.adaptive_spline_degree=2",
+    ]
+    if algo == "sfm":
+        adaptive_overrides.append("algo.invert_time_convention=false")
+    config = _compose_tiny(algo, *adaptive_overrides)
+    model = algo_registry.get(config.algo.name)(config, _tokenizer_for(algo))
+    assert hasattr(model.noise, "record_time_loss_pair")
+
+    observations = []
+    model._record_time_loss = lambda t, loss, *_args, **kwargs: observations.append(
+        (t.detach(), loss.detach(), kwargs.get("schedule_name", "schedule"))
+    )
+    tokens = torch.tensor([[1, 2, 3, 4], [4, 3, 2, 1]])
+    result = model._loss(tokens, torch.ones_like(tokens), train_mode=True)
+
+    assert torch.isfinite(result.loss)
+    assert observations, f"{algo} bypassed the adaptive statistic recorder"
+    for times, losses, _name in observations:
+        assert times.shape == (tokens.shape[0],)
+        assert losses.shape == tokens.shape
+        assert torch.isfinite(times).all()
+        assert torch.isfinite(losses).all()
+
+
+def test_blurred_factorized_candi_reports_both_adaptive_axes():
+    config = _compose_tiny(
+        "candi_ra_change",
+        "sampling.predictor=candi",
+        "noise=log-linear-adaptive",
+        "noise.adaptive_buffer_size=2",
+        "noise.adaptive_refit_every=1",
+        "noise.adaptive_warmup_steps=0",
+        "noise.adaptive_n_grid=32",
+        "noise.adaptive_n_knots=4",
+        "noise.adaptive_spline_degree=2",
+        "algo.factorized_adaptive_schedule=true",
+        "algo.joint_loss_probe=false",
+        "algo.spatial_blurring.bandwidth=0.5",
+    )
+    model = algo_registry.get("candi_ra_change")(config, Text8Tokenizer())
+    observations = []
+    model._record_time_loss = lambda _t, _loss, *_args, **kwargs: observations.append(
+        kwargs.get("schedule_name", "schedule")
+    )
+    tokens = torch.tensor([[1, 2, 3, 4], [4, 3, 2, 1]])
+    result = model._loss(tokens, torch.ones_like(tokens), train_mode=True)
+
+    assert torch.isfinite(result.loss)
+    assert observations == ["schedule/discrete", "schedule/continuous_rank"]
+
+
+@pytest.mark.parametrize(
+    ("experiment", "adaptive", "factorized"),
+    [
+        ("sudoku_candi_ra_change", False, False),
+        ("sudoku_candi_ra_adaptive", True, False),
+        ("sudoku_candi_ra_factorized_adaptive", True, True),
+    ],
+)
+def test_blurred_candi_experiment_composition(experiment, adaptive, factorized):
+    with initialize_config_dir(config_dir=CONFIG_DIR, version_base=None):
+        config = compose(
+            config_name="config", overrides=[f"+experiment={experiment}"]
+        )
+    assert config.algo.name == "candi_ra_change"
+    assert config.algo.curve_type == "linear"
+    assert config.algo.spatial_blurring.bandwidth == 0.5
+    assert config.noise.get("adaptive", False) is adaptive
+    assert config.algo.factorized_adaptive_schedule is factorized

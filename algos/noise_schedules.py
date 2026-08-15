@@ -31,6 +31,8 @@ class LogLinear(NoiseSchedule):
 
 
 class CosineSquared(NoiseSchedule):
+    type = "cosine-squared"
+
     def __init__(self, eps=1e-3):
         super().__init__()
         self.eps = eps
@@ -55,6 +57,11 @@ class TruncatedSchedule(NoiseSchedule):
         lo = base.alpha_t(torch.tensor(1.0)).item()
         self.scale = (alpha_max - alpha_min) / (hi - lo)
         self.offset = alpha_min - self.scale * lo
+
+    @property
+    def type(self):
+        """Preserve the transition-family identity through composition."""
+        return self.base.type
 
     def alpha_t(self, t):
         return (self.scale * self.base.alpha_t(t) + self.offset).clamp_min(self.eps)
@@ -94,6 +101,11 @@ class AdaptiveSchedule(NoiseSchedule):
         self._grid = np.linspace(0, 1, n_grid)
         self._alpha_spline = None
         self._dalpha_spline = None
+
+    @property
+    def type(self):
+        """Preserve the transition-family identity through composition."""
+        return self.base.type
 
     def record_time_loss_pair(self, t, loss, step):
         if step < self.warmup_steps:

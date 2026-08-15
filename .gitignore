@@ -27,6 +27,7 @@ new_sudoku_runs/
 new_candi_curve_runs/
 new_candi_curve_results/
 new_candi_temperature_results/
+.worktrees/
 data_cache/
 
 # Distribution / packaging

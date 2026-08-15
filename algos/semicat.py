@@ -97,7 +97,7 @@ class Semicat(Diffusion):
         Returns:
             Per-token loss of shape (B, L).
         """
-        del output_tokens, current_accumulation_step, train_mode
+        del output_tokens
 
         B, L = x0_tokens.shape
         x1 = x0_tokens  # clean data
@@ -107,9 +107,13 @@ class Semicat(Diffusion):
             B, L, self.vocab_size, device=x1.device, dtype=torch.float32
         )
 
-        # Sample time uniformly
-        t = torch.rand(B, device=x1.device)
-        t_broad = _view_for(t, x0)  # (B, 1, 1)
+        # Sample a shared clean-to-noise schedule coordinate, then map it to
+        # Semicat's opposite convention (0=noise, 1=clean). With the base
+        # log-linear schedule this is the original uniform interpolation;
+        # adaptive schedules remap how training traverses the same path.
+        schedule_t = self._sample_t(B, current_accumulation_step)
+        interpolation_t = self._schedule_path_time(schedule_t)
+        t_broad = _view_for(interpolation_t, x0)  # (B, 1, 1)
 
         # Interpolate
         xt = self._interpolate(x0, x1, t_broad)
@@ -120,7 +124,7 @@ class Semicat(Diffusion):
         # Predict clean tokens — network receives (xt, t, t) following
         # the original semicat convention where both time args are t
         # for the VFM (non-distillation) case.
-        sigma = self._sigma_from_time(t)
+        sigma = self._sigma_from_time(interpolation_t)
         x1_pred = self._backbone_logits(xt, sigma)
 
         # Cross-entropy loss per token
@@ -131,6 +135,9 @@ class Semicat(Diffusion):
             reduction="none",
             label_smoothing=self.label_smoothing,
         )  # (B, L)
+        self._record_time_loss(
+            schedule_t, loss, valid_tokens, train_mode
+        )
         return loss
 
     def _sigma_from_time(self, t: Tensor) -> Tensor:

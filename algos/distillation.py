@@ -91,9 +91,11 @@ class Distillation(DUO):
 
     def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=None,
             valid_tokens=None):
-        del valid_tokens
-        del output_tokens, train_mode
-        t = self._sample_t(x0.shape[0], current_accumulation_step)
+        del output_tokens
+        schedule_t = self._sample_t(x0.shape[0], current_accumulation_step)
+        # Preserve the original path for the base log-linear schedule while
+        # allowing AdaptiveSchedule to redistribute examples along it.
+        t = self._schedule_path_time(schedule_t)
         dt = self._compute_dt()
         t = torch.clip(t + dt, 0, 1)
 
@@ -120,13 +122,21 @@ class Distillation(DUO):
             log_x_theta_student = log_x_theta_student.to(torch.float64)
             log_x_theta_teacher = log_x_theta_teacher.to(torch.float64)
         if self.loss_type == "kl-fwd":
-            return (
+            loss = (
                 log_x_theta_teacher.exp() * (log_x_theta_teacher - log_x_theta_student)
             ).sum(-1)
         elif self.loss_type == "kl-bwd":
-            return (
+            loss = (
                 log_x_theta_student.exp() * (log_x_theta_student - log_x_theta_teacher)
             ).sum(-1)
+        else:
+            raise NotImplementedError(
+                f"adaptive distillation loss is not implemented for {self.loss_type}"
+            )
+        self._record_time_loss(
+            schedule_t, loss, valid_tokens, bool(train_mode)
+        )
+        return loss
 
     def training_step(self, batch, batch_idx):
         self.log(

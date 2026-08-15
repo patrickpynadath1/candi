@@ -281,6 +281,23 @@ class TrainerBase(L.LightningModule):
         schedule.record_time_loss_pair(t.detach(), per_example, int(self.global_step))
         self._log_adaptive_schedule(schedule, schedule_name)
 
+    def _schedule_path_time(self, t, schedule=None):
+        """Map schedule time to a normalized noise-to-clean path coordinate.
+
+        The result is zero at the schedule's clean endpoint and one at its
+        noisy endpoint, including for truncated and adaptively remapped
+        schedules. This lets objectives with their own interpolation geometry
+        share the schedule machinery without assuming ``alpha(t) == 1 - t``.
+        """
+        schedule = self.noise if schedule is None else schedule
+        alpha = schedule.alpha_t(t)
+        clean_alpha = schedule.alpha_t(torch.zeros_like(t))
+        noisy_alpha = schedule.alpha_t(torch.ones_like(t))
+        scale = (clean_alpha - noisy_alpha).clamp_min(
+            torch.finfo(alpha.dtype).eps
+        )
+        return ((clean_alpha - alpha) / scale).clamp(0, 1)
+
     def _log_adaptive_schedule(self, schedule=None, schedule_name="schedule"):
         schedule = self.noise if schedule is None else schedule
         snapshot_fn = getattr(schedule, "snapshot", None)
