@@ -98,6 +98,13 @@ def test_candi_nll_matches_independent_formula(pure_continuous):
     assert torch.allclose(result, expected)
 
 
+def test_candi_raw_ce_excludes_likelihood_weighting():
+    probabilities = torch.tensor([[[0.2, 0.7, 0.1], [0.6, 0.3, 0.1]]])
+    targets = torch.tensor([[1, 0]])
+    result = CANDI.raw_ce_per_token(probabilities.log(), targets)
+    assert torch.allclose(result, -torch.tensor([[0.7, 0.6]]).log())
+
+
 def test_candi_q_xt_shapes_and_finite_values():
     model = _bare(
         CANDI,
@@ -139,6 +146,15 @@ def test_candi_q_xt_accepts_independent_rank_degradation():
     assert torch.allclose(
         result["continuous_noise"], torch.tensor([0.28, 0.82])
     )
+
+
+def test_factorized_time_sampling_covers_full_stratified_marginal():
+    torch.manual_seed(7)
+    values = CANDI._sample_factorized_time(32, torch.device("cpu"), eps=0.01)
+    bins = ((values - 0.01) / 0.99 * 32).floor().long()
+    assert torch.equal(bins.sort().values, torch.arange(32))
+    assert values.min() >= 0.01
+    assert values.max() <= 1
 
 
 def test_candi_q_xt_keeps_prompt_as_clean_onehot():

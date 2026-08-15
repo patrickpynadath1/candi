@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="620" viewBox="0 0 960 620">
+  <style>
+    text { font-family: sans-serif; fill: #172033; }
+    .axis { stroke: #26334d; stroke-width: 2; }
+    .grid { stroke: #d9deea; stroke-width: 1; }
+    .label { font-size: 16px; }
+    .small { font-size: 13px; }
+    .linear { stroke: #222; stroke-width: 4; fill: none; }
+    .cf2 { stroke: #2b6cb0; stroke-width: 3; fill: none; }
+    .cf4 { stroke: #00a6a6; stroke-width: 3; fill: none; }
+    .cf8 { stroke: #28a745; stroke-width: 3; fill: none; }
+    .df { stroke: #dc3545; stroke-width: 3; fill: none; }
+    .bez { stroke: #805ad5; stroke-width: 3; fill: none; stroke-dasharray: 8 5; }
+    .seq { stroke: #e67e22; stroke-width: 3; fill: none; stroke-dasharray: 3 5; }
+  </style>
+  <rect width="960" height="620" fill="#fbfcff"/>
+  <text x="480" y="34" text-anchor="middle" font-size="24" font-weight="bold">Candidate CANDI corruption paths</text>
+  <text x="480" y="58" text-anchor="middle" class="small">Training moves clean → noisy; sampling follows the same path in reverse</text>
+
+  <g transform="translate(105,90)">
+    <g class="grid">
+      <path d="M0 80H420 M0 160H420 M0 240H420 M0 320H420"/>
+      <path d="M84 0V400 M168 0V400 M252 0V400 M336 0V400"/>
+    </g>
+    <path class="axis" d="M0 0V400H420"/>
+    <text x="210" y="445" text-anchor="middle" class="label">discrete corruption d</text>
+    <text x="-210" y="-62" transform="rotate(-90)" text-anchor="middle" class="label">continuous rank degradation c</text>
+    <text x="-7" y="420" text-anchor="end" class="small">(0,0) clean</text>
+    <text x="427" y="-8" class="small">(1,1) noisy</text>
+
+    <!-- coordinates use y = 400(1-c), x = 420d -->
+    <path class="linear" d="M0 400 L420 0"/>
+    <path class="cf2" d="M0 400 C15 240,100 85,420 0"/>
+    <path class="cf4" d="M0 400 C5 165,45 35,420 0"/>
+    <path class="cf8" d="M0 400 C2 80,18 10,420 0"/>
+    <path class="df" d="M0 400 C300 390,405 250,420 0"/>
+    <path class="bez" d="M0 400 C21 180,189 20,420 0"/>
+    <path class="seq" d="M0 400 C8 270,20 90,100 45 C250 5,390 20,420 0"/>
+  </g>
+
+  <g transform="translate(590,105)">
+    <text x="0" y="0" font-size="18" font-weight="bold">Geometry families</text>
+    <path class="linear" d="M0 32H55"/><text x="70" y="38" class="label">legacy / linear</text>
+    <path class="cf2" d="M0 72H55"/><text x="70" y="78" class="label">continuous-first p=2</text>
+    <path class="cf4" d="M0 112H55"/><text x="70" y="118" class="label">continuous-first p=4</text>
+    <path class="cf8" d="M0 152H55"/><text x="70" y="158" class="label">continuous-first p=8</text>
+    <path class="df" d="M0 192H55"/><text x="70" y="198" class="label">discrete-first family</text>
+    <path class="bez" d="M0 232H55"/><text x="70" y="238" class="label">Bézier intermediate</text>
+    <path class="seq" d="M0 272H55"/><text x="70" y="278" class="label">soft sequential phases</text>
+
+    <rect x="0" y="315" width="300" height="150" rx="10" fill="#eef3ff" stroke="#b8c6e8"/>
+    <text x="15" y="342" font-size="16" font-weight="bold">Two independent questions</text>
+    <text x="15" y="372" class="small">1. Geometry: which (d,c) pairs are visited?</text>
+    <text x="15" y="400" class="small">2. Traversal: how much time is spent there?</text>
+    <text x="15" y="430" class="small">Adaptive runs learn traversal g(t) while</text>
+    <text x="15" y="451" class="small">holding the selected geometric curve fixed.</text>
+  </g>
+</svg>
