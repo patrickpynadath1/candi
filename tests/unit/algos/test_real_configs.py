@@ -39,6 +39,7 @@ ALGORITHM_CONFIGS = [
     ("sedd", ("sampling.predictor=analytic",)),
     ("cadd", ("sampling.predictor=cadd",)),
     ("candi", ("sampling.predictor=candi_cached",)),
+    ("candi_ra_change", ("sampling.predictor=candi",)),
     ("cont_diff_onehot", ("sampling.predictor=continuous_onehot",)),
     ("embedding_diffusion", ("sampling.predictor=continuous_embedding",)),
     ("cfm", ("sampling.predictor=semicat_euler",)),
