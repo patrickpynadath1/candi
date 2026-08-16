@@ -19,12 +19,10 @@ class AR(TrainerBase):
     )
 
     def __init__(self, config, tokenizer):
-        vocab_size = tokenizer.vocab_size
-        if not hasattr(tokenizer, "mask_token") or tokenizer.mask_token is None:
-            self.mask_index = vocab_size
-            vocab_size += 1
-        else:
-            self.mask_index = tokenizer.mask_token_id
+        # Include added tokens such as TinyGSM's [PAD]. AR does not need a
+        # synthetic mask class; adding one can collide with an added token ID.
+        vocab_size = len(tokenizer)
+        self.mask_index = getattr(tokenizer, "mask_token_id", None)
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self.save_hyperparameters()
         self._validate_configuration()
@@ -41,18 +39,26 @@ class AR(TrainerBase):
         valid_tokens = valid_tokens[:, 1:]
         return input_tokens, output_tokens, valid_tokens
 
-    def nll(self, input_tokens, output_tokens, current_accumulation_step, *args,
-            valid_tokens=None):
+    def nll(
+        self,
+        input_tokens,
+        output_tokens,
+        current_accumulation_step,
+        *args,
+        valid_tokens=None,
+    ):
         del valid_tokens
         del current_accumulation_step
         output = self.backbone(input_tokens, None)
-        output[:, :, self.mask_index] = self.neg_infinity
+        if self.mask_index is not None:
+            output[:, :, self.mask_index] = self.neg_infinity
         output = output.log_softmax(-1)
         return -output.gather(-1, output_tokens[:, :, None])[:, :, 0]
 
     def next_token_logits(self, tokens):
         logits = self.backbone(tokens, None)
-        logits[:, :, self.mask_index] = self.neg_infinity
+        if self.mask_index is not None:
+            logits[:, :, self.mask_index] = self.neg_infinity
         return logits
 
     def next_token_logits_cached(self, tokens, cache=None, position_ids=None):
@@ -73,7 +79,8 @@ class AR(TrainerBase):
             query_position_ids=position_ids,
             cache=cache,
         )
-        logits[:, :, self.mask_index] = self.neg_infinity
+        if self.mask_index is not None:
+            logits[:, :, self.mask_index] = self.neg_infinity
         return logits, cache
 
     def _process_sigma(self, sigma):

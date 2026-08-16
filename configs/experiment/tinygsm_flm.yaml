@@ -1,5 +1,6 @@
 # @package _global_
 defaults:
+  - override /callbacks: [checkpoint_every_n_steps, checkpoint_monitor, learning_rate_monitor, gsm8k_eval]
   - override /data: tiny-gsm
   - override /model: small_flm
   - override /algo: flm
@@ -12,3 +13,5 @@ trainer:
   val_check_interval: 10000
 eval:
   generate_samples: false
+gsm8k:
+  scoring: code

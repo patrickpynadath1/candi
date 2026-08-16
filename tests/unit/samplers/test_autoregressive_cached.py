@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 from samplers.autoregressive_cached import CachedAutoregressiveSampler
@@ -40,6 +41,20 @@ def test_cached_ar_prefills_once_then_processes_one_token_at_a_time():
         "tokens_processed": 4,
         "cache_used": True,
     }
+
+
+def test_cached_ar_zero_temperature_uses_greedy_decoding():
+    result = run_sampler(
+        CachedAutoregressiveSampler(use_float64=False, temperature=0),
+        CachedARModel(),
+        SamplingRequest(num_samples=2),
+    )
+    assert result.samples[:, 1:].eq(2).all()
+
+
+def test_cached_ar_rejects_negative_temperature():
+    with pytest.raises(ValueError, match="non-negative"):
+        CachedAutoregressiveSampler(use_float64=False, temperature=-0.1)
 
 
 def test_cached_ar_prefills_the_entire_prompt_once():

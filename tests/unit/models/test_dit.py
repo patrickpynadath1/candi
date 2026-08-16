@@ -12,7 +12,7 @@ from models.dit_cont import ContDIT
 from models.registry import models
 
 
-def _config(*, causal=False, time_conditioning=True):
+def _config(*, causal=False, time_conditioning=True, tie_word_embeddings=False):
     return SimpleNamespace(
         algo=SimpleNamespace(
             causal_attention=causal, time_conditioning=time_conditioning
@@ -24,10 +24,9 @@ def _config(*, causal=False, time_conditioning=True):
             n_blocks=1,
             dropout=0.0,
             scale_by_sigma=False,
+            tie_word_embeddings=tie_word_embeddings,
         ),
     )
-
-
 
 
 def test_dit_token_and_embedding_paths_are_equivalent_with_a_real_block():
@@ -73,6 +72,11 @@ def test_causal_dit_does_not_require_time_conditioning():
     logits = model(torch.tensor([[0, 1, 2]]), None)
     assert logits.shape == (1, 3, 5)
     assert torch.isfinite(logits).all()
+
+
+def test_dit_can_tie_input_and_output_embeddings():
+    model = DIT(_config(tie_word_embeddings=True), vocab_size=6)
+    assert model.output_layer.linear.weight is model.vocab_embed.embedding
 
 
 def test_causal_dit_future_tokens_cannot_change_earlier_logits():

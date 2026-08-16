@@ -73,6 +73,8 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             cond_dim=cond_dim,
             adaLN=self.adaLN,
         )
+        if getattr(config.model, "tie_word_embeddings", False):
+            self.output_layer.linear.weight = self.vocab_embed.embedding
         self.scale_by_sigma = config.model.scale_by_sigma
 
     def _get_bias_dropout_scale(self):

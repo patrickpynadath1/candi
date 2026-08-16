@@ -70,6 +70,54 @@ def test_gsm8k_can_score_existing_predictions(tmp_path):
     assert (output / "results.json").exists()
 
 
+def test_exact_length_batches_preserve_singletons():
+    dataset = [
+        {"input_ids": [1, 2]},
+        {"input_ids": [3, 4, 5]},
+        {"input_ids": [6, 7]},
+        {"input_ids": [8, 9]},
+    ]
+    batches = list(evaluation.exact_length_batches(dataset, range(4), batch_size=2))
+    assert batches == [[0, 2], [3], [1]]
+
+
+def test_gsm8k_generation_uses_equal_length_prompt_batches():
+    dataset = [
+        {"input_ids": [1, 2], "prompt": "a", "response_ground_truth": "#### 1"},
+        {
+            "input_ids": [1, 2, 3],
+            "prompt": "singleton",
+            "response_ground_truth": "#### 2",
+        },
+        {"input_ids": [1, 4], "prompt": "b", "response_ground_truth": "#### 3"},
+    ]
+
+    class Tokenizer:
+        eos_token_id = 9
+
+        def decode(self, tokens, skip_special_tokens=True):
+            del skip_special_tokens
+            return " ".join(str(token) for token in tokens)
+
+    class Model:
+        num_tokens = 5
+        device = torch.device("cpu")
+
+        def generate_samples(self, count, prompt_tokens, prompt_mask, **kwargs):
+            del kwargs
+            lengths = prompt_mask.sum(1)
+            assert torch.equal(lengths, lengths[:1].expand_as(lengths))
+            result = prompt_tokens.clone()
+            result[torch.arange(count), lengths] = 9
+            return result
+
+    records = evaluation.generate_gsm8k_records(
+        Model(), dataset, Tokenizer(), batch_size=2, num_steps=1
+    )
+    assert sorted(record["dataset_index"] for record in records) == [0, 1, 2]
+    assert all(record["hit_eos"] for record in records)
+
+
 def test_gsm8k_bootstrap_is_seeded_and_empty_inputs_are_defined(tmp_path):
     predictions = [
         {

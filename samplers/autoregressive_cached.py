@@ -15,6 +15,8 @@ class CachedAutoregressiveSampler(Sampler):
     )
 
     def __init__(self, *, use_float64: bool, temperature: float):
+        if temperature < 0:
+            raise ValueError("temperature must be non-negative")
         self.use_float64 = use_float64
         self.temperature = temperature
 
@@ -36,27 +38,37 @@ class CachedAutoregressiveSampler(Sampler):
             start = 0
             samples[:, 0] = model.tokenizer.bos_token_id
 
-        noise = (
-            torch.distributions.Gumbel(0, 1)
-            .sample((request.num_samples, num_pred_tokens, model.vocab_size))
-            .to(model.device)
-        )
-        if self.use_float64:
-            noise = noise.to(torch.float64)
-
         cache = None
         model_calls = 0
         tokens_processed = 0
+        finished = torch.zeros(
+            request.num_samples, dtype=torch.bool, device=model.device
+        )
+        eos = getattr(model.tokenizer, "eos_token_id", None)
         for index in range(start, num_pred_tokens):
             if cache is None:
                 tokens = samples[:, : index + 1]
             else:
                 tokens = samples[:, index : index + 1]
             logits, cache = model.next_token_logits_cached(tokens, cache=cache)
-            log_probs = (logits[:, -1] / self.temperature).log_softmax(-1)
-            samples[:, index + 1] = (log_probs + noise[:, index]).argmax(-1)
+            step_logits = logits[:, -1]
+            if self.temperature == 0:
+                next_tokens = step_logits.argmax(-1)
+            else:
+                log_probs = (step_logits / self.temperature).log_softmax(-1)
+                noise = -torch.empty_like(log_probs).exponential_().log()
+                if self.use_float64:
+                    noise = noise.to(torch.float64)
+                next_tokens = (log_probs + noise).argmax(-1)
+            samples[:, index + 1] = torch.where(
+                finished, samples[:, index + 1], next_tokens
+            )
+            if eos is not None:
+                finished |= next_tokens == eos
             model_calls += 1
             tokens_processed += tokens.shape[1]
+            if eos is not None and finished.all():
+                break
         return SamplingResult(
             samples,
             {

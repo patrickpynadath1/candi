@@ -24,6 +24,7 @@ def _config(tmp_path, **data_overrides):
         train_on_prompt=False,
         train_on_pad=False,
         filter_too_long=False,
+        max_examples=None,
         wrap=False,
         val_ratio=0.5,
         val_seed=1,
@@ -71,9 +72,7 @@ def test_tinygsm_truncation_keeps_eos_and_never_trains_on_prompt(monkeypatch, tm
 
 
 def test_tinygsm_rejects_filtering_and_wrapping_together(monkeypatch, tmp_path):
-    raw = datasets.Dataset.from_dict(
-        {"question": ["a", "b"], "code": ["c", "d"]}
-    )
+    raw = datasets.Dataset.from_dict({"question": ["a", "b"], "code": ["c", "d"]})
     monkeypatch.setattr(datasets, "load_dataset", lambda *args, **kwargs: raw)
     with pytest.raises(ValueError, match="cannot both"):
         get_tinygsm_dataset(

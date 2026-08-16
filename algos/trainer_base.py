@@ -229,6 +229,11 @@ class TrainerBase(L.LightningModule):
             sampler_cls = dataloader.RandomFaultTolerantSampler
         updated_dls = []
         for dl in self.trainer.fit_loop._combined_loader.flattened:
+            if isinstance(dl.dataset, torch.utils.data.IterableDataset):
+                # Iterable streams shard themselves and cannot use a map-style
+                # random/distributed sampler. Resuming restarts the stream.
+                updated_dls.append(dl)
+                continue
             if hasattr(dl.sampler, "shuffle"):
                 dl_sampler = sampler_cls(dl.dataset, shuffle=dl.sampler.shuffle)
             else:

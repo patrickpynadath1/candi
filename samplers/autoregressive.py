@@ -15,6 +15,8 @@ class AutoregressiveSampler(Sampler):
     )
 
     def __init__(self, *, use_float64: bool, temperature: float):
+        if temperature < 0:
+            raise ValueError("temperature must be non-negative")
         self.use_float64 = use_float64
         self.temperature = temperature
 
@@ -34,27 +36,35 @@ class AutoregressiveSampler(Sampler):
             start = 0
             x[:, 0] = model.tokenizer.bos_token_id
 
-        noise = torch.distributions.Gumbel(0, 1).sample(
-            (request.num_samples, num_pred_tokens, model.vocab_size)
-        ).to(model.device)
-        if self.use_float64:
-            noise = noise.to(torch.float64)
-
         nfe = 0
+        finished = torch.zeros(
+            request.num_samples, dtype=torch.bool, device=model.device
+        )
+        eos = getattr(model.tokenizer, "eos_token_id", None)
         for i in range(start, num_pred_tokens):
             logits = model.next_token_logits(x[:, : i + 1])
-            log_probs = (logits / self.temperature).log_softmax(-1)
-            x[:, i + 1] = (log_probs[:, -1] + noise[:, i]).argmax(-1)
+            step_logits = logits[:, -1]
+            if self.temperature == 0:
+                next_tokens = step_logits.argmax(-1)
+            else:
+                step_log_probs = (step_logits / self.temperature).log_softmax(-1)
+                noise = -torch.empty_like(step_log_probs).exponential_().log()
+                if self.use_float64:
+                    noise = noise.to(torch.float64)
+                next_tokens = (step_log_probs + noise).argmax(-1)
+            x[:, i + 1] = torch.where(finished, x[:, i + 1], next_tokens)
+            if eos is not None:
+                finished |= next_tokens == eos
             nfe += 1
+            if eos is not None and finished.all():
+                break
         return SamplingResult(x, {"nfe": nfe})
 
 
 @sampler_registry.register("ar")
 def _create_ar(config):
     algo_config = getattr(config, "algo", None)
-    temperature = (
-        algo_config.get("temp", 1.0) if algo_config is not None else 1.0
-    )
+    temperature = algo_config.get("temp", 1.0) if algo_config is not None else 1.0
     return AutoregressiveSampler(
         use_float64=config.sampling.use_float64,
         temperature=temperature,

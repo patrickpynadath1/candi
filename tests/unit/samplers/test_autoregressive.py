@@ -31,6 +31,20 @@ def test_generates_left_to_right_and_reports_model_evaluations():
     assert result.metadata == {"nfe": 3}
 
 
+def test_zero_temperature_uses_greedy_decoding():
+    result = run_sampler(
+        AutoregressiveSampler(use_float64=False, temperature=0),
+        ARModel(),
+        SamplingRequest(num_samples=2),
+    )
+    assert result.samples[:, 1:].eq(2).all()
+
+
+def test_rejects_negative_temperature():
+    with pytest.raises(ValueError, match="non-negative"):
+        AutoregressiveSampler(use_float64=False, temperature=-0.1)
+
+
 def test_preserves_a_fixed_prompt():
     request = SamplingRequest(
         num_samples=1,
