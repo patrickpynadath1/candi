@@ -34,4 +34,6 @@ CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     "spherical_schedule": ("sampling_alpha",),
     "spherical_embeddings": ("sampling_embeddings",),
     "spherical_logits": ("sampling_logits",),
+    "blurring_prior": ("prior_sample",),
+    "blurring_transition": ("sample_step",),
 }

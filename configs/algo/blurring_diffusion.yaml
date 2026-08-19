@@ -1,0 +1,20 @@
+name: blurring_diffusion
+backbone: blurring_dit
+causal_attention: false
+parameterization: mean
+T: 0
+time_conditioning: true
+
+# Small, normalized table for corruption and posterior-mean blending.
+input_embedding_dim: 4
+# Untied table used only to form vocabulary logits.
+output_embedding_dim: 256
+detach_forward_embedding: false
+
+basis: dct  # dct or isotropic (the load-bearing baseline)
+tau_schedule: linear  # linear, cosine, or exponential
+tau_max: 8.0
+terminal_mean: 0.001
+lambda_scale: 1.0
+noise_rate: 1.0
+exponential_rate: 4.0

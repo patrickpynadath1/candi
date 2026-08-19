@@ -17,6 +17,7 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "ancestral_cache",
         "ar",
         "ar_cached",
+        "blurring_ode",
         "cadd",
         "candi",
         "candi_cached",

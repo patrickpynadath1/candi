@@ -42,6 +42,7 @@ ALGORITHM_CONFIGS = [
     ("candi_ra_change", ("sampling.predictor=candi",)),
     ("cont_diff_onehot", ("sampling.predictor=continuous_onehot",)),
     ("embedding_diffusion", ("sampling.predictor=continuous_embedding",)),
+    ("blurring_diffusion", ("sampling.predictor=blurring_ode",)),
     ("cfm", ("sampling.predictor=semicat_euler",)),
     ("semicat", ("sampling.predictor=semicat_euler",)),
     ("mdlm_perm", ("sampling.predictor=permuted_ar",)),

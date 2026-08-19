@@ -40,6 +40,7 @@ def create_sampler(config, *, default: str | None = None) -> Sampler:
     # depend on their implementations during module initialization.
     from . import (  # noqa: F401
         analytic,
+        blurring_ode,
         ancestral,
         ancestral_cached,
         autoregressive,
