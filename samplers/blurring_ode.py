@@ -18,7 +18,7 @@ class BlurringODESampler(Sampler):
     @torch.no_grad()
     def sample(self, model, request):
         steps = request.num_steps or model.config.sampling.steps
-        times = torch.linspace(1.0, request.eps, steps + 1, device=model.device)
+        times = torch.linspace(1.0, 0.0, steps + 1, device=model.device)
         state = model.prior_sample(request.num_samples, model.num_tokens)
         if request.prompt_mask is None:
             active = torch.ones(
@@ -36,8 +36,8 @@ class BlurringODESampler(Sampler):
             state, probabilities = model.sample_step(
                 state, times[index], times[index + 1], active
             )
-        final_time = torch.full(
-            (state.shape[0],), request.eps, device=state.device, dtype=state.dtype
+        final_time = torch.zeros(
+            state.shape[0], device=state.device, dtype=state.dtype
         )
         probabilities = model.forward(state, final_time).exp()
         tokens = probabilities.argmax(-1)

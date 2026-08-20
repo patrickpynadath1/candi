@@ -22,6 +22,10 @@ trainer:
 sampling:
   predictor: blurring_ode
   steps: 64
+  # If true, every reverse step embeds argmax x0 tokens instead of the
+  # posterior-mean probability blend. This changes sampling only.
+  greedy_clean_estimate: false
+  omit_reblur: false
 
 callbacks:
   sudoku_eval:

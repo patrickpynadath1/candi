@@ -40,18 +40,31 @@ class BlurringDiffusion(Diffusion):
         self.basis = config.algo.get("basis", "dct")
         if self.basis not in {"dct", "isotropic"}:
             raise ValueError("algo.basis must be 'dct' or 'isotropic'")
-        self.tau_schedule = config.algo.get("tau_schedule", "linear")
-        if self.tau_schedule not in {"linear", "cosine", "exponential"}:
-            raise ValueError("unknown blurring tau schedule")
-        self.tau_max = float(config.algo.get("tau_max", 8.0))
+        self.tau_schedule = config.algo.get("tau_schedule", "geometric")
+        if self.tau_schedule != "geometric":
+            raise ValueError("blurring diffusion requires a geometric tau schedule")
+        self.tau_min_attenuation = float(
+            config.algo.get("tau_min_attenuation", 0.01)
+        )
+        self.terminal_nonzero_mode = float(
+            config.algo.get("terminal_nonzero_mode", 0.01)
+        )
         terminal_mean = float(config.algo.get("terminal_mean", 1e-3))
         if not 0 < terminal_mean < 1:
             raise ValueError("algo.terminal_mean must lie in (0, 1)")
-        self.lambda_floor = -math.log(terminal_mean) / self.tau_max
+        self.terminal_mean = terminal_mean
         self.lambda_scale = float(config.algo.get("lambda_scale", 1.0))
-        self.noise_rate = float(config.algo.get("noise_rate", 1.0))
-        self.exponential_rate = float(config.algo.get("exponential_rate", 4.0))
+        self.noise_power = float(config.algo.get("noise_power", 2.0))
+        self.crossing_max_decile_fraction = float(
+            config.algo.get("crossing_max_decile_fraction", 0.45)
+        )
         self._dct_cache = {}
+        schedule_length = int(
+            config.algo.get(
+                "schedule_length", getattr(tokenizer, "seq_len", self.num_tokens)
+            )
+        )
+        self._validate_schedule(schedule_length)
         self.save_hyperparameters()
 
     def _validate_configuration(self):
@@ -63,41 +76,87 @@ class BlurringDiffusion(Diffusion):
     def _process_model_input(self, x0, valid_tokens):
         return x0, None, valid_tokens
 
-    def _tau(self, t):
-        if self.tau_schedule == "linear":
-            return self.tau_max * t, torch.full_like(t, self.tau_max)
-        if self.tau_schedule == "cosine":
-            angle = math.pi * t / 2
-            return (
-                self.tau_max * (1 - torch.cos(angle)),
-                self.tau_max * math.pi / 2 * torch.sin(angle),
-            )
-        rate = self.exponential_rate
-        denominator = math.expm1(rate)
-        return (
-            self.tau_max * torch.expm1(rate * t) / denominator,
-            self.tau_max * rate * torch.exp(rate * t) / denominator,
-        )
+    def _schedule_constants(self, length):
+        k = torch.arange(length, dtype=torch.float64)
+        laplacian = 2 * (1 - torch.cos(math.pi * k / length))
+        lambda_max = float(laplacian[-1]) * self.lambda_scale
+        lambda_one = float(laplacian[1]) * self.lambda_scale
+        tau_min = self.tau_min_attenuation / lambda_max
+        tau_end = -math.log(self.terminal_nonzero_mode) / lambda_one
+        tau_geometric_max = tau_end + tau_min
+        lambda_floor = -math.log(self.terminal_mean) / tau_end
+        return tau_min, tau_geometric_max, lambda_floor
+
+    def _tau(self, t, length):
+        # Shifted geometric time resolves the spec's endpoint contradiction:
+        # it retains log spacing while ensuring tau(0)=0 and therefore a(0)=1.
+        tau_min, tau_max, _ = self._schedule_constants(length)
+        log_ratio = math.log(tau_max / tau_min)
+        unshifted = tau_min * torch.exp(log_ratio * t)
+        return unshifted - tau_min, unshifted * log_ratio
 
     def _rates(self, length, reference):
+        _, _, lambda_floor = self._schedule_constants(length)
         if self.basis == "isotropic":
-            return torch.full((length,), self.lambda_floor, **reference)
+            return torch.full((length,), lambda_floor, **reference)
         k = torch.arange(length, **reference)
         laplacian = 2 * (1 - torch.cos(math.pi * k / length))
-        return self.lambda_floor + self.lambda_scale * laplacian
+        return lambda_floor + self.lambda_scale * laplacian
 
     def mode_coefficients(self, t, length):
-        tau, tau_prime = self._tau(t)
+        tau, tau_prime = self._tau(t, length)
         reference = {"device": t.device, "dtype": t.dtype}
         rates = self._rates(length, reference)
         a = torch.exp(-tau[:, None] * rates[None, :])
         a_prime = -tau_prime[:, None] * rates[None, :] * a
-        remainder = torch.exp(-2 * self.noise_rate * tau)
-        sigma = torch.sqrt((1 - remainder).clamp_min(1e-12))
-        sigma_prime = (
-            self.noise_rate * tau_prime * remainder / sigma.clamp_min(1e-8)
+        sigma = t.clamp_min(0).pow(self.noise_power)
+        sigma_prime = self.noise_power * t.clamp_min(0).pow(
+            self.noise_power - 1
         )
         return a, sigma, a_prime, sigma_prime
+
+    @torch.no_grad()
+    def _validate_schedule(self, length):
+        grid = torch.linspace(0, 1, 10001, dtype=torch.float64)
+        a, sigma, _, _ = self.mode_coefficients(grid, length)
+        snr = a.square() / sigma[:, None].square().clamp_min(1e-30)
+        crossed = snr <= 1
+        if not crossed.any(dim=0).all():
+            raise ValueError("every positional mode must cross SNR=1 by t=1")
+        indices = crossed.to(torch.int8).argmax(dim=0)
+        crossing_times = grid[indices]
+        if not torch.all(crossing_times[:-1] >= crossing_times[1:]):
+            raise ValueError("SNR crossing times must decrease with frequency")
+        histogram = torch.histc(crossing_times, bins=10, min=0, max=1).long()
+        densest = float(histogram.max()) / length
+        if (
+            self.basis == "dct"
+            and length >= 32
+            and densest > self.crossing_max_decile_fraction
+        ):
+            raise ValueError(
+                "blur mode deaths are too bunched: densest decile contains "
+                f"{densest:.1%} of modes"
+            )
+        terminal_mean_snr = float(snr[-1, 0]) * length
+        if crossing_times[0] < 0.75:
+            raise ValueError("mean positional mode dies too early")
+        if terminal_mean_snr >= 0.1:
+            raise ValueError(
+                f"worst-case terminal mean-mode SNR is {terminal_mean_snr:.4g}"
+            )
+        # Check the posterior's Markov variance condition on adjacent grid steps.
+        ratio = a[1:] / a[:-1].clamp_min(torch.finfo(a.dtype).tiny)
+        d2 = sigma[1:, None].square() - ratio.square() * sigma[:-1, None].square()
+        if d2.min() < -1e-10:
+            raise ValueError("schedule violates reverse-step Markov variance")
+        print(
+            "Blurring schedule diagnostics: "
+            f"L={length}, crossing_deciles={histogram.tolist()}, "
+            f"t0={float(crossing_times[0]):.4f}, "
+            f"terminal_mean_snr<={terminal_mean_snr:.4g}, "
+            f"crossing_times={crossing_times.tolist()}"
+        )
 
     @staticmethod
     def _segments(mask):
@@ -186,13 +245,45 @@ class BlurringDiffusion(Diffusion):
     def clean_prompt_embedding(self, tokens):
         return self.backbone.get_embedding(tokens, detach=True)
 
+    def sampling_clean_estimate(self, probabilities):
+        """Map p(x0 | xt) to the small embedding space for a reverse step."""
+        greedy = bool(self.config.sampling.get("greedy_clean_estimate", False))
+        values = probabilities.argmax(-1) if greedy else probabilities
+        estimate = self.backbone.get_embedding(values, detach=True)
+        if estimate.shape[-1] != self.backbone.input_dim:
+            raise RuntimeError("reverse clean estimate must blend the E_in table")
+        return estimate
+
+    def reverse_mode_moments(self, state_modes, clean_modes, t, s, length):
+        """Exact q(y_s | y_t, x0_hat) moments in the fixed mode basis."""
+        a_t, sigma_t, _, _ = self.mode_coefficients(t, length)
+        a_s, sigma_s, _, _ = self.mode_coefficients(s, length)
+        ratio = a_t / a_s.clamp_min(torch.finfo(a_s.dtype).tiny)
+        d2 = sigma_t[:, None].square() - ratio.square() * sigma_s[:, None].square()
+        if d2.min() < -1e-6:
+            raise RuntimeError("reverse transition has negative variance")
+        d2 = d2.clamp_min(0)
+        sigma_t2 = sigma_t[:, None].square().clamp_min(1e-20)
+        coefficient_state = sigma_s[:, None].square() / sigma_t2 * ratio
+        # a_s is the re-blur gate: clean_modes is a sharp t=0 prediction.
+        coefficient_prediction = d2 / sigma_t2 * a_s
+        if bool(self.config.sampling.get("omit_reblur", False)):
+            # Deliberately broken diagnostic requested by the spec.
+            coefficient_prediction = d2 / sigma_t2
+        mean = (
+            coefficient_state[:, :, None] * state_modes
+            + coefficient_prediction[:, :, None] * clean_modes
+        )
+        variance = d2 * sigma_s[:, None].square() / sigma_t2
+        return mean, variance
+
     @torch.no_grad()
     def sample_step(self, x, t, s, active_mask):
         times = torch.full(
             (x.shape[0],), float(t), device=x.device, dtype=x.dtype
         )
         probabilities = self.forward(x, times).exp()
-        estimate = self.backbone.get_embedding(probabilities, detach=True).to(x.dtype)
+        estimate = self.sampling_clean_estimate(probabilities).to(x.dtype)
         updated = x.clone()
         if torch.equal(active_mask, active_mask[:1].expand_as(active_mask)):
             spans = list(self._segments(active_mask[0]))
@@ -202,16 +293,13 @@ class BlurringDiffusion(Diffusion):
                 basis = self._basis(length, x)
                 state_modes = torch.matmul(basis.t(), x[:, start:end])
                 clean_modes = torch.matmul(basis.t(), estimate[:, start:end])
-                a_t, sigma_t, _, _ = self.mode_coefficients(times, length)
                 target_times = torch.full_like(times, float(s))
-                a_s, sigma_s, _, _ = self.mode_coefficients(target_times, length)
-                residual = (
-                    state_modes - a_t[:, :, None] * clean_modes
-                ) / sigma_t[:, None, None].clamp_min(1e-6)
-                next_modes = (
-                    a_s[:, :, None] * clean_modes
-                    + sigma_s[:, None, None] * residual
+                mean, variance = self.reverse_mode_moments(
+                    state_modes, clean_modes, times, target_times, length
                 )
+                next_modes = mean
+                if float(s) > 0:
+                    next_modes = mean + variance.sqrt()[:, :, None] * torch.randn_like(mean)
                 updated[:, start:end] = torch.matmul(basis, next_modes)
                 return updated, probabilities
         for batch in range(x.shape[0]):
@@ -220,19 +308,13 @@ class BlurringDiffusion(Diffusion):
                 basis = self._basis(length, x)
                 state_modes = basis.t() @ x[batch, start:end]
                 clean_modes = basis.t() @ estimate[batch, start:end]
-                a_t, sigma_t, _, _ = self.mode_coefficients(
-                    times[batch : batch + 1], length
-                )
                 target_time = torch.full_like(times[batch : batch + 1], float(s))
-                a_s, sigma_s, _, _ = self.mode_coefficients(target_time, length)
-                # Deterministic Gaussian/DDIM transition.  It follows the same
-                # conditional path as the probability-flow field but remains
-                # stable as sigma approaches zero at the clean endpoint.
-                residual = (
-                    state_modes - a_t[0, :, None] * clean_modes
-                ) / sigma_t[0].clamp_min(1e-6)
-                next_modes = (
-                    a_s[0, :, None] * clean_modes + sigma_s[0] * residual
+                mean, variance = self.reverse_mode_moments(
+                    state_modes.unsqueeze(0), clean_modes.unsqueeze(0),
+                    times[batch : batch + 1], target_time, length,
                 )
+                next_modes = mean[0]
+                if float(s) > 0:
+                    next_modes = next_modes + variance[0].sqrt()[:, None] * torch.randn_like(next_modes)
                 updated[batch, start:end] = basis @ next_modes
         return updated, probabilities

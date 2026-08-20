@@ -12,9 +12,13 @@ output_embedding_dim: 256
 detach_forward_embedding: false
 
 basis: dct  # dct or isotropic (the load-bearing baseline)
-tau_schedule: linear  # linear, cosine, or exponential
-tau_max: 8.0
-terminal_mean: 0.001
+# Geometric heat time is recomputed for each generated sequence length.
+tau_schedule: geometric
+tau_min_attenuation: 0.01
+terminal_nonzero_mode: 0.01
+# Gives a worst-case terminal mean-mode SNR below 0.1 for Sudoku length 89.
+terminal_mean: 0.03
 lambda_scale: 1.0
-noise_rate: 1.0
-exponential_rate: 4.0
+# sigma(t) = t^noise_power: shared across modes, zero at the clean endpoint.
+noise_power: 2.0
+crossing_max_decile_fraction: 0.45
