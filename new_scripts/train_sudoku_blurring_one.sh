@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -lt 2 || $# -gt 5 ]]; then
-  echo "usage: $0 GPU_ID LABEL [D_IN] [dct|isotropic] [live|detached]" >&2
+if [[ $# -lt 2 ]]; then
+  echo "usage: $0 GPU_ID LABEL [D_IN] [dct|isotropic] [live|detached] [HYDRA_OVERRIDE ...]" >&2
   exit 2
 fi
 
@@ -11,6 +11,12 @@ label=$2
 input_dim=${3:-4}
 basis=${4:-dct}
 embedding_mode=${5:-live}
+if [[ $# -ge 5 ]]; then
+  shift 5
+else
+  shift "$#"
+fi
+extra_overrides=("$@")
 if [[ "${basis}" != "dct" && "${basis}" != "isotropic" ]]; then
   echo "basis must be dct or isotropic" >&2
   exit 2
@@ -46,4 +52,5 @@ CUDA_VISIBLE_DEVICES="${gpu_id}" "${repo_root}/.venv/bin/python" "${repo_root}/m
   "checkpointing.save_dir=${run_dir}" \
   callbacks.checkpoint_every_n_steps.every_n_train_steps=5000 \
   +trainer.check_val_every_n_epoch=null \
-  "hydra.run.dir=${run_dir}"
+  "hydra.run.dir=${run_dir}" \
+  "${extra_overrides[@]}"

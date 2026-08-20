@@ -16,6 +16,29 @@ For Sudoku, the 91-token puzzle prefix remains clean and the DCT acts on the
 
 ## Initial ablation
 
+The complete initial matrix can be distributed evenly across any number of GPUs:
+
+```bash
+new_scripts/run_sudoku_blurring_ablation.sh 4 5 6 7
+```
+
+Before the full run, exercise every variant for two optimizer steps on a tiny
+dataset (these are real training and conditional-generation runs):
+
+```bash
+new_scripts/run_sudoku_blurring_ablation.sh --smoke 4 5
+```
+
+Each GPU receives a round-robin queue and runs its assigned jobs sequentially.
+Per-run logs are written below
+`$DUO_STORAGE_ROOT/new_sudoku_runs/blurring_ablation_{smoke,full}`.
+
+The commands below remain useful for launching individual variants.
+
+The corrected geometric-schedule runs use the `geometric_reblur_` label prefix.
+Checkpoints trained with the earlier linear schedule are not sampler-compatible
+with the corrected trajectory and must not be used to evaluate this method.
+
 Run live normalized input tables first:
 
 ```bash
