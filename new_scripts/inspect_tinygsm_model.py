@@ -26,10 +26,10 @@ def main_cli():
     tokenizer = dataloader.get_tokenizer(config)
     model = algo_registry.get(config.algo.name)(config, tokenizer)
     trainable = sum(parameter.numel() for parameter in model.parameters())
-    tied = (
-        model.backbone.output_layer.linear.weight
-        is model.backbone.vocab_embed.embedding
-    )
+    input_embedding = getattr(getattr(model.backbone, "vocab_embed", None), "embedding", None)
+    if input_embedding is None:
+        input_embedding = getattr(model.backbone, "token_embedding", None)
+    tied = model.backbone.output_layer.linear.weight is input_embedding
     print(f"experiment={args.experiment}")
     print(f"parameters={trainable:,}")
     print(f"vocabulary={model.vocab_size:,}")
