@@ -1,0 +1,24 @@
+defaults:
+  - candi
+  - _self_
+
+name: candi_blurred
+backbone: blurring_dit
+is_embed: true
+reserve_mask_embedding: true
+
+# Ablated independently from the transformer width. `512` recovers the normal
+# CANDI input-embedding width for the Sudoku tiny model.
+input_embedding_dim: 16
+output_embedding_dim: 512
+
+# Replaces CANDI's independent continuous rank noise. The discrete corruption,
+# reveal objective, and adaptive two-axis machinery remain unchanged.
+blurring:
+  basis: dct
+  tau_min_attenuation: 0.01
+  terminal_nonzero_mode: 0.01
+  terminal_mean: 0.03
+  lambda_scale: 1.0
+  noise_power: 2.0
+  crossing_max_decile_fraction: 0.45

@@ -39,6 +39,7 @@ ALGORITHM_CONFIGS = [
     ("sedd", ("sampling.predictor=analytic",)),
     ("cadd", ("sampling.predictor=cadd",)),
     ("candi", ("sampling.predictor=candi_cached",)),
+    ("candi_blurred", ("sampling.predictor=candi_entropy_bounded",)),
     ("candi_ra_change", ("sampling.predictor=candi",)),
     ("cont_diff_onehot", ("sampling.predictor=continuous_onehot",)),
     ("embedding_diffusion", ("sampling.predictor=continuous_embedding",)),
@@ -56,6 +57,18 @@ ALGORITHM_CONFIGS = [
     ),
     ("flm", ("sampling.predictor=flm_euler",)),
     ("sfm", ("sampling.predictor=sfm",)),
+    ("replaid", ("sampling.predictor=replaid_ddpm",)),
+    ("replaid_keep_mse", ("sampling.predictor=replaid_keep_ddpm",)),
+    ("replaid_keep_hybrid_elbo", ("sampling.predictor=replaid_keep_ddpm",)),
+    ("replaid_keep_mse_reveal_ce", ("sampling.predictor=replaid_keep_ddpm",)),
+    (
+        "latent_fm",
+        (
+            "model=latent_split_tiny",
+            "model.n_blocks=2",
+            "sampling.predictor=latent_fm",
+        ),
+    ),
     (
         "distillation",
         (
@@ -98,7 +111,8 @@ def test_shipping_algorithm_config_constructs_real_backbone_and_sampler(algo, ov
     model = algo_registry.get(config.algo.name)(config, _tokenizer_for(algo))
     sampler = create_sampler(config)
 
-    assert len(model.backbone.blocks) == 1
+    expected_blocks = 2 if algo == "latent_fm" else 1
+    assert len(model.backbone.blocks) == expected_blocks
     assert model.backbone.blocks[0].attn_qkv.weight.shape[1] == 8
     sampler.validate_model(model)
 
@@ -118,6 +132,28 @@ def test_real_mdlm_training_path_reaches_output_projection():
     assert gradient is not None
     assert torch.isfinite(gradient).all()
     assert torch.count_nonzero(gradient) > 0
+
+
+def test_mdlm_can_allocate_mask_after_added_pad_token():
+    class TokenizerWithAddedPad(Text8Tokenizer):
+        vocab_size = 35
+        pad_token_id = 35
+        mask_token = None
+        mask_token_id = None
+
+        def __len__(self):
+            return 36
+
+    config = _compose_tiny(
+        "mdlm",
+        "sampling.predictor=ancestral_cache",
+        "algo.mask_after_added_tokens=true",
+    )
+    model = algo_registry.get("mdlm")(config, TokenizerWithAddedPad())
+
+    assert model.mask_index == 36
+    assert model.mask_index != model.tokenizer.pad_token_id
+    assert model.vocab_size == 37
 
 
 def test_duo_rejects_integral_cache_for_a_different_vocabulary():

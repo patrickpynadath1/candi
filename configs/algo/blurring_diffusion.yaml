@@ -10,6 +10,7 @@ input_embedding_dim: 4
 # Untied table used only to form vocabulary logits.
 output_embedding_dim: 256
 detach_forward_embedding: false
+reserve_mask_embedding: false
 
 basis: dct  # dct or isotropic (the load-bearing baseline)
 # Geometric heat time is recomputed for each generated sequence length.

@@ -24,6 +24,9 @@ class BlurringDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         cond_dim = int(config.model.cond_dim)
         self.input_dim = int(config.algo.input_embedding_dim)
         self.output_dim = int(config.algo.output_embedding_dim)
+        self.reserve_mask_embedding = bool(
+            config.algo.get("reserve_mask_embedding", False)
+        )
 
         self.input_embedding = nn.Embedding(vocab_size, self.input_dim)
         nn.init.normal_(self.input_embedding.weight, std=self.input_dim ** -0.5)
@@ -53,14 +56,18 @@ class BlurringDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         """Normalize on use so every forward process sees unit-length rows."""
         return F.normalize(self.input_embedding.weight, dim=-1)
 
+    def data_input_table(self):
+        table = self.normalized_input_table()
+        return table[:-1] if self.reserve_mask_embedding else table
+
     def get_embedding(self, values, *, detach=False):
         """Embed integer tokens or blend the small table with token probabilities."""
-        table = self.normalized_input_table()
+        table = self.data_input_table()
         if detach:
             table = table.detach()
         if not values.dtype.is_floating_point:
             return F.embedding(values, table)
-        if values.shape[-1] != self.vocab_size:
+        if values.shape[-1] != table.shape[0]:
             raise ValueError(
                 "probability blends must end in the vocabulary dimension"
             )
@@ -81,4 +88,4 @@ class BlurringDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                 hidden = block(hidden, rotary, c=condition)
             features = self.output_projection(hidden)
             logits = features @ self.output_embedding.t() + self.output_bias
-        return logits
+        return logits[:, :, :-1] if self.reserve_mask_embedding else logits
