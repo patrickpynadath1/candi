@@ -60,3 +60,31 @@ def test_embedding_diffusion_q_xt_clean_endpoint():
     result = model.q_xt(tokens, torch.ones(2, 1))
     assert torch.equal(result["xt"], model.backbone.get_embedding(tokens))
     assert result["xt"].shape == (2, 2, 4)
+
+
+def test_embedding_diffusion_flow_matching_uses_linear_interpolation(monkeypatch):
+    class Backbone(torch.nn.Module):
+        def get_embedding(self, tokens):
+            return torch.nn.functional.one_hot(tokens, 4).float()
+
+    model = _bare(
+        ContDiffEmbed,
+        backbone=Backbone(),
+        continuous_path="flow_matching",
+    )
+    monkeypatch.setattr(torch, "randn_like", lambda value, **_: torch.ones_like(value))
+    tokens = torch.tensor([[0, 2]])
+    # q_xt receives alpha=1-t, so this corresponds to t=0.25.
+    result = model.q_xt(tokens, torch.tensor([[0.75]]))
+    clean = model.backbone.get_embedding(tokens)
+    assert torch.allclose(result["xt"], 0.75 * clean + 0.25)
+    assert torch.allclose(result["continuous_noise"], torch.tensor([0.25]))
+    assert torch.allclose(
+        -torch.log1p(-result["discrete_noise"]), torch.tensor([0.25])
+    )
+
+
+def test_embedding_diffusion_flow_matching_schedule_is_linear():
+    model = _bare(ContDiffEmbed, continuous_path="flow_matching")
+    times = torch.tensor([1.0, 0.5, 0.0])
+    assert torch.equal(model.sampling_continuous_schedule(times), times)

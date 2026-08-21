@@ -26,6 +26,9 @@ class ContDiffEmbed(Diffusion):
         self.save_hyperparameters()
 
         self.pure_continuous = config.algo.pure_continuous
+        self.continuous_path = getattr(config.algo, "continuous_path", "ve")
+        if self.continuous_path not in {"ve", "flow_matching"}:
+            raise ValueError("algo.continuous_path must be 've' or 'flow_matching'")
 
         self.continuous_noise =torch.linspace(.2, 4.0, 1000)
         self.discrete_noise = expected_rank(d=self.vocab_size, a=torch.tensor(1).to(self.device), sigma=self.continuous_noise)
@@ -42,10 +45,21 @@ class ContDiffEmbed(Diffusion):
     def ve_sde_noise_sched(self, t, sigma_min=0.01, sigma_max=10.0):
         return sigma_min * (sigma_max / sigma_min) ** t
 
+    def _is_flow_matching(self):
+        # getattr keeps older checkpoints and lightweight test fixtures valid.
+        return getattr(self, "continuous_path", "ve") == "flow_matching"
+
+    def _model_discrete_noise(self, t):
+        # ContDIT internally maps p to -log(1-p). This inverse makes its actual
+        # timestep condition equal to t for the flow-matching path.
+        return -torch.expm1(-t) if self._is_flow_matching() else t
+
     def sample_t(self, n, accum_step):
         return super()._sample_t(n, accum_step)
 
     def get_continuous_from_discrete_noise(self, discrete_noise):
+        if self._is_flow_matching():
+            return discrete_noise
         sigmas = training_sigma_ve(discrete_noise, sigma_min=self.sigma_min, sigma_max=self.sigma_max)
         return sigmas
 
@@ -85,24 +99,27 @@ class ContDiffEmbed(Diffusion):
         return nll
 
     def q_xt(self, x, alpha_t, valid_tokens=None):
-        t = (1 - alpha_t).squeeze()
+        t = (1 - alpha_t).reshape(-1)
         continuous_noise = self.get_continuous_from_discrete_noise(t)
 
         clean_embeddings = self.backbone.get_embedding(x)
-        sigma = self.get_continuous_from_discrete_noise(t).squeeze()
-        noise = torch.randn_like(clean_embeddings, device=x.device) * sigma[:, None, None]
-        xt = clean_embeddings + noise
+        noise = torch.randn_like(clean_embeddings, device=x.device)
+        if self._is_flow_matching():
+            xt = (1 - t[:, None, None]) * clean_embeddings + t[:, None, None] * noise
+        else:
+            sigma = continuous_noise.squeeze()
+            xt = clean_embeddings + noise * sigma[:, None, None]
         if valid_tokens is not None:
             xt = torch.where(valid_tokens.bool().unsqueeze(-1), xt, clean_embeddings)
 
         return {
             'xt': xt,
-            'discrete_noise': t,
+            'discrete_noise': self._model_discrete_noise(t),
             'continuous_noise': continuous_noise,
         }
 
     def prior_sample(self, *batch_dims):
-        sigma_max = self.sigma_max
+        sigma_max = 1.0 if self._is_flow_matching() else self.sigma_max
         noise = torch.randn(
             *batch_dims,
             self.backbone.config.model.hidden_size,
@@ -114,6 +131,8 @@ class ContDiffEmbed(Diffusion):
     def forward(self, **kwargs):
         kwargs["reveal_mask"] = None
         kwargs["is_embed"] = True
+        if self._is_flow_matching():
+            kwargs["precond"] = False
         with torch.amp.autocast(
             "cuda", dtype=torch.float32, enabled=torch.cuda.is_available()
         ):
@@ -150,6 +169,8 @@ class ContDiffEmbed(Diffusion):
         return x, prompt_mask
 
     def sampling_continuous_schedule(self, timesteps):
+        if self._is_flow_matching():
+            return timesteps
         return self.get_continuous_noise_sched_pure_cont(timesteps)
 
     def sample_continuous_transition(self, **kwargs):
@@ -166,6 +187,23 @@ class ContDiffEmbed(Diffusion):
         clean_mask: torch.Tensor=None,
         is_embed=False,
     ) -> torch.Tensor:
+
+        if self._is_flow_matching():
+            time_t_vec = torch.full(
+                (x.shape[0],), time_t.item(), device=x.device, dtype=x.dtype
+            )
+            cond_denoised = self.forward(
+                xt=x,
+                discrete_noise=self._model_discrete_noise(time_t_vec),
+                reveal_mask=clean_mask,
+                continuous_noise=time_t_vec,
+                is_embed=is_embed,
+            ).double()
+            denoised = cond_denoised.exp()
+            x0_hat = self.backbone.get_embedding(denoised).to(x.dtype)
+            velocity = (x - x0_hat) / time_t.clamp_min(1e-5)
+            x_cont = x + (time_s - time_t) * velocity
+            return x_cont, denoised
 
         dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_s - sigma_t).item()
         time_t_vec = torch.ones(x.shape[0], device=x.device) * time_t.item()
