@@ -4,6 +4,7 @@ from collections import Counter
 import json
 import math
 import os
+import time
 
 from typing import List, Dict, Tuple
 import fsspec
@@ -29,10 +30,46 @@ omegaconf.OmegaConf.register_new_resolver("div_up", lambda x, y: (x + y - 1) // 
 def _load_from_checkpoint(diffusion_model, config, tokenizer):
     if "hf" in config.algo.backbone:
         return diffusion_model(config, tokenizer=tokenizer).to("cuda")
-    
-    
-    model = diffusion_model.load_from_checkpoint(
-        config.eval.checkpoint_path, tokenizer=tokenizer, config=config
+
+    # Evaluation needs model buffers and (normally) EMA weights, not optimizer,
+    # callback, or trainer-loop state. Lightning's load_from_checkpoint eagerly
+    # restores the complete training archive and is pathologically slow for our
+    # ~450 MB checkpoints. mmap keeps unused optimizer tensors lazy.
+    started = time.monotonic()
+    checkpoint = torch.load(
+        config.eval.checkpoint_path,
+        map_location="cpu",
+        weights_only=False,
+        mmap=True,
+    )
+    model = diffusion_model(config, tokenizer=tokenizer)
+    state_dict = {
+        key.replace("_orig_mod.", ""): value
+        for key, value in checkpoint["state_dict"].items()
+        if "teacher" not in key
+    }
+    model.load_state_dict(state_dict, strict=True)
+
+    if not config.eval.disable_ema and model.ema is not None:
+        shadows = checkpoint.get("ema", {}).get("shadow_params")
+        parameters = list(model._get_parameters())
+        if shadows is None:
+            raise KeyError("checkpoint does not contain EMA shadow parameters")
+        if len(shadows) != len(parameters):
+            raise ValueError(
+                "EMA parameter count mismatch: "
+                f"checkpoint has {len(shadows)}, model has {len(parameters)}"
+            )
+        with torch.no_grad():
+            for parameter, shadow in zip(parameters, shadows):
+                parameter.copy_(shadow)
+    # EMA is already materialized in the model. Disabling the helper prevents
+    # _eval_mode() from cloning every parameter and copying it a second time.
+    model.ema = None
+    print(
+        f"Lightweight checkpoint load completed in "
+        f"{time.monotonic() - started:.2f}s",
+        flush=True,
     )
     return model
 

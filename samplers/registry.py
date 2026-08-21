@@ -35,7 +35,9 @@ class SamplerRegistry:
 sampler_registry = SamplerRegistry()
 
 
-def create_sampler(config, *, default: str | None = None) -> Sampler:
+def create_sampler(
+    config, *, default: str | None = None, sampling_overrides: dict | None = None
+) -> Sampler:
     # Importing registers the built-in factories without making registry.py
     # depend on their implementations during module initialization.
     from . import (  # noqa: F401
@@ -48,8 +50,10 @@ def create_sampler(config, *, default: str | None = None) -> Sampler:
         cadd,
         candi,
         candi_cached,
+        candi_entropy_bounded,
         continuous_embedding,
         continuous_onehot,
+        entropy_bounded,
         permuted_autoregressive,
         permuted_autoregressive_uncached,
         semi_autoregressive,
@@ -57,9 +61,18 @@ def create_sampler(config, *, default: str | None = None) -> Sampler:
         semicat_euler,
         semicat_flow_map,
         flm_euler,
+        latent_fm,
+        replaid_ddpm,
+        replaid_keep_ddpm,
+        replaid_keep_entropy_bounded,
         sfm,
+        uniform_entropy_bounded,
     )
 
+    if sampling_overrides:
+        from omegaconf import OmegaConf
+
+        config = OmegaConf.merge(config, {"sampling": sampling_overrides})
     predictor = default or getattr(config.sampling, "predictor", None)
     if predictor is None:
         raise ValueError("sampling.predictor must select a registered sampler")

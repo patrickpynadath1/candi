@@ -11,8 +11,9 @@ from .utils import (
 
 
 class CachedAncestralSampler(Sampler):
-    def __init__(self, noise_removal):
+    def __init__(self, noise_removal, greedy_clean_estimate=False):
         self.noise_removal = noise_removal
+        self.greedy_clean_estimate = bool(greedy_clean_estimate)
         required = {"discrete_prior", "noise_schedule", "ancestral_transition"}
         if noise_removal == "greedy":
             required.add("greedy_denoise")
@@ -32,10 +33,12 @@ class CachedAncestralSampler(Sampler):
         cache = None
         for i in range(steps):
             t = times[i] * torch.ones(x.shape[0], 1, device=model.device)
-            cache, x_next = model.sample_ancestral_transition(
-                x=x, t=t, dt=dt, p_x0=cache,
-                prompt_mask=request.prompt_mask,
+            transition_args = dict(
+                x=x, t=t, dt=dt, p_x0=cache, prompt_mask=request.prompt_mask
             )
+            if model.sampling_family == "uniform_diffusion":
+                transition_args["greedy_clean_estimate"] = self.greedy_clean_estimate
+            cache, x_next = model.sample_ancestral_transition(**transition_args)
             if not torch.allclose(x_next, x) or model.time_conditioning:
                 cache = None
             x = x_next
@@ -56,4 +59,7 @@ class CachedAncestralSampler(Sampler):
 
 @sampler_registry.register("ancestral_cache")
 def _create(config):
-    return CachedAncestralSampler(config.sampling.noise_removal)
+    return CachedAncestralSampler(
+        config.sampling.noise_removal,
+        getattr(config.sampling, "greedy_clean_estimate", False),
+    )

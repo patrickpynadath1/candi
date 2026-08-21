@@ -503,12 +503,22 @@ class TrainerBase(L.LightningModule):
 
     def generate_samples(
         self, num_samples, num_steps=None, eps=1e-5,
-        prompt_tokens=None, prompt_mask=None, **options
+        prompt_tokens=None, prompt_mask=None, return_result=False,
+        sampler_name=None, sampler_overrides=None, **options
     ):
         configured = getattr(self.config.sampling, "predictor", None)
-        sampler_name = (
-            configured if configured in self.supported_samplers else self.default_sampler
-        )
+        if sampler_name is None:
+            sampler_name = (
+                configured
+                if configured in self.supported_samplers
+                else self.default_sampler
+            )
+        elif sampler_name not in self.supported_samplers:
+            raise ValueError(
+                f"Sampler {sampler_name!r} is not supported by "
+                f"{type(self).__name__}; expected one of "
+                f"{sorted(self.supported_samplers)}"
+            )
         legacy_method = options.pop(
             "sampling_method", getattr(self, "sampling_method", None)
         )
@@ -516,7 +526,11 @@ class TrainerBase(L.LightningModule):
             sampler_name = f"semicat_{legacy_method}"
             if sampler_name not in self.supported_samplers:
                 raise ValueError(f"Unknown sampling method: {legacy_method}")
-        sampler = create_sampler(self.config, default=sampler_name)
+        sampler = create_sampler(
+            self.config,
+            default=sampler_name,
+            sampling_overrides=sampler_overrides,
+        )
         result = run_sampler(
             sampler,
             self,
@@ -529,7 +543,7 @@ class TrainerBase(L.LightningModule):
                 options=options,
             ),
         )
-        return result.samples
+        return result if return_result else result.samples
 
     def restore_model_and_sample(self, num_steps, eps=1e-5):
         """Generate samples from the model."""

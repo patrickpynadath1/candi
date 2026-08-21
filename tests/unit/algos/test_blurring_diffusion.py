@@ -158,7 +158,7 @@ def test_conditional_sampler_preserves_prompt():
 
 
 def test_greedy_sampling_embeds_argmax_instead_of_probability_mean():
-    model = make_model("+sampling.greedy_clean_estimate=true")
+    model = make_model("sampling.greedy_clean_estimate=true")
     probabilities = torch.full((1, 1, model.vocab_size), 0.05)
     probabilities[..., 3] = 0.40
     probabilities = probabilities / probabilities.sum(-1, keepdim=True)

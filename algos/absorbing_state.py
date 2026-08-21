@@ -9,13 +9,15 @@ import torch.nn.functional as F
 class AbsorbingState(Diffusion):
     sampling_family = "absorbing_diffusion"
     supported_samplers = frozenset({
-        "ancestral", "ancestral_cache", "analytic", "semi_ar",
+        "ancestral", "ancestral_cache", "analytic", "entropy_bounded",
+        "semi_ar",
     })
     sampling_capabilities = Diffusion.sampling_capabilities | {
         "ancestral_transition",
         "analytic_transition",
         "denoiser_transition",
         "zero_time_denoise",
+        "denoising_log_probs",
     }
     def __init__(self, config, tokenizer):
         self.temp = config.algo.get("temp", 1.0)
@@ -30,6 +32,11 @@ class AbsorbingState(Diffusion):
             self.token_offset = True
         else:
             self.token_offset = False
+            if config.algo.get("mask_after_added_tokens", False):
+                # Hugging Face's vocab_size excludes added special tokens.
+                # Allocate the absorbing state after those IDs so it cannot
+                # collide with an added PAD token (as in SmolLM/TinyGSM).
+                vocab_size = max(vocab_size, len(tokenizer))
         if not hasattr(tokenizer, "mask_token") or tokenizer.mask_token is None:
             self.mask_index = vocab_size
             vocab_size += 1

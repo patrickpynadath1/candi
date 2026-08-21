@@ -1,0 +1,10 @@
+name: duo_base
+backbone: dit
+parameterization: mean
+time_conditioning: true
+T: 0
+subs_masking: false
+causal_attention: false
+loss_type: elbo
+ignore_bos: false
+temp: 1.0

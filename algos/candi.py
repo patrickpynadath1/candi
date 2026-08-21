@@ -19,7 +19,9 @@ import math
 @algo_registry.register("candi")
 class CANDI(Diffusion):
     default_sampler = "candi_cached"
-    supported_samplers = frozenset({"candi", "candi_cached"})
+    supported_samplers = frozenset({
+        "candi", "candi_cached", "candi_entropy_bounded",
+    })
     sampling_family = "candi"
     sampling_capabilities = frozenset({
         "continuous_prior", "continuous_schedule", "candi_discrete_schedule",

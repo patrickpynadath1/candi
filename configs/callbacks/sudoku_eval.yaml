@@ -1,0 +1,14 @@
+sudoku_eval:
+  _target_: tasks.sudoku_callback.SudokuEvaluationCallback
+  every_n_train_steps: 1000
+  subset_size: 128
+  batch_size: 64
+  num_steps: 45
+  seed: 42
+  log_examples: 8
+  output_dir: ${cwd:}/sudoku_callback
+  full_eval_at_end: false
+  # Optional list. Each entry may set name, predictor, num_steps, and sampler
+  # configuration overrides such as entropy_bound. Empty preserves the single
+  # sampling.predictor behavior.
+  samplers: null

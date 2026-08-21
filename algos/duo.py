@@ -15,10 +15,13 @@ import collections
 
 @algo_registry.register("duo_base")
 class DUO_BASE(UniformState):
-    supported_samplers = frozenset({"ancestral", "ancestral_cache", "semi_ar"})
+    supported_samplers = frozenset({
+        "ancestral", "ancestral_cache", "semi_ar", "uniform_entropy_bounded",
+    })
     sampling_capabilities = UniformState.sampling_capabilities | {
         "ancestral_transition",
         "zero_time_denoise",
+        "uniform_entropy_transition",
     }
     def __init__(self, config, tokenizer):
         self.temp = config.algo.get("temp", 1.0)
@@ -115,8 +118,10 @@ class DUO_BASE(UniformState):
         assert diffusion_loss.ndim == 2
         return diffusion_loss
 
-    def _ancestral_update(self, x, t, dt, p_x0=None, noise_removal_step=False, prompt_mask=None):
-        del p_x0
+    def _uniform_prediction_and_transition(
+        self, x, t, dt, noise_removal_step=False, frozen_mask=None,
+        greedy_clean_estimate=False,
+    ):
         _, alpha_t = self.noise(t)
         if noise_removal_step:
             alpha_s = torch.ones_like(alpha_t)
@@ -127,6 +132,10 @@ class DUO_BASE(UniformState):
 
         cur_logits = (self.forward(x, sigma_t)).double()
         xtheta_to_use = cur_logits.exp()
+        if greedy_clean_estimate:
+            xtheta_to_use = F.one_hot(
+                cur_logits.argmax(dim=-1), num_classes=self.vocab_size
+            ).to(cur_logits)
 
 
 
@@ -139,10 +148,30 @@ class DUO_BASE(UniformState):
         xs = sample_categorical(q_xs)
 
         # to handle conditional generation for inputs / infilling tasks
-        if prompt_mask is not None:
+        if frozen_mask is not None:
             # expects the original x to have the prompt tokens where prompt_mask = 1
-            xs = torch.where(prompt_mask.bool(), x, xs)
+            xs = torch.where(frozen_mask.bool(), x, xs)
+        return cur_logits, xs
+
+    def _ancestral_update(
+        self, x, t, dt, p_x0=None, noise_removal_step=False,
+        prompt_mask=None, greedy_clean_estimate=False,
+    ):
+        del p_x0
+        _, xs = self._uniform_prediction_and_transition(
+            x, t, dt, noise_removal_step=noise_removal_step,
+            frozen_mask=prompt_mask,
+            greedy_clean_estimate=greedy_clean_estimate,
+        )
         return None, xs
+
+    def sample_uniform_entropy_transition(
+        self, x, t, dt, frozen_mask=None, greedy_clean_estimate=False
+    ):
+        return self._uniform_prediction_and_transition(
+            x, t, dt, frozen_mask=frozen_mask,
+            greedy_clean_estimate=greedy_clean_estimate,
+        )
 
 
 class Integral(torch.autograd.Function):

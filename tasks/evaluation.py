@@ -41,8 +41,12 @@ def _write_results(output_dir, results):
 def evaluate_sudoku(diffusion_model, config, tokenizer, load_checkpoint, logger):
     model = _prepare_model(diffusion_model, config, tokenizer, load_checkpoint)
     dataset = get_sudoku_dataset(config, tokenizer)["validation"]
+    max_examples = getattr(config.sudoku, "max_examples", None)
+    if max_examples is not None:
+        dataset = dataset.select(range(min(int(max_examples), len(dataset))))
     batch_size, prompt_length = config.sudoku.batch_size, tokenizer.prompt_len
     records = []
+    sample_nfes = []
     for start in trange(0, len(dataset), batch_size, desc="Sudoku evaluation"):
         batch = torch.stack(
             [
@@ -57,12 +61,23 @@ def evaluate_sudoku(diffusion_model, config, tokenizer, load_checkpoint, logger)
         prompt_mask = torch.zeros_like(prompt_tokens, dtype=torch.bool)
         prompt_tokens[:, :prompt_length] = batch[:, :prompt_length].to(model.device)
         prompt_mask[:, :prompt_length] = True
-        generated = model.generate_samples(
+        sampling_result = model.generate_samples(
             count,
             num_steps=config.sampling.steps,
             prompt_tokens=prompt_tokens,
             prompt_mask=prompt_mask,
-        ).cpu()
+            return_result=True,
+        )
+        generated = sampling_result.samples.cpu()
+        if "nfe_per_sample" in sampling_result.metadata:
+            sample_nfes.extend(
+                float(value)
+                for value in sampling_result.metadata["nfe_per_sample"]
+            )
+        elif "nfe" in sampling_result.metadata:
+            sample_nfes.extend(
+                [float(sampling_result.metadata["nfe"])] * count
+            )
         truth = batch[:, prompt_length:]
         predictions = generated[:, prompt_length : prompt_length + truth.shape[1]]
         for prediction, target in zip(predictions, truth):
@@ -84,6 +99,11 @@ def evaluate_sudoku(diffusion_model, config, tokenizer, load_checkpoint, logger)
         "valid_box_rate": sum(record["valid_boxes"] for record in records) / total,
         "num_correct": sum(record["exact"] for record in records),
         "num_total": len(records),
+        "mean_nfe": (
+            sum(sample_nfes) / len(sample_nfes) if sample_nfes else None
+        ),
+        "min_nfe": min(sample_nfes) if sample_nfes else None,
+        "max_nfe": max(sample_nfes) if sample_nfes else None,
         "records": records,
     }
     destination = _write_results(config.sudoku.output_dir, results)

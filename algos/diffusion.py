@@ -125,6 +125,11 @@ class Diffusion(TrainerBase):
         sigma = self._sigma_from_alphat(self.noise(t)[1])
         return self.forward(xt=x, sigma=sigma).argmax(dim=-1)
 
+    def sample_denoising_log_probs(self, x, t):
+        """Return normalized clean-token predictions for a noisy state."""
+        sigma = self._sigma_from_alphat(self.noise(t)[1])
+        return self.forward(xt=x, sigma=sigma)
+
     def sample_zero_time_denoise(self, x, ones):
         return self.forward(x, 0 * ones).argmax(dim=-1)
 

@@ -5,6 +5,8 @@ import datasets
 import pytest
 import torch
 
+from samplers import SamplingResult
+
 from tasks import evaluation
 from tasks.sudoku import SudokuTokenizer, encode_example
 from tasks.sudoku_generator import generate_grids
@@ -34,7 +36,7 @@ def test_sudoku_evaluation_preserves_prompt(monkeypatch, tmp_path):
         def generate_samples(self, count, **kwargs):
             assert kwargs["prompt_mask"][0, : tokenizer.prompt_len].all()
             assert not kwargs["prompt_mask"][0, tokenizer.prompt_len :].any()
-            return torch.tensor([ids])
+            return SamplingResult(torch.tensor([ids]), {"nfe": 2})
 
     monkeypatch.setattr(evaluation, "get_sudoku_dataset", lambda *args: dataset)
     monkeypatch.setattr(evaluation, "_prepare_model", lambda *args: Model())

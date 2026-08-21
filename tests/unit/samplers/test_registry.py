@@ -21,8 +21,10 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "cadd",
         "candi",
         "candi_cached",
+        "candi_entropy_bounded",
         "continuous_embedding",
         "continuous_onehot",
+        "entropy_bounded",
         "semi_ar",
         "permuted_ar",
         "permuted_ar_uncached",
@@ -30,7 +32,12 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "semicat_euler",
         "semicat_flow_map",
         "flm_euler",
+        "latent_fm",
+        "replaid_ddpm",
+        "replaid_keep_ddpm",
+        "replaid_keep_entropy_bounded",
         "sfm",
+        "uniform_entropy_bounded",
     }
 
 

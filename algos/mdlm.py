@@ -11,7 +11,9 @@ class MDLM(AbsorbingState):
 
     def _validate_configuration(self):
         # ancestral sampling isn't desirable because it's slow
-        assert self.config.sampling.predictor == "ancestral_cache"
+        assert self.config.sampling.predictor in {
+            "ancestral_cache", "entropy_bounded",
+        }
 
     def _process_model_output(self, model_output, xt, sigma):
         del sigma

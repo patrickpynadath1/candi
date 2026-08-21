@@ -8,3 +8,4 @@ causal_attention: False
 ignore_bos: False
 loss_type: elbo
 temp: 1.0
+mask_after_added_tokens: false  # opt in for new checkpoints; preserves old vocab layouts

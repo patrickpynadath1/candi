@@ -1,0 +1,22 @@
+# @package _global_
+defaults:
+  - sudoku_candi
+  - override /callbacks: [checkpoint_every_n_steps, checkpoint_monitor, learning_rate_monitor, sudoku_eval]
+
+data:
+  difficulty: hard
+
+sampling:
+  predictor: candi_entropy_bounded
+  entropy_bound: 0.1
+  steps: 180
+
+callbacks:
+  sudoku_eval:
+    every_n_train_steps: 1000
+    subset_size: 128
+    batch_size: 64
+    num_steps: 180
+    seed: 42
+    log_examples: 8
+    full_eval_at_end: false
