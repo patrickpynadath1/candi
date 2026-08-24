@@ -11,14 +11,37 @@ reserve_mask_embedding: true
 # CANDI input-embedding width for the Sudoku tiny model.
 input_embedding_dim: 16
 output_embedding_dim: 512
+# Mirrored at the top level because the backbone is constructed before the
+# algorithm adapter reads the nested blur configuration.
+feature_lambda_min: 0.25
+feature_lambda_max: 1.0e9
+column_init_alpha: 0.25
 
 # Replaces CANDI's independent continuous rank noise. The discrete corruption,
 # reveal objective, and adaptive two-axis machinery remain unchanged.
 blurring:
   basis: dct
+  feature_rho: 0.5
+  feature_lambda_min: 0.25
+  feature_lambda_max: 1.0e9
+  feature_tau_min: 1.0e-9
+  feature_tau_max: 20.0
+  detach_forward_embedding: false
+  # Keep the completed Sudoku runs on their original clock by default. This can
+  # be enabled independently when ablating the linearized schedule with CANDI.
+  time_warp: none
+  linearized_crossing_min: 0.05
+  linearized_crossing_max: 0.95
   tau_min_attenuation: 0.01
   terminal_nonzero_mode: 0.01
   terminal_mean: 0.03
   lambda_scale: 1.0
   noise_power: 2.0
   crossing_max_decile_fraction: 0.45
+
+# Scale on the exact Gaussian reverse-posterior noise used by the standard
+# CANDI sampler. 1.0 is stochastic posterior sampling; 0.0 follows its mean.
+continuous_noise_scale: 1.0
+# posterior: exact stochastic Markov bridge; ddim: deterministic shared-noise
+# non-Markovian transition that preserves the forward marginals for exact x0.
+continuous_transition: posterior

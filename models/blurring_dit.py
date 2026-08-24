@@ -1,5 +1,7 @@
 """Bidirectional DiT with separate input and output vocabulary geometry."""
 
+import math
+
 import huggingface_hub
 import omegaconf
 import torch
@@ -29,7 +31,7 @@ class BlurringDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         )
 
         self.input_embedding = nn.Embedding(vocab_size, self.input_dim)
-        nn.init.normal_(self.input_embedding.weight, std=self.input_dim ** -0.5)
+        self._initialize_input_embedding()
         self.input_projection = nn.Linear(self.input_dim, hidden)
         self.time_embedding = TimestepEmbedder(cond_dim)
         self.rotary_emb = Rotary(hidden // config.model.n_heads)
@@ -46,11 +48,50 @@ class BlurringDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             ]
         )
         self.output_projection = nn.Linear(hidden, self.output_dim, bias=False)
-        self.output_embedding = nn.Parameter(
-            torch.empty(vocab_size, self.output_dim)
-        )
+        self.output_embedding = nn.Parameter(torch.empty(vocab_size, self.output_dim))
         self.output_bias = nn.Parameter(torch.zeros(vocab_size))
-        nn.init.normal_(self.output_embedding, std=self.output_dim ** -0.5)
+        nn.init.normal_(self.output_embedding, std=self.output_dim**-0.5)
+
+    def _initialize_input_embedding(self):
+        """Column-aware initialization for the declared feature ordering."""
+        feature_min = float(self.config.algo.get("feature_lambda_min", 1.0))
+        feature_max = float(self.config.algo.get("feature_lambda_max", 1.0))
+        alpha = float(self.config.algo.get("column_init_alpha", 0.0))
+        if feature_min <= 0 or feature_max < feature_min or alpha < 0:
+            raise ValueError("feature rates must be positive/ordered and alpha >= 0")
+        # Large declared rates die first. There is deliberately no covariance
+        # inversion: column 0 has the smallest rate and survives longest.
+        rates = torch.logspace(
+            math.log10(feature_min),
+            math.log10(feature_max),
+            self.input_dim,
+        )
+        column_scale = (rates[0] / rates).pow(alpha)
+        nn.init.normal_(self.input_embedding.weight, std=self.input_dim**-0.5)
+        with torch.no_grad():
+            self.input_embedding.weight.mul_(column_scale[None, :])
+        self.project_input_table_(iterations=64)
+
+    @torch.no_grad()
+    def project_input_table_(self, iterations=4):
+        """Project data rows toward centered columns and unit row norms."""
+        data = (
+            self.input_embedding.weight[:-1]
+            if self.reserve_mask_embedding
+            else self.input_embedding.weight
+        )
+        for _ in range(iterations):
+            data.sub_(data.mean(dim=0, keepdim=True))
+            data.div_(data.norm(dim=-1, keepdim=True).clamp_min(1e-12))
+        data.sub_(data.mean(dim=0, keepdim=True))
+        # The final centering perturbation is O(1/V); normalize-on-use below
+        # makes the row-norm constraint exact in every forward process.
+        if self.reserve_mask_embedding:
+            mask = self.input_embedding.weight[-1]
+            mask.div_(mask.norm().clamp_min(1e-12))
+
+    def input_column_norms(self):
+        return self.data_input_table().norm(dim=0)
 
     def normalized_input_table(self):
         """Normalize on use so every forward process sees unit-length rows."""
@@ -68,9 +109,7 @@ class BlurringDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if not values.dtype.is_floating_point:
             return F.embedding(values, table)
         if values.shape[-1] != table.shape[0]:
-            raise ValueError(
-                "probability blends must end in the vocabulary dimension"
-            )
+            raise ValueError("probability blends must end in the vocabulary dimension")
         return values.to(table.dtype) @ table
 
     def forward(self, xt, time, **_kwargs):

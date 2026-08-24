@@ -53,19 +53,58 @@ def test_high_frequency_modes_die_first_and_prior_is_clean():
     assert sigma[-1] > 0.999
 
 
+def test_linearized_schedule_spreads_snr_crossings_uniformly():
+    model = make_model("model.length=89")
+    grid = torch.linspace(0, 1, 10001, dtype=torch.float64)
+    a, sigma, _, _ = model.mode_coefficients(grid, 89)
+    snr = a.square() / sigma[:, None].square().clamp_min(1e-30)
+    crossings = grid[(snr <= 1).to(torch.int8).argmax(dim=0)]
+    expected = torch.linspace(0.95, 0.05, 89, dtype=torch.float64)
+    assert torch.allclose(crossings, expected, atol=3e-4)
+    histogram = torch.histc(crossings, bins=10, min=0, max=1)
+    assert int(histogram.max()) <= 10
+
+
+def test_linearized_schedule_preserves_endpoints_and_markov_variance():
+    model = make_model("model.length=89")
+    grid = torch.linspace(0, 1, 1001, dtype=torch.float64)
+    a, sigma, _, _ = model.mode_coefficients(grid, 89)
+    assert torch.equal(a[0], torch.ones_like(a[0]))
+    assert sigma[0] == 0
+    assert torch.allclose(sigma[-1], torch.tensor(1.0, dtype=sigma.dtype))
+    ratio = a[1:] / a[:-1].clamp_min(torch.finfo(a.dtype).tiny)
+    d2 = sigma[1:, None].square() - ratio.square() * sigma[:-1, None].square()
+    assert d2.min() >= -1e-10
+
+
+def test_original_geometric_clock_remains_selectable():
+    model = make_model(
+        "algo.time_warp=none",
+        "algo.crossing_max_decile_fraction=0.45",
+        "model.length=89",
+    )
+    grid = torch.linspace(0, 1, 10001, dtype=torch.float64)
+    a, sigma, _, _ = model.mode_coefficients(grid, 89)
+    crossings = grid[
+        (a.square() / sigma[:, None].square().clamp_min(1e-30) <= 1)
+        .to(torch.int8)
+        .argmax(dim=0)
+    ]
+    histogram = torch.histc(crossings, bins=10, min=0, max=1)
+    assert int(histogram.max()) == 37
+
+
 def test_reverse_posterior_reblurs_oracle_prediction_to_target_time():
     model = make_model()
     length, width = 6, 3
     clean = torch.randn(2, length, width)
     t = torch.tensor([0.8, 0.6])
     s = torch.tensor([0.35, 0.2])
-    a_t, _, _, _ = model.mode_coefficients(t, length)
-    a_s, _, _, _ = model.mode_coefficients(s, length)
-    expected_state = a_t[:, :, None] * clean
-    mean, _ = model.reverse_mode_moments(
-        expected_state, clean, t, s, length
-    )
-    assert torch.allclose(mean, a_s[:, :, None] * clean, atol=2e-5)
+    a_t, _, _, _ = model.separable_coefficients(t, length, width)
+    a_s, _, _, _ = model.separable_coefficients(s, length, width)
+    expected_state = a_t * clean
+    mean, _ = model.reverse_mode_moments(expected_state, clean, t, s, length)
+    assert torch.allclose(mean, a_s * clean, atol=2e-5)
 
 
 def test_omitting_reblur_reproduces_wrong_oracle_landing():
@@ -73,12 +112,10 @@ def test_omitting_reblur_reproduces_wrong_oracle_landing():
     length = 6
     clean = torch.randn(1, length, 2)
     t, s = torch.tensor([0.8]), torch.tensor([0.35])
-    a_t, _, _, _ = model.mode_coefficients(t, length)
-    a_s, _, _, _ = model.mode_coefficients(s, length)
-    mean, _ = model.reverse_mode_moments(
-        a_t[:, :, None] * clean, clean, t, s, length
-    )
-    assert not torch.allclose(mean, a_s[:, :, None] * clean, atol=1e-4)
+    a_t, _, _, _ = model.separable_coefficients(t, length, clean.shape[-1])
+    a_s, _, _, _ = model.separable_coefficients(s, length, clean.shape[-1])
+    mean, _ = model.reverse_mode_moments(a_t * clean, clean, t, s, length)
+    assert not torch.allclose(mean, a_s * clean, atol=1e-4)
 
 
 def test_reverse_posterior_identity_at_clean_endpoint():
@@ -97,24 +134,23 @@ def test_reverse_posterior_matches_forward_marginal_variance():
     model = make_model()
     length = 6
     t, s = torch.tensor([0.75]), torch.tensor([0.3])
-    a_t, sigma_t, _, _ = model.mode_coefficients(t, length)
-    _, sigma_s, _, _ = model.mode_coefficients(s, length)
     clean = torch.randn(1, length, 1)
+    a_t, sigma_t, _, _ = model.separable_coefficients(t, length, clean.shape[-1])
+    _, sigma_s, _, _ = model.separable_coefficients(s, length, clean.shape[-1])
     # Recover the linear state coefficient by comparing two states one unit apart.
-    base = a_t[:, :, None] * clean
-    mean_0, posterior_variance = model.reverse_mode_moments(
-        base, clean, t, s, length
-    )
+    base = a_t * clean
+    mean_0, posterior_variance = model.reverse_mode_moments(base, clean, t, s, length)
     mean_1, _ = model.reverse_mode_moments(
         base + torch.ones_like(base), clean, t, s, length
     )
-    state_coefficient = (mean_1 - mean_0).squeeze(-1)
+    state_coefficient = mean_1 - mean_0
     marginal_variance = (
-        state_coefficient.square() * sigma_t[:, None].square()
+        state_coefficient.square() * sigma_t[:, None, None].square()
         + posterior_variance
     )
     assert torch.allclose(
-        marginal_variance, sigma_s[:, None].square().expand_as(marginal_variance),
+        marginal_variance,
+        sigma_s[:, None, None].square().expand_as(marginal_variance),
         atol=1e-6,
     )
 
@@ -167,3 +203,56 @@ def test_greedy_sampling_embeds_argmax_instead_of_probability_mean():
     blended = model.backbone.get_embedding(probabilities, detach=True)
     assert torch.equal(estimate, expected)
     assert not torch.allclose(estimate, blended)
+
+
+def test_feature_columns_die_in_declared_order_and_rho_endpoints_work():
+    model = make_model()
+    t = torch.tensor([0.6])
+    joint, _, _, _ = model.separable_coefficients(t, 6, 4)
+    assert torch.all(joint[0, :, 0] > joint[0, :, -1])
+
+    positional = make_model("algo.feature_rho=1.0")
+    joint, sigma, _, _ = positional.separable_coefficients(t, 6, 4)
+    a_pos, expected_sigma, _, _ = positional.mode_coefficients(t, 6)
+    assert torch.allclose(joint, a_pos[:, :, None].expand_as(joint))
+    assert torch.equal(sigma, expected_sigma)
+
+    feature_only = make_model("algo.feature_rho=0.0")
+    joint, _, _, _ = feature_only.separable_coefficients(t, 6, 4)
+    assert torch.allclose(joint[:, :1], joint)
+
+
+def test_feature_deaths_span_the_requested_early_to_late_window():
+    model = make_model("algo.input_embedding_dim=16")
+    grid = torch.linspace(0, 1, 10001, dtype=torch.float64)
+    joint, sigma, _, _ = model.separable_coefficients(grid, 6, 16)
+    # k=0 includes positional attenuation as it will in the real process.
+    crossings = grid[
+        (joint[:, 0].square() / sigma[:, None].square().clamp_min(1e-30) <= 1)
+        .to(torch.int8)
+        .argmax(0)
+    ]
+    assert 0.85 <= crossings[0] <= 0.95
+    assert 0.05 <= crossings[-1] <= 0.15
+    assert torch.all(crossings[:-1] >= crossings[1:])
+
+
+def test_input_table_is_centered_normalized_and_column_aware():
+    model = make_model()
+    table = model.backbone.data_input_table()
+    assert torch.allclose(table.mean(0), torch.zeros(4), atol=2e-4)
+    assert torch.allclose(table.norm(dim=-1), torch.ones(len(table)), atol=1e-6)
+    norms = table.norm(dim=0)
+    assert norms[0] > norms[-1]
+
+
+def test_padding_values_cannot_leak_into_generated_span():
+    model = make_model()
+    valid = torch.tensor([[0, 0, 1, 1, 1, 1]], dtype=torch.bool)
+    tokens_a = torch.tensor([[1, 2, 3, 4, 5, 6]])
+    tokens_b = torch.tensor([[7, 8, 3, 4, 5, 6]])
+    torch.manual_seed(11)
+    noisy_a = model.q_xt(tokens_a, torch.tensor([0.5]), valid)
+    torch.manual_seed(11)
+    noisy_b = model.q_xt(tokens_b, torch.tensor([0.5]), valid)
+    assert torch.equal(noisy_a[:, 2:], noisy_b[:, 2:])
