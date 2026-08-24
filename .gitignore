@@ -21,9 +21,11 @@ __pycache__/
 
 # results
 new_eval_results/
+new_eval_results
 new_eval_runs/
 new_results/
 new_sudoku_runs/
+new_sudoku_runs
 new_candi_curve_runs/
 new_candi_curve_results/
 new_candi_temperature_results/
