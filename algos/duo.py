@@ -137,7 +137,8 @@ class DUO_BASE(UniformState):
                 cur_logits.argmax(dim=-1), num_classes=self.vocab_size
             ).to(cur_logits)
 
-        if getattr(self.config.model, "sflm_compat", False):
+        model_config = getattr(getattr(self, "config", None), "model", None)
+        if getattr(model_config, "sflm_compat", False):
             p_xt = torch.gather(
                 xtheta_to_use, -1, x.unsqueeze(-1)
             ).squeeze(-1)
