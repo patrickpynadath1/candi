@@ -34,6 +34,7 @@ def _tokenizer_for(algo):
 
 ALGORITHM_CONFIGS = [
     ("ar", ("sampling.predictor=ar",)),
+    ("block_diffusion", ("sampling.predictor=block_diffusion",)),
     ("mdlm", ("sampling.predictor=ancestral_cache",)),
     ("d3pm", ("sampling.predictor=ancestral",)),
     ("sedd", ("sampling.predictor=analytic",)),
@@ -80,7 +81,7 @@ ALGORITHM_CONFIGS = [
 
 TIME_CONDITIONED_CONFIGS = [
     entry for entry in ALGORITHM_CONFIGS
-    if entry[0] not in {"ar", "mdlm_perm"}
+    if entry[0] not in {"ar", "block_diffusion", "mdlm_perm"}
 ]
 
 
@@ -132,6 +133,60 @@ def test_real_mdlm_training_path_reaches_output_projection():
     assert gradient is not None
     assert torch.isfinite(gradient).all()
     assert torch.count_nonzero(gradient) > 0
+
+
+def test_block_diffusion_runs_rolling_sampler_with_both_updates():
+    config = _compose_tiny(
+        "block_diffusion",
+        "sampling.predictor=block_diffusion",
+        "algo.block_size=2",
+    )
+    model = algo_registry.get("block_diffusion")(config, Text8Tokenizer()).eval()
+    for update in ("euler", "renoise"):
+        model.config.algo.rolling_update = update
+        result = model.generate_samples(
+            2,
+            return_result=True,
+            sampler_overrides={
+                "predictor": "block_diffusion",
+                "use_float64": False,
+            },
+            sampler_name="block_diffusion",
+        )
+        assert result.samples.shape == (2, 4)
+        assert result.metadata["nfe"] > 0
+
+
+def test_block_diffusion_verifier_free_euler_honors_fixed_and_budgeted_nfe():
+    config = _compose_tiny(
+        "block_diffusion",
+        "sampling.predictor=block_diffusion_euler",
+        "algo.block_size=2",
+        "algo.rolling_warmup_steps=0",
+        "model.length=5",
+    )
+    model = algo_registry.get("block_diffusion")(config, Text8Tokenizer()).eval()
+    for overrides in (
+        {"tokens_per_step": 2, "nfe_budget": None, "refinement_steps": 0},
+        {"tokens_per_step": 1, "nfe_budget": 2, "refinement_steps": 0},
+        {"tokens_per_step": 2, "nfe_budget": None, "refinement_steps": 1},
+    ):
+        model.config.algo.euler_tokens_per_step = overrides["tokens_per_step"]
+        model.config.algo.euler_nfe_budget = overrides["nfe_budget"]
+        model.config.algo.rolling_refinement_steps = overrides["refinement_steps"]
+        result = model.generate_samples(
+            2,
+            return_result=True,
+            sampler_name="block_diffusion_euler",
+            sampler_overrides={
+                "predictor": "block_diffusion_euler",
+                "use_float64": False,
+            },
+        )
+        assert result.samples.shape == (2, 5)
+        expected_nfe = 3 if overrides["refinement_steps"] else 2
+        assert result.metadata["nfe"] == expected_nfe
+        assert result.metadata["speculative"] is False
 
 
 def test_mdlm_can_allocate_mask_after_added_pad_token():

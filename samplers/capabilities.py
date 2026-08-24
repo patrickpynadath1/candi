@@ -23,6 +23,8 @@ CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     "cadd_discrete_transition": ("sample_cadd_discrete_transition",),
     "candi_continuous_transition": ("sample_candi_continuous_transition",),
     "candi_discrete_transition": ("sample_candi_discrete_transition",),
+    "candi_clean_distribution": ("sample_candi_clean_distribution",),
+    "candi_forward_corruption": ("sample_candi_forward_corruption",),
     "candi_cached_continuous_transition": (
         "sample_candi_cached_continuous_transition",
     ),
@@ -44,4 +46,10 @@ CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     "replaid_keep_denoise": ("sample_replaid_keep_denoise",),
     "blurring_prior": ("prior_sample",),
     "blurring_transition": ("sample_step",),
+    "block_diffusion_logits": (
+        "active_window_logits",
+        "clean_prefix_logits",
+        "logits_to_x0",
+    ),
+    "rolling_latents": ("update_rolling_latents",),
 }

@@ -1,0 +1,22 @@
+name: block_diffusion
+backbone: dit
+causal_attention: true
+parameterization: ar
+time_conditioning: false
+adaLN: true
+T: 0
+block_size: 8
+noise_curriculum_steps: 100000
+max_noise_level: 1.0
+clean_loss_weight: 0.5
+gradient_cosine_every: 0
+embedding_scale: 1.0
+rolling_update: euler  # euler / renoise
+renoise_correlation: 0.0
+rolling_warmup_steps: 8
+rolling_refinement_steps: 0
+rolling_x0_projection: soft  # soft / argmax
+euler_tokens_per_step: 4
+euler_nfe_budget: null
+temp: 1.0
+ignore_bos: false

@@ -18,6 +18,8 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "ar",
         "ar_cached",
         "blurring_ode",
+        "block_diffusion",
+        "block_diffusion_euler",
         "cadd",
         "candi",
         "candi_cached",
@@ -36,6 +38,7 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "replaid_ddpm",
         "replaid_keep_ddpm",
         "replaid_keep_entropy_bounded",
+        "renoising",
         "sfm",
         "uniform_entropy_bounded",
     }

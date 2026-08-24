@@ -43,6 +43,7 @@ def create_sampler(
     from . import (  # noqa: F401
         analytic,
         blurring_ode,
+        block_diffusion,
         ancestral,
         ancestral_cached,
         autoregressive,
@@ -65,6 +66,7 @@ def create_sampler(
         replaid_ddpm,
         replaid_keep_ddpm,
         replaid_keep_entropy_bounded,
+        renoising,
         sfm,
         uniform_entropy_bounded,
     )
