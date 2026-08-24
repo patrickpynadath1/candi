@@ -1,0 +1,9 @@
+text8_sampling:
+  _target_: tasks.text8_callback.Text8SamplingCallback
+  every_n_train_steps: 1000
+  num_samples: 128
+  batch_size: 128
+  num_steps: 128
+  log_examples: 8
+  output_dir: ${cwd:}/text8_callback
+  samplers: null

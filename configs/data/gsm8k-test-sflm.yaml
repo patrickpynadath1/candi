@@ -1,0 +1,12 @@
+train: gsm8k_test
+valid: gsm8k_test
+tokenizer_name_or_path: HuggingFaceTB/SmolLM-135M
+cache_dir: ${hydra:runtime.cwd}/data_cache
+data_path: null
+# The published S-FLM TinyGSM checkpoints were trained with the literal two
+# characters backslash+n, not an actual newline character.
+separator: '\n'
+wrap: false
+streaming: false
+insert_train_eos: false
+insert_valid_eos: false

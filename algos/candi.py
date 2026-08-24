@@ -564,6 +564,7 @@ class CANDI(Diffusion):
         sigma_t: torch.Tensor,
         clean_mask: torch.Tensor=None,
         is_embed=False,
+        return_untempered=False,
     ) -> torch.Tensor:
 
         dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_s - sigma_t).item()
@@ -579,6 +580,11 @@ class CANDI(Diffusion):
             x0_hat = denoised
         d = (x - x0_hat) / (sigma_t_vec[:, None, None] ** 2)
         x_cont = x - dt_cont_vec[:, None, None]  * d
+        if return_untempered:
+            untempered = torch.softmax(
+                cond_denoised.float() * float(self.temp), dim=-1
+            )
+            return x_cont, denoised, untempered
         return x_cont, denoised
 
 

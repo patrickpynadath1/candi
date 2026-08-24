@@ -312,7 +312,7 @@ class LabelEmbedder(nn.Module):
 
 
 class DDiTBlockCausal(nn.Module):
-    def __init__(self, dim, n_heads, mlp_ratio=4, dropout=0.1):
+    def __init__(self, dim, n_heads, mlp_ratio=4, dropout=0.1, cond_dim=None):
         super().__init__()
         self.n_heads = n_heads
 
@@ -329,6 +329,11 @@ class DDiTBlockCausal(nn.Module):
         )
         self.dropout2 = nn.Dropout(dropout)
         self.dropout = dropout
+        self.anchored_adaLN = cond_dim is not None
+        if self.anchored_adaLN:
+            self.adaLN_modulation = nn.Linear(cond_dim, 6 * dim)
+            self.adaLN_modulation.weight.data.zero_()
+            self.adaLN_modulation.bias.data.zero_()
 
     def _get_bias_dropout_scale(self):
         if self.training:
@@ -376,6 +381,60 @@ class DDiTBlockCausal(nn.Module):
         # mlp operation
         x = bias_dropout_scale_fn(self.mlp(self.norm2(x)), None, scale, x, self.dropout)
         return x
+
+    def forward_masked(
+        self, x, rotary_cos_sin, attention_mask, c=None, c_anchor=None
+    ):
+        """Causal-block attention with an explicit boolean [Q, K] mask."""
+        bias_dropout_scale_fn = self._get_bias_dropout_scale()
+        x_skip = x
+        normalized = self.norm1(x)
+        if self.anchored_adaLN:
+            if c is None or c_anchor is None:
+                raise ValueError("anchored AdaLN requires tokenwise conditions")
+            modulation = self.adaLN_modulation(c) - self.adaLN_modulation(c_anchor)
+            (
+                shift_msa,
+                scale_msa,
+                gate_msa,
+                shift_mlp,
+                scale_mlp,
+                gate_mlp,
+            ) = modulation.chunk(6, dim=-1)
+            normalized = modulate_fused(normalized, shift_msa, scale_msa)
+        qkv = einops.rearrange(
+            self.attn_qkv(normalized),
+            "b s (three h d) -> b s three h d",
+            three=3,
+            h=self.n_heads,
+        )
+        q, k, v = qkv.unbind(dim=2)
+        q = apply_rotary_positions(q, rotary_cos_sin)
+        k = apply_rotary_positions(k, rotary_cos_sin)
+        attended = F.scaled_dot_product_attention(
+            q.transpose(1, 2),
+            k.transpose(1, 2),
+            v.transpose(1, 2),
+            attn_mask=attention_mask,
+            is_causal=False,
+            dropout_p=0.0,
+        )
+        attended = einops.rearrange(
+            attended.transpose(1, 2), "b s h d -> b s (h d)"
+        )
+        scale = torch.ones(1, device=x.device, dtype=x.dtype)
+        attention_scale = 1 + gate_msa if self.anchored_adaLN else scale
+        x = bias_dropout_scale_fn(
+            self.attn_out(attended), None, attention_scale, x_skip, self.dropout
+        )
+        mlp_input = self.norm2(x)
+        mlp_scale = scale
+        if self.anchored_adaLN:
+            mlp_input = modulate_fused(mlp_input, shift_mlp, scale_mlp)
+            mlp_scale = 1 + gate_mlp
+        return bias_dropout_scale_fn(
+            self.mlp(mlp_input), None, mlp_scale, x, self.dropout
+        )
 
     def forward_positioned(
         self,
@@ -433,7 +492,10 @@ class DDiTBlockCausal(nn.Module):
 
 
 class DDiTBlock(nn.Module):
-    def __init__(self, dim, n_heads, adaLN, cond_dim=None, mlp_ratio=4, dropout=0.1):
+    def __init__(
+        self, dim, n_heads, adaLN, cond_dim=None, mlp_ratio=4, dropout=0.1,
+        exact_sflm_attention=False,
+    ):
         super().__init__()
         self.n_heads = n_heads
         self.adaLN = adaLN
@@ -451,6 +513,7 @@ class DDiTBlock(nn.Module):
         )
         self.dropout2 = nn.Dropout(dropout)
         self.dropout = dropout
+        self.exact_sflm_attention = bool(exact_sflm_attention)
 
         if self.adaLN:
             self.adaLN_modulation = nn.Linear(cond_dim, 6 * dim)
@@ -490,9 +553,24 @@ class DDiTBlock(nn.Module):
             three=3,
             h=self.n_heads,
         )
-        q, k, v = split_and_apply_rotary_pos_emb(qkv, rotary_cos_sin)
-
-        x = regular_attention_multi_headed(q, k, v)
+        if self.exact_sflm_attention:
+            # The published S-FLM checkpoints were evaluated with packed,
+            # in-place RoPE before PyTorch SDPA. Applying RoPE separately to
+            # Q/K is mathematically equivalent but not BF16-equivalent and the
+            # numerical difference compounds across diffusion NFEs.
+            with torch.amp.autocast("cuda", enabled=False):
+                cos, sin = rotary_cos_sin
+                qkv = apply_rotary_pos_emb(
+                    qkv, cos.to(qkv.dtype), sin.to(qkv.dtype)
+                )
+            qkv = einops.rearrange(qkv, "b s three h d -> b h three s d")
+            x = F.scaled_dot_product_attention(
+                qkv[:, :, 0], qkv[:, :, 1], qkv[:, :, 2]
+            )
+            x = einops.rearrange(x, "b h s d -> b s (h d)")
+        else:
+            q, k, v = split_and_apply_rotary_pos_emb(qkv, rotary_cos_sin)
+            x = regular_attention_multi_headed(q, k, v)
 
         if self.adaLN:
             x = bias_dropout_scale_fn(
@@ -578,10 +656,15 @@ class DDiTFinalLayer(nn.Module):
             self.adaLN_modulation.weight.data.zero_()
             self.adaLN_modulation.bias.data.zero_()
 
-    def forward(self, x, c):
+    def forward(self, x, c, c_anchor=None):
         x = self.norm_final(x)
         if self.adaLN:
-            shift, scale = self.adaLN_modulation(c)[:, None].chunk(2, dim=2)
+            modulation = self.adaLN_modulation(c)
+            if c_anchor is not None:
+                modulation = modulation - self.adaLN_modulation(c_anchor)
+            if modulation.ndim == 2:
+                modulation = modulation[:, None]
+            shift, scale = modulation.chunk(2, dim=-1)
             x = modulate_fused(x, shift, scale)
         x = self.linear(x)
         return x

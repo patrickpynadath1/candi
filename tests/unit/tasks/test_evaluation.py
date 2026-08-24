@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 
 import datasets
+import numpy as np
 import pytest
 import torch
 
@@ -72,6 +73,42 @@ def test_gsm8k_can_score_existing_predictions(tmp_path):
     assert (output / "results.json").exists()
 
 
+def test_gsm8k_max_examples_uses_seeded_random_subset(monkeypatch, tmp_path):
+    dataset = [{"input_ids": [index]} for index in range(10)]
+    captured = {}
+
+    monkeypatch.setattr(evaluation, "_prepare_model", lambda *args: object())
+    monkeypatch.setattr(evaluation, "get_gsm8k_dataset", lambda *args: dataset)
+
+    def generate(*args, indices, **kwargs):
+        del args, kwargs
+        captured["indices"] = indices
+        return []
+
+    monkeypatch.setattr(evaluation, "generate_gsm8k_records", generate)
+    config = SimpleNamespace(
+        gsm8k=SimpleNamespace(
+            input_file=None,
+            output_dir=str(tmp_path),
+            scoring="numeric",
+            timeout=1.0,
+            bootstrap_size=1,
+            max_examples=4,
+            subset_seed=42,
+        ),
+        loader=SimpleNamespace(eval_batch_size=2),
+        sampling=SimpleNamespace(steps=32),
+        seed=1,
+    )
+
+    evaluation.evaluate_gsm8k(None, config, None, None, Logger())
+
+    expected = sorted(
+        np.random.default_rng(42).choice(10, size=4, replace=False).tolist()
+    )
+    assert captured["indices"] == expected
+
+
 def test_exact_length_batches_preserve_singletons():
     dataset = [
         {"input_ids": [1, 2]},
@@ -105,19 +142,23 @@ def test_gsm8k_generation_uses_equal_length_prompt_batches():
         num_tokens = 5
         device = torch.device("cpu")
 
-        def generate_samples(self, count, prompt_tokens, prompt_mask, **kwargs):
+        def generate_samples(
+            self, count, prompt_tokens, prompt_mask, return_result=False, **kwargs
+        ):
             del kwargs
+            assert return_result
             lengths = prompt_mask.sum(1)
             assert torch.equal(lengths, lengths[:1].expand_as(lengths))
             result = prompt_tokens.clone()
             result[torch.arange(count), lengths] = 9
-            return result
+            return SamplingResult(result, {"nfe_per_sample": [3] * count})
 
     records = evaluation.generate_gsm8k_records(
         Model(), dataset, Tokenizer(), batch_size=2, num_steps=1
     )
     assert sorted(record["dataset_index"] for record in records) == [0, 1, 2]
     assert all(record["hit_eos"] for record in records)
+    assert all(record["nfe"] == 3 for record in records)
 
 
 def test_gsm8k_bootstrap_is_seeded_and_empty_inputs_are_defined(tmp_path):

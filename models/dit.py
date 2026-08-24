@@ -39,13 +39,19 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
         self.causal = config.algo.causal_attention
-        self.adaLN = config.algo.time_conditioning
+        # Older S-FLM checkpoints explicitly record whether AdaLN was used.
+        # Fall back to time_conditioning for native configs created before the
+        # explicit flag was introduced.
+        self.adaLN = getattr(config.algo, "adaLN", config.algo.time_conditioning)
         self.config = config
+        self.normalize_embeddings = bool(
+            getattr(config.model, "normalize_embeddings", False)
+        )
         self.vocab_size = vocab_size
         dim = config.model.hidden_size
         cond_dim = config.model.cond_dim
         self.vocab_embed = EmbeddingLayer(dim, vocab_size)
-        if not self.causal:
+        if not self.causal or self.adaLN:
             self.sigma_map = TimestepEmbedder(cond_dim)
         self.rotary_emb = Rotary(dim // config.model.n_heads)
         self.position_rotary_emb = PositionRotary(dim // config.model.n_heads)
@@ -54,7 +60,10 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         for _ in range(config.model.n_blocks):
             if self.causal:
                 block = DDiTBlockCausal(
-                    dim=dim, n_heads=config.model.n_heads, dropout=config.model.dropout
+                    dim=dim,
+                    n_heads=config.model.n_heads,
+                    dropout=config.model.dropout,
+                    cond_dim=cond_dim if self.adaLN else None,
                 )
             else:
                 block = DDiTBlock(
@@ -63,6 +72,9 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                     cond_dim=cond_dim,
                     adaLN=self.adaLN,
                     dropout=config.model.dropout,
+                    exact_sflm_attention=getattr(
+                        config.model, "sflm_compat", False
+                    ),
                 )
             blocks.append(block)
         self.blocks = nn.ModuleList(blocks)
@@ -84,7 +96,7 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             return bias_dropout_add_scale_fused_inference
 
     def forward(self, x, sigma, get_logits=True):
-        x = self.vocab_embed(x)
+        x = self.get_embedding(x)
         if self.adaLN:
             t_cond = F.silu(self.sigma_map(sigma))
         else:
@@ -149,7 +161,7 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if cache is not None and len(cache.layers) != len(self.blocks):
             raise ValueError("KV cache layer count does not match the model")
 
-        hidden = self.vocab_embed(x)
+        hidden = self.get_embedding(x)
         query_rotary = self.position_rotary_emb(query_position_ids)
         key_rotary = self.position_rotary_emb(key_position_ids)
         with torch.amp.autocast("cuda", dtype=torch.bfloat16, enabled=hidden.is_cuda):
@@ -168,7 +180,10 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         return self.output_layer(h, c=sigma)
 
     def get_embedding(self, x):
-        return self.vocab_embed(x)
+        embedding = self.vocab_embed(x)
+        if self.normalize_embeddings:
+            embedding = F.normalize(embedding, dim=-1)
+        return embedding
 
     def forward_with_embeddings(self, x_emb, sigma):
         if self.causal:
@@ -187,3 +202,40 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             x = self.output_layer(x, c=t_cond)
 
         return x
+
+    def forward_masked_embeddings(
+        self, x_emb, attention_mask, position_ids, noise_times=None
+    ):
+        """Run embedded tokens with explicit attention and semantic positions."""
+        if not self.causal:
+            raise ValueError("masked embedding attention requires a causal DiT")
+        if x_emb.shape[:2] != position_ids.shape:
+            raise ValueError("embeddings and position IDs must have matching shapes")
+        if attention_mask.shape != (x_emb.shape[1], x_emb.shape[1]):
+            raise ValueError("attention_mask must be [sequence, sequence]")
+        rotary_cos_sin = self.position_rotary_emb(position_ids)
+        # PositionRotary is batch-aware, while the older packed helper expects
+        # the same position sequence for every example. Block diffusion uses
+        # identical semantic positions across the batch, so use the first row.
+        rotary_cos_sin = tuple(value[:1] for value in rotary_cos_sin)
+        condition = anchor = None
+        if self.adaLN:
+            if noise_times is None or noise_times.shape != x_emb.shape[:2]:
+                raise ValueError("tokenwise noise_times must match [batch, sequence]")
+            flat_times = noise_times.reshape(-1)
+            condition = F.silu(self.sigma_map(flat_times)).reshape(
+                *noise_times.shape, -1
+            )
+            anchor = F.silu(self.sigma_map(torch.zeros_like(flat_times))).reshape(
+                *noise_times.shape, -1
+            )
+        with torch.amp.autocast(
+            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()
+        ):
+            hidden = x_emb
+            for block in self.blocks:
+                hidden = block.forward_masked(
+                    hidden, rotary_cos_sin, attention_mask, condition, anchor
+                )
+            hidden = self.output_layer(hidden, c=condition, c_anchor=anchor)
+        return hidden

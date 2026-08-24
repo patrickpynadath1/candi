@@ -2,8 +2,10 @@ from tqdm import tqdm
 
 from collections import Counter
 import json
+import importlib
 import math
 import os
+import sys
 import time
 
 from typing import List, Dict, Tuple
@@ -35,6 +37,17 @@ def _load_from_checkpoint(diffusion_model, config, tokenizer):
     # callback, or trainer-loop state. Lightning's load_from_checkpoint eagerly
     # restores the complete training archive and is pathologically slow for our
     # ~450 MB checkpoints. mmap keeps unused optimizer tensors lazy.
+    # Transformers 5 folded the old GPT2 fast-tokenizer module into the slow
+    # module. Published Lightning checkpoints may still pickle the old path.
+    old_gpt2_module = "transformers.models.gpt2.tokenization_gpt2_fast"
+    if old_gpt2_module not in sys.modules:
+        from transformers import GPT2TokenizerFast
+
+        current_gpt2_module = importlib.import_module(
+            "transformers.models.gpt2.tokenization_gpt2"
+        )
+        current_gpt2_module.GPT2TokenizerFast = GPT2TokenizerFast
+        sys.modules[old_gpt2_module] = current_gpt2_module
     started = time.monotonic()
     checkpoint = torch.load(
         config.eval.checkpoint_path,
@@ -48,6 +61,14 @@ def _load_from_checkpoint(diffusion_model, config, tokenizer):
         for key, value in checkpoint["state_dict"].items()
         if "teacher" not in key
     }
+    # PositionRotary was added after the published S-FLM checkpoints. Its
+    # inv_freq buffer is deterministic (and unused by these non-causal
+    # checkpoints), so materialize only that known compatibility buffer while
+    # retaining strict loading for every learned parameter.
+    model_state = model.state_dict()
+    rotary_buffer = "backbone.position_rotary_emb.inv_freq"
+    if rotary_buffer in model_state and rotary_buffer not in state_dict:
+        state_dict[rotary_buffer] = model_state[rotary_buffer]
     model.load_state_dict(state_dict, strict=True)
 
     if not config.eval.disable_ema and model.ema is not None:

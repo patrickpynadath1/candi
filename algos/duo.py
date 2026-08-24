@@ -137,6 +137,63 @@ class DUO_BASE(UniformState):
                 cur_logits.argmax(dim=-1), num_classes=self.vocab_size
             ).to(cur_logits)
 
+        if getattr(self.config.model, "sflm_compat", False):
+            p_xt = torch.gather(
+                xtheta_to_use, -1, x.unsqueeze(-1)
+            ).squeeze(-1)
+            alpha_t_fast = alpha_t
+            alpha_s_fast = alpha_s
+            if alpha_t_fast.ndim == 3:
+                alpha_t_fast = alpha_t_fast.squeeze(-1)
+            if alpha_s_fast.ndim == 3:
+                alpha_s_fast = alpha_s_fast.squeeze(-1)
+            if alpha_t_fast.shape[1] == 1:
+                alpha_t_fast = alpha_t_fast.expand_as(p_xt)
+            if alpha_s_fast.shape[1] == 1:
+                alpha_s_fast = alpha_s_fast.expand_as(p_xt)
+            alpha_t_fast = alpha_t_fast.to(xtheta_to_use.dtype)
+            alpha_s_fast = alpha_s_fast.to(xtheta_to_use.dtype)
+            denominator = (
+                alpha_t_fast * self.vocab_size * p_xt + (1 - alpha_t_fast)
+            )
+            sampled_x0 = sample_categorical(xtheta_to_use)
+            threshold = torch.rand_like(p_xt)
+            if noise_removal_step:
+                keep_xt_probability = (
+                    alpha_t_fast * self.vocab_size * p_xt / denominator
+                ).clamp(0.0, 1.0)
+                xs = torch.where(
+                    threshold < keep_xt_probability, x, sampled_x0
+                )
+            else:
+                alpha_ts = alpha_t_fast / alpha_s_fast
+                uniform_probability = (
+                    (1 - alpha_ts) * (1 - alpha_s_fast) / denominator
+                ).clamp(0.0, 1.0)
+                keep_xt_probability = (
+                    alpha_t_fast * self.vocab_size * p_xt
+                    + alpha_ts
+                    - alpha_t_fast
+                ) / denominator
+                keep_xt_probability = keep_xt_probability.clamp(0.0, 1.0)
+                uniform_samples = torch.randint(
+                    0, self.vocab_size, x.shape, device=x.device
+                )
+                keep_or_resample = torch.where(
+                    (uniform_probability + keep_xt_probability).clamp(max=1.0)
+                    > threshold,
+                    x,
+                    sampled_x0,
+                )
+                xs = torch.where(
+                    uniform_probability > threshold,
+                    uniform_samples,
+                    keep_or_resample,
+                )
+            if frozen_mask is not None:
+                xs = torch.where(frozen_mask.bool(), x, xs)
+            return cur_logits, xs
+
 
 
         q_xs = self._compute_posterior(
@@ -158,12 +215,12 @@ class DUO_BASE(UniformState):
         prompt_mask=None, greedy_clean_estimate=False,
     ):
         del p_x0
-        _, xs = self._uniform_prediction_and_transition(
+        clean_log_probs, xs = self._uniform_prediction_and_transition(
             x, t, dt, noise_removal_step=noise_removal_step,
             frozen_mask=prompt_mask,
             greedy_clean_estimate=greedy_clean_estimate,
         )
-        return None, xs
+        return clean_log_probs, xs
 
     def sample_uniform_entropy_transition(
         self, x, t, dt, frozen_mask=None, greedy_clean_estimate=False

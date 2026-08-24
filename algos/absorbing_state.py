@@ -88,6 +88,22 @@ class AbsorbingState(Diffusion):
         assert alpha_t.ndim == 2
         p_x0 = (self.forward(x, self._sigma_from_alphat(alpha_t)).double())
         p_x0 = p_x0.exp()
+        if getattr(self.config.model, "sflm_compat", False):
+            # Match the published S-FLM sampler exactly: draw x0 first, then
+            # independently decide whether each masked position is revealed.
+            # A single materialized joint categorical is algebraically
+            # equivalent, but gives different finite-precision/RNG behavior.
+            sampled_x0 = sample_categorical(p_x0)
+            if noise_removal_step:
+                should_denoise = torch.ones_like(sampled_x0, dtype=torch.bool)
+            else:
+                denoise_probability = (alpha_s - alpha_t) / (1 - alpha_t)
+                should_denoise = (
+                    torch.rand_like(sampled_x0, dtype=torch.float64)
+                    < denoise_probability
+                )
+            update = (x == self.mask_index) & should_denoise
+            return p_x0, torch.where(update, sampled_x0, x)
         q_xs = p_x0 * (alpha_s - alpha_t)[:, :, None]
         q_xs[:, :, self.mask_index] = 1 - alpha_s
         _x = sample_categorical(q_xs)

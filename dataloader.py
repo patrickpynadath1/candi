@@ -889,6 +889,40 @@ def get_dataset(
     return chunked_dataset
 
 
+class VocabSizeTokenizerWrapper:
+    """Compatibility wrapper used by the published s-flm checkpoints."""
+
+    def __init__(self, tokenizer):
+        object.__setattr__(self, "_tokenizer", tokenizer)
+
+    def _wrapped(self):
+        return object.__getattribute__(self, "_tokenizer")
+
+    @property
+    def vocab_size(self):
+        return len(self._wrapped())
+
+    def __len__(self):
+        return len(self._wrapped())
+
+    def __call__(self, *args, **kwargs):
+        return self._wrapped()(*args, **kwargs)
+
+    def __getattr__(self, name):
+        if name == "_tokenizer":
+            raise AttributeError(name)
+        return getattr(self._wrapped(), name)
+
+    def __setattr__(self, name, value):
+        if name == "_tokenizer":
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._wrapped(), name, value)
+
+    def __repr__(self):
+        return f"Wrapped<{self._wrapped()}>"
+
+
 def get_tokenizer(config):
     if config.data.tokenizer_name_or_path == "sudoku":
         from tasks.sudoku import SudokuTokenizer
@@ -928,6 +962,8 @@ def get_tokenizer(config):
         tokenizer.eos_token = tokenizer.sep_token
     if tokenizer.pad_token is None:
         tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+    if config.data.tokenizer_name_or_path == "HuggingFaceTB/SmolLM-135M":
+        tokenizer = VocabSizeTokenizerWrapper(tokenizer)
     return tokenizer
 
 

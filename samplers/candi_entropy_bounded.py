@@ -21,11 +21,13 @@ class CANDIEntropyBoundedSampler(Sampler):
         }),
     )
 
-    def __init__(self, gamma, greedy_clean_estimate=False):
+    def __init__(self, gamma, greedy_clean_estimate=False,
+                 entropy_untempered=False):
         if gamma < 0:
             raise ValueError("sampling.entropy_bound must be nonnegative")
         self.gamma = float(gamma)
         self.greedy_clean_estimate = bool(greedy_clean_estimate)
+        self.entropy_untempered = bool(entropy_untempered)
 
     def sample(self, model, request):
         steps, times = continuous_time_grid(model, request)
@@ -55,11 +57,17 @@ class CANDIEntropyBoundedSampler(Sampler):
             active = ~accepted
             if not active.any():
                 break
-            continued, clean_probs = model.sample_candi_continuous_transition(
+            transition = model.sample_candi_continuous_transition(
                 x, discrete_times[i], sigma_s=sigmas[i], sigma_t=sigmas[i + 1],
                 clean_mask=accepted, time_s=discrete_times[i + 1],
+                return_untempered=self.entropy_untempered,
             )
-            entropy = predictive_entropy(clean_probs)
+            if self.entropy_untempered:
+                continued, clean_probs, entropy_probs = transition
+            else:
+                continued, clean_probs = transition
+                entropy_probs = clean_probs
+            entropy = predictive_entropy(entropy_probs)
             newly_accepted, counts = select_entropy_bounded(
                 entropy, active, self.gamma
             )
@@ -103,6 +111,7 @@ class CANDIEntropyBoundedSampler(Sampler):
             "nfe_per_sample": nfe_per_sample.cpu().tolist(),
             "entropy_bound": self.gamma,
             "greedy_clean_estimate": self.greedy_clean_estimate,
+            "entropy_untempered": self.entropy_untempered,
             "accepted_per_step": accepted_per_step,
         })
 
@@ -112,4 +121,5 @@ def _create(config):
     return CANDIEntropyBoundedSampler(
         getattr(config.sampling, "entropy_bound", 0.0),
         getattr(config.sampling, "greedy_clean_estimate", False),
+        getattr(config.sampling, "entropy_untempered", False),
     )

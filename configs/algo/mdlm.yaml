@@ -1,4 +1,5 @@
 name: mdlm
+adaLN: true
 backbone: dit  # dit / dimamba / hf_dit
 parameterization: subs
 time_conditioning: False

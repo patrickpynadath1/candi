@@ -22,6 +22,8 @@ gsm8k:
   scoring: numeric  # numeric (safe default) / code (isolated subprocess)
   timeout: 3.0
   bootstrap_size: 1
+  max_examples: null
+  subset_seed: 42
 
 seed: 1
 scratch_dir:  /home/patrick/.cache/discrete_diffusion
@@ -42,7 +44,9 @@ sampling:
   use_float64: True
   p_nucleus: 1.0
   entropy_bound: 0.0  # gamma for the entropy_bounded MDLM sampler
+  entropy_untempered: false  # rank EB acceptance with temperature-1 probabilities
   greedy_clean_estimate: false  # argmax accepted clean predictions in EB samplers
+  trace_argmax_changes: false  # compare clean-prediction argmax across sampler NFEs
   num_sample_batches: 2  # Total samples: `num_gpus` * `loader.eval_batch_size` * num_sample_batches
   num_sample_log: 2
   semi_ar: False
