@@ -66,12 +66,83 @@ def sample_monotone_times(
     return torch.cat(values, dim=-1)
 
 
+def sample_position_times(
+    batch_size: int,
+    length: int,
+    block_size: int,
+    *,
+    mode: str,
+    max_time: float | torch.Tensor = 1.0,
+    device=None,
+    dtype=torch.float32,
+) -> torch.Tensor:
+    """Sample either monotone blockwise times or one shared time per sequence."""
+    if mode == "monotone":
+        return sample_monotone_times(
+            batch_size,
+            length,
+            block_size,
+            max_time=max_time,
+            device=device,
+            dtype=dtype,
+        )
+    if mode == "sequence_constant":
+        cap = torch.as_tensor(max_time, device=device, dtype=dtype)
+        if cap.ndim == 0:
+            cap = cap.expand(batch_size)
+        if cap.shape != (batch_size,):
+            raise ValueError("max_time must be scalar or [batch]")
+        sampled = torch.rand(batch_size, 1, device=device, dtype=dtype) * cap[:, None]
+        return sampled.expand(-1, length)
+    raise ValueError("noise_level_mode must be 'monotone' or 'sequence_constant'")
+
+
 def flow_interpolate(clean: torch.Tensor, times: torch.Tensor, noise=None):
     """Linear flow path z_t=(1-t)x_0+t*epsilon."""
     if noise is None:
         noise = torch.randn_like(clean)
     t = times.unsqueeze(-1).to(clean.dtype)
     return (1 - t) * clean + t * noise, noise
+
+
+def detached_clean_logit_kl(
+    noisy_logits: torch.Tensor,
+    clean_logits: torch.Tensor,
+    *,
+    direction: str,
+    temperature: float = 1.0,
+) -> torch.Tensor:
+    """Per-token KL with the clean distribution always acting as a fixed teacher."""
+    if temperature <= 0:
+        raise ValueError("KL temperature must be positive")
+    if direction not in {"forward", "reverse"}:
+        raise ValueError("KL direction must be 'forward' or 'reverse'")
+    noisy = noisy_logits.float() / temperature
+    clean = clean_logits.detach().float() / temperature
+    noisy_log_probs = F.log_softmax(noisy, dim=-1)
+    clean_log_probs = F.log_softmax(clean, dim=-1)
+    if direction == "forward":
+        clean_probs = clean_log_probs.exp()
+        kl = (clean_probs * (clean_log_probs - noisy_log_probs)).sum(dim=-1)
+    else:
+        noisy_probs = noisy_log_probs.exp()
+        kl = (noisy_probs * (noisy_log_probs - clean_log_probs)).sum(dim=-1)
+    return kl * temperature**2
+
+
+def delayed_linear_curriculum_cap(
+    step: int, start_step: int, end_step: int, max_noise_level: float
+) -> float:
+    """AR before start, linear noise ramp through end, full noise afterward."""
+    if start_step < 0 or end_step < start_step:
+        raise ValueError("curriculum must satisfy 0 <= start_step <= end_step")
+    if step < start_step:
+        return 0.0
+    duration = end_step - start_step
+    if duration == 0:
+        return max_noise_level
+    progress = min(max((step - start_step) / duration, 0.0), 1.0)
+    return max_noise_level * progress
 
 
 def rolling_latent_update(
@@ -113,8 +184,30 @@ class BlockDiffusion(AR):
         super().__init__(config, tokenizer)
         self.block_size = int(config.algo.block_size)
         self.noise_curriculum_steps = int(config.algo.get("noise_curriculum_steps", 0))
+        self.noise_curriculum_start_step = int(
+            config.algo.get("noise_curriculum_start_step", 0)
+        )
+        configured_end = config.algo.get("noise_curriculum_end_step", None)
+        self.noise_curriculum_end_step = (
+            self.noise_curriculum_steps
+            if configured_end is None
+            else int(configured_end)
+        )
         self.max_noise_level = float(config.algo.get("max_noise_level", 1.0))
+        self.noise_level_mode = str(
+            config.algo.get("noise_level_mode", "monotone")
+        )
         self.clean_loss_weight = float(config.algo.get("clean_loss_weight", 0.5))
+        self.logit_kl_weight = float(config.algo.get("logit_kl_weight", 0.0))
+        self.logit_kl_direction = str(
+            config.algo.get("logit_kl_direction", "forward")
+        )
+        self.logit_kl_temperature = float(
+            config.algo.get("logit_kl_temperature", 1.0)
+        )
+        self.logit_kl_position_weighting = str(
+            config.algo.get("logit_kl_position_weighting", "noise")
+        )
         self.gradient_cosine_every = int(
             config.algo.get("gradient_cosine_every", 0)
         )
@@ -127,19 +220,57 @@ class BlockDiffusion(AR):
             raise ValueError("block diffusion requires causal_attention=true")
         if int(self.config.algo.block_size) <= 0:
             raise ValueError("block_size must be positive")
+        if self.config.algo.get("noise_level_mode", "monotone") not in {
+            "monotone",
+            "sequence_constant",
+        }:
+            raise ValueError(
+                "noise_level_mode must be 'monotone' or 'sequence_constant'"
+            )
+        curriculum_start = int(
+            self.config.algo.get("noise_curriculum_start_step", 0)
+        )
+        configured_end = self.config.algo.get("noise_curriculum_end_step", None)
+        curriculum_end = (
+            int(self.config.algo.get("noise_curriculum_steps", 0))
+            if configured_end is None
+            else int(configured_end)
+        )
+        if curriculum_start < 0 or curriculum_end < curriculum_start:
+            raise ValueError(
+                "noise curriculum must satisfy 0 <= start_step <= end_step"
+            )
         clean_weight = float(self.config.algo.get("clean_loss_weight", 0.5))
         if not 0 <= clean_weight <= 1:
             raise ValueError("clean_loss_weight must be in [0, 1]")
+        if float(self.config.algo.get("logit_kl_weight", 0.0)) < 0:
+            raise ValueError("logit_kl_weight must be nonnegative")
+        if self.config.algo.get("logit_kl_direction", "forward") not in {
+            "forward",
+            "reverse",
+        }:
+            raise ValueError("logit_kl_direction must be 'forward' or 'reverse'")
+        if float(self.config.algo.get("logit_kl_temperature", 1.0)) <= 0:
+            raise ValueError("logit_kl_temperature must be positive")
+        if self.config.algo.get("logit_kl_position_weighting", "noise") not in {
+            "none",
+            "noise",
+        }:
+            raise ValueError("logit_kl_position_weighting must be 'none' or 'noise'")
 
     def _normalized_embeddings(self, tokens):
         embeddings = self.backbone.get_embedding(tokens)
         return F.normalize(embeddings, dim=-1) * self.embedding_scale
 
     def _curriculum_cap(self, train_mode):
-        if not train_mode or self.noise_curriculum_steps <= 0:
+        if not train_mode:
             return self.max_noise_level
-        progress = min(float(self.global_step) / self.noise_curriculum_steps, 1.0)
-        return self.max_noise_level * progress
+        return delayed_linear_curriculum_cap(
+            int(self.global_step),
+            self.noise_curriculum_start_step,
+            self.noise_curriculum_end_step,
+            self.max_noise_level,
+        )
 
     def doubled_logits(self, clean_tokens, times, noise=None):
         clean = self._normalized_embeddings(clean_tokens)
@@ -164,10 +295,11 @@ class BlockDiffusion(AR):
         valid_tokens=None,
     ):
         del current_accumulation_step
-        times = sample_monotone_times(
+        times = sample_position_times(
             input_tokens.shape[0],
             input_tokens.shape[1],
             self.block_size,
+            mode=self.noise_level_mode,
             max_time=self._curriculum_cap(train_mode),
             device=input_tokens.device,
             dtype=self.backbone.get_embedding(input_tokens).dtype,
@@ -187,10 +319,27 @@ class BlockDiffusion(AR):
         denominator = valid_tokens.sum().clamp_min(1)
         self._last_clean_loss = (clean_nll * valid_tokens).sum() / denominator
         self._last_noisy_loss = (noisy_nll * valid_tokens).sum() / denominator
-        return (
+        combined_nll = (
             self.clean_loss_weight * clean_nll
             + (1 - self.clean_loss_weight) * noisy_nll
         )
+        if self.logit_kl_weight > 0:
+            logit_kl = detached_clean_logit_kl(
+                noisy_logits,
+                clean_logits,
+                direction=self.logit_kl_direction,
+                temperature=self.logit_kl_temperature,
+            )
+            if self.logit_kl_position_weighting == "noise":
+                kl_weights = times.to(logit_kl.dtype)
+                weighted_valid = valid_tokens * kl_weights
+                kl_scale = valid_tokens.sum().clamp_min(1) / weighted_valid.sum().clamp_min(1e-8)
+                logit_kl = logit_kl * kl_weights * kl_scale
+            self._last_logit_kl = (logit_kl * valid_tokens).sum() / denominator
+            combined_nll = combined_nll + self.logit_kl_weight * logit_kl
+        else:
+            self._last_logit_kl = torch.zeros_like(self._last_clean_loss)
+        return combined_nll
 
     def training_step(self, batch, batch_idx):
         loss = super().training_step(batch, batch_idx)
@@ -204,6 +353,13 @@ class BlockDiffusion(AR):
         self.log(
             "diagnostics/noisy_nll",
             self._last_noisy_loss.detach(),
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
+        self.log(
+            "diagnostics/logit_kl",
+            self._last_logit_kl.detach(),
             on_step=True,
             on_epoch=False,
             sync_dist=True,

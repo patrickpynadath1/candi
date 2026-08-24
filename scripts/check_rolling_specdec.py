@@ -76,8 +76,9 @@ def main(args):
         "token_min": int(samples.min()),
         "token_max": int(samples.max()),
         "metadata": result.metadata,
-        "text": tokenizer.batch_decode(samples),
     }
+    if not args.metadata_only:
+        report["text"] = tokenizer.batch_decode(samples)
     print(json.dumps(report, indent=2))
 
 
@@ -103,4 +104,5 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed", type=int, default=23)
     parser.add_argument("--disable-ema", action="store_true")
+    parser.add_argument("--metadata-only", action="store_true")
     main(parser.parse_args())

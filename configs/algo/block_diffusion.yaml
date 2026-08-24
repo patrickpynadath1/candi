@@ -7,8 +7,15 @@ adaLN: true
 T: 0
 block_size: 8
 noise_curriculum_steps: 100000
+noise_curriculum_start_step: 0
+noise_curriculum_end_step: null  # null preserves legacy 0 -> noise_curriculum_steps
 max_noise_level: 1.0
+noise_level_mode: monotone  # monotone / sequence_constant
 clean_loss_weight: 0.5
+logit_kl_weight: 0.0
+logit_kl_direction: forward  # forward: KL(clean || noisy), reverse: KL(noisy || clean)
+logit_kl_temperature: 1.0
+logit_kl_position_weighting: noise  # none / noise
 gradient_cosine_every: 0
 embedding_scale: 1.0
 rolling_update: euler  # euler / renoise

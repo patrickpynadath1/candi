@@ -99,6 +99,7 @@ class BlockDiffusionSampler(Sampler):
         latents[:, :1] = anchor
 
         nfe = accepted_total = rejected_total = 0
+        accepted_prefix_total = verified_advance_total = verification_sequences = 0
         generated_length = capacity - boundary - 1
         if not self.speculative and self.nfe_budget is not None:
             minimum_nfe = self.warmup_steps + math.ceil(
@@ -178,6 +179,9 @@ class BlockDiffusionSampler(Sampler):
                     p = (target_logits / self.temperature).softmax(-1)
                 active = torch.ones(batch, dtype=torch.bool, device=model.device)
                 advance = torch.zeros(batch, dtype=torch.long, device=model.device)
+                rejected_in_window = torch.zeros(
+                    batch, dtype=torch.bool, device=model.device
+                )
                 committed = proposals.clone()
                 for offset in range(window):
                     proposed = proposals[:, offset]
@@ -195,10 +199,15 @@ class BlockDiffusionSampler(Sampler):
                         )
                         committed[rejects, offset] = correction[rejects]
                         advance[rejects] = offset + 1
+                        rejected_in_window |= rejects
                         rejected_total += int(rejects.sum())
                     advance[accepts] = offset + 1
                     accepted_total += int(accepts.sum())
                     active = accepts
+                accepted_prefix = advance - rejected_in_window.long()
+                accepted_prefix_total += int(accepted_prefix.sum())
+                verified_advance_total += int(advance.sum())
+                verification_sequences += batch
                 # Batches generally advance different amounts. Commit the common
                 # verified prefix; this keeps one dense rolling state per batch.
                 step = max(int(advance.min().item()), 1)
@@ -290,6 +299,19 @@ class BlockDiffusionSampler(Sampler):
                 "nfe": nfe,
                 "accepted": accepted_total,
                 "rejected": rejected_total,
+                "accepted_prefix_total": accepted_prefix_total,
+                "verified_advance_total": verified_advance_total,
+                "verification_sequences": verification_sequences,
+                "mean_accepted_length": (
+                    accepted_prefix_total / verification_sequences
+                    if verification_sequences
+                    else None
+                ),
+                "mean_verified_advance": (
+                    verified_advance_total / verification_sequences
+                    if verification_sequences
+                    else None
+                ),
                 "speculative": self.speculative,
                 "tokens_per_step": None if self.speculative else self.tokens_per_step,
                 "nfe_budget": None if self.speculative else self.nfe_budget,

@@ -5,9 +5,12 @@ import torch
 from algos.block_diffusion import (
     BlockDiffusion,
     block_diffusion_mask,
+    detached_clean_logit_kl,
+    delayed_linear_curriculum_cap,
     flow_interpolate,
     rolling_latent_update,
     sample_monotone_times,
+    sample_position_times,
 )
 from models.dit import DIT
 
@@ -67,6 +70,15 @@ def test_sampled_position_times_are_monotone_and_end_at_block_maximum():
         assert torch.all(times[:, start + 1 : stop] >= times[:, start : stop - 1])
 
 
+def test_sequence_constant_times_share_one_noise_level_everywhere():
+    times = sample_position_times(
+        64, 17, 4, mode="sequence_constant", max_time=0.6
+    )
+    assert times.shape == (64, 17)
+    assert times.min() >= 0 and times.max() <= 0.6
+    assert torch.equal(times, times[:, :1].expand_as(times))
+
+
 def test_linear_flow_has_exact_clean_and_noise_endpoints():
     clean = torch.randn(2, 3, 5)
     noise = torch.randn_like(clean)
@@ -75,6 +87,38 @@ def test_linear_flow_has_exact_clean_and_noise_endpoints():
     assert torch.equal(returned_noise, noise)
     assert torch.allclose(latent[:, 0], clean[:, 0])
     assert torch.allclose(latent[:, 2], noise[:, 2])
+
+
+def test_delayed_noise_curriculum_has_ar_ramp_and_full_noise_phases():
+    values = [
+        delayed_linear_curriculum_cap(step, 2500, 5000, 1.0)
+        for step in (0, 2499, 2500, 3750, 5000, 9000)
+    ]
+    assert values == [0.0, 0.0, 0.0, 0.5, 1.0, 1.0]
+
+
+@torch.no_grad()
+def test_forward_and_reverse_logit_kl_are_zero_for_equal_logits():
+    logits = torch.randn(2, 3, 7)
+    for direction in ("forward", "reverse"):
+        kl = detached_clean_logit_kl(
+            logits, logits, direction=direction, temperature=2.0
+        )
+        assert torch.allclose(kl, torch.zeros_like(kl), atol=1e-6)
+
+
+def test_logit_kl_detaches_clean_teacher_for_both_directions():
+    for direction in ("forward", "reverse"):
+        noisy = torch.randn(2, 3, 7, requires_grad=True)
+        clean = torch.randn(2, 3, 7, requires_grad=True)
+        loss = detached_clean_logit_kl(
+            noisy, clean, direction=direction, temperature=1.5
+        ).mean()
+        noisy_gradient, clean_gradient = torch.autograd.grad(
+            loss, (noisy, clean), allow_unused=True
+        )
+        assert noisy_gradient is not None and noisy_gradient.abs().sum() > 0
+        assert clean_gradient is None
 
 
 def test_zero_noise_doubled_mask_is_exactly_ar_equivalent():

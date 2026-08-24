@@ -7,3 +7,5 @@ text8_sampling:
   log_examples: 8
   output_dir: ${cwd:}/text8_callback
   samplers: null
+  at_validation_end: true
+  seed: 23

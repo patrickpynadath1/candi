@@ -155,6 +155,9 @@ def test_block_diffusion_runs_rolling_sampler_with_both_updates():
         )
         assert result.samples.shape == (2, 4)
         assert result.metadata["nfe"] > 0
+        assert result.metadata["verification_sequences"] > 0
+        assert 0 <= result.metadata["mean_accepted_length"] <= 2
+        assert 1 <= result.metadata["mean_verified_advance"] <= 2
 
 
 def test_block_diffusion_verifier_free_euler_honors_fixed_and_budgeted_nfe():
