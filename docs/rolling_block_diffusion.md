@@ -40,6 +40,12 @@ curriculum remains exactly AR before `noise_curriculum_start_step`, ramps
 linearly to full noise at `noise_curriculum_end_step`, and stays at full noise
 for the remainder of training.
 
+The ready-to-run launcher is
+`scripts/train_owt_block_constant_noise.sh`. Its defaults use a one-million-step
+budget with an AR phase through 250k and a linear noise ramp from 250k to 500k.
+All scale, batch, validation, and curriculum values are environment variables;
+see the header of the script for an invocation example.
+
 ## Training-time rolling evaluation
 
 `Text8SamplingCallback` can run after every validation event. Its generation is
