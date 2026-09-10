@@ -303,6 +303,28 @@ def test_train_start_replaces_loader_with_cpu_safe_sampler(monkeypatch):
     assert not updated.persistent_workers
 
 
+def test_train_start_refreshes_already_created_lightning_iterator(monkeypatch):
+    from lightning.pytorch.loops.fetchers import _DataFetcher
+    from lightning.pytorch.utilities.combined_loader import CombinedLoader
+
+    trainer = _bare_trainer()
+    trainer.config.loader = SimpleNamespace(batch_size=2, num_workers=0, pin_memory=False)
+    combined = CombinedLoader([torch.utils.data.DataLoader(list(range(6)), batch_size=2)])
+    fetcher = _DataFetcher()
+    fetcher.setup(combined)
+    iter(fetcher)
+    trainer._test_trainer = SimpleNamespace(
+        _accelerator_connector=SimpleNamespace(use_distributed_sampler=False, is_distributed=False),
+        fit_loop=SimpleNamespace(_combined_loader=combined, _data_fetcher=fetcher),
+    )
+    monkeypatch.setattr(TrainerBase, "trainer", property(lambda self: self._test_trainer))
+    trainer.on_train_start()
+    next(fetcher)
+    sampler = combined.flattened[0].sampler
+    assert sampler.counter == 2
+    assert torch.is_tensor(sampler.state_dict()["random_state"])
+
+
 def test_validation_epoch_end_restores_training_mode_after_exception(monkeypatch):
     trainer = _bare_trainer(ema=True)
     trainer._eval_mode()

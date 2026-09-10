@@ -1114,6 +1114,7 @@ class RandomFaultTolerantSampler(torch.utils.data.RandomSampler):
             generator = torch.Generator().manual_seed(seed)
         kwargs.pop("shuffle", None)
         super().__init__(*args, generator=generator, **kwargs)
+        self.state = self.generator.get_state()
         self.counter = 0
         self.restarting = False
 

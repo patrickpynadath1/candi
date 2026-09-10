@@ -140,6 +140,7 @@ class TrainerBase(L.LightningModule):
         self.noise.train()
 
     def on_load_checkpoint(self, checkpoint):
+        self._resume_random_state = checkpoint.get("sampler", {}).get("random_state")
         if self.ema:
             self.ema.load_state_dict(checkpoint["ema"])
         # Copied from:
@@ -251,6 +252,11 @@ class TrainerBase(L.LightningModule):
                         ),
                     }
                 )
+            elif not distributed and getattr(self, "_resume_random_state", None) is not None:
+                dl_sampler.load_state_dict({
+                    "random_state": self._resume_random_state,
+                    "counter": self.fast_forward_batches * self.config.loader.batch_size,
+                })
             updated_dls.append(
                 torch.utils.data.DataLoader(
                     dl.dataset,
@@ -262,7 +268,16 @@ class TrainerBase(L.LightningModule):
             persistent_workers=self.config.loader.num_workers > 0,
                 )
             )
-        self.trainer.fit_loop._combined_loader.flattened = updated_dls
+        combined = self.trainer.fit_loop._combined_loader
+        fetcher = getattr(self.trainer.fit_loop, "_data_fetcher", None)
+        if fetcher is not None:
+            # Lightning creates the first iterator before on_train_start.
+            # Updating flattened alone leaves it reading the original loader
+            # and saves an unused (uninitialized) replacement sampler.
+            combined.reset()
+        combined.flattened = updated_dls
+        if fetcher is not None:
+            iter(fetcher)
 
     def optimizer_step(self, *args, **kwargs):
         super().optimizer_step(*args, **kwargs)
