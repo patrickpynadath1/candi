@@ -17,16 +17,19 @@ class SphereDiT(nn.Module):
     def __init__(self, config, vocab_size):
         super().__init__()
         dim, cond_dim = config.model.hidden_size, config.model.cond_dim
-        self.embed_dim, self.eps = dim, getattr(config.model, "eps", 1e-6)
-        self.sphere_embed = nn.Embedding(vocab_size, dim)
+        self.embed_dim = int(getattr(config.model, "input_embedding_dim", dim))
+        self.hidden_dim = int(dim)
+        self.eps = getattr(config.model, "eps", 1e-6)
+        self.sphere_embed = nn.Embedding(vocab_size, self.embed_dim)
         init = getattr(config.model, "init", "ngpt")
         if init == "pretrained":
             nn.init.zeros_(self.sphere_embed.weight)
         elif init in {"ngpt", "random"}:
-            std = 1 / math.sqrt(dim) if init == "ngpt" else 0.02
+            std = 1 / math.sqrt(self.embed_dim) if init == "ngpt" else 0.02
             nn.init.normal_(self.sphere_embed.weight, std=std)
         else:
             raise ValueError(f"unknown sphere embedding initialization: {init}")
+        self.input_projection = nn.Linear(self.embed_dim, self.hidden_dim)
         self.sigma_map = TimestepEmbedder(cond_dim)
         self.rotary_emb = Rotary(dim // config.model.n_heads)
         self.blocks = nn.ModuleList(
@@ -61,14 +64,19 @@ class SphereDiT(nn.Module):
         )
 
     def forward(self, x, sigma):
+        if x.ndim != 3 or x.shape[-1] != self.embed_dim:
+            raise ValueError(
+                f"expected [batch, length, {self.embed_dim}] spherical embeddings"
+            )
         cond = F.silu(self.sigma_map(sigma))
-        rotary = self.rotary_emb(x)
+        hidden = self.input_projection(x)
+        rotary = self.rotary_emb(hidden)
         with torch.amp.autocast(
             "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()
         ):
             for block in self.blocks:
-                x = block(x, rotary, c=cond)
-            logits = self.output_layer(x, c=cond)
+                hidden = block(hidden, rotary, c=cond)
+            logits = self.output_layer(hidden, c=cond)
         if self.learn_temperature:
             logits, raw_temp = logits[..., :-1], logits[..., -1:]
             logits = logits / (1.000001 + torch.tanh(raw_temp) * 0.999999)

@@ -28,8 +28,12 @@ class SphereArchBlock(nn.Module):
         self.k = nn.Linear(dim, dim, bias=False)
         self.v = nn.Linear(dim, dim, bias=False)
         self.o = nn.Linear(dim, dim, bias=False)
-        self.fc = nn.Linear(dim, dim * 4 * (2 if mlp_type == "swiglu" else 1))
-        self.proj = nn.Linear(dim * 4, dim)
+        if mlp_type not in {"gelu", "swiglu"}:
+            raise ValueError(f"Unknown mlp_type: {mlp_type}")
+        width = dim * 4 * (2 if mlp_type == "swiglu" else 1)
+        self.fc = nn.Linear(dim, width, bias=mlp_type == "gelu")
+        self.proj = nn.Linear(dim * 4, dim, bias=mlp_type == "gelu")
+        self.mlp_scale = nn.Parameter(torch.ones(width))
         self.qk_scale = nn.Parameter(torch.ones(dim) / math.sqrt(dim))
         self.attn_alpha = nn.Parameter(torch.ones(dim) / math.sqrt(dim))
         self.mlp_alpha = nn.Parameter(torch.ones(dim) / math.sqrt(dim))
@@ -61,23 +65,29 @@ class SphereArchBlock(nn.Module):
             self.alpha_mod(cond).chunk(2, -1) if self.alpha_mod is not None else (0, 0)
         )
         normalized_h = sphere_normalize(h, self.eps)
-        normalized_att = sphere_normalize(self.o(att), self.eps)
+        normalized_att = sphere_normalize(
+            F.dropout(self.o(att), p=self.dropout, training=self.training), self.eps
+        )
         alpha_att = (self.attn_alpha * (0.05 * math.sqrt(self.dim)) + da).abs()
         h = sphere_normalize(
-            normalized_h + alpha_att.unsqueeze(1) * (normalized_att - normalized_h),
+            normalized_h
+            + alpha_att.reshape(-1, 1, dim) * (normalized_att - normalized_h),
             self.eps,
         )
-        z = self.fc(h)
+        z = self.fc(h) * (self.mlp_scale * math.sqrt(self.dim))
         if self.mlp_type == "swiglu":
             u, g = z.chunk(2, -1)
             z = u * F.silu(g)
         else:
-            z = F.gelu(z)
+            z = F.gelu(z, approximate="tanh")
         normalized_h = sphere_normalize(h, self.eps)
-        normalized_mlp = sphere_normalize(self.proj(z), self.eps)
+        normalized_mlp = sphere_normalize(
+            F.dropout(self.proj(z), p=self.dropout, training=self.training), self.eps
+        )
         alpha_mlp = (self.mlp_alpha * (0.05 * math.sqrt(self.dim)) + dm).abs()
         return sphere_normalize(
-            normalized_h + alpha_mlp.unsqueeze(1) * (normalized_mlp - normalized_h),
+            normalized_h
+            + alpha_mlp.reshape(-1, 1, dim) * (normalized_mlp - normalized_h),
             self.eps,
         )
 
@@ -115,6 +125,18 @@ class SphereArch(nn.Module):
         )
         self.head = nn.Linear(d, vocab_size, bias=False)
         self.out_scale = nn.Parameter(torch.ones(vocab_size) / math.sqrt(d))
+        # Match the release's Gaussian initialization before projection.
+        for block in self.blocks:
+            for layer in (block.q, block.k, block.v, block.fc):
+                nn.init.normal_(layer.weight, std=1 / math.sqrt(d))
+            for layer in (block.o, block.proj):
+                nn.init.normal_(
+                    layer.weight, std=1 / math.sqrt(2 * d * len(self.blocks))
+                )
+            for layer in (block.fc, block.proj):
+                if layer.bias is not None:
+                    nn.init.zeros_(layer.bias)
+        nn.init.normal_(self.head.weight, std=1 / math.sqrt(d))
         path = getattr(config.model, "pretrained_ckpt_path", None)
         if path is not None:
             load_compatible_checkpoint(self, path)
@@ -125,20 +147,25 @@ class SphereArch(nn.Module):
 
     @torch.no_grad()
     def renormalize_weights(self):
-        for name, p in self.named_parameters():
-            if name == "sphere_embed.weight" and not self.normalize_input_embed:
-                continue
-            if p.ndim >= 2:
-                p.copy_(sphere_normalize(p, self.eps))
+        if self.normalize_input_embed:
+            self.sphere_embed.weight.copy_(
+                sphere_normalize(self.sphere_embed.weight, self.eps)
+            )
+        self.head.weight.copy_(sphere_normalize(self.head.weight, self.eps))
+        for block in self.blocks:
+            for layer in (block.q, block.k, block.v, block.fc):
+                layer.weight.copy_(sphere_normalize(layer.weight, self.eps))
+            for layer in (block.o, block.proj):
+                layer.weight.copy_(sphere_normalize(layer.weight.T, self.eps).T)
 
     def forward(self, x, sigma):
         cond = F.silu(self.time(sigma))
         if self.time_token is not None:
             token = sphere_normalize(self.time_token(cond), self.eps).unsqueeze(1)
-            x = torch.cat((token, x), dim=1)
+            x = torch.cat((x, token), dim=1)
         rotary = self.rotary(x)
         for block in self.blocks:
             x = block(x, rotary, cond)
         if self.time_token is not None:
-            x = x[:, 1:]
-        return self.head(x) * (self.out_scale * math.sqrt(self.embed_dim)).abs()
+            x = x[:, :-1]
+        return self.head(x) * (self.out_scale * math.sqrt(self.embed_dim))

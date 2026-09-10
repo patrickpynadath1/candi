@@ -332,3 +332,72 @@ def test_blurred_candi_experiment_composition(experiment, adaptive, factorized):
     assert config.algo.spatial_blurring.bandwidth == 0.5
     assert config.noise.get("adaptive", False) is adaptive
     assert config.algo.factorized_adaptive_schedule is factorized
+
+
+@pytest.mark.parametrize('backbone', ['sphere_dit', 'sphere_arch'])
+def test_sfm_corrected_adaptive_training_checkpoint_and_sampling(backbone, tmp_path):
+    from samplers.base import SamplingRequest
+    config = _compose_tiny('sfm', 'sampling.predictor=sfm',
+        'model=small_sphere_arch' if backbone == 'sphere_arch' else 'model=tiny_sphere_dit',
+        'model.hidden_size=8', 'model.cond_dim=8', 'model.n_blocks=1',
+        'model.n_heads=2', 'model.length=4', 'model.dropout=0',
+        f'algo.backbone={backbone}', f'algo.renormalize_weights={str(backbone == "sphere_arch").lower()}',
+        f'checkpointing.save_dir={tmp_path}',
+        'algo.invert_time_convention=false', 'noise=log-linear-adaptive',
+        '+noise.adaptive_coordinate=physical', 'noise.alpha_max=0.093',
+        'noise.adaptive_buffer_size=2', 'noise.adaptive_refit_every=1',
+        'noise.adaptive_warmup_steps=0', 'noise.adaptive_n_grid=32',
+        'noise.adaptive_n_knots=4', 'noise.adaptive_spline_degree=2')
+    model = algo_registry.get('sfm')(config, Text8Tokenizer())
+    tokens = torch.tensor([[1, 2, 3, 4], [4, 3, 2, 1]])
+    loss = model._loss(tokens, torch.ones_like(tokens), train_mode=True).loss
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert torch.isfinite(model.backbone.sphere_embed.weight.grad).all()
+    assert model.noise.refit_count == 1
+    expected = model.noise.alpha_t(torch.linspace(0, 1, 10))
+    restored = algo_registry.get('sfm')(config, Text8Tokenizer())
+    restored.load_state_dict(model.state_dict())
+    assert torch.equal(restored.noise.alpha_t(torch.linspace(0, 1, 10)), expected)
+    with torch.no_grad():
+        result = create_sampler(config).sample(restored.eval(), SamplingRequest(2, num_steps=3))
+    assert result.samples.shape == tokens.shape
+    assert result.metadata['nfe'] == 3
+
+
+def test_sfm_sphere_dit_supports_smaller_spherical_input_dimension(tmp_path):
+    from samplers.base import SamplingRequest
+    config = _compose_tiny(
+        'sfm', 'sampling.predictor=sfm', 'model=tiny_sphere_dit',
+        'model.input_embedding_dim=16', 'model.hidden_size=32',
+        'model.cond_dim=16', 'model.n_blocks=1', 'model.n_heads=4',
+        'model.length=4', 'model.dropout=0', 'algo.backbone=sphere_dit',
+        f'checkpointing.save_dir={tmp_path}', 'algo.invert_time_convention=false',
+        'algo.auto_truncation=true',
+    )
+    model = algo_registry.get('sfm')(config, Text8Tokenizer())
+    tokens = torch.tensor([[1, 2, 3, 4], [4, 3, 2, 1]])
+    loss = model._loss(tokens, torch.ones_like(tokens), train_mode=True).loss
+    loss.backward()
+    assert torch.isfinite(loss)
+    from algos.spherical_utils import spherical_truncation_alpha_max
+    assert config.noise.alpha_max == pytest.approx(
+        spherical_truncation_alpha_max(model.vocab_size, 16, 0.1)
+    )
+    assert model.prior_sample(2, 4).shape == (2, 4, 16)
+    with torch.no_grad():
+        result = create_sampler(config).sample(
+            model.eval(), SamplingRequest(2, num_steps=3)
+        )
+    assert result.samples.shape == tokens.shape
+
+
+@pytest.mark.parametrize('experiment', ['sudoku_sfm_adaptive', 'sudoku_sfm_truncated_adaptive', 'tinygsm_sfm'])
+def test_sfm_experiments_select_physical_adaptation(experiment):
+    with initialize_config_dir(config_dir=CONFIG_DIR, version_base=None):
+        config = compose(config_name='config', overrides=[f'+experiment={experiment}'])
+    assert config.noise.adaptive_coordinate == 'physical'
+    assert not config.algo.invert_time_convention
+    assert config.algo.auto_truncation is (
+        experiment == 'sudoku_sfm_truncated_adaptive'
+    )

@@ -20,3 +20,6 @@ eval:
   generate_samples: false
 gsm8k:
   scoring: code
+
+noise:
+  adaptive_coordinate: physical

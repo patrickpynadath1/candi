@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from algos.flm_utils import alpha_to_gamma, build_luts, gamma_to_alpha
@@ -7,7 +8,13 @@ from algos.noise_schedules import (
     LogLinear,
     TruncatedSchedule,
 )
-from algos.spherical_utils import exp_map, log_map, slerp, sphere_normalize
+from algos.spherical_utils import (
+    exp_map,
+    log_map,
+    slerp,
+    sphere_normalize,
+    spherical_truncation_alpha_max,
+)
 from algos.trainer_base import TrainerBase
 
 
@@ -24,6 +31,15 @@ def test_slerp_endpoints():
     y = sphere_normalize(torch.randn(2, 4))
     assert torch.allclose(slerp(x, y, torch.tensor(0.0)), x, atol=2e-5)
     assert torch.allclose(slerp(x, y, torch.tensor(1.0)), y, atol=2e-5)
+
+
+def test_spherical_truncation_bound_depends_on_embedding_dimension():
+    assert spherical_truncation_alpha_max(12, 512, 0.1) == pytest.approx(
+        0.09273369218709283
+    )
+    assert spherical_truncation_alpha_max(12, 16, 0.1) == pytest.approx(
+        0.6132772450133581
+    )
 
 
 def test_flm_luts_are_monotone_and_invertible():
@@ -121,3 +137,44 @@ def test_adaptive_schedule_refits_and_restores_spline():
     )
     torch.nn.Module.load_state_dict(recursively_restored, schedule.state_dict())
     assert torch.allclose(recursively_restored.alpha_t(t), alpha)
+
+
+def test_spherical_degenerate_endpoints_and_gradients():
+    x = torch.tensor([[1.0, 0.0, 0.0]], dtype=torch.float64, requires_grad=True)
+    assert torch.equal(log_map(x, x), torch.zeros_like(x))
+    tangent = log_map(x, -x)
+    assert torch.allclose((tangent * x).sum(-1), torch.zeros(1, dtype=x.dtype))
+    assert torch.allclose(exp_map(x, tangent), -x, atol=1e-12)
+    midpoint = slerp(x, -x, torch.tensor(0.5))
+    assert torch.allclose(midpoint.norm(dim=-1), torch.ones(1, dtype=x.dtype))
+    slerp(x, x, torch.tensor(0.5)).sum().backward()
+    assert torch.isfinite(x.grad).all()
+    delta = torch.zeros_like(x, requires_grad=True)
+    exp_map(x.detach(), delta)[0, 1].backward()
+    assert delta.grad[0, 1] == 1
+
+
+def test_sfm_truncated_schedule_linearizes_loss_across_refits():
+    schedule = AdaptiveSchedule(
+        TruncatedSchedule(LogLinear(), 0.001, 0.093),
+        buffer_size=256,
+        refit_every=1,
+        n_grid=256,
+        n_knots=12,
+        spline_degree=3,
+        ridge_alpha=1e-8,
+        uniform_mix=1e-4,
+        max_steps=10,
+        warmup_steps=0,
+        ema=0,
+        coordinate="physical",
+    )
+    t = torch.linspace(0, 1, 256, dtype=torch.float64)
+    hi, lo = schedule.base.alpha_t(t[[0, -1]])
+    for step in range(3):
+        progress = (hi - schedule.alpha_t(t)) / (hi - lo)
+        schedule.record_time_loss_pair(t, progress.square(), step)
+        warped = (hi - schedule.alpha_t(t)) / (hi - lo)
+        assert torch.allclose(warped.square(), t, atol=0.012)
+        assert warped[0] == 0 and warped[-1] == 1
+        assert torch.all(warped.diff() > 0)

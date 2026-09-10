@@ -1,11 +1,16 @@
 """Spherical Flow Matching for language modeling."""
 
 import torch
+from omegaconf import OmegaConf, open_dict
 
 from .diffusion import Diffusion
 from .noise_schedules import get_noise
 from .registry import algo_registry
-from .spherical_utils import slerp, sphere_normalize
+from .spherical_utils import (
+    slerp,
+    sphere_normalize,
+    spherical_truncation_alpha_max,
+)
 
 
 @algo_registry.register("sfm")
@@ -23,6 +28,25 @@ class SFM(Diffusion):
     )
 
     def __init__(self, config, tokenizer):
+        if getattr(config.algo, "auto_truncation", False):
+            dimension = int(
+                getattr(config.model, "input_embedding_dim", config.model.hidden_size)
+            )
+            vocab_size = (
+                len(tokenizer.added_tokens_decoder)
+                if hasattr(config.data, "vocab_file")
+                else len(tokenizer)
+            )
+            alpha_max = spherical_truncation_alpha_max(
+                vocab_size,
+                dimension,
+                float(config.algo.truncation_delta),
+            )
+            if OmegaConf.is_config(config.noise):
+                with open_dict(config.noise):
+                    config.noise.alpha_max = alpha_max
+            else:
+                config.noise.alpha_max = alpha_max
         super().__init__(config, tokenizer)
         self.eps = getattr(config.algo, "eps", 1e-6)
         self.invert_time_convention = getattr(
@@ -41,6 +65,14 @@ class SFM(Diffusion):
             raise ValueError("adaptive schedule requires invert_time_convention=false")
         if self.config.algo.backbone == "sphere_arch" and not self.renormalize_weights:
             raise ValueError("sphere_arch requires renormalize_weights=true")
+        if getattr(self.config.algo, "auto_truncation", False):
+            expected = spherical_truncation_alpha_max(
+                self.vocab_size,
+                self.backbone.embed_dim,
+                float(self.config.algo.truncation_delta),
+            )
+            if abs(float(self.config.noise.alpha_max) - expected) > 1e-12:
+                raise ValueError("automatic spherical truncation does not match the model")
 
     def _process_model_output(self, model_output, xt=None, sigma=None):
         del xt, sigma

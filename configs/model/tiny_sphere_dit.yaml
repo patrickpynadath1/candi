@@ -1,6 +1,7 @@
 name: tiny-sphere-dit
 type: sphere_dit
 hidden_size: 512
+input_embedding_dim: 512
 cond_dim: 128
 length: 180
 n_blocks: 8

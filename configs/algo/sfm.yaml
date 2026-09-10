@@ -11,3 +11,5 @@ invert_time_convention: true
 renormalize_weights: false
 ignore_bos: false
 temp: 1.0
+auto_truncation: false
+truncation_delta: 0.1

@@ -76,7 +76,7 @@ class AdaptiveSchedule(NoiseSchedule):
     def __init__(
         self, base, buffer_size, refit_every, n_grid, n_knots,
         spline_degree, ridge_alpha, uniform_mix, max_steps, warmup_steps,
-        ema,
+        ema, coordinate="legacy_time",
     ):
         super().__init__()
         self.base = base
@@ -88,6 +88,13 @@ class AdaptiveSchedule(NoiseSchedule):
         self.uniform_mix = uniform_mix
         self.warmup_steps = warmup_steps
         self.ema = ema
+        if coordinate not in {"legacy_time", "physical"}:
+            raise ValueError("adaptive coordinate must be legacy_time or physical")
+        self.coordinate = coordinate
+        if coordinate == "physical":
+            if not 0 < uniform_mix <= 1 or not 0 <= ema < 1:
+                raise ValueError("need 0 < uniform_mix <= 1 and 0 <= ema < 1")
+            self.register_buffer("num_observed", torch.tensor(0, dtype=torch.long))
         self.register_buffer("t_buf", torch.zeros(buffer_size, dtype=torch.float64))
         self.register_buffer("loss_buf", torch.zeros(buffer_size, dtype=torch.float64))
         self.register_buffer("buf_pos", torch.tensor(0, dtype=torch.long))
@@ -110,6 +117,23 @@ class AdaptiveSchedule(NoiseSchedule):
     def record_time_loss_pair(self, t, loss, step):
         if step < self.warmup_steps:
             return
+        if self.coordinate == "physical":
+            # Store the corruption at observation time, not a clock whose
+            # meaning changes every time the schedule is refitted.
+            clean = self.base.alpha_t(torch.zeros_like(t))
+            noisy = self.base.alpha_t(torch.ones_like(t))
+            t = ((clean - self.alpha_t(t)) / (clean - noisy)).clamp(0, 1)
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                pairs = [None] * torch.distributed.get_world_size()
+                torch.distributed.all_gather_object(pairs, (t.detach().cpu(), loss.detach().cpu()))
+                t = torch.cat([pair[0] for pair in pairs])
+                loss = torch.cat([pair[1] for pair in pairs])
+            finite = torch.isfinite(t) & torch.isfinite(loss)
+            t, loss = t[finite], loss[finite]
+            if not len(t):
+                return
+            self.num_observed.add_(len(t)).clamp_max_(self.buffer_size)
+            t, loss = t[-self.buffer_size:], loss[-self.buffer_size:]
         n = len(t)
         pos = self.buf_pos.item()
         end = pos + n
@@ -126,6 +150,8 @@ class AdaptiveSchedule(NoiseSchedule):
             self.loss_buf[: n - first] = loss_val[first:]
         self.buf_pos.fill_(end % self.buffer_size)
         buffer_full = end >= self.buffer_size or self.has_schedule.item()
+        if self.coordinate == "physical":
+            buffer_full = self.num_observed.item() >= self.buffer_size
         if (
             buffer_full
             and step % self.refit_every == 0
@@ -152,20 +178,39 @@ class AdaptiveSchedule(NoiseSchedule):
         importance = (1 - self.uniform_mix) * importance + self.uniform_mix
         self.loss_profile.copy_(torch.from_numpy(smooth_loss))
         self.sampling_density.copy_(torch.from_numpy(importance / importance.sum()))
-        cdf = np.cumsum(importance)
+        if self.coordinate == "physical":
+            # Integrate intervals so F(0)=0 exactly; pointwise cumsum followed
+            # by extrapolation can otherwise take the schedule out of bounds.
+            cdf = np.concatenate(([0.], np.cumsum((importance[:-1] + importance[1:]) / 2)))
+        else:
+            cdf = np.cumsum(importance)
         cdf /= cdf[-1]
         remapped_t = PchipInterpolator(cdf, self._grid)(self._grid)
-        alpha = self.base.alpha_t(torch.as_tensor(remapped_t)).cpu().numpy()
+        if self.coordinate == "physical":
+            hi = self.base.alpha_t(torch.tensor(0., dtype=torch.float64)).item()
+            lo = self.base.alpha_t(torch.tensor(1., dtype=torch.float64)).item()
+            alpha = hi + (lo - hi) * remapped_t
+            alpha[0], alpha[-1] = hi, lo
+        else:
+            alpha = self.base.alpha_t(torch.as_tensor(remapped_t)).cpu().numpy()
         alpha_tensor = torch.from_numpy(alpha).to(self.ema_alpha_vals)
         self.refit_count += 1
         if self.ema > 0:
             self.ema_alpha_vals.mul_(self.ema).add_(alpha_tensor, alpha=1 - self.ema)
             correction = 1 - self.ema ** self.refit_count.item()
             alpha = (self.ema_alpha_vals / correction).cpu().numpy()
+        if self.coordinate == "physical":
+            alpha[0], alpha[-1] = hi, lo
         self._alpha_spline = PchipInterpolator(self._grid, alpha)
         self._dalpha_spline = self._alpha_spline.derivative()
         self.alpha_vals.copy_(torch.from_numpy(alpha))
         self.has_schedule.fill_(True)
+
+    def _load_from_state_dict(self, *args, **kwargs):
+        super()._load_from_state_dict(*args, **kwargs)
+        # Recursive parent-module loading bypasses load_state_dict below.
+        self._alpha_spline = None
+        self._dalpha_spline = None
 
     def load_state_dict(self, state_dict, strict=True, *args, **kwargs):
         result = super().load_state_dict(state_dict, strict=strict, *args, **kwargs)
@@ -201,7 +246,7 @@ class AdaptiveSchedule(NoiseSchedule):
         base_alpha = self.base.alpha_t(grid).detach().cpu()
         alpha = self.alpha_t(grid).detach().cpu()
         dalpha = self.alpha_prime_t(grid).detach().cpu()
-        return {
+        snapshot = {
             "refit_count": int(self.refit_count.item()),
             "step": int(self.last_refit_step.item()),
             "grid": grid.tolist(),
@@ -211,6 +256,14 @@ class AdaptiveSchedule(NoiseSchedule):
             "loss_profile": self.loss_profile.detach().cpu().tolist(),
             "sampling_density": self.sampling_density.detach().cpu().tolist(),
         }
+        if self.coordinate == "physical":
+            progress = (base_alpha[0] - alpha) / (base_alpha[0] - base_alpha[-1])
+            snapshot["coordinate"] = self.coordinate
+            snapshot["progress"] = progress.tolist()
+            snapshot["warped_loss_profile"] = np.interp(
+                progress.numpy(), self._grid, self.loss_profile.cpu().numpy()
+            ).tolist()
+        return snapshot
 
 
 def get_noise(config):
@@ -221,18 +274,17 @@ def get_noise(config):
         base = CosineSquared(cfg.eps)
     else:
         raise ValueError(f"unknown noise schedule: {cfg.type}")
-    if (
-        getattr(cfg, "alpha_min", None) is not None
-        or getattr(cfg, "alpha_max", None) is not None
-    ):
+    alpha_min = getattr(cfg, "alpha_min", None)
+    alpha_max = getattr(cfg, "alpha_max", None)
+    if alpha_min is not None or alpha_max is not None:
         lo = (
-            cfg.alpha_min
-            if cfg.alpha_min is not None
+            alpha_min
+            if alpha_min is not None
             else base.alpha_t(torch.tensor(1.0)).item()
         )
         hi = (
-            cfg.alpha_max
-            if cfg.alpha_max is not None
+            alpha_max
+            if alpha_max is not None
             else base.alpha_t(torch.tensor(0.0)).item()
         )
         base = TruncatedSchedule(base, lo, hi, cfg.eps)
@@ -249,5 +301,6 @@ def get_noise(config):
             max_steps=config.trainer.max_steps,
             warmup_steps=cfg.adaptive_warmup_steps,
             ema=cfg.adaptive_ema,
+            coordinate=cfg.get("adaptive_coordinate", "legacy_time"),
         )
     return base
