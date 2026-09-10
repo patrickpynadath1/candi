@@ -56,6 +56,64 @@ def test_cont_dit_token_and_embedding_paths():
     assert torch.allclose(token_logits, embedding_logits)
 
 
+def test_cont_dit_exact_noisy_endpoint_is_finite():
+    model = ContDIT(_config(), vocab_size=6)
+    tokens = torch.tensor([[0, 1, 2]])
+    logits = model(
+        tokens,
+        discrete_noise=torch.ones(1),
+        reveal_mask=torch.zeros_like(tokens),
+        precond=False,
+    )
+    assert torch.isfinite(logits).all()
+
+
+def test_cont_dit_uses_blurring_dit_input_and_output_geometry():
+    model = ContDIT(_config(), vocab_size=6)
+    data_table = torch.nn.functional.normalize(
+        model.vocab_embed.embedding[:-1], dim=-1
+    )
+
+    assert model.input_projection.in_features == model.input_dim
+    assert model.input_projection.out_features == model.dim
+    assert model.output_projection.in_features == model.dim
+    assert model.output_projection.out_features == model.output_dim
+    assert model.output_embedding.shape == (6, model.output_dim)
+    assert model.output_bias.shape == (6,)
+    assert torch.allclose(data_table.norm(dim=-1), torch.ones(5), atol=1e-6)
+    assert model.output_embedding is not model.vocab_embed.embedding
+
+
+def test_cont_dit_blurring_style_head_and_transformer_receive_gradients():
+    torch.manual_seed(1)
+    model = ContDIT(_config(), vocab_size=6)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    tokens = torch.tensor([[0, 1, 2], [2, 3, 4]])
+    targets = torch.tensor([[1, 2, 3], [3, 4, 0]])
+    for _ in range(3):
+        optimizer.zero_grad()
+        logits = model(
+            tokens,
+            discrete_noise=torch.tensor([0.2, 0.7]),
+            reveal_mask=torch.zeros_like(tokens),
+            precond=False,
+        )
+        torch.nn.functional.cross_entropy(
+            logits.flatten(0, 1), targets.flatten()
+        ).backward()
+        optimizer.step()
+
+    for parameter in (
+        model.input_projection.weight,
+        model.blocks[0].attn_qkv.weight,
+        model.output_projection.weight,
+        model.output_embedding,
+    ):
+        assert parameter.grad is not None
+        assert torch.isfinite(parameter.grad).all()
+        assert torch.count_nonzero(parameter.grad) > 0
+
+
 def test_cont_dit_mask_embedding_is_last_vocabulary_row():
     model = ContDIT(_config(), vocab_size=6)
     assert torch.equal(model.get_mask_embed(), model.vocab_embed.embedding[-1])

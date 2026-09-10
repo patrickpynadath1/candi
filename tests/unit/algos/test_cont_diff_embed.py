@@ -79,8 +79,9 @@ def test_embedding_diffusion_flow_matching_uses_linear_interpolation(monkeypatch
     clean = model.backbone.get_embedding(tokens)
     assert torch.allclose(result["xt"], 0.75 * clean + 0.25)
     assert torch.allclose(result["continuous_noise"], torch.tensor([0.25]))
+    assert torch.allclose(result["discrete_noise"], torch.tensor([0.25]))
     assert torch.allclose(
-        -torch.log1p(-result["discrete_noise"]), torch.tensor([0.25])
+        -torch.log1p(-result["discrete_noise"]), -torch.log(torch.tensor([0.75]))
     )
 
 

@@ -50,9 +50,9 @@ class ContDiffEmbed(Diffusion):
         return getattr(self, "continuous_path", "ve") == "flow_matching"
 
     def _model_discrete_noise(self, t):
-        # ContDIT internally maps p to -log(1-p). This inverse makes its actual
-        # timestep condition equal to t for the flow-matching path.
-        return -torch.expm1(-t) if self._is_flow_matching() else t
+        # ContDIT accepts corruption probability p and applies -log(1-p).
+        # Keep the interpolation clock and model conditioning distinct.
+        return t
 
     def sample_t(self, n, accum_step):
         return super()._sample_t(n, accum_step)
@@ -122,7 +122,7 @@ class ContDiffEmbed(Diffusion):
         sigma_max = 1.0 if self._is_flow_matching() else self.sigma_max
         noise = torch.randn(
             *batch_dims,
-            self.backbone.config.model.hidden_size,
+            self.backbone.input_dim,
             dtype=torch.float32,
             device=self.device,
         ) * sigma_max
