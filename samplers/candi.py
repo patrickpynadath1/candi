@@ -39,8 +39,11 @@ class CANDISampler(Sampler):
         )
         changes_per_step = []
         for i in range(steps):
+            conventional = getattr(model, "conventional_sigma_order", False)
             continuous, clean_probs = model.sample_candi_continuous_transition(
-                x, discrete_times[i], sigma_s=sigmas[i], sigma_t=sigmas[i + 1],
+                x, discrete_times[i],
+                sigma_s=sigmas[i + 1] if conventional else sigmas[i],
+                sigma_t=sigmas[i] if conventional else sigmas[i + 1],
                 clean_mask=clean, time_s=discrete_times[i + 1],
             )
             if self.trace_argmax_changes:
@@ -54,15 +57,20 @@ class CANDISampler(Sampler):
                     changed_positions |= changed
                     changes_per_step.append(step_counts.cpu().tolist())
                 previous_argmax = current_argmax
-            x, clean = model.sample_candi_discrete_transition(
-                continuous,
-                clean_probs,
-                discrete_times[i],
-                discrete_times[i] - discrete_times[i + 1],
-                prev_clean_mask=clean,
-            )
+            if conventional and model.pure_continuous:
+                x = continuous
+            else:
+                x, clean = model.sample_candi_discrete_transition(
+                    continuous,
+                    clean_probs,
+                    discrete_times[i],
+                    discrete_times[i] - discrete_times[i + 1],
+                    prev_clean_mask=clean,
+                )
         state_tokens_fn = getattr(model, "sampling_state_tokens", None)
         tokens = state_tokens_fn(x) if callable(state_tokens_fn) else x.argmax(-1)
+        if getattr(model, "conventional_sigma_order", False) and model.pure_continuous:
+            tokens = clean_probs.argmax(-1)
         metadata = {"nfe": steps}
         if self.trace_argmax_changes:
             metadata.update({

@@ -23,6 +23,7 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "cadd",
         "candi",
         "candi_cached",
+        "candi_embedding",
         "candi_entropy_bounded",
         "continuous_embedding",
         "continuous_onehot",

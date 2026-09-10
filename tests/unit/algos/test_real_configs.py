@@ -40,6 +40,8 @@ ALGORITHM_CONFIGS = [
     ("sedd", ("sampling.predictor=analytic",)),
     ("cadd", ("sampling.predictor=cadd",)),
     ("candi", ("sampling.predictor=candi_cached",)),
+    ("candi_rank", ("sampling.predictor=candi", "noise=rank-adaptive")),
+    ("candi_embedding", ("sampling.predictor=candi_embedding", "noise=rank-adaptive")),
     ("candi_blurred", ("sampling.predictor=candi_entropy_bounded",)),
     ("candi_ra_change", ("sampling.predictor=candi",)),
     ("cont_diff_onehot", ("sampling.predictor=continuous_onehot",)),
@@ -257,7 +259,7 @@ def test_time_conditioned_algorithm_reports_adaptive_statistic(algo, overrides):
     """Every scheduled objective must report the time/statistic pair it used."""
     adaptive_overrides = [
         *overrides,
-        "noise=log-linear-adaptive",
+        "noise=rank-adaptive" if algo in {"candi_rank", "candi_embedding"} else "noise=log-linear-adaptive",
         "noise.adaptive_buffer_size=2",
         "noise.adaptive_refit_every=1",
         "noise.adaptive_warmup_steps=0",

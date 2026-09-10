@@ -27,7 +27,9 @@ def diffusion_time_grid(model, request):
 
 def continuous_time_grid(model, request):
     steps = request.num_steps or model.config.sampling.steps
-    times = torch.linspace(0.999, request.eps, steps + 1, device=model.device)
+    exact = getattr(model, "exact_time_endpoints", False)
+    times = torch.linspace(1.0 if exact else 0.999, 0.0 if exact else request.eps,
+                           steps + 1, device=model.device)
     return steps, times
 
 

@@ -16,6 +16,21 @@ import torch
 import torch.nn.functional as F
 import math
 
+
+HYBRID_LOSS_WEIGHTINGS = frozenset({"none", "likelihood"})
+
+
+def hybrid_token_loss(raw_ce, derivative, alpha, weighting):
+    """Optionally apply the continuous-time likelihood weight to hybrid CE."""
+    if weighting not in HYBRID_LOSS_WEIGHTINGS:
+        raise ValueError(
+            "algo.hybrid_loss_weighting must be 'none' or 'likelihood'"
+        )
+    if weighting == "none":
+        return raw_ce
+    return raw_ce * (-derivative / (1 - alpha).clamp_min(1e-8))[:, None]
+
+
 @algo_registry.register("candi")
 class CANDI(Diffusion):
     default_sampler = "candi_cached"
@@ -37,6 +52,13 @@ class CANDI(Diffusion):
         self.save_hyperparameters()
 
         self.pure_continuous = config.algo.pure_continuous
+        self.hybrid_loss_weighting = config.algo.get(
+            "hybrid_loss_weighting", "none"
+        )
+        if self.hybrid_loss_weighting not in HYBRID_LOSS_WEIGHTINGS:
+            raise ValueError(
+                "algo.hybrid_loss_weighting must be 'none' or 'likelihood'"
+            )
 
         self.continuous_noise =torch.linspace(.2, 4.0, 1000)
         self.discrete_noise = expected_rank(d=self.vocab_size-1, a=torch.tensor(1).to(self.device), sigma=self.continuous_noise)
@@ -195,7 +217,12 @@ class CANDI(Diffusion):
         raw_ce = self.raw_ce_per_token(log_x_theta, x0_tokens)
         if self.pure_continuous:
             return raw_ce
-        return -raw_ce * dalpha_t / (1 - alpha_t)
+        return hybrid_token_loss(
+            raw_ce,
+            dalpha_t.reshape(-1),
+            alpha_t.reshape(-1),
+            self.hybrid_loss_weighting,
+        )
 
     @staticmethod
     def raw_ce_per_token(log_x_theta, x0_tokens):
@@ -327,7 +354,10 @@ class CANDI(Diffusion):
             **noisy_output,
         )
         raw_ce = self.raw_ce_per_token(log_x_theta, x0)
-        adaptive_loss = raw_ce if self.factorized_adaptive_schedule else loss
+        adaptive_loss = raw_ce if (
+            self.factorized_adaptive_schedule
+            or self.config.algo.get("adaptive_loss_signal", "objective") == "raw_ce"
+        ) else loss
         schedule_name = (
             "schedule/discrete" if self.factorized_adaptive_schedule else "schedule"
         )

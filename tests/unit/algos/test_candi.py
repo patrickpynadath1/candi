@@ -78,9 +78,16 @@ def test_candi_discrete_noising_matches_uniform_transition_probability():
     )
 
 
-@pytest.mark.parametrize("pure_continuous", [False, True])
-def test_candi_nll_matches_independent_formula(pure_continuous):
-    model = _bare(CANDI, pure_continuous=pure_continuous)
+@pytest.mark.parametrize(
+    "pure_continuous,weighting",
+    [(True, "none"), (False, "none"), (False, "likelihood")],
+)
+def test_candi_nll_matches_independent_formula(pure_continuous, weighting):
+    model = _bare(
+        CANDI,
+        pure_continuous=pure_continuous,
+        hybrid_loss_weighting=weighting,
+    )
     probabilities = torch.tensor([[[0.2, 0.7, 0.1], [0.6, 0.3, 0.1]]])
     targets = torch.tensor([[1, 0]])
     alpha = torch.tensor([[0.6]])
@@ -90,11 +97,9 @@ def test_candi_nll_matches_independent_formula(pure_continuous):
         probabilities.log(), targets, alpha, derivative, reveal_mask=None
     )
     selected_log_probability = torch.tensor([[0.7, 0.6]]).log()
-    expected = (
-        -selected_log_probability
-        if pure_continuous
-        else selected_log_probability * derivative / (1 - alpha)
-    )
+    expected = -selected_log_probability
+    if not pure_continuous and weighting == "likelihood":
+        expected = selected_log_probability * derivative / (1 - alpha)
     assert torch.allclose(result, expected)
 
 

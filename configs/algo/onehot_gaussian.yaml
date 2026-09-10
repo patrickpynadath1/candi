@@ -1,0 +1,7 @@
+defaults:
+  - candi_embedding
+
+name: onehot_gaussian
+is_embed: false
+pure_continuous: true
+interpolation_schedule: linear

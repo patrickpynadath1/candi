@@ -1,0 +1,11 @@
+defaults:
+  - embedding_diffusion
+
+name: candi_embedding
+continuous_path: flow_matching
+pure_continuous: false
+interpolation_schedule: linear
+min_percentile: 0.01
+max_percentile: 0.49
+# Rank variants remain strictly inside the finite .01-to-.49 interval.
+rank_endpoint_width: 0.0

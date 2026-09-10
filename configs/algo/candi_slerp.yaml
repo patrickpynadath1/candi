@@ -1,0 +1,9 @@
+defaults:
+  - candi_embedding
+
+name: candi_slerp
+interpolation_schedule: geometric_rank
+slerp_precision: float64
+# Zero retains .01 -> .49; positive width connects to exact 0 -> .5 endpoints.
+rank_endpoint_width: 0.0
+truncation_delta: 0.1

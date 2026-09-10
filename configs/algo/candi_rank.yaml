@@ -1,0 +1,9 @@
+defaults:
+  - candi
+
+name: candi_rank
+cont_schedule_type: geometric
+cont_schedule_target: r
+min_percentile: 0.01
+max_percentile: 0.49
+adaptive_loss_signal: raw_ce

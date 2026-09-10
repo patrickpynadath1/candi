@@ -14,6 +14,9 @@ sigma_min: .01
 sigma_max: 2.0
 temp: 1.0
 pure_continuous: True
+# Used only by hybrid subclasses (CANDI embedding and SLERP).
+# `likelihood` restores the continuous-time -alpha'/(1-alpha) weighting.
+hybrid_loss_weighting: none
 is_embed: True
 reserve_mask_embedding: false
 # ve: x_t = x_0 + sigma(t) * noise with an exponential sigma schedule.

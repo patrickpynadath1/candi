@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+  - override /data: sudoku
+  - override /model: tiny
+  - override /algo: candi_slerp
+  - override /noise: rank-adaptive
+
+model: {length: 180, hidden_size: 512}
+noise: {adaptive: true}
+loader: {global_batch_size: 256}
+trainer: {max_steps: 20000, val_check_interval: 20000, check_val_every_n_epoch: null}
+sampling: {predictor: candi_embedding}
+eval: {generate_samples: false}

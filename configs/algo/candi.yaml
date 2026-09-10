@@ -14,6 +14,9 @@ sigma_min: .01
 sigma_max: 2.0
 temp: 1.0
 pure_continuous: False
+# Hybrid denoising uses plain token CE by default. Set to likelihood to recover
+# the continuous-time -alpha'(t)/(1-alpha(t)) objective weighting.
+hybrid_loss_weighting: none
 is_embed: False 
 use_percentile_scheduling: True # only affects inference schedule
 cont_schedule_type: linear
