@@ -134,6 +134,8 @@ def _print_config(
 @L.pytorch.utilities.rank_zero_only
 def _print_batch(train_ds, valid_ds, tokenizer, k=64, vocab_offset=False):
     for dl_type, dl in [("train", train_ds), ("valid", valid_ds)]:
+        if dl is None:
+            continue
         print(f"Printing {dl_type} dataloader batch.")
         batch = next(iter(dl))
         print("Batch input_ids.shape", batch["input_ids"].shape)
@@ -527,6 +529,9 @@ def main(config):
     }
     if config.mode == "sample_eval":
         _generate_samples(**kwargs)
+    elif config.mode == "reasoning_eval":
+        from tasks.reasoning import evaluate_reasoning
+        evaluate_reasoning(load_checkpoint=_load_from_checkpoint, **kwargs)
     elif config.mode == "sudoku_eval":
         evaluate_sudoku(load_checkpoint=_load_from_checkpoint, **kwargs)
     elif config.mode == "gsm8k_eval":

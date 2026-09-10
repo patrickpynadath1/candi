@@ -1,0 +1,1016 @@
+{
+  "description": "Reasoning task integration validation; not benchmark accuracy",
+  "tests": {
+    "regression_passed": 606,
+    "final_reasoning_tests_passed": 88,
+    "note": "The targeted tests overlap the regression suite. Nested GSM8K isolation tests require running outside the outer sandbox."
+  },
+  "cpu_smoke": {
+    "training_runs": 96,
+    "evaluations": 112,
+    "profiles": 6,
+    "variants_per_profile": 16,
+    "steps": 2,
+    "evaluation_nfe": 4,
+    "subset_limit_per_source_split": 256,
+    "all_statuses_zero": true
+  },
+  "source_gold_audit": {
+    "sudoku_extreme/train": {
+      "gold_labels_checked": 1001000,
+      "all_valid": true
+    },
+    "sudoku_extreme/test": {
+      "gold_labels_checked": 422786,
+      "all_valid": true
+    },
+    "sudoku_shah/train": {
+      "gold_labels_checked": 1804463,
+      "all_valid": true
+    },
+    "sudoku_shah/test": {
+      "gold_labels_checked": 100000,
+      "all_valid": true
+    },
+    "maze_unique/train": {
+      "gold_labels_checked": 1000,
+      "all_valid": true
+    },
+    "maze_unique/test": {
+      "gold_labels_checked": 1000,
+      "all_valid": true
+    }
+  },
+  "zebra_inventory": {
+    "train": {
+      "total": 1499933,
+      "layouts": {
+        "4x5": 93793,
+        "5x4": 93731,
+        "3x4": 93733,
+        "4x4": 93604,
+        "6x4": 93769,
+        "4x3": 93673,
+        "4x6": 93701,
+        "6x6": 93785,
+        "6x3": 93767,
+        "5x6": 93719,
+        "6x5": 93668,
+        "3x3": 93771,
+        "3x6": 93734,
+        "5x5": 93767,
+        "3x5": 93859,
+        "5x3": 93859
+      },
+      "max_prompt_tokens": 352
+    },
+    "test": {
+      "total": 100000,
+      "layouts": {
+        "6x6": 6206,
+        "4x5": 6203,
+        "3x4": 6264,
+        "4x4": 6393,
+        "3x6": 6262,
+        "4x6": 6295,
+        "6x4": 6228,
+        "3x3": 6226,
+        "6x3": 6230,
+        "4x3": 6324,
+        "5x6": 6274,
+        "5x3": 6138,
+        "6x5": 6325,
+        "3x5": 6137,
+        "5x5": 6229,
+        "5x4": 6266
+      },
+      "max_prompt_tokens": 341
+    }
+  },
+  "zebra_gold_audit": {
+    "test_records": 100000,
+    "all_valid": true,
+    "between": "ordered triple: first < second < third"
+  },
+  "zebra_solver_audit": [
+    {
+      "source_id": "zebra/test/3",
+      "solutions": 1,
+      "matches_gold": true
+    },
+    {
+      "source_id": "zebra/test/5",
+      "solutions": 1,
+      "matches_gold": true
+    },
+    {
+      "source_id": "zebra/test/6",
+      "solutions": 1,
+      "matches_gold": true
+    },
+    {
+      "source_id": "zebra/test/25",
+      "solutions": 1,
+      "matches_gold": true
+    },
+    {
+      "source_id": "zebra/test/49",
+      "solutions": 1,
+      "matches_gold": true
+    }
+  ],
+  "shah_extreme_overlap": {
+    "protocol": "exact puzzle bytes; no symmetry equivalence audit",
+    "shah_train_records": 1804463,
+    "shah_unique_puzzles": 1804463,
+    "extreme_test_records": 422786,
+    "overlap_count": 0,
+    "extreme_source_ids": [],
+    "sources": {
+      "shah/Sudoku-train-data.npy": "3f829eef34b4c403de5a25f4e1bde0b2651e75a82029a45944270fd7a7bf441d",
+      "eqr/sudoku-extreme-1k-aug-1000/test/all__inputs.npy": "cbc2ab9f1743d79da9c0c26273460140bf542a5fb3229cfdd80575615163bcd5"
+    }
+  },
+  "gpu_device": "NVIDIA RTX A6000; GPU 0; available outside execution sandbox",
+  "gpu_small_learning_probes": [
+    {
+      "profile": "maze_unique",
+      "variant": "candi_geometric_adaptive",
+      "steps": 200,
+      "device": "cuda",
+      "initial_loss": 2.1182862758636474,
+      "final_loss": 0.4149749457836151,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 5.923919567838311,
+      "steps_per_second": 33.7614307064236,
+      "parameters": 30857,
+      "sequence_length": 1802,
+      "batch_size": 2,
+      "peak_allocated_bytes": 31008256,
+      "training_target_accuracy": 0.46000000834465027
+    },
+    {
+      "profile": "maze_unique",
+      "variant": "slerp_geometric_rank_adaptive",
+      "steps": 200,
+      "device": "cuda",
+      "initial_loss": 2.087772274017334,
+      "final_loss": 0.23625691384077072,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 6.583028709515929,
+      "steps_per_second": 30.38115263129494,
+      "parameters": 30792,
+      "sequence_length": 1802,
+      "batch_size": 2,
+      "peak_allocated_bytes": 40327680,
+      "training_target_accuracy": 0.6299999952316284
+    },
+    {
+      "profile": "sudoku_extreme",
+      "variant": "candi_geometric_adaptive",
+      "steps": 200,
+      "device": "cuda",
+      "initial_loss": 2.585062313079834,
+      "final_loss": 1.1247371077537536,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 6.106019893661141,
+      "steps_per_second": 32.75456082408551,
+      "parameters": 31117,
+      "sequence_length": 180,
+      "batch_size": 2,
+      "peak_allocated_bytes": 19850752,
+      "training_target_accuracy": 0.06179775297641754
+    },
+    {
+      "profile": "sudoku_extreme",
+      "variant": "slerp_geometric_rank_adaptive",
+      "steps": 200,
+      "device": "cuda",
+      "initial_loss": 2.4908730506896974,
+      "final_loss": 1.1457273602485656,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 6.563858095556498,
+      "steps_per_second": 30.469884797691318,
+      "parameters": 31052,
+      "sequence_length": 180,
+      "batch_size": 2,
+      "peak_allocated_bytes": 20914688,
+      "training_target_accuracy": 0.10674157738685608
+    },
+    {
+      "profile": "sudoku_shah",
+      "variant": "candi_geometric_adaptive",
+      "steps": 200,
+      "device": "cuda",
+      "initial_loss": 2.585062313079834,
+      "final_loss": 1.1382757782936097,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 5.867559619247913,
+      "steps_per_second": 34.085720977409586,
+      "parameters": 31117,
+      "sequence_length": 180,
+      "batch_size": 2,
+      "peak_allocated_bytes": 19873280,
+      "training_target_accuracy": 0.07303370535373688
+    },
+    {
+      "profile": "sudoku_shah",
+      "variant": "slerp_geometric_rank_adaptive",
+      "steps": 200,
+      "device": "cuda",
+      "initial_loss": 2.4908730506896974,
+      "final_loss": 1.0821814775466918,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 6.53161272034049,
+      "steps_per_second": 30.620309035954918,
+      "parameters": 31052,
+      "sequence_length": 180,
+      "batch_size": 2,
+      "peak_allocated_bytes": 20914688,
+      "training_target_accuracy": 0.12921348214149475
+    },
+    {
+      "profile": "zebra_4x4",
+      "variant": "candi_geometric_adaptive",
+      "steps": 200,
+      "device": "cuda",
+      "initial_loss": 3.096272611618042,
+      "final_loss": 0.6107510685920715,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 5.922105615958571,
+      "steps_per_second": 33.77177189495756,
+      "parameters": 31897,
+      "sequence_length": 548,
+      "batch_size": 2,
+      "peak_allocated_bytes": 22509568,
+      "training_target_accuracy": 0.25
+    },
+    {
+      "profile": "zebra_4x4",
+      "variant": "slerp_geometric_rank_adaptive",
+      "steps": 200,
+      "device": "cuda",
+      "initial_loss": 3.237379217147827,
+      "final_loss": 0.805214262008667,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 6.506499605253339,
+      "steps_per_second": 30.73849414184553,
+      "parameters": 31832,
+      "sequence_length": 548,
+      "batch_size": 2,
+      "peak_allocated_bytes": 25366528,
+      "training_target_accuracy": 0.21875
+    }
+  ],
+  "gpu_capacity_probes": [
+    {
+      "profile": "maze_unique",
+      "variant": "candi_geometric_adaptive",
+      "steps": 10,
+      "device": "cuda",
+      "production": true,
+      "precision": "float32",
+      "initial_loss": 2.108795499801636,
+      "final_loss": 0.8920594215393066,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 0.5905486512929201,
+      "steps_per_second": 16.93340587283784,
+      "parameters": 28556041,
+      "sequence_length": 1802,
+      "batch_size": 4,
+      "peak_allocated_bytes": 2532779008,
+      "training_target_accuracy": 0.38055557012557983
+    },
+    {
+      "profile": "maze_unique",
+      "variant": "slerp_geometric_rank_adaptive",
+      "steps": 10,
+      "device": "cuda",
+      "production": true,
+      "precision": "float32",
+      "initial_loss": 2.0384311437606812,
+      "final_loss": 4.109760808944702,
+      "improved": false,
+      "conditioning_preserved": true,
+      "seconds": 0.706224275752902,
+      "steps_per_second": 14.159807788169065,
+      "parameters": 28555016,
+      "sequence_length": 1802,
+      "batch_size": 4,
+      "peak_allocated_bytes": 2813059584,
+      "training_target_accuracy": 0.028888888657093048
+    },
+    {
+      "profile": "sudoku_extreme",
+      "variant": "candi_geometric_adaptive",
+      "steps": 10,
+      "device": "cuda",
+      "production": true,
+      "precision": "float32",
+      "initial_loss": 2.5066808700561523,
+      "final_loss": 2.566739797592163,
+      "improved": false,
+      "conditioning_preserved": true,
+      "seconds": 0.8677302729338408,
+      "steps_per_second": 11.524318456920357,
+      "parameters": 28560141,
+      "sequence_length": 180,
+      "batch_size": 64,
+      "peak_allocated_bytes": 3767204864,
+      "training_target_accuracy": 0.10358145833015442
+    },
+    {
+      "profile": "sudoku_extreme",
+      "variant": "slerp_geometric_rank_adaptive",
+      "steps": 10,
+      "device": "cuda",
+      "production": true,
+      "precision": "float32",
+      "initial_loss": 2.474321746826172,
+      "final_loss": 2.3836801528930662,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 0.9995974618941545,
+      "steps_per_second": 10.004027002080244,
+      "parameters": 28559116,
+      "sequence_length": 180,
+      "batch_size": 64,
+      "peak_allocated_bytes": 4234441216,
+      "training_target_accuracy": 0.10182584077119827
+    },
+    {
+      "profile": "sudoku_shah",
+      "variant": "candi_geometric_adaptive",
+      "steps": 10,
+      "device": "cuda",
+      "production": true,
+      "precision": "float32",
+      "initial_loss": 2.5066808700561523,
+      "final_loss": 2.524378776550293,
+      "improved": false,
+      "conditioning_preserved": true,
+      "seconds": 0.7873297315090895,
+      "steps_per_second": 12.70115886622599,
+      "parameters": 28560141,
+      "sequence_length": 180,
+      "batch_size": 64,
+      "peak_allocated_bytes": 3774807040,
+      "training_target_accuracy": 0.10568820685148239
+    },
+    {
+      "profile": "sudoku_shah",
+      "variant": "slerp_geometric_rank_adaptive",
+      "steps": 10,
+      "device": "cuda",
+      "production": true,
+      "precision": "float32",
+      "initial_loss": 2.474321746826172,
+      "final_loss": 2.3515564441680907,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 0.9342388194054365,
+      "steps_per_second": 10.703901178463285,
+      "parameters": 28559116,
+      "sequence_length": 180,
+      "batch_size": 64,
+      "peak_allocated_bytes": 4233808384,
+      "training_target_accuracy": 0.10182584077119827
+    },
+    {
+      "profile": "zebra_4x4",
+      "variant": "candi_geometric_adaptive",
+      "steps": 10,
+      "device": "cuda",
+      "production": true,
+      "precision": "float32",
+      "initial_loss": 3.2018529891967775,
+      "final_loss": 1.3682177305221557,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 0.6291439980268478,
+      "steps_per_second": 15.894612412043172,
+      "parameters": 28572441,
+      "sequence_length": 548,
+      "batch_size": 16,
+      "peak_allocated_bytes": 2965968384,
+      "training_target_accuracy": 0.27734375
+    },
+    {
+      "profile": "zebra_4x4",
+      "variant": "slerp_geometric_rank_adaptive",
+      "steps": 10,
+      "device": "cuda",
+      "production": true,
+      "precision": "float32",
+      "initial_loss": 2.61741304397583,
+      "final_loss": 1.2214382648468018,
+      "improved": true,
+      "conditioning_preserved": true,
+      "seconds": 0.7809794172644615,
+      "steps_per_second": 12.804434763501225,
+      "parameters": 28571416,
+      "sequence_length": 548,
+      "batch_size": 16,
+      "peak_allocated_bytes": 3303812608,
+      "training_target_accuracy": 0.2265625
+    }
+  ],
+  "gpu_entrypoint_checks": [
+    {
+      "path": "/tmp/duo_reasoning/gpu_entrypoint/maze_unique/candi_geometric_adaptive/hybrid/seed_1",
+      "stage": "eval.status",
+      "result": {
+        "returncode": 0,
+        "seconds": 6.750373249873519
+      }
+    },
+    {
+      "path": "/tmp/duo_reasoning/gpu_entrypoint/maze_unique/candi_geometric_adaptive/hybrid/seed_1",
+      "stage": "train.status",
+      "result": {
+        "returncode": 0,
+        "seconds": 12.243179272860289
+      }
+    },
+    {
+      "path": "/tmp/duo_reasoning/gpu_entrypoint/maze_unique/slerp_geometric_rank_adaptive/hybrid/seed_1",
+      "stage": "eval.status",
+      "result": {
+        "returncode": 0,
+        "seconds": 7.216761577874422
+      }
+    },
+    {
+      "path": "/tmp/duo_reasoning/gpu_entrypoint/maze_unique/slerp_geometric_rank_adaptive/hybrid/seed_1",
+      "stage": "train.status",
+      "result": {
+        "returncode": 0,
+        "seconds": 12.451127404347062
+      }
+    }
+  ],
+  "prepared_subset_manifests": {
+    "maze_unique": {
+      "version": 1,
+      "task": "maze_unique",
+      "layout": null,
+      "seed": 42,
+      "dev_fraction": 0.05,
+      "source_limit": 256,
+      "full_training": false,
+      "sources": [
+        {
+          "path": "eqr/maze-30x30-unique-1k/test/all__group_indices.npy",
+          "bytes": 4132,
+          "sha256": "8e1237f248ecff97e22387e835f3845a3cd4c6a4af7a125a57724a0fea1e8b0a",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/test/all__group_indices.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/test/all__inputs.npy",
+          "bytes": 900128,
+          "sha256": "c501b3f75ec018e27fd6d00534b6738ebcc555da50536909e530787d16b1ce0f",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/test/all__inputs.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/test/all__labels.npy",
+          "bytes": 900128,
+          "sha256": "20b21168459847fb260d986394098addf7cca94becc7e682dcb358967d5993dc",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/test/all__labels.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/test/all__puzzle_identifiers.npy",
+          "bytes": 4128,
+          "sha256": "ab73033e922426e7ab6bc1277db2bf5399476f6e97aed84417e22d9876380837",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/test/all__puzzle_identifiers.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/test/all__puzzle_indices.npy",
+          "bytes": 4132,
+          "sha256": "8e1237f248ecff97e22387e835f3845a3cd4c6a4af7a125a57724a0fea1e8b0a",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/test/all__puzzle_indices.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/train/all__group_indices.npy",
+          "bytes": 4132,
+          "sha256": "8e1237f248ecff97e22387e835f3845a3cd4c6a4af7a125a57724a0fea1e8b0a",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/train/all__group_indices.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/train/all__inputs.npy",
+          "bytes": 900128,
+          "sha256": "2922455815232dcb636ee45f335e7ce834aa45d4fab743b96ac97c17284ca7e2",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/train/all__inputs.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/train/all__labels.npy",
+          "bytes": 900128,
+          "sha256": "6b1a99761606b78f85fe43085b158457f22a3d6274b1e09f12f7b16814fdb5e4",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/train/all__labels.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/train/all__puzzle_identifiers.npy",
+          "bytes": 4128,
+          "sha256": "ab73033e922426e7ab6bc1277db2bf5399476f6e97aed84417e22d9876380837",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/train/all__puzzle_identifiers.npy"
+        },
+        {
+          "path": "eqr/maze-30x30-unique-1k/train/all__puzzle_indices.npy",
+          "bytes": 4132,
+          "sha256": "8e1237f248ecff97e22387e835f3845a3cd4c6a4af7a125a57724a0fea1e8b0a",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/maze-30x30-unique-1k/train/all__puzzle_indices.npy"
+        }
+      ],
+      "prompt_length": 902,
+      "length": 1802,
+      "vocab_size": 8,
+      "vocabulary": [
+        "<PAD>",
+        "<BOS>",
+        "<ANSWER>",
+        "#",
+        " ",
+        "S",
+        "G",
+        "o"
+      ],
+      "profile": "source_subset_smoke",
+      "counts": {
+        "train": 244,
+        "validation": 12,
+        "test": 256
+      },
+      "group_counts": {
+        "train": 244,
+        "validation": 12,
+        "test": 256
+      },
+      "gold_checks": {
+        "train": 244,
+        "validation": 12,
+        "test": 256
+      },
+      "exact_puzzle_overlap": {
+        "train:validation": 0,
+        "train:test": 0,
+        "validation:test": 0
+      },
+      "fingerprint": "f9f669d1bdbfa02eaf64a6b898160c2b48543c61af189faceee4a00351be55bd"
+    },
+    "sudoku_extreme": {
+      "version": 1,
+      "task": "sudoku_extreme",
+      "layout": null,
+      "seed": 42,
+      "dev_fraction": 0.05,
+      "source_limit": 256,
+      "full_training": false,
+      "sources": [
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/test/all__group_indices.npy",
+          "bytes": 1691276,
+          "sha256": "446152661511a03c4136e3fa04b4f37006deb354174acd0e484647722af8a728",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/test/all__group_indices.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/test/all__inputs.npy",
+          "bytes": 34245794,
+          "sha256": "cbc2ab9f1743d79da9c0c26273460140bf542a5fb3229cfdd80575615163bcd5",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/test/all__inputs.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/test/all__labels.npy",
+          "bytes": 34245794,
+          "sha256": "3d0bb8e73ecc5681675803c1cb518ebb4e771dac93a6741256a7a85ab8e29c2b",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/test/all__labels.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/test/all__puzzle_identifiers.npy",
+          "bytes": 1691272,
+          "sha256": "be81966a7892a8e0f3b7e62028791a82052ae6bd20d2588de3d4f3e8022cfd49",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/test/all__puzzle_identifiers.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/test/all__puzzle_indices.npy",
+          "bytes": 1691276,
+          "sha256": "446152661511a03c4136e3fa04b4f37006deb354174acd0e484647722af8a728",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/test/all__puzzle_indices.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/train/all__group_indices.npy",
+          "bytes": 4132,
+          "sha256": "ecc663b22fbfa835a00f31d9898bd9de7603fb1b38fc910a830b9bada36a8965",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/train/all__group_indices.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/train/all__inputs.npy",
+          "bytes": 648648128,
+          "sha256": "3d539fd262106d22f8a6feb947c7311ad4fec65acf3d3c15414aa3166112893f",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/train/all__inputs.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/train/all__labels.npy",
+          "bytes": 648648128,
+          "sha256": "2cadc1ce68611ab0cd0fde95cc3e3c87769080d076739de6dd4a0a67ad644a12",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/train/all__labels.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/train/all__puzzle_identifiers.npy",
+          "bytes": 4004128,
+          "sha256": "31e994f77201ba44d975ab63f9064d7df41e6d71fca4fe4ca1ad1d435ab41779",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/train/all__puzzle_identifiers.npy"
+        },
+        {
+          "path": "eqr/sudoku-extreme-1k-aug-1000/train/all__puzzle_indices.npy",
+          "bytes": 4004132,
+          "sha256": "3badf2dc0e238adaf75c3fb5b58be965deed5c2714316160df561e2b8d1e6236",
+          "repository": "locuslab/EqR-data",
+          "revision": "bcb7d45c157c06a054b715933557d266f5bd9d7f",
+          "url": "https://huggingface.co/datasets/locuslab/EqR-data/resolve/bcb7d45c157c06a054b715933557d266f5bd9d7f/sudoku-extreme-1k-aug-1000/train/all__puzzle_indices.npy"
+        }
+      ],
+      "prompt_length": 91,
+      "length": 180,
+      "vocab_size": 12,
+      "vocabulary": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11"
+      ],
+      "profile": "source_subset_smoke",
+      "counts": {
+        "train": 241,
+        "validation": 15,
+        "test": 256
+      },
+      "group_counts": {
+        "train": 241,
+        "validation": 15,
+        "test": 256
+      },
+      "gold_checks": {
+        "train": 241,
+        "validation": 15,
+        "test": 256
+      },
+      "exact_puzzle_overlap": {
+        "train:validation": 0,
+        "train:test": 0,
+        "validation:test": 0
+      },
+      "fingerprint": "48e0a46aef315e31fbb06f0793150acfe407819b96d26133b19090ee31599596"
+    },
+    "sudoku_shah": {
+      "version": 1,
+      "task": "sudoku_shah",
+      "layout": null,
+      "seed": 42,
+      "dev_fraction": 0.05,
+      "source_limit": 256,
+      "full_training": false,
+      "sources": [
+        {
+          "path": "shah/Sudoku-train-data.npy",
+          "bytes": 586450603,
+          "sha256": "3f829eef34b4c403de5a25f4e1bde0b2651e75a82029a45944270fd7a7bf441d",
+          "url": "https://drive.usercontent.google.com/download?id=1u9jw_MykbfbGSRNXjXQtmzT5I_geWHLN&export=download"
+        },
+        {
+          "path": "shah/Sudoku-test-data.npy",
+          "bytes": 32500128,
+          "sha256": "f13f537637ac64fb8f4cd5f5c6343a196472c21cd6e596428ed514b9e558ff3a",
+          "url": "https://drive.usercontent.google.com/download?id=1QMnUMkGcO_E_loAYFDmNo27dA3aryVcx&export=download"
+        }
+      ],
+      "prompt_length": 91,
+      "length": 180,
+      "vocab_size": 12,
+      "vocabulary": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11"
+      ],
+      "profile": "source_subset_smoke",
+      "counts": {
+        "train": 241,
+        "validation": 15,
+        "test": 256
+      },
+      "group_counts": {
+        "train": 241,
+        "validation": 15,
+        "test": 256
+      },
+      "gold_checks": {
+        "train": 241,
+        "validation": 15,
+        "test": 256
+      },
+      "exact_puzzle_overlap": {
+        "train:validation": 0,
+        "train:test": 0,
+        "validation:test": 0
+      },
+      "fingerprint": "69dacce42c2bfbb7637f9b1da3eca198b2470e499e0ecbb8ea2ee26d16cff2f5"
+    },
+    "zebra_4x4": {
+      "version": 1,
+      "task": "zebra",
+      "layout": [
+        4,
+        4
+      ],
+      "seed": 42,
+      "dev_fraction": 0.05,
+      "source_limit": 256,
+      "full_training": false,
+      "sources": [
+        {
+          "path": "shah/zebra-train-data.pkl",
+          "bytes": 1118186790,
+          "sha256": "ad16703895255af934b6bb6266454a2b6ab06ad2a060a6298ca3431de247fcb7",
+          "url": "https://drive.usercontent.google.com/download?id=1UHoalXvhDtSYm3D3Dgm6YQgcTQKT7Ahf&export=download"
+        },
+        {
+          "path": "shah/zebra-test-data.pkl",
+          "bytes": 73678243,
+          "sha256": "e9ddfee3714aba8a5995d77e4fb5782e0d16cbfd7c5f6087396b1cfc5513c007",
+          "url": "https://drive.usercontent.google.com/download?id=1LCzeK8p5Z48AlOVn5BtPkj2Tqgvui7yH&export=download"
+        }
+      ],
+      "prompt_length": 512,
+      "length": 548,
+      "vocab_size": 24,
+      "vocabulary": [
+        "<PAD>",
+        "<BOS>",
+        "<ANSWER>",
+        "<HOUSES>",
+        "<ATTRS>",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "=",
+        "!=",
+        "immediate-left",
+        "nbr",
+        "ends",
+        "left-of",
+        "inbetween",
+        "LHS",
+        "RHS",
+        "c",
+        "n",
+        "CLUE_END"
+      ],
+      "profile": "source_subset_smoke",
+      "counts": {
+        "train": 246,
+        "validation": 10,
+        "test": 256
+      },
+      "group_counts": {
+        "train": 246,
+        "validation": 10,
+        "test": 256
+      },
+      "gold_checks": {
+        "train": 246,
+        "validation": 10,
+        "test": 256
+      },
+      "exact_puzzle_overlap": {
+        "train:validation": 0,
+        "train:test": 1,
+        "validation:test": 0
+      },
+      "fingerprint": "c42e8800a6d08d44f506d805bca4d28d05188a14f82fb9b70dc544e7852efbb6"
+    },
+    "zebra_5x5": {
+      "version": 1,
+      "task": "zebra",
+      "layout": [
+        5,
+        5
+      ],
+      "seed": 42,
+      "dev_fraction": 0.05,
+      "source_limit": 256,
+      "full_training": false,
+      "sources": [
+        {
+          "path": "shah/zebra-train-data.pkl",
+          "bytes": 1118186790,
+          "sha256": "ad16703895255af934b6bb6266454a2b6ab06ad2a060a6298ca3431de247fcb7",
+          "url": "https://drive.usercontent.google.com/download?id=1UHoalXvhDtSYm3D3Dgm6YQgcTQKT7Ahf&export=download"
+        },
+        {
+          "path": "shah/zebra-test-data.pkl",
+          "bytes": 73678243,
+          "sha256": "e9ddfee3714aba8a5995d77e4fb5782e0d16cbfd7c5f6087396b1cfc5513c007",
+          "url": "https://drive.usercontent.google.com/download?id=1LCzeK8p5Z48AlOVn5BtPkj2Tqgvui7yH&export=download"
+        }
+      ],
+      "prompt_length": 512,
+      "length": 548,
+      "vocab_size": 24,
+      "vocabulary": [
+        "<PAD>",
+        "<BOS>",
+        "<ANSWER>",
+        "<HOUSES>",
+        "<ATTRS>",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "=",
+        "!=",
+        "immediate-left",
+        "nbr",
+        "ends",
+        "left-of",
+        "inbetween",
+        "LHS",
+        "RHS",
+        "c",
+        "n",
+        "CLUE_END"
+      ],
+      "profile": "source_subset_smoke",
+      "counts": {
+        "train": 243,
+        "validation": 13,
+        "test": 256
+      },
+      "group_counts": {
+        "train": 243,
+        "validation": 13,
+        "test": 256
+      },
+      "gold_checks": {
+        "train": 243,
+        "validation": 13,
+        "test": 256
+      },
+      "exact_puzzle_overlap": {
+        "train:validation": 0,
+        "train:test": 1,
+        "validation:test": 0
+      },
+      "fingerprint": "b493d18468cd9be2428b3c1de5c59ff9ef84c1852cd313299a64cab7424cdb0d"
+    },
+    "zebra_mixed": {
+      "version": 1,
+      "task": "zebra",
+      "layout": null,
+      "seed": 42,
+      "dev_fraction": 0.05,
+      "source_limit": 256,
+      "full_training": false,
+      "sources": [
+        {
+          "path": "shah/zebra-train-data.pkl",
+          "bytes": 1118186790,
+          "sha256": "ad16703895255af934b6bb6266454a2b6ab06ad2a060a6298ca3431de247fcb7",
+          "url": "https://drive.usercontent.google.com/download?id=1UHoalXvhDtSYm3D3Dgm6YQgcTQKT7Ahf&export=download"
+        },
+        {
+          "path": "shah/zebra-test-data.pkl",
+          "bytes": 73678243,
+          "sha256": "e9ddfee3714aba8a5995d77e4fb5782e0d16cbfd7c5f6087396b1cfc5513c007",
+          "url": "https://drive.usercontent.google.com/download?id=1LCzeK8p5Z48AlOVn5BtPkj2Tqgvui7yH&export=download"
+        }
+      ],
+      "prompt_length": 512,
+      "length": 548,
+      "vocab_size": 24,
+      "vocabulary": [
+        "<PAD>",
+        "<BOS>",
+        "<ANSWER>",
+        "<HOUSES>",
+        "<ATTRS>",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "=",
+        "!=",
+        "immediate-left",
+        "nbr",
+        "ends",
+        "left-of",
+        "inbetween",
+        "LHS",
+        "RHS",
+        "c",
+        "n",
+        "CLUE_END"
+      ],
+      "profile": "source_subset_smoke",
+      "counts": {
+        "train": 242,
+        "validation": 14,
+        "test": 256
+      },
+      "group_counts": {
+        "train": 242,
+        "validation": 14,
+        "test": 256
+      },
+      "gold_checks": {
+        "train": 242,
+        "validation": 14,
+        "test": 256
+      },
+      "exact_puzzle_overlap": {
+        "train:validation": 0,
+        "train:test": 0,
+        "validation:test": 0
+      },
+      "fingerprint": "14609b64d1fe13a604adc6d4908b1565b81145ca564f5923c9c9ca08a7ab366e"
+    }
+  },
+  "limitations": [
+    "Full benchmark sweeps not launched.",
+    "Tiny-set probes establish decreasing loss, not near-perfect generation.",
+    "Full release conversion remains to run for datasets other than Maze; downloaded source files are cached.",
+    "GPU capacity probes use float32 without EMA; separate two-step BF16 Maze entrypoint checks use trainer defaults."
+  ],
+  "artifact_root": "/tmp/duo_reasoning"
+}

@@ -928,6 +928,9 @@ def get_tokenizer(config):
         from tasks.sudoku import SudokuTokenizer
 
         tokenizer = SudokuTokenizer()
+    elif config.data.tokenizer_name_or_path in {"sudoku_extreme", "sudoku_shah", "maze_unique", "zebra"}:
+        from tasks.reasoning import get_reasoning_tokenizer
+        tokenizer = get_reasoning_tokenizer(config.data.tokenizer_name_or_path)
     elif config.data.tokenizer_name_or_path == "text8":
         tokenizer = Text8Tokenizer()
     elif config.data.tokenizer_name_or_path == "bert-base-uncased":
@@ -970,6 +973,7 @@ def get_tokenizer(config):
 def get_dataloaders(
     config, tokenizer, skip_train=False, skip_valid=False, valid_seed=None
 ):
+    skip_valid = skip_valid or config.data.get("full_training", False)
     # A CPU process is a single data-parallel worker for batch-size purposes.
     num_gpus = max(1, torch.cuda.device_count())
     if config.trainer.accumulate_grad_batches > 1:

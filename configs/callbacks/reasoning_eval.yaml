@@ -1,0 +1,8 @@
+reasoning_eval:
+  _target_: tasks.reasoning_callback.ReasoningEvaluationCallback
+  every_n_train_steps: 1000
+  subset_size: 128
+  batch_size: 4
+  num_steps: 45
+  seed: 42
+  output_dir: ${checkpointing.save_dir}/monitoring

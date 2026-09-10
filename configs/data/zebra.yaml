@@ -1,0 +1,14 @@
+train: zebra
+valid: zebra
+tokenizer_name_or_path: zebra
+cache_dir: ${hydra:runtime.cwd}/data_cache
+prepared_dir: ${.cache_dir}/reasoning/zebra
+prompt_length: 476  # maximum packed prompt length; targets immediately follow clues
+wrap: false
+streaming: false
+insert_train_eos: false
+insert_valid_eos: false
+limit_train: null
+limit_validation: null
+limit_test: null
+full_training: false

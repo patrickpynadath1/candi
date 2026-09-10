@@ -112,12 +112,21 @@ def solution_grid(tokens):
     return [values[index : index + 9] for index in range(0, 81, 9)]
 
 
-def sudoku_metrics(generated, ground_truth):
+def sudoku_metrics(generated, ground_truth, puzzle=None):
     generated = torch.as_tensor(generated)
     ground_truth = torch.as_tensor(ground_truth)
     exact = bool(torch.equal(generated, ground_truth))
     cell_accuracy = float((generated == ground_truth).float().mean())
     grid = solution_grid(generated)
+    extras = {}
+    if puzzle is not None:
+        puzzle = torch.as_tensor(puzzle)
+        digits = (ground_truth >= 1) & (ground_truth <= 9)
+        clues = (puzzle >= 1) & (puzzle <= 9)
+        extras = {
+            "digit_accuracy": float((generated[digits] == ground_truth[digits]).float().mean()),
+            "clue_consistency": bool((generated[clues] == puzzle[clues]).all()),
+        }
     if grid is None:
         return {
             "exact": exact,
@@ -126,6 +135,8 @@ def sudoku_metrics(generated, ground_truth):
             "valid_columns": 0.0,
             "valid_boxes": 0.0,
             "valid_grid": False,
+            **extras,
+            **({"valid_solution": False} if puzzle is not None else {}),
         }
     target = set(range(1, 10))
     rows = [set(row) == target for row in grid]
@@ -137,11 +148,16 @@ def sudoku_metrics(generated, ground_truth):
         for row in (0, 3, 6)
         for column in (0, 3, 6)
     ]
-    return {
+    result = {
         "exact": exact,
         "cell_accuracy": cell_accuracy,
         "valid_rows": sum(rows) / 9,
         "valid_columns": sum(columns) / 9,
         "valid_boxes": sum(boxes) / 9,
         "valid_grid": all(rows + columns + boxes),
+        **extras,
     }
+    if puzzle is not None:
+        format_valid = bool(((generated == 10) == (ground_truth == 10)).all())
+        result["valid_solution"] = result["valid_grid"] and extras["clue_consistency"] and format_valid
+    return result

@@ -1,6 +1,8 @@
 """Routing for datasets that need structured task semantics."""
 
-TASK_DATASETS = frozenset({"sudoku", "tiny_gsm", "gsm8k_test"})
+from .reasoning import TASK_NAMES
+
+TASK_DATASETS = frozenset({"sudoku", "tiny_gsm", "gsm8k_test"}) | TASK_NAMES
 
 
 def is_task_dataset(name):
@@ -9,6 +11,10 @@ def is_task_dataset(name):
 
 def get_task_dataset(config, tokenizer, split):
     name = config.data.train if split == "train" else config.data.valid
+    if name in TASK_NAMES:
+        from .reasoning import load_prepared
+
+        return load_prepared(config, tokenizer, split)
     if name == "sudoku":
         from .sudoku import get_sudoku_dataset
 

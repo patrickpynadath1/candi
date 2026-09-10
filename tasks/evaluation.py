@@ -1,6 +1,7 @@
 """Conditional generation loops for structured reasoning tasks."""
 
 import json
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -9,7 +10,6 @@ import torch
 from tqdm import tqdm, trange
 
 from .gsm8k import (
-    evaluate_code,
     evaluate_codes,
     get_gsm8k_dataset,
     gold_answer,
@@ -45,6 +45,14 @@ def evaluate_sudoku(diffusion_model, config, tokenizer, load_checkpoint, logger)
     if max_examples is not None:
         dataset = dataset.select(range(min(int(max_examples), len(dataset))))
     batch_size, prompt_length = config.sudoku.batch_size, tokenizer.prompt_len
+    diagnostics = getattr(model, "rank_diagnostics", None)
+    if callable(diagnostics):
+        path = Path(config.sudoku.output_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "rank_diagnostics.json").write_text(json.dumps(diagnostics(), indent=2))
+    if model.device.type == "cuda":
+        torch.cuda.synchronize(model.device)
+    started = time.perf_counter()
     records = []
     sample_nfes = []
     for start in trange(0, len(dataset), batch_size, desc="Sudoku evaluation"):
@@ -80,8 +88,8 @@ def evaluate_sudoku(diffusion_model, config, tokenizer, load_checkpoint, logger)
             )
         truth = batch[:, prompt_length:]
         predictions = generated[:, prompt_length : prompt_length + truth.shape[1]]
-        for prediction, target in zip(predictions, truth):
-            metrics = sudoku_metrics(prediction, target)
+        for prediction, target, example in zip(predictions, truth, batch):
+            metrics = sudoku_metrics(prediction, target, example[1:prompt_length-1])
             records.append(
                 {
                     "generated": tokenizer.decode(prediction),
@@ -90,6 +98,9 @@ def evaluate_sudoku(diffusion_model, config, tokenizer, load_checkpoint, logger)
                 }
             )
     total = max(len(records), 1)
+    if model.device.type == "cuda":
+        torch.cuda.synchronize(model.device)
+    elapsed = time.perf_counter()-started
     results = {
         "accuracy": sum(record["exact"] for record in records) / total,
         "cell_accuracy": sum(record["cell_accuracy"] for record in records) / total,
@@ -99,6 +110,11 @@ def evaluate_sudoku(diffusion_model, config, tokenizer, load_checkpoint, logger)
         "valid_box_rate": sum(record["valid_boxes"] for record in records) / total,
         "num_correct": sum(record["exact"] for record in records),
         "num_total": len(records),
+        "digit_accuracy": sum(record["digit_accuracy"] for record in records) / total,
+        "clue_consistency_rate": sum(record["clue_consistency"] for record in records) / total,
+        "valid_solution_rate": sum(record["valid_solution"] for record in records) / total,
+        "evaluation_seconds": elapsed,
+        "seconds_per_puzzle": elapsed / total,
         "mean_nfe": (
             sum(sample_nfes) / len(sample_nfes) if sample_nfes else None
         ),

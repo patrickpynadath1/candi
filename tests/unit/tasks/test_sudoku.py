@@ -63,3 +63,20 @@ def test_sudoku_tokenizer_contract():
     assert len(tokenizer) == 12
     assert tokenizer.prompt_len == 91
     assert "<BOS>" in tokenizer.decode([11, 1, 10])
+
+
+def test_valid_grid_must_obey_clues_and_digit_accuracy_excludes_separators():
+    puzzle, solution = generate_grids(1, "easy", 5)[0]
+    encoded, _ = encode_example(puzzle, solution, SudokuTokenizer())
+    truth, clue_tokens = torch.tensor(encoded[91:]), torch.tensor(encoded[1:90])
+    result = sudoku_metrics(truth, truth, clue_tokens)
+    assert result["valid_solution"] and result["digit_accuracy"] == 1
+    # A digit permutation remains a valid grid but violates the puzzle clues.
+    other = torch.where(truth == 1, 2, torch.where(truth == 2, 1, truth))
+    result = sudoku_metrics(other, truth, clue_tokens)
+    assert result["valid_grid"] and not result["valid_solution"]
+    assert not result["clue_consistency"]
+    wrong = truth.clone()
+    wrong[0] = 0
+    result = sudoku_metrics(wrong, truth, clue_tokens)
+    assert abs(result["digit_accuracy"] - 80/81) < 1e-6
