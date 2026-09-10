@@ -1,0 +1,47 @@
+# @package _global_
+# Mixed-size (3x3--6x6) Zebra masked-diffusion baseline.  The prepared
+# dataset preserves the official test split, excludes its clue groups from
+# training, and packs each answer immediately after its variable-length prompt.
+defaults:
+  - sudoku_mdlm
+  - override /data: zebra
+  - override /callbacks: [checkpoint_every_n_steps, checkpoint_monitor, learning_rate_monitor, reasoning_eval]
+
+model:
+  length: 512
+
+data:
+  prepared_dir: ${hydra:runtime.cwd}/data_cache/reasoning_packed_v2/zebra_mixed
+  prompt_length: 476
+  limit_validation: 2048
+
+loader:
+  global_batch_size: 16
+  eval_global_batch_size: 16
+
+trainer:
+  max_steps: 20000
+  val_check_interval: 1000
+
+sampling:
+  predictor: entropy_bounded
+  entropy_bound: 0.1
+  greedy_clean_estimate: true
+  # EB stops when every answer position is committed and reports actual NFE.
+  # This remains the conventional sampling field for evaluation provenance.
+  steps: 45
+
+callbacks:
+  reasoning_eval:
+    every_n_train_steps: 1000
+    subset_size: 128
+    batch_size: 16
+    num_steps: 45
+    seed: 42
+  checkpoint_every_n_steps:
+    every_n_train_steps: 5000
+    save_top_k: -1
+    save_last: true
+  checkpoint_monitor:
+    save_top_k: 1
+    monitor: val/nll
