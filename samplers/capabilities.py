@@ -34,6 +34,8 @@ CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     "flm_prior": ("prior_sample",),
     "flm_time_map": ("sampling_gamma",),
     "flm_logits": ("sampling_logits",),
+    "frm_denoise": ("predict", "prior_sample", "clamp_state"),
+    "frm_sudoku_layout": ("clues_from_prompt", "serialize_solution"),
     "spherical_prior": ("prior_sample",),
     "spherical_schedule": ("sampling_alpha",),
     "spherical_embeddings": ("sampling_embeddings",),

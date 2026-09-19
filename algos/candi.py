@@ -20,6 +20,16 @@ import math
 HYBRID_LOSS_WEIGHTINGS = frozenset({"none", "likelihood"})
 
 
+def adaptive_observation_mask(valid_tokens, reveal_mask, pure_continuous):
+    """Select tokens whose prediction loss should fit the adaptive clock."""
+    if pure_continuous:
+        return valid_tokens
+    unrevealed = ~reveal_mask.bool()
+    if valid_tokens is None:
+        return unrevealed
+    return valid_tokens.bool() & unrevealed
+
+
 def hybrid_token_loss(raw_ce, derivative, alpha, weighting):
     """Optionally apply the continuous-time likelihood weight to hybrid CE."""
     if weighting not in HYBRID_LOSS_WEIGHTINGS:
@@ -361,14 +371,23 @@ class CANDI(Diffusion):
         schedule_name = (
             "schedule/discrete" if self.factorized_adaptive_schedule else "schedule"
         )
+        adaptive_valid_tokens = adaptive_observation_mask(
+            valid_tokens,
+            noisy_output["reveal_mask"],
+            self.pure_continuous,
+        )
         self._record_time_loss(
-            t, adaptive_loss, valid_tokens, train_mode, schedule_name=schedule_name
+            t,
+            adaptive_loss,
+            adaptive_valid_tokens,
+            train_mode,
+            schedule_name=schedule_name,
         )
         if rank_t is not None:
             self._record_time_loss(
                 rank_t,
                 raw_ce,
-                valid_tokens,
+                adaptive_valid_tokens,
                 train_mode,
                 schedule=self.continuous_rank_schedule,
                 schedule_name="schedule/continuous_rank",

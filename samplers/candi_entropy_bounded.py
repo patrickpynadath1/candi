@@ -57,8 +57,12 @@ class CANDIEntropyBoundedSampler(Sampler):
             active = ~accepted
             if not active.any():
                 break
+            conventional = getattr(model, "conventional_sigma_order", False)
             transition = model.sample_candi_continuous_transition(
-                x, discrete_times[i], sigma_s=sigmas[i], sigma_t=sigmas[i + 1],
+                x,
+                discrete_times[i],
+                sigma_s=sigmas[i + 1] if conventional else sigmas[i],
+                sigma_t=sigmas[i] if conventional else sigmas[i + 1],
                 clean_mask=accepted, time_s=discrete_times[i + 1],
                 return_untempered=self.entropy_untempered,
             )

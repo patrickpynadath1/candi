@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - sudoku_extreme_frm_stage_b
+
+trainer:
+  max_steps: 10000
+callbacks:
+  checkpoint_every_n_steps:
+    every_n_train_steps: 1000
+    filename: "step_{step:06d}"
+  reasoning_eval:
+    every_n_train_steps: 1000
+    subset_size: 128
+    batch_size: 128
+    num_steps: 64
+reasoning:
+  max_examples: 128
+wandb:
+  job_type: fpf-warmup-ablation
+  name: frm-fpf-pilot

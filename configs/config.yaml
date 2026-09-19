@@ -67,6 +67,7 @@ training:
   change_of_variables: False
   loss_precision: 'float32'  # bf16, float32, float64
   finetune_path: ''
+  reset_ema_on_finetune: false
 
 eval:
   checkpoint_path: ''  # Used to evaluate a checkpoint after training.

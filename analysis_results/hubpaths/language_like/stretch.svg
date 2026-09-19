@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440">
+<rect width="760" height="440" fill="white"/>
+<path d="M70 40V370H730" fill="none" stroke="black"/>
+<circle cx="70.00" cy="60.00" r="2" fill="#2463ac"/>
+<circle cx="86.92" cy="365.59" r="2" fill="#2463ac"/>
+<circle cx="103.85" cy="131.26" r="2" fill="#2463ac"/>
+<circle cx="120.77" cy="293.60" r="2" fill="#2463ac"/>
+<circle cx="137.69" cy="277.44" r="2" fill="#2463ac"/>
+<circle cx="154.62" cy="217.20" r="2" fill="#2463ac"/>
+<circle cx="171.54" cy="275.24" r="2" fill="#2463ac"/>
+<circle cx="188.46" cy="289.19" r="2" fill="#2463ac"/>
+<circle cx="205.38" cy="279.64" r="2" fill="#2463ac"/>
+<circle cx="222.31" cy="328.86" r="2" fill="#2463ac"/>
+<circle cx="239.23" cy="299.48" r="2" fill="#2463ac"/>
+<circle cx="256.15" cy="330.33" r="2" fill="#2463ac"/>
+<circle cx="273.08" cy="336.21" r="2" fill="#2463ac"/>
+<circle cx="290.00" cy="335.47" r="2" fill="#2463ac"/>
+<circle cx="306.92" cy="343.55" r="2" fill="#2463ac"/>
+<circle cx="323.85" cy="344.29" r="2" fill="#2463ac"/>
+<circle cx="340.77" cy="347.23" r="2" fill="#2463ac"/>
+<circle cx="357.69" cy="358.25" r="2" fill="#2463ac"/>
+<circle cx="374.62" cy="356.78" r="2" fill="#2463ac"/>
+<circle cx="391.54" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="408.46" cy="356.78" r="2" fill="#2463ac"/>
+<circle cx="425.38" cy="360.45" r="2" fill="#2463ac"/>
+<circle cx="442.31" cy="364.86" r="2" fill="#2463ac"/>
+<circle cx="459.23" cy="369.27" r="2" fill="#2463ac"/>
+<circle cx="476.15" cy="366.33" r="2" fill="#2463ac"/>
+<circle cx="493.08" cy="367.80" r="2" fill="#2463ac"/>
+<circle cx="510.00" cy="367.80" r="2" fill="#2463ac"/>
+<circle cx="526.92" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="543.85" cy="369.27" r="2" fill="#2463ac"/>
+<circle cx="560.77" cy="369.27" r="2" fill="#2463ac"/>
+<circle cx="577.69" cy="369.27" r="2" fill="#2463ac"/>
+<circle cx="594.62" cy="369.27" r="2" fill="#2463ac"/>
+<circle cx="611.54" cy="367.06" r="2" fill="#2463ac"/>
+<circle cx="628.46" cy="369.27" r="2" fill="#2463ac"/>
+<circle cx="645.38" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="662.31" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="679.23" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="696.15" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="713.08" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="730.00" cy="369.27" r="2" fill="#2463ac"/>
+<text x="70" y="390" text-anchor="middle" font-size="11">1.01</text>
+<text x="62" y="374" text-anchor="end" font-size="11">0</text>
+<text x="235" y="390" text-anchor="middle" font-size="11">1.26</text>
+<text x="62" y="296" text-anchor="end" font-size="11">106</text>
+<text x="400" y="390" text-anchor="middle" font-size="11">1.5</text>
+<text x="62" y="219" text-anchor="end" font-size="11">211</text>
+<text x="565" y="390" text-anchor="middle" font-size="11">1.74</text>
+<text x="62" y="142" text-anchor="end" font-size="11">316</text>
+<text x="730" y="390" text-anchor="middle" font-size="11">1.99</text>
+<text x="62" y="64" text-anchor="end" font-size="11">422</text>
+<text x="380" y="24" text-anchor="middle">Stretch</text>
+<text x="400" y="425" text-anchor="middle">value</text>
+<text x="15" y="210" transform="rotate(-90 15 210)" text-anchor="middle">count</text>
+</svg>

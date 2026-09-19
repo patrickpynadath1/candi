@@ -924,7 +924,11 @@ class VocabSizeTokenizerWrapper:
 
 
 def get_tokenizer(config):
-    if config.data.tokenizer_name_or_path == "sudoku":
+    if config.data.tokenizer_name_or_path == "hubpaths":
+        from tasks.hubpaths.data import get_tokenizer as get_hubpaths_tokenizer
+
+        tokenizer = get_hubpaths_tokenizer(config)
+    elif config.data.tokenizer_name_or_path == "sudoku":
         from tasks.sudoku import SudokuTokenizer
 
         tokenizer = SudokuTokenizer()

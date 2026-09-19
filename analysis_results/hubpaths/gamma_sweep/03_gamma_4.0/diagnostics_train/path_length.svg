@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440">
+<rect width="760" height="440" fill="white"/>
+<path d="M70 40V370H730" fill="none" stroke="black"/>
+<circle cx="70.00" cy="353.68" r="2" fill="#2463ac"/>
+<circle cx="125.00" cy="345.53" r="2" fill="#2463ac"/>
+<circle cx="180.00" cy="337.37" r="2" fill="#2463ac"/>
+<circle cx="235.00" cy="231.32" r="2" fill="#2463ac"/>
+<circle cx="290.00" cy="68.16" r="2" fill="#2463ac"/>
+<circle cx="345.00" cy="60.00" r="2" fill="#2463ac"/>
+<circle cx="400.00" cy="84.47" r="2" fill="#2463ac"/>
+<circle cx="455.00" cy="92.63" r="2" fill="#2463ac"/>
+<circle cx="510.00" cy="117.11" r="2" fill="#2463ac"/>
+<circle cx="565.00" cy="206.84" r="2" fill="#2463ac"/>
+<circle cx="620.00" cy="304.74" r="2" fill="#2463ac"/>
+<circle cx="675.00" cy="361.84" r="2" fill="#2463ac"/>
+<circle cx="730.00" cy="370.00" r="2" fill="#2463ac"/>
+<text x="70" y="390" text-anchor="middle" font-size="11">3.5</text>
+<text x="62" y="374" text-anchor="end" font-size="11">2</text>
+<text x="235" y="390" text-anchor="middle" font-size="11">6.5</text>
+<text x="62" y="296" text-anchor="end" font-size="11">11.5</text>
+<text x="400" y="390" text-anchor="middle" font-size="11">9.5</text>
+<text x="62" y="219" text-anchor="end" font-size="11">21</text>
+<text x="565" y="390" text-anchor="middle" font-size="11">12.5</text>
+<text x="62" y="142" text-anchor="end" font-size="11">30.5</text>
+<text x="730" y="390" text-anchor="middle" font-size="11">15.5</text>
+<text x="62" y="64" text-anchor="end" font-size="11">40</text>
+<text x="380" y="24" text-anchor="middle">Path Length</text>
+<text x="400" y="425" text-anchor="middle">value</text>
+<text x="15" y="210" transform="rotate(-90 15 210)" text-anchor="middle">count</text>
+</svg>

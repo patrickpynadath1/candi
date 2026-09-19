@@ -1,0 +1,28 @@
+# @package _global_
+# S-FLM's truncated SLERP path with a coupled discrete reveal process.
+defaults:
+  - sudoku_candi_slerp
+
+data:
+  difficulty: hard
+
+algo:
+  pure_continuous: false
+  interpolation_schedule: truncated_linear
+  truncation_delta: 0.1
+  truncation_alpha_min: 0.001
+  hybrid_loss_weighting: none
+
+noise:
+  adaptive: true
+  adaptive_coordinate: physical
+  adaptive_buffer_size: 12800
+  adaptive_refit_every: 50
+  adaptive_ema: 0.9
+  adaptive_uniform_mix: 0.001
+
+trainer:
+  limit_val_batches: 0.0
+
+sampling:
+  steps: 180

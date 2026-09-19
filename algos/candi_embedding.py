@@ -2,7 +2,11 @@
 
 import torch
 
-from .candi import HYBRID_LOSS_WEIGHTINGS, hybrid_token_loss
+from .candi import (
+    HYBRID_LOSS_WEIGHTINGS,
+    adaptive_observation_mask,
+    hybrid_token_loss,
+)
 from .cont_diff_embed import ContDiffEmbed
 from .rank_schedules import SphereRankSchedule, embedding_table_rank
 from .registry import algo_registry
@@ -12,7 +16,9 @@ from .registry import algo_registry
 class CANDIEmbedding(ContDiffEmbed):
     sampling_family = "candi_embedding"
     default_sampler = "candi_embedding"
-    supported_samplers = frozenset({"candi_embedding"})
+    supported_samplers = frozenset({
+        "candi_embedding", "candi_embedding_entropy_bounded"
+    })
     exact_time_endpoints = True
 
     supported_interpolations = {"linear", "linear_rank", "geometric_rank"}
@@ -95,7 +101,12 @@ class CANDIEmbedding(ContDiffEmbed):
             loss = hybrid_token_loss(
                 raw_ce, derivative, alpha, self.hybrid_loss_weighting
             )
-        self._record_time_loss(t, raw_ce, valid_tokens, train_mode)
+        adaptive_valid_tokens = adaptive_observation_mask(
+            valid_tokens, noisy["reveal_mask"], not self.hybrid_mask
+        )
+        self._record_time_loss(
+            t, raw_ce, adaptive_valid_tokens, train_mode
+        )
         return loss
 
     def sampling_continuous_schedule(self, timesteps):

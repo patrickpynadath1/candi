@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440">
+<rect width="760" height="440" fill="white"/>
+<path d="M70 40V370H730" fill="none" stroke="black"/>
+<circle cx="70.00" cy="292.50" r="2" fill="#2463ac"/>
+<circle cx="117.14" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="164.29" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="211.43" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="258.57" cy="292.50" r="2" fill="#2463ac"/>
+<circle cx="305.71" cy="292.50" r="2" fill="#2463ac"/>
+<circle cx="352.86" cy="215.00" r="2" fill="#2463ac"/>
+<circle cx="400.00" cy="292.50" r="2" fill="#2463ac"/>
+<circle cx="447.14" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="494.29" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="541.43" cy="60.00" r="2" fill="#2463ac"/>
+<circle cx="588.57" cy="215.00" r="2" fill="#2463ac"/>
+<circle cx="635.71" cy="215.00" r="2" fill="#2463ac"/>
+<circle cx="682.86" cy="292.50" r="2" fill="#2463ac"/>
+<circle cx="730.00" cy="292.50" r="2" fill="#2463ac"/>
+<text x="70" y="390" text-anchor="middle" font-size="11">3.64</text>
+<text x="235" y="390" text-anchor="middle" font-size="11">7.18</text>
+<text x="400" y="390" text-anchor="middle" font-size="11">10.7</text>
+<text x="565" y="390" text-anchor="middle" font-size="11">14.3</text>
+<text x="730" y="390" text-anchor="middle" font-size="11">17.8</text>
+<text x="62" y="374" text-anchor="end" font-size="11">0</text>
+<text x="62" y="296" text-anchor="end" font-size="11">1</text>
+<text x="62" y="219" text-anchor="end" font-size="11">2</text>
+<text x="62" y="142" text-anchor="end" font-size="11">3</text>
+<text x="62" y="64" text-anchor="end" font-size="11">4</text>
+<text x="380" y="24" text-anchor="middle">Conditional Entropy Bits</text>
+<text x="400" y="425" text-anchor="middle">value</text>
+<text x="15" y="210" transform="rotate(-90 15 210)" text-anchor="middle">count</text>
+</svg>

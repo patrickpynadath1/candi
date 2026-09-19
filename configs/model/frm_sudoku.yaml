@@ -1,0 +1,10 @@
+name: frm-sudoku-7m
+type: frm_dit
+hidden_size: 256
+cond_dim: 128
+length: 180  # outer transport; the network itself processes 81 grid cells
+grid_length: 81
+n_blocks: 7
+n_heads: 8
+dropout: 0.1
+scale_by_sigma: false

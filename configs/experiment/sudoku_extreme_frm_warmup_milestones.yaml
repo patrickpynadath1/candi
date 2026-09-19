@@ -1,0 +1,17 @@
+# @package _global_
+defaults:
+  - sudoku_extreme_frm_stage_a
+
+trainer:
+  max_steps: 10000
+callbacks:
+  checkpoint_every_n_steps:
+    every_n_train_steps: 1000
+    filename: "step_{step:06d}"
+  reasoning_eval:
+    # Keep the inherited callback structurally valid, but do not spend warmup
+    # compute on generation; the downstream FPF pilots own evaluation.
+    every_n_train_steps: 1000000
+wandb:
+  job_type: warmup-milestones
+  name: frm-warmup-10k

@@ -4,6 +4,7 @@ import torch
 from algos.flm_utils import alpha_to_gamma, build_luts, gamma_to_alpha
 from algos.noise_schedules import (
     AdaptiveSchedule,
+    CDCDAdaptiveSchedule,
     CosineSquared,
     LogLinear,
     TruncatedSchedule,
@@ -137,6 +138,48 @@ def test_adaptive_schedule_refits_and_restores_spline():
     )
     torch.nn.Module.load_state_dict(recursively_restored, schedule.state_dict())
     assert torch.allclose(recursively_restored.alpha_t(t), alpha)
+
+
+def test_cdcd_schedule_fits_monotone_piecewise_linear_loss_and_restores():
+    schedule = CDCDAdaptiveSchedule(
+        LogLinear(eps=0),
+        buffer_size=8,
+        refit_every=1,
+        n_grid=101,
+        n_knots=4,
+        spline_degree=2,
+        ridge_alpha=1e-3,
+        uniform_mix=0.01,
+        max_steps=10,
+        warmup_steps=0,
+        ema=0,
+        coordinate="physical",
+        bins=10,
+        max_importance=100,
+    )
+    t = torch.linspace(0, 1, 8)
+    noisy_loss = torch.tensor([0., .2, .1, .5, .4, .9, .8, 1.2])
+    schedule.record_time_loss_pair(t, noisy_loss, step=1)
+    snapshot = schedule.snapshot()
+    profile = torch.tensor(snapshot["loss_profile"])
+    alpha = torch.tensor(snapshot["alpha"])
+    density = torch.tensor(snapshot["sampling_density"])
+    assert schedule.refit_count.item() == 1
+    assert torch.all(profile[1:] >= profile[:-1])
+    assert torch.all(profile >= 0)
+    assert torch.all(alpha[1:] <= alpha[:-1])
+    assert torch.all(density > 0)
+    assert density.sum().item() == pytest.approx(1.0)
+    assert "linear_loss_target" in snapshot
+
+    restored = CDCDAdaptiveSchedule(
+        LogLinear(eps=0), buffer_size=8, refit_every=1, n_grid=101,
+        n_knots=4, spline_degree=2, ridge_alpha=1e-3,
+        uniform_mix=0.01, max_steps=10, warmup_steps=0, ema=0,
+        coordinate="physical", bins=10, max_importance=100,
+    )
+    restored.load_state_dict(schedule.state_dict())
+    assert torch.allclose(restored.alpha_t(t), schedule.alpha_t(t))
 
 
 def test_spherical_degenerate_endpoints_and_gradients():

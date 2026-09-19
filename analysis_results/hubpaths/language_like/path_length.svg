@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440">
+<rect width="760" height="440" fill="white"/>
+<path d="M70 40V370H730" fill="none" stroke="black"/>
+<circle cx="70.00" cy="367.51" r="2" fill="#2463ac"/>
+<circle cx="98.70" cy="361.29" r="2" fill="#2463ac"/>
+<circle cx="127.39" cy="353.82" r="2" fill="#2463ac"/>
+<circle cx="156.09" cy="321.45" r="2" fill="#2463ac"/>
+<circle cx="184.78" cy="309.00" r="2" fill="#2463ac"/>
+<circle cx="213.48" cy="274.14" r="2" fill="#2463ac"/>
+<circle cx="242.17" cy="260.44" r="2" fill="#2463ac"/>
+<circle cx="270.87" cy="169.56" r="2" fill="#2463ac"/>
+<circle cx="299.57" cy="164.58" r="2" fill="#2463ac"/>
+<circle cx="328.26" cy="77.43" r="2" fill="#2463ac"/>
+<circle cx="356.96" cy="63.73" r="2" fill="#2463ac"/>
+<circle cx="385.65" cy="60.00" r="2" fill="#2463ac"/>
+<circle cx="414.35" cy="106.06" r="2" fill="#2463ac"/>
+<circle cx="443.04" cy="149.64" r="2" fill="#2463ac"/>
+<circle cx="471.74" cy="230.56" r="2" fill="#2463ac"/>
+<circle cx="500.43" cy="279.12" r="2" fill="#2463ac"/>
+<circle cx="529.13" cy="304.02" r="2" fill="#2463ac"/>
+<circle cx="557.83" cy="331.41" r="2" fill="#2463ac"/>
+<circle cx="586.52" cy="332.65" r="2" fill="#2463ac"/>
+<circle cx="615.22" cy="352.57" r="2" fill="#2463ac"/>
+<circle cx="643.91" cy="365.02" r="2" fill="#2463ac"/>
+<circle cx="672.61" cy="362.53" r="2" fill="#2463ac"/>
+<circle cx="701.30" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="730.00" cy="363.78" r="2" fill="#2463ac"/>
+<text x="70" y="390" text-anchor="middle" font-size="11">7.5</text>
+<text x="62" y="374" text-anchor="end" font-size="11">0</text>
+<text x="235" y="390" text-anchor="middle" font-size="11">13.2</text>
+<text x="62" y="296" text-anchor="end" font-size="11">62.2</text>
+<text x="400" y="390" text-anchor="middle" font-size="11">19</text>
+<text x="62" y="219" text-anchor="end" font-size="11">124</text>
+<text x="565" y="390" text-anchor="middle" font-size="11">24.8</text>
+<text x="62" y="142" text-anchor="end" font-size="11">187</text>
+<text x="730" y="390" text-anchor="middle" font-size="11">30.5</text>
+<text x="62" y="64" text-anchor="end" font-size="11">249</text>
+<text x="380" y="24" text-anchor="middle">Path Length</text>
+<text x="400" y="425" text-anchor="middle">value</text>
+<text x="15" y="210" transform="rotate(-90 15 210)" text-anchor="middle">count</text>
+</svg>

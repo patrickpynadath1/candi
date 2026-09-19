@@ -3,6 +3,7 @@ from .common import (
     TimestepEmbedder,
     Rotary,
     DDiTBlock,
+    DDiTFinalLayer,
     bias_dropout_add_scale_fused_train,
     bias_dropout_add_scale_fused_inference,
     Preconditioning
@@ -37,6 +38,9 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.reserve_mask_embedding = getattr(
             config.algo, "reserve_mask_embedding", True
         )
+        self.legacy_architecture = bool(
+            getattr(config.algo, "legacy_architecture", False)
+        )
         dim = int(config.model.hidden_size)
         self.dim = dim
         self.input_dim = int(getattr(config.algo, "input_embedding_dim", dim))
@@ -48,7 +52,11 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             reserve_mask_embedding=self.reserve_mask_embedding,
         )
         self._initialize_input_embedding()
-        self.input_projection = nn.Linear(self.input_dim, dim)
+        if self.legacy_architecture:
+            if self.input_dim != dim:
+                raise ValueError("legacy ContDIT requires embedding dim == hidden dim")
+        else:
+            self.input_projection = nn.Linear(self.input_dim, dim)
         self.mask_index = vocab_size - 1 if self.reserve_mask_embedding else None
         self.use_precond = use_precond
 
@@ -76,12 +84,20 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         # Match BlurringDIT's untied, factorized output geometry. In
         # particular, do not place a second AdaLN block or a zero-initialized
         # classifier after the transformer.
-        self.output_projection = nn.Linear(dim, self.output_dim, bias=False)
-        self.output_embedding = nn.Parameter(
-            torch.empty(vocab_size, self.output_dim)
-        )
-        self.output_bias = nn.Parameter(torch.zeros(vocab_size))
-        nn.init.normal_(self.output_embedding, std=self.output_dim**-0.5)
+        if self.legacy_architecture:
+            self.output_layer = DDiTFinalLayer(
+                hidden_size=dim,
+                out_channels=vocab_size,
+                cond_dim=cond_dim,
+                adaLN=self.adaLN,
+            )
+        else:
+            self.output_projection = nn.Linear(dim, self.output_dim, bias=False)
+            self.output_embedding = nn.Parameter(
+                torch.empty(vocab_size, self.output_dim)
+            )
+            self.output_bias = nn.Parameter(torch.zeros(vocab_size))
+            nn.init.normal_(self.output_embedding, std=self.output_dim**-0.5)
 
     def _algo_value(self, name, default):
         if hasattr(self.config.algo, "get"):
@@ -153,7 +169,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             x = self.precond(x, continuous_noise=continuous_noise, embeds=embedding, reveal_mask=reveal_mask)
 
         t_cond = F.silu(self.sigma_map(sigma))
-        hidden = self.input_projection(x)
+        hidden = x if self.legacy_architecture else self.input_projection(x)
         rotary_cos_sin = self.rotary_emb(hidden)
 
         with torch.amp.autocast(
@@ -161,8 +177,11 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         ):
             for i in range(len(self.blocks)):
                 hidden = self.blocks[i](hidden, rotary_cos_sin, c=t_cond)
-            features = self.output_projection(hidden)
-            logits = features @ self.output_embedding.t() + self.output_bias
+            if self.legacy_architecture:
+                logits = self.output_layer(hidden, c=t_cond)
+            else:
+                features = self.output_projection(hidden)
+                logits = features @ self.output_embedding.t() + self.output_bias
 
         data_logits = (
             logits[:, :, :-1] if self.reserve_mask_embedding else logits

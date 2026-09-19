@@ -1,0 +1,8 @@
+defaults:
+  - rank-adaptive
+
+adaptive_method: cdcd_monotone
+adaptive_cdcd_bins: 100
+adaptive_cdcd_max_importance: 100.0
+# CDCD found small uniform mixtures useful; this also guarantees invertibility.
+adaptive_uniform_mix: 0.01

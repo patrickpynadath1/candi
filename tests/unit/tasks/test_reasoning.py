@@ -315,8 +315,8 @@ def test_reasoning_sweep_matrix_and_layouts(monkeypatch, tmp_path):
         profiles=None, variants=None, seeds=None, modes=None, command="plan"
     )
     jobs = list(runner.jobs(MATRIX, profiles, args))
-    assert len(jobs) == 288
-    assert len({(j["variant"], j["mode"]) for j in jobs}) == 16
+    assert len(jobs) == 342
+    assert len({(j["variant"], j["mode"]) for j in jobs}) == 19
     for name, profile in profiles.items():
         job = dict(profile=name, variant="candi_geometric", mode="hybrid", seed=1)
         _, values = runner.overrides(MATRIX, profiles, job, tmp_path, tmp_path / "data")

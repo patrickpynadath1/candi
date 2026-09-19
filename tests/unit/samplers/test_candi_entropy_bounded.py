@@ -41,6 +41,22 @@ class CANDIEntropyModel(ModelBase):
         return x + 0.1, probs
 
 
+class ConventionalSigmaCANDIModel(CANDIEntropyModel):
+    conventional_sigma_order = True
+
+    def sampling_continuous_schedule(self, times, steps):
+        del steps
+        return 1 + times
+
+    def sample_candi_continuous_transition(
+        self, x, *_args, sigma_s, sigma_t, **_kwargs
+    ):
+        self.sigma_pair = (float(sigma_s), float(sigma_t))
+        probs = torch.zeros((*x.shape[:2], 4))
+        probs[..., 0] = 1
+        return x, probs
+
+
 def test_rejected_candi_sites_continue_continuous_trajectory():
     model = CANDIEntropyModel()
     result = run_sampler(
@@ -74,3 +90,14 @@ def test_greedy_candi_eb_commits_argmax_tokens():
     )
     assert torch.equal(result.samples, torch.zeros_like(result.samples))
     assert result.metadata["greedy_clean_estimate"] is True
+
+
+def test_conventional_sigma_order_moves_from_noisy_to_clean():
+    model = ConventionalSigmaCANDIModel()
+    run_sampler(
+        CANDIEntropyBoundedSampler(10.0, greedy_clean_estimate=True),
+        model,
+        SamplingRequest(num_samples=1, num_steps=1),
+    )
+    sigma_s, sigma_t = model.sigma_pair
+    assert sigma_s < sigma_t

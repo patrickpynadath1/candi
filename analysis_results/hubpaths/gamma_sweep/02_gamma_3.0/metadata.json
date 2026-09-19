@@ -1,0 +1,81 @@
+{
+  "config": {
+    "alpha": 0.0,
+    "backbone": "ring",
+    "backbone_link_prob": 1.0,
+    "backbone_shortcuts": 0,
+    "branching": 5,
+    "bridge_rate": 0.0,
+    "cache_goals": 4,
+    "cluster_size_dist": "equal",
+    "edge_cost": 1.0,
+    "endpoint_alpha": 0.0,
+    "gamma": 3.0,
+    "goal_batch_size": 4,
+    "holdout_cluster_pairs": 2,
+    "hub_cost": 0.0,
+    "hub_link_prob": 1.0,
+    "hubs_per_cluster": 2,
+    "hubs_per_group": 2,
+    "length_mode": "at_most",
+    "max_degree": null,
+    "max_dist": 10,
+    "max_sampling_attempts": 100000,
+    "max_steps": 16,
+    "mean_degree": 8,
+    "min_degree": 2,
+    "min_dist": 2,
+    "min_edge_count": 0,
+    "n_clusters": 8,
+    "n_hints": 0,
+    "n_levels": 1,
+    "n_nodes": 200,
+    "n_test": 20,
+    "n_train": 256,
+    "n_val": 20,
+    "n_waypoints": 3,
+    "require_simple": false,
+    "seed": 0,
+    "starts_per_goal": 256,
+    "temperature": 1.0
+  },
+  "counts": {
+    "test": 20,
+    "test_ood": 20,
+    "train": 256,
+    "validation": 20
+  },
+  "coverage": {
+    "edges_below_target": 0,
+    "min_edge_count": 0,
+    "topup_attempts": 0,
+    "undirected": true
+  },
+  "eval_routes_unique_up_to_reversal": true,
+  "exact_walk_statistics": true,
+  "format_version": 1,
+  "heldout_cluster_pairs": [
+    [
+      1,
+      7
+    ],
+    [
+      2,
+      4
+    ]
+  ],
+  "hint_conditioning": "fixed-position constraints; does not model the random hint-selection mechanism",
+  "metric_columns": [
+    "true_logprob",
+    "cond_entropy_bits",
+    "shortest_dist",
+    "coverage_topup"
+  ],
+  "seq_len": 21,
+  "special_tokens": {
+    "MASK": 2,
+    "PAD": 0,
+    "SEP": 1
+  },
+  "waypoint_semantics": "distinct nodes, ordered first visits, global horizon"
+}

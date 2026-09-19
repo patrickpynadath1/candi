@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440">
+<rect width="760" height="440" fill="white"/>
+<path d="M70 40V370H730" fill="none" stroke="black"/>
+<circle cx="70.00" cy="174.41" r="2" fill="#2463ac"/>
+<circle cx="212.12" cy="144.46" r="2" fill="#2463ac"/>
+<circle cx="295.26" cy="79.26" r="2" fill="#2463ac"/>
+<circle cx="354.25" cy="60.00" r="2" fill="#2463ac"/>
+<circle cx="400.00" cy="71.08" r="2" fill="#2463ac"/>
+<circle cx="437.38" cy="121.78" r="2" fill="#2463ac"/>
+<circle cx="468.99" cy="136.27" r="2" fill="#2463ac"/>
+<circle cx="496.37" cy="79.26" r="2" fill="#2463ac"/>
+<circle cx="520.52" cy="153.42" r="2" fill="#2463ac"/>
+<circle cx="542.12" cy="174.41" r="2" fill="#2463ac"/>
+<circle cx="561.67" cy="218.62" r="2" fill="#2463ac"/>
+<circle cx="579.51" cy="136.27" r="2" fill="#2463ac"/>
+<circle cx="595.92" cy="239.61" r="2" fill="#2463ac"/>
+<circle cx="611.11" cy="304.80" r="2" fill="#2463ac"/>
+<circle cx="625.26" cy="218.62" r="2" fill="#2463ac"/>
+<circle cx="638.49" cy="304.80" r="2" fill="#2463ac"/>
+<circle cx="650.92" cy="218.62" r="2" fill="#2463ac"/>
+<circle cx="662.64" cy="266.67" r="2" fill="#2463ac"/>
+<circle cx="684.25" cy="266.67" r="2" fill="#2463ac"/>
+<circle cx="730.00" cy="370.00" r="2" fill="#2463ac"/>
+<text x="70" y="390" text-anchor="middle" font-size="11">0</text>
+<text x="62" y="374" text-anchor="end" font-size="11">0</text>
+<text x="235" y="390" text-anchor="middle" font-size="11">0.349</text>
+<text x="62" y="296" text-anchor="end" font-size="11">0.358</text>
+<text x="400" y="390" text-anchor="middle" font-size="11">0.699</text>
+<text x="62" y="219" text-anchor="end" font-size="11">0.716</text>
+<text x="565" y="390" text-anchor="middle" font-size="11">1.05</text>
+<text x="62" y="142" text-anchor="end" font-size="11">1.07</text>
+<text x="730" y="390" text-anchor="middle" font-size="11">1.4</text>
+<text x="62" y="64" text-anchor="end" font-size="11">1.43</text>
+<text x="380" y="24" text-anchor="middle">Realized degree distribution</text>
+<text x="400" y="425" text-anchor="middle">log10 degree</text>
+<text x="15" y="210" transform="rotate(-90 15 210)" text-anchor="middle">log10 nodes</text>
+</svg>

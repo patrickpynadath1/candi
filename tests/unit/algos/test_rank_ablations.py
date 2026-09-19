@@ -7,6 +7,7 @@ from omegaconf import OmegaConf
 
 import main  # noqa: F401 -- registers Hydra resolvers
 from algos import algo_registry
+from algos.noise_schedules import CDCDAdaptiveSchedule
 from samplers import create_sampler
 from tasks.sudoku import SudokuTokenizer
 
@@ -95,6 +96,71 @@ def test_adaptive_candi_records_raw_ce():
     assert torch.allclose(unweighted, captured[0])
 
 
+def test_hybrid_adaptive_schedule_averages_only_unrevealed_valid_tokens():
+    config = config_for("candi_geometric_adaptive", "hybrid")
+    model = algo_registry.get(config.algo.name)(config, SudokuTokenizer())
+    captured = []
+    model._record_time_loss = lambda _t, _loss, valid, *_args, **_kwargs: (
+        captured.append(valid.clone())
+    )
+    reveal = torch.tensor([
+        [True, False, False, True, False, False, True, False],
+        [False, True, False, False, True, False, False, True],
+    ])
+    valid = torch.tensor([
+        [1, 1, 1, 1, 0, 0, 1, 1],
+        [1, 1, 0, 1, 1, 1, 0, 1],
+    ])
+    model._sample_t = lambda *args: torch.tensor([.2, .8])
+    original_q_xt = model.q_xt
+
+    def fixed_reveal(*args, **kwargs):
+        noisy = original_q_xt(*args, **kwargs)
+        noisy["reveal_mask"] = reveal
+        return noisy
+
+    model.q_xt = fixed_reveal
+    tokens = torch.randint(1, 10, (2, 8))
+    model.nll(tokens, None, train_mode=True, valid_tokens=valid)
+    assert len(captured) == 1
+    assert torch.equal(captured[0], valid.bool() & ~reveal)
+
+
+def test_adaptive_recorder_omits_examples_without_observed_tokens():
+    config = config_for("candi_geometric_adaptive", "hybrid")
+    model = algo_registry.get(config.algo.name)(config, SudokuTokenizer())
+
+    class Recorder:
+        def __init__(self):
+            self.calls = []
+
+        def record_time_loss_pair(self, times, losses, step):
+            self.calls.append((times, losses, step))
+
+    recorder = Recorder()
+    times = torch.tensor([.1, .2, .3])
+    losses = torch.tensor([[9., 9.], [2., 4.], [6., 12.]])
+    observed = torch.tensor([[0, 0], [1, 1], [0, 1]])
+    model._record_time_loss(
+        times, losses, observed, True, schedule=recorder
+    )
+    assert len(recorder.calls) == 1
+    recorded_times, recorded_losses, _ = recorder.calls[0]
+    assert torch.equal(recorded_times, torch.tensor([.2, .3]))
+    assert torch.equal(recorded_losses, torch.tensor([3., 12.]))
+
+
+@pytest.mark.parametrize(
+    "variant",
+    ["candi_linear_cdcd_adaptive", "candi_geometric_cdcd_adaptive"],
+)
+def test_cdcd_variants_instantiate_cdcd_schedule(variant):
+    config = config_for(variant, "hybrid")
+    model = algo_registry.get(config.algo.name)(config, SudokuTokenizer())
+    assert config.noise.adaptive is True
+    assert isinstance(model.noise, CDCDAdaptiveSchedule)
+
+
 @pytest.mark.parametrize(
     "variant",
     [
@@ -128,6 +194,7 @@ def test_slerp_states_remain_spherical_and_coupling_survives_refit(mode, tmp_pat
     config.noise.adaptive_warmup_steps = 0
     config.noise.adaptive_n_knots = 3
     model = algo_registry.get(config.algo.name)(config, SudokuTokenizer())
+    model._sample_t = lambda n, *_args: torch.full((n,), .8)
     tokens = torch.randint(1, 10, (8, 8))
     alpha = torch.linspace(.05, .95, 8)[:, None]
     noisy = model.q_xt(tokens, alpha)
@@ -149,12 +216,12 @@ def test_slerp_states_remain_spherical_and_coupling_survives_refit(mode, tmp_pat
     model.eval().generate_samples(2, num_steps=4)
 
 
-def test_requested_matrix_has_eight_pure_and_eight_hybrid_configs():
+def test_requested_matrix_has_eight_pure_and_eleven_hybrid_configs():
     from types import SimpleNamespace
     from new_scripts.sudoku_rank_ablation import entries
     args = SimpleNamespace(variants=None, modes=None, difficulties=None, seeds=None)
     jobs = entries(MANIFEST, args)
-    assert len(jobs) == 144
+    assert len(jobs) == 171
     pure = {j['variant'] for j in jobs if j['mode'] == 'pure'}
     hybrid = {j['variant'] for j in jobs if j['mode'] == 'hybrid'}
     assert pure == {'embedding_linear_adaptive', 'embedding_geometric_rank',
@@ -164,9 +231,12 @@ def test_requested_matrix_has_eight_pure_and_eight_hybrid_configs():
     assert hybrid == {'embedding_linear', 'embedding_linear_rank',
                       'embedding_geometric_rank', 'embedding_geometric_rank_adaptive',
                       'slerp_geometric_rank_adaptive', 'candi_orig',
-                      'candi_geometric', 'candi_geometric_adaptive'}
+                      'candi_geometric', 'candi_geometric_adaptive',
+                      'candi_linear_adaptive',
+                      'candi_geometric_cdcd_adaptive',
+                      'candi_linear_cdcd_adaptive'}
     args.modes = ['hybrid']
-    assert len(entries(MANIFEST, args)) == 72
+    assert len(entries(MANIFEST, args)) == 99
 
 
 @pytest.mark.parametrize('variant', ['onehot_gaussian_adaptive', 'embedding_linear_adaptive'])

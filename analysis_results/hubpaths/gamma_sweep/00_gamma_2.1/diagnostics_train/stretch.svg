@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440">
+<rect width="760" height="440" fill="white"/>
+<path d="M70 40V370H730" fill="none" stroke="black"/>
+<circle cx="70.00" cy="60.00" r="2" fill="#2463ac"/>
+<circle cx="96.40" cy="323.73" r="2" fill="#2463ac"/>
+<circle cx="122.80" cy="120.15" r="2" fill="#2463ac"/>
+<circle cx="149.20" cy="332.99" r="2" fill="#2463ac"/>
+<circle cx="175.60" cy="171.04" r="2" fill="#2463ac"/>
+<circle cx="202.00" cy="286.72" r="2" fill="#2463ac"/>
+<circle cx="228.40" cy="314.48" r="2" fill="#2463ac"/>
+<circle cx="254.80" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="281.20" cy="291.34" r="2" fill="#2463ac"/>
+<circle cx="307.60" cy="337.61" r="2" fill="#2463ac"/>
+<circle cx="334.00" cy="356.12" r="2" fill="#2463ac"/>
+<circle cx="360.40" cy="346.87" r="2" fill="#2463ac"/>
+<circle cx="386.80" cy="356.12" r="2" fill="#2463ac"/>
+<circle cx="413.20" cy="356.12" r="2" fill="#2463ac"/>
+<circle cx="439.60" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="466.00" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="492.40" cy="346.87" r="2" fill="#2463ac"/>
+<circle cx="518.80" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="545.20" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="571.60" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="598.00" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="624.40" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="650.80" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="677.20" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="703.60" cy="370.00" r="2" fill="#2463ac"/>
+<circle cx="730.00" cy="365.37" r="2" fill="#2463ac"/>
+<text x="70" y="390" text-anchor="middle" font-size="11">1.03</text>
+<text x="62" y="374" text-anchor="end" font-size="11">0</text>
+<text x="235" y="390" text-anchor="middle" font-size="11">1.42</text>
+<text x="62" y="296" text-anchor="end" font-size="11">16.8</text>
+<text x="400" y="390" text-anchor="middle" font-size="11">1.8</text>
+<text x="62" y="219" text-anchor="end" font-size="11">33.5</text>
+<text x="565" y="390" text-anchor="middle" font-size="11">2.18</text>
+<text x="62" y="142" text-anchor="end" font-size="11">50.2</text>
+<text x="730" y="390" text-anchor="middle" font-size="11">2.57</text>
+<text x="62" y="64" text-anchor="end" font-size="11">67</text>
+<text x="380" y="24" text-anchor="middle">Stretch</text>
+<text x="400" y="425" text-anchor="middle">value</text>
+<text x="15" y="210" transform="rotate(-90 15 210)" text-anchor="middle">count</text>
+</svg>

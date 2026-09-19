@@ -1,4 +1,4 @@
-# Explicit requested matrix: eight pure and eight hybrid configurations.
+# Explicit requested matrix: eight pure and eleven hybrid configurations.
 version: 2
 difficulties: [easy, medium, hard]
 seeds: [1, 2, 3]
@@ -65,3 +65,18 @@ variants:
     modes: [hybrid]
     experiment: sudoku_candi_rank
     overrides: [algo.cont_schedule_type=geometric, noise.adaptive=true]
+  candi_linear_adaptive:
+    label: Onehot Rank Linear + Adaptive
+    modes: [hybrid]
+    experiment: sudoku_candi_rank
+    overrides: [algo.cont_schedule_type=linear, noise.adaptive=true]
+  candi_geometric_cdcd_adaptive:
+    label: Onehot Rank Geo + CDCD Adaptive
+    modes: [hybrid]
+    experiment: sudoku_candi_rank
+    overrides: [algo.cont_schedule_type=geometric, noise=rank-adaptive-cdcd, noise.adaptive=true]
+  candi_linear_cdcd_adaptive:
+    label: Onehot Rank Linear + CDCD Adaptive
+    modes: [hybrid]
+    experiment: sudoku_candi_rank
+    overrides: [algo.cont_schedule_type=linear, noise=rank-adaptive-cdcd, noise.adaptive=true]

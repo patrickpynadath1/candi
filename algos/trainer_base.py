@@ -293,12 +293,21 @@ class TrainerBase(L.LightningModule):
             return
         if valid_tokens is None:
             per_example = token_loss.detach().mean(-1)
+            observed_t = t.detach()
         else:
             weights = valid_tokens.to(token_loss)
-            per_example = (token_loss.detach() * weights).sum(-1) / weights.sum(
-                -1
-            ).clamp_min(1)
-        schedule.record_time_loss_pair(t.detach(), per_example, int(self.global_step))
+            counts = weights.sum(-1)
+            observed = counts > 0
+            if not observed.any():
+                return
+            per_example = (
+                (token_loss.detach() * weights).sum(-1)[observed]
+                / counts[observed]
+            )
+            observed_t = t.detach()[observed]
+        schedule.record_time_loss_pair(
+            observed_t, per_example, int(self.global_step)
+        )
         self._log_adaptive_schedule(schedule, schedule_name)
 
     def _schedule_path_time(self, t, schedule=None):
@@ -352,23 +361,44 @@ class TrainerBase(L.LightningModule):
                 ys=[
                     snapshot["base_alpha"],
                     snapshot["alpha"],
-                    snapshot["sampling_density"],
                 ],
-                keys=["base_alpha", "adaptive_alpha", "sampling_density"],
+                keys=["base_alpha", "adaptive_alpha"],
                 title=f"Adaptive schedule at step {step}",
                 xname="t",
             )
-            dynamics_plot = wandb.plot.line_series(
+            density_plot = wandb.plot.line_series(
                 xs=snapshot["grid"],
-                ys=[snapshot["loss_profile"], snapshot["dalpha_dt"]],
-                keys=["smoothed_loss", "dalpha_dt"],
-                title=f"Adaptive schedule dynamics at step {step}",
-                xname="t",
+                ys=[[
+                    value * len(snapshot["sampling_density"])
+                    for value in snapshot["sampling_density"]
+                ]],
+                keys=["relative_sampling_density"],
+                title=f"Adaptive sampling density at step {step}",
+                xname="physical corruption",
+            )
+            loss_plot = wandb.plot.line_series(
+                xs=snapshot["grid"],
+                ys=[snapshot["loss_profile"]],
+                keys=["smoothed_loss"],
+                title=f"Adaptive loss profile at step {step}",
+                xname="physical corruption",
+            )
+            warped_loss_plot = wandb.plot.line_series(
+                xs=snapshot["grid"],
+                ys=[
+                    snapshot["warped_loss_profile"],
+                    snapshot["linear_loss_target"],
+                ],
+                keys=["warped_loss", "linear_target"],
+                title=f"Loss versus adaptive clock at step {step}",
+                xname="outer clock",
             )
             experiment.log(
                 {
                     f"{schedule_name}/profile": plot,
-                    f"{schedule_name}/dynamics": dynamics_plot,
+                    f"{schedule_name}/sampling_density": density_plot,
+                    f"{schedule_name}/loss_profile": loss_plot,
+                    f"{schedule_name}/linearized_loss": warped_loss_plot,
                     f"{schedule_name}/refit_count": refit,
                     f"{schedule_name}/alpha_min": min(snapshot["alpha"]),
                     f"{schedule_name}/alpha_max": max(snapshot["alpha"]),

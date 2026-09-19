@@ -10,7 +10,7 @@ from .registry import algo_registry
 @algo_registry.register("candi_rank")
 class CANDIRank(CANDI):
     default_sampler = "candi"
-    supported_samplers = frozenset({"candi"})
+    supported_samplers = frozenset({"candi", "candi_entropy_bounded"})
     exact_time_endpoints = True
     conventional_sigma_order = True
 

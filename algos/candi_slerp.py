@@ -29,6 +29,14 @@ class CANDISLERP(CANDIEmbedding):
                 self.backbone.input_dim,
                 delta,
             )
+            self.clean_alpha_min = float(
+                config.algo.get("truncation_alpha_min", 0.0)
+            )
+            if not 0 <= self.clean_alpha_min < self.clean_alpha_max:
+                raise ValueError(
+                    "truncation_alpha_min must be nonnegative and below "
+                    "the spherical truncation alpha_max"
+                )
             self.rank_schedule = self.make_rank_schedule(self.backbone.input_dim)
         self.slerp_precision = config.algo.slerp_precision
         if self.slerp_precision not in {"float32", "float64"}:
@@ -36,7 +44,10 @@ class CANDISLERP(CANDIEmbedding):
 
     def interpolation(self, progress):
         if self.interpolation_schedule == "truncated_linear":
-            return 1-self.clean_alpha_max*(1-progress)
+            return 1 - (
+                self.clean_alpha_min
+                + (self.clean_alpha_max - self.clean_alpha_min) * (1 - progress)
+            )
         return super().interpolation(progress)
 
     def prior_sample(self, *batch_dims):
@@ -108,4 +119,6 @@ class CANDISLERP(CANDIEmbedding):
             prior_matches_endpoint=(self.interpolation_schedule == "truncated_linear" or self.rank_schedule.endpoint_width > 0),
             interpolation_schedule=self.interpolation_schedule,
             endpoint_width=self.rank_schedule.endpoint_width,
+            truncation_alpha_min=getattr(self, "clean_alpha_min", None),
+            truncation_alpha_max=getattr(self, "clean_alpha_max", None),
         )

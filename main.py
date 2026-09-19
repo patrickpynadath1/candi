@@ -20,6 +20,7 @@ import dataloader as dataloader
 import utils
 import algos
 from algos import algo_registry
+from models.ema import ExponentialMovingAverage
 from text_metrics import evaluate_text_metrics
 from tasks.evaluation import evaluate_gsm8k, evaluate_sudoku
 
@@ -69,6 +70,31 @@ def _load_from_checkpoint(diffusion_model, config, tokenizer):
     rotary_buffer = "backbone.position_rotary_emb.inv_freq"
     if rotary_buffer in model_state and rotary_buffer not in state_dict:
         state_dict[rotary_buffer] = model_state[rotary_buffer]
+    # Older S-FLM checkpoints fed normalized embeddings directly into the
+    # transformer. The later input projection is exactly equivalent when it
+    # is identity, including for EMA weights.
+    projection_weight = "backbone.input_projection.weight"
+    projection_bias = "backbone.input_projection.bias"
+    if (
+        config.algo.name == "sfm"
+        and projection_weight in model_state
+        and projection_weight not in state_dict
+    ):
+        weight = model_state[projection_weight]
+        if weight.ndim != 2 or weight.shape[0] != weight.shape[1]:
+            raise ValueError("legacy S-FLM requires a square input projection")
+        identity = torch.eye(weight.shape[0], dtype=weight.dtype)
+        zero_bias = torch.zeros_like(model_state[projection_bias])
+        state_dict[projection_weight] = identity
+        state_dict[projection_bias] = zero_bias
+        shadows = checkpoint.get("ema", {}).get("shadow_params")
+        if shadows is not None:
+            parameters = list(model._get_parameters())
+            if len(shadows) != len(parameters) - 2:
+                raise ValueError("unexpected legacy S-FLM EMA parameter count")
+            checkpoint["ema"]["shadow_params"] = [
+                shadows[0], identity.clone(), zero_bias.clone(), *shadows[1:]
+            ]
     model.load_state_dict(state_dict, strict=True)
 
     if not config.eval.disable_ema and model.ema is not None:
@@ -497,6 +523,14 @@ def _train(diffusion_model, config, logger, tokenizer):
         model = diffusion_model.load_from_checkpoint(
             config.training.finetune_path, tokenizer=tokenizer, config=config
         )
+        if config.training.get("reset_ema_on_finetune", False):
+            model.ema = (
+                ExponentialMovingAverage(
+                    model._get_parameters(), decay=config.training.ema
+                )
+                if config.training.ema > 0
+                else None
+            )
     else:
         model = diffusion_model(config, tokenizer=tokenizer)
 

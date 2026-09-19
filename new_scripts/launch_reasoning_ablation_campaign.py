@@ -16,15 +16,43 @@ import time
 
 from omegaconf import OmegaConf
 
-from launch_reasoning_method_smoke import snapshot, task_overrides, write_json
+from launch_reasoning_method_smoke import (
+    snapshot,
+    task_overrides as reasoning_task_overrides,
+    write_json,
+)
 from sudoku_rank_ablation import ROOT
 
 
-TASKS = ("sudoku_hard", "sudoku_extreme", "maze_unique")
+TASKS = (
+    "sudoku_easy",
+    "sudoku_medium",
+    "sudoku_hard",
+    "sudoku_extreme",
+    "maze_unique",
+)
+
+
+def task_overrides(task, profile, root, prepared):
+    if task in {"sudoku_easy", "sudoku_medium", "sudoku_hard"}:
+        return [
+            "data=sudoku",
+            f"data.difficulty={task.removeprefix('sudoku_')}",
+            f"data.cache_dir={root / 'data'}",
+            "model.length=180",
+            "loader.global_batch_size=256",
+            "loader.eval_global_batch_size=128",
+            "reasoning.batch_size=64",
+            # Periodic task evaluation is handled by reasoning_eval. Disabling
+            # Lightning's redundant full validation avoids the PyArrow worker
+            # abort observed at step 5K in the earlier campaign.
+            "trainer.limit_val_batches=0",
+        ]
+    return reasoning_task_overrides(task, profile, root, prepared)
 
 
 def method_specs(matrix):
-    """Expand the requested eight pure and eight hybrid configurations."""
+    """Expand the requested eight pure and eleven hybrid configurations."""
     specs = []
     for variant, entry in matrix.variants.items():
         for mode in entry.modes:
@@ -44,8 +72,8 @@ def method_specs(matrix):
                     overrides=overrides,
                 )
             )
-    if len(specs) != 16:
-        raise AssertionError(f"expected 16 method configurations, got {len(specs)}")
+    if len(specs) != 19:
+        raise AssertionError(f"expected 19 method configurations, got {len(specs)}")
     return specs
 
 
@@ -76,7 +104,7 @@ def make_job(
     run_id = hashlib.sha256(
         json.dumps(identity, sort_keys=True).encode()
     ).hexdigest()[:16]
-    max_steps = 20000 if task == "sudoku_hard" else profiles[task].max_steps
+    max_steps = 20000 if task.startswith("sudoku_") else profiles[task].max_steps
     values = [
         f"+experiment={method['experiment']}",
         *method["overrides"],
@@ -145,8 +173,18 @@ def main():
     parser.add_argument(
         "--prepared", type=Path, default=ROOT / "data_cache/reasoning"
     )
-    parser.add_argument("--tasks", nargs="+", choices=TASKS, default=list(TASKS))
+    parser.add_argument(
+        "--tasks",
+        nargs="+",
+        choices=TASKS,
+        default=["sudoku_hard", "sudoku_extreme", "maze_unique"],
+    )
     parser.add_argument("--seeds", nargs="+", type=int, default=[1])
+    parser.add_argument(
+        "--variants",
+        nargs="+",
+        help="Run only these manifest variants (all configured modes are retained).",
+    )
     parser.add_argument(
         "--gpus", nargs="+", default=["0", "2", "3", "4", "5", "6"]
     )
@@ -193,6 +231,12 @@ def main():
         ROOT / "configs/sweeps/reasoning_tasks.yaml"
     ).profiles
     methods = method_specs(matrix)
+    if args.variants:
+        unknown = sorted(set(args.variants) - set(matrix.variants))
+        if unknown:
+            parser.error(f"unknown variants: {', '.join(unknown)}")
+        selected = set(args.variants)
+        methods = [method for method in methods if method["variant"] in selected]
     jobs = [
         make_job(
             profiles,
@@ -237,17 +281,39 @@ def main():
     source = snapshot(root)
 
     for task in args.tasks:
-        if task == "sudoku_hard":
+        if task in {"sudoku_easy", "sudoku_medium", "sudoku_hard"}:
             continue
         manifest = prepared / task / "manifest.json"
         if not manifest.exists():
             raise FileNotFoundError(manifest)
-    hard_link = root / "data" / args.hard_cache.name
-    hard_link.parent.mkdir(parents=True, exist_ok=True)
-    if "sudoku_hard" in args.tasks and not hard_link.exists():
-        hard_link.symlink_to(args.hard_cache)
-    if "sudoku_hard" in args.tasks and not hard_link.exists():
-        raise FileNotFoundError(args.hard_cache)
+    cache_root = root / "data"
+    cache_root.mkdir(parents=True, exist_ok=True)
+    for task in args.tasks:
+        if task not in {"sudoku_easy", "sudoku_medium", "sudoku_hard"}:
+            continue
+        difficulty = task.removeprefix("sudoku_")
+        name = f"sudoku_{difficulty}_train48000_valid2000_seed42"
+        destination = cache_root / name
+        candidates = [
+            args.hard_cache if difficulty == "hard" else ROOT / "data_cache" / name,
+            Path("/home/patrick/.cache/duo/data_cache") / name,
+        ]
+        source_cache = next((path for path in candidates if path.exists()), None)
+        if not destination.exists() and source_cache is not None:
+            destination.symlink_to(source_cache.resolve())
+        if not destination.exists():
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "new_scripts/prepare_sudoku.py"),
+                    "--difficulty",
+                    difficulty,
+                    "--cache-dir",
+                    str(cache_root),
+                ],
+                cwd=ROOT,
+                check=True,
+            )
 
     states = {
         str(index): (

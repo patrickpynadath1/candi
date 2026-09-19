@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+  - sudoku_extreme_frm_stage_a
+
+algo:
+  training_stage: fpf
+training:
+  # Supply Stage A with training.finetune_path=/absolute/path/to/last.ckpt.
+  # Optimizer state is fresh because this is a finetune load, not a resume.
+  reset_ema_on_finetune: true
+wandb:
+  job_type: stage-b-fpf
+  name: frm-stage-b-fpf

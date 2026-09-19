@@ -1,0 +1,43 @@
+# @package _global_
+defaults:
+  - override /data: sudoku_extreme
+  - override /model: frm_sudoku
+  - override /algo: frm
+  - override /lr_scheduler: constant_warmup
+  - override /strategy: single_gpu
+  - override /callbacks: [checkpoint_every_n_steps, learning_rate_monitor, reasoning_eval]
+
+data:
+  full_training: true
+loader:
+  global_batch_size: 128
+  eval_global_batch_size: 128
+optim:
+  lr: 3e-4
+  weight_decay: 0
+training:
+  ema: 0.9999
+  warmup_steps: 0
+trainer:
+  max_steps: 100000
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  check_val_every_n_epoch: null
+  limit_val_batches: 0
+sampling:
+  predictor: frm_euler
+  steps: 64
+reasoning:
+  max_examples: 1000
+callbacks:
+  reasoning_eval:
+    every_n_train_steps: 5000
+    subset_size: 1000
+    batch_size: 128
+    num_steps: 64
+eval:
+  generate_samples: false
+wandb:
+  group: frm-sudoku-extreme
+  job_type: stage-a
+  name: frm-stage-a
