@@ -29,7 +29,11 @@ class CANDIEntropyBoundedSampler(Sampler):
         self.greedy_clean_estimate = bool(greedy_clean_estimate)
         self.entropy_untempered = bool(entropy_untempered)
 
+    def _transition_kwargs(self, model):
+        return {}
+
     def sample(self, model, request):
+        transition_kwargs = self._transition_kwargs(model)
         steps, times = continuous_time_grid(model, request)
         x = model.prior_sample(request.num_samples, model.num_tokens)
         prompt_state_fn = getattr(model, "sampling_prompt_state", None)
@@ -39,7 +43,7 @@ class CANDIEntropyBoundedSampler(Sampler):
             )
         else:
             x, accepted = inject_onehot_prompt(x, request)
-        accepted = accepted.bool()
+        accepted = accepted.bool().clone()
         state_tokens_fn = getattr(model, "sampling_state_tokens", None)
         output_tokens = (
             state_tokens_fn(x) if callable(state_tokens_fn) else x.argmax(-1)
@@ -65,6 +69,7 @@ class CANDIEntropyBoundedSampler(Sampler):
                 sigma_t=sigmas[i] if conventional else sigmas[i + 1],
                 clean_mask=accepted, time_s=discrete_times[i + 1],
                 return_untempered=self.entropy_untempered,
+                **transition_kwargs,
             )
             if self.entropy_untempered:
                 continued, clean_probs, entropy_probs = transition

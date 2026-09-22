@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+  - sudoku_candi
+  - override /algo: candi_softmax_looped
+
+data:
+  difficulty: hard
+
+sampling:
+  predictor: candi_looped_entropy_bounded
+  entropy_bound: 0.1
+  greedy_clean_estimate: true
+  steps: 180

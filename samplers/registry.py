@@ -51,6 +51,7 @@ def create_sampler(
         cadd,
         candi,
         candi_cached,
+        candi_looped,
         candi_entropy_bounded,
         candi_embedding_entropy_bounded,
         continuous_embedding,

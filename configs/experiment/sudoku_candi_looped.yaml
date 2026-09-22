@@ -1,0 +1,7 @@
+# @package _global_
+defaults:
+  - sudoku_candi
+  - override /algo: candi_looped
+
+sampling:
+  predictor: candi_looped

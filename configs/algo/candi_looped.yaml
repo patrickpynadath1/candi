@@ -1,0 +1,9 @@
+defaults:
+  - candi
+  - _self_
+
+name: candi_looped
+backbone: looped_cont_dit
+# Standalone validation-loss passes. Sampling uses one pass per timestep,
+# carrying the previous timestep's hidden state through the trajectory.
+validation_loops: 2

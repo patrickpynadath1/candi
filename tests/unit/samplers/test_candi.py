@@ -1,10 +1,38 @@
 import torch
+import pytest
 
 from samplers.base import SamplingRequest
 from samplers.candi import CANDISampler
 from samplers.runner import run_sampler
 
 from .helpers import ModelBase, onehot_prior
+
+
+@pytest.mark.parametrize("greedy", [False, True])
+def test_greedy_changes_only_token_commit_distribution(greedy):
+    class RecordingModel(CANDIModel):
+        def sample_candi_continuous_transition(self, x, *_args, **_kwargs):
+            self.continued = x + 0.25
+            self.probs = torch.zeros_like(x)
+            self.probs[..., 1] = 0.4
+            self.probs[..., 2] = 0.6
+            return self.continued, self.probs
+
+        def sample_candi_discrete_transition(
+            self, continuous, probs, time, dt, *, prev_clean_mask
+        ):
+            assert torch.equal(continuous, self.continued)
+            expected = torch.zeros_like(probs)
+            expected[..., 2] = 1
+            assert torch.equal(probs, expected if greedy else self.probs)
+            assert time > 0 and dt > 0
+            return continuous, prev_clean_mask
+
+    result = run_sampler(
+        CANDISampler(greedy_clean_estimate=greedy), RecordingModel(),
+        SamplingRequest(num_samples=2, num_steps=2),
+    )
+    assert result.metadata["greedy_clean_estimate"] is greedy
 
 
 class CANDIModel(ModelBase):
