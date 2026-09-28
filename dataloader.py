@@ -1082,6 +1082,10 @@ def get_dataloaders(
             shuffle=not config.data.streaming,
             drop_last=True,
             persistent_workers=config.loader.num_workers > 0,
+            multiprocessing_context=(
+                config.loader.get("multiprocessing_context", "spawn")
+                if config.loader.num_workers > 0 else None
+            ),
         )
         train_loader.tokenizer = tokenizer
     if skip_valid:
@@ -1101,6 +1105,11 @@ def get_dataloaders(
             shuffle=shuffle_valid,
             generator=generator,
             drop_last=True,
+            persistent_workers=config.loader.num_workers > 0,
+            multiprocessing_context=(
+                config.loader.get("multiprocessing_context", "spawn")
+                if config.loader.num_workers > 0 else None
+            ),
         )
         # Will be used in generative perplexity calculation
         valid_loader.tokenizer = tokenizer

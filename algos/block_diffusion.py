@@ -272,7 +272,14 @@ class BlockDiffusion(AR):
             self.max_noise_level,
         )
 
+    def interpolation(self, times):
+        return times
+
+    def _record_block_time_loss(self, times, losses, valid_tokens, train_mode):
+        pass
+
     def doubled_logits(self, clean_tokens, times, noise=None):
+        times = self.interpolation(times)
         clean = self._normalized_embeddings(clean_tokens)
         noisy, noise = flow_interpolate(clean, times, noise)
         embeddings = torch.cat((noisy, clean), dim=1)
@@ -331,7 +338,7 @@ class BlockDiffusion(AR):
                 temperature=self.logit_kl_temperature,
             )
             if self.logit_kl_position_weighting == "noise":
-                kl_weights = times.to(logit_kl.dtype)
+                kl_weights = self.interpolation(times).to(logit_kl.dtype)
                 weighted_valid = valid_tokens * kl_weights
                 kl_scale = valid_tokens.sum().clamp_min(1) / weighted_valid.sum().clamp_min(1e-8)
                 logit_kl = logit_kl * kl_weights * kl_scale
@@ -339,6 +346,7 @@ class BlockDiffusion(AR):
             combined_nll = combined_nll + self.logit_kl_weight * logit_kl
         else:
             self._last_logit_kl = torch.zeros_like(self._last_clean_loss)
+        self._record_block_time_loss(times, noisy_nll, valid_tokens, train_mode)
         return combined_nll
 
     def training_step(self, batch, batch_idx):
@@ -443,6 +451,7 @@ class BlockDiffusion(AR):
 
     def active_window_logits(self, clean_prefix, noisy_window, noisy_times):
         """Predict the next token from each source in a rolling noisy window."""
+        noisy_times = self.interpolation(noisy_times)
         batch, window, _ = noisy_window.shape
         prefix = self._normalized_embeddings(clean_prefix)
         prefix_length = clean_prefix.shape[1]
@@ -501,5 +510,8 @@ class BlockDiffusion(AR):
             )
         raise ValueError("projection must be 'soft' or 'argmax'")
 
-    def update_rolling_latents(self, *args, **kwargs):
-        return rolling_latent_update(*args, **kwargs)
+    def update_rolling_latents(self, latent, x0_hat, old_time, new_time, **kwargs):
+        return rolling_latent_update(
+            latent, x0_hat, self.interpolation(old_time),
+            self.interpolation(new_time), **kwargs,
+        )

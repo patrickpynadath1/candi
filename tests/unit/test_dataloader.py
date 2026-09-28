@@ -1,4 +1,6 @@
 from types import SimpleNamespace
+import multiprocessing
+import os
 
 import pytest
 import torch
@@ -9,6 +11,15 @@ import dataloader
 class Namespace(SimpleNamespace):
     def get(self, key, default=None):
         return getattr(self, key, default)
+
+
+class WorkerContextDataset(torch.utils.data.Dataset):
+    def __len__(self):
+        return 4
+
+    def __getitem__(self, index):
+        return {"index": index, "pid": os.getpid(),
+                "start_method": multiprocessing.get_start_method()}
 
 
 def _config(*, global_batch=4, eval_global_batch=4, workers=0):
@@ -133,6 +144,25 @@ def test_train_loader_supports_zero_workers(monkeypatch):
     train, _ = dataloader.get_dataloaders(_config(workers=0), object(), skip_valid=True)
 
     assert len(list(train)) == 2
+
+
+def test_train_and_validation_workers_spawn_and_persist(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
+    monkeypatch.setattr(dataloader, "get_dataset", lambda *_args, **_kwargs: WorkerContextDataset())
+    train, valid = dataloader.get_dataloaders(_config(workers=1), None)
+    try:
+        for loader in (train, valid):
+            first = list(loader)
+            second = list(loader)
+            assert all(method == "spawn" for batch in first + second for method in batch["start_method"])
+            first_pids = {int(pid) for batch in first for pid in batch["pid"]}
+            second_pids = {int(pid) for batch in second for pid in batch["pid"]}
+            assert first_pids == second_pids
+            assert os.getpid() not in first_pids
+    finally:
+        for loader in (train, valid):
+            if loader._iterator is not None:
+                loader._iterator._shutdown_workers()
 
 
 def test_random_fault_tolerant_sampler_resumes_exact_remaining_order():

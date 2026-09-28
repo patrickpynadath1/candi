@@ -1,0 +1,10 @@
+defaults:
+  - block_diffusion
+
+name: block_diffusion_embedding
+noise_level_mode: monotone
+interpolation_schedule: linear
+min_percentile: 0.01
+max_percentile: 0.49
+# Preserve the rolling sampler's exact clean anchor and Gaussian prior.
+rank_endpoint_width: 0.01

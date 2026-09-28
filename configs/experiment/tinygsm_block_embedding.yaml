@@ -1,0 +1,14 @@
+# @package _global_
+defaults:
+  - tinygsm_candi
+  - override /algo: block_diffusion_embedding
+  - override /noise: rank-adaptive
+
+noise:
+  adaptive: false
+
+sampling:
+  predictor: block_diffusion_euler
+
+algo:
+  noise_level_mode: monotone
