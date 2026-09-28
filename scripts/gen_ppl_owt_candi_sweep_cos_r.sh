@@ -14,24 +14,27 @@
 
 
 export HYDRA_FULL_ERROR=1
+export SCRATCH_DIR=$RCAC_SCRATCH/cont_diff
 
 eval_batch_size=8
 mixed_coeff=.5
-CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py \
+CUDA_VISIBLE_DEVICES=$1 python main_for_sweeps.py scratch_dir=$SCRATCH_DIR \
   mode=sample_eval \
   loader.batch_size=16 \
-  loader.eval_batch_size=8 \
+  loader.eval_batch_size=32 \
   data=openwebtext-split \
   model=small \
   algo=candi \
-  sampling.num_sample_batches=16 \
-  eval.checkpoint_path=/home/patrick/.cache/discrete_diffusion/openwebtext-train/candi-cos-r-.01-.25/checkpoints/last.ckpt  \
-  model.length=1024 \
-  algo.sampler=cached \
-  algo.cont_schedule_type=cosine \
+  sampling.num_sample_batches=4 \
+  eval.checkpoint_path=/scratch/gautschi/ppynadat/cont_diff/openwebtext-train/candi-cos-r-50k/checkpoints/last.ckpt \
+  eval.generated_samples_path=$SCRATCH_DIR/cont_diff/owt-gen/candi-cos-r-.01-.25/gen_samples.json \
+  eval.compute_eval_metrics=False \
   algo.cont_schedule_target=r \
+  algo.cont_schedule_type=cosine \
   algo.max_percentile=.25 \
   algo.min_percentile=.01 \
+  model.length=1024 \
+  algo.sampler=cached \
   algo.mixed_coeff=$mixed_coeff \
   +wandb.offline=true;
 

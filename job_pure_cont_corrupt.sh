@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH -J owt-pure-cont-corrupt
+#SBATCH -p gpu                 # H100 partition  :contentReference[oaicite:0]{index=0}
+#SBATCH --nodes=1              # keep all GPUs on the same node
+#SBATCH --gres=gpu:8           # all 8 H100
+#SBATCH -A ruqiz
+#SBATCH --cpus-per-task=112    # give the single task every core
+#SBATCH -t 24:00:00              # wall-time (edit as needed)
+#SBATCH -o logs/%x-%j.out      # capture stdout/stderr
+
+module purge
+module load conda
+conda activate cont_diff
+
+export SCRATCH_DIR=$RCAC_SCRATCH/cont_diff
+CUDA_LAUNCH_BLOCKING=1 torchrun --nproc_per_node=8 main.py scratch_dir=$SCRATCH_DIR \
+	data=openwebtext \
+	wandb.name=pure-cont-corrupt \
+	optim.lr=.0003 \
+	lr_scheduler=constant_warmup \
+	lr_scheduler.num_warmup_steps=2500 \
+	wandb.project=candi-owt \
+	algo=candi \
+	model=small \
+	model.length=128 \
+	trainer.max_steps=50000 \
+	trainer.accumulate_grad_batches=4 \
+	batch_size=512 \
+	trainer.val_check_interval=5000 \
+	algo.weighted_loss=False \
+	algo.clean_reveal_ratio=1 \
+	algo.use_mixed_mask=True \
+	algo.mixed_coeff=0 \
+	algo.use_percentile_scheduling=True \
+	algo.min_percentile=.1 \
+	algo.max_percentile=.4 \
+	algo.use_uniform_sampling=False \
+	algo.pure_continuous=True \
+	algo.cont_noise_schedule=corruption \
+	algo.is_embed=False;
