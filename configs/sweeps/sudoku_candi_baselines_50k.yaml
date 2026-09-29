@@ -1,0 +1,123 @@
+# CANDI embedding x schedule x adaptation, plus matched baselines.
+version: 1
+variants:
+  candi_onehot_linear_fixed:
+    label: candi_onehot_linear_fixed
+    modes:
+    - hybrid
+    experiment: sudoku_candi_rank
+    overrides:
+    - algo.cont_schedule_type=linear
+    - noise.adaptive=false
+  candi_onehot_linear_adaptive:
+    label: candi_onehot_linear_adaptive
+    modes:
+    - hybrid
+    experiment: sudoku_candi_rank
+    overrides:
+    - algo.cont_schedule_type=linear
+    - noise.adaptive=true
+  candi_onehot_geometric_fixed:
+    label: candi_onehot_geometric_fixed
+    modes:
+    - hybrid
+    experiment: sudoku_candi_rank
+    overrides:
+    - algo.cont_schedule_type=geometric
+    - noise.adaptive=false
+  candi_onehot_geometric_adaptive:
+    label: candi_onehot_geometric_adaptive
+    modes:
+    - hybrid
+    experiment: sudoku_candi_rank
+    overrides:
+    - algo.cont_schedule_type=geometric
+    - noise.adaptive=true
+  candi_learned_linear_fixed:
+    label: candi_learned_linear_fixed
+    modes:
+    - hybrid
+    experiment: sudoku_candi_embedding
+    overrides:
+    - algo.interpolation_schedule=linear_rank
+    - noise.adaptive=false
+  candi_learned_linear_adaptive:
+    label: candi_learned_linear_adaptive
+    modes:
+    - hybrid
+    experiment: sudoku_candi_embedding
+    overrides:
+    - algo.interpolation_schedule=linear_rank
+    - noise.adaptive=true
+  candi_learned_geometric_fixed:
+    label: candi_learned_geometric_fixed
+    modes:
+    - hybrid
+    experiment: sudoku_candi_embedding
+    overrides:
+    - algo.interpolation_schedule=geometric_rank
+    - noise.adaptive=false
+  candi_learned_geometric_adaptive:
+    label: candi_learned_geometric_adaptive
+    modes:
+    - hybrid
+    experiment: sudoku_candi_embedding
+    overrides:
+    - algo.interpolation_schedule=geometric_rank
+    - noise.adaptive=true
+  candi_spherical_linear_fixed:
+    label: candi_spherical_linear_fixed
+    modes:
+    - hybrid
+    experiment: sudoku_candi_slerp
+    overrides:
+    - algo.interpolation_schedule=truncated_linear
+    - noise.adaptive=false
+  candi_spherical_linear_adaptive:
+    label: candi_spherical_linear_adaptive
+    modes:
+    - hybrid
+    experiment: sudoku_candi_slerp
+    overrides:
+    - algo.interpolation_schedule=truncated_linear
+    - noise.adaptive=true
+  candi_spherical_geometric_fixed:
+    label: candi_spherical_geometric_fixed
+    modes:
+    - hybrid
+    experiment: sudoku_candi_slerp
+    overrides:
+    - algo.interpolation_schedule=geometric_rank
+    - noise.adaptive=false
+  candi_spherical_geometric_adaptive:
+    label: candi_spherical_geometric_adaptive
+    modes:
+    - hybrid
+    experiment: sudoku_candi_slerp
+    overrides:
+    - algo.interpolation_schedule=geometric_rank
+    - noise.adaptive=true
+  mdlm:
+    label: mdlm
+    modes:
+    - baseline
+    experiment: sudoku_mdlm
+    candi: false
+    overrides:
+    - +trainer.check_val_every_n_epoch=null
+  sfm:
+    label: sfm
+    modes:
+    - baseline
+    experiment: sudoku_sfm_truncated_adaptive
+    candi: false
+    overrides: []
+  duo:
+    label: duo
+    modes:
+    - baseline
+    experiment: sudoku_duo
+    candi: false
+    overrides:
+    - algo.name=duo_base
+    - +trainer.check_val_every_n_epoch=null

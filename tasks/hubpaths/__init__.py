@@ -23,7 +23,12 @@ __all__ = [
     "RouteDistribution",
     "verify_route",
     "verify_route_batch",
+    "LatentCoreConfig",
+    "CorePrior",
+    "build_latent_dataset",
 ]
 
 from .routes import RouteDistribution
 from .verify import verify_route, verify_route_batch
+
+from .latent import LatentCoreConfig, CorePrior, build_latent_dataset

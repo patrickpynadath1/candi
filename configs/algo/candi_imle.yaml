@@ -1,0 +1,8 @@
+defaults:
+  - candi
+  - _self_
+
+name: candi_imle
+backbone: cont_dit
+imle_candidates: 8
+imle_noise_std: 1.0

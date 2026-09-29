@@ -1,7 +1,10 @@
 """Deterministic generation of unique-solution Sudoku tasks."""
 
 import random
+from contextlib import nullcontext
 from multiprocessing import Pool
+
+from tqdm.auto import tqdm
 
 DIFFICULTY_TO_CLUES = {"easy": 40, "medium": 35, "hard": 30}
 
@@ -81,19 +84,25 @@ def generate_grids(count, difficulty, seed, num_workers=1):
         raise ValueError(f"unknown Sudoku difficulty: {difficulty}")
     clues = DIFFICULTY_TO_CLUES[difficulty]
     results, seen, next_seed = [], set(), seed
-    while len(results) < count:
-        batch_count = count - len(results)
-        jobs = [(next_seed + i, clues) for i in range(batch_count)]
-        next_seed += batch_count
-        if num_workers > 1:
-            with Pool(num_workers) as pool:
-                candidates = pool.map(_generate_one, jobs)
-        else:
-            candidates = map(_generate_one, jobs)
-        for puzzle, solution in candidates:
-            key = tuple(value for row in solution for value in row)
-            if key not in seen:
-                seen.add(key)
-                results.append((puzzle, solution))
+    pool_context = Pool(num_workers) if num_workers > 1 else nullcontext()
+    with pool_context as pool, tqdm(
+        total=count, desc=f"Generating Sudoku {difficulty}", unit="puzzle"
+    ) as progress:
+        while len(results) < count:
+            batch_count = count - len(results)
+            jobs = [(next_seed + i, clues) for i in range(batch_count)]
+            next_seed += batch_count
+            # Stream results in seed order to preserve deterministic datasets.
+            candidates = (
+                pool.imap(_generate_one, jobs, chunksize=1)
+                if pool is not None
+                else map(_generate_one, jobs)
+            )
+            for puzzle, solution in candidates:
+                key = tuple(value for row in solution for value in row)
+                if key not in seen:
+                    seen.add(key)
+                    results.append((puzzle, solution))
+                    progress.update(1)
     random.Random(seed).shuffle(results)
     return results

@@ -87,3 +87,100 @@ def _create(config):
         getattr(config.sampling, "entropy_bound", 0.0),
         getattr(config.sampling, "greedy_clean_estimate", False),
     )
+
+
+class UniformEntropyBoundedRenoiseSampler(Sampler):
+    """Commit entropy-bounded predictions and fully re-noise every rejection.
+
+    Committed tokens are retained only as discrete context for the next model
+    call. Uncommitted positions do not follow or freeze a reverse trajectory:
+    they are replaced by fresh samples from the uniform prior after every call.
+    The denoiser time is the fraction of generated positions still uncommitted.
+    """
+
+    spec = SamplerSpec(
+        name="uniform_entropy_bounded_renoise",
+        compatible_families=frozenset({"uniform_diffusion"}),
+        required_capabilities=frozenset({
+            "discrete_prior", "noise_schedule", "uniform_entropy_transition",
+        }),
+    )
+
+    def __init__(self, gamma, greedy_clean_estimate=False):
+        if gamma < 0:
+            raise ValueError("sampling.entropy_bound must be nonnegative")
+        self.gamma = float(gamma)
+        self.greedy_clean_estimate = bool(greedy_clean_estimate)
+
+    def sample(self, model, request):
+        max_nfe = int(request.num_steps or model.config.sampling.steps)
+        x = inject_token_prompt(
+            model.prior_sample(request.num_samples, model.num_tokens), request
+        )
+        prompt_mask = (
+            torch.zeros_like(x, dtype=torch.bool)
+            if request.prompt_mask is None
+            else request.prompt_mask.bool().clone()
+        )
+        generated = ~prompt_mask
+        committed = prompt_mask.clone()
+        accepted_per_step = []
+        nfe_per_sample = torch.zeros(x.shape[0], dtype=torch.long, device=x.device)
+
+        for index in range(max_nfe):
+            active = generated & ~committed
+            if not active.any():
+                break
+            denominator = generated.sum(dim=-1).clamp_min(1)
+            t = (active.sum(dim=-1) / denominator).to(model.dtype).unsqueeze(-1)
+            # The transition sample is intentionally discarded. Nothing is
+            # frozen inside the reverse kernel; rejected coordinates are
+            # replaced by independent uniform noise below.
+            log_probs, _ = model.sample_uniform_entropy_transition(
+                x=x,
+                t=t,
+                dt=1.0 / max_nfe,
+                frozen_mask=None,
+                greedy_clean_estimate=self.greedy_clean_estimate,
+            )
+            probs = log_probs.float().exp()
+            entropy = predictive_entropy(probs)
+            newly_committed, counts = select_entropy_bounded(
+                entropy, active, self.gamma
+            )
+            clean_samples = (
+                probs.argmax(dim=-1)
+                if self.greedy_clean_estimate
+                else sample_probabilities(probs)
+            )
+
+            fresh_noise = model.prior_sample(request.num_samples, model.num_tokens)
+            x = torch.where(committed, x, fresh_noise)
+            x = torch.where(newly_committed, clean_samples, x)
+            committed |= newly_committed
+            x = preserve_prompt(x, request)
+            accepted_per_step.append(counts)
+            newly_complete = nfe_per_sample.eq(0) & ~(generated & ~committed).any(-1)
+            nfe_per_sample[newly_complete] = index + 1
+
+        if (generated & ~committed).any():
+            raise RuntimeError(
+                "uniform entropy-bounded re-noising exhausted sampling.steps "
+                "before accepting every generated position"
+            )
+        return SamplingResult(apply_token_offset(model, x), {
+            "nfe": len(accepted_per_step),
+            "nfe_per_sample": nfe_per_sample.cpu().tolist(),
+            "entropy_bound": self.gamma,
+            "greedy_clean_estimate": self.greedy_clean_estimate,
+            "accepted_per_step": accepted_per_step,
+            "rejected_transition": "fresh_uniform_prior",
+        })
+
+
+@sampler_registry.register("uniform_entropy_bounded_renoise")
+def _create_renoise(config):
+    return UniformEntropyBoundedRenoiseSampler(
+        getattr(config.sampling, "entropy_bound", 0.0),
+        getattr(config.sampling, "greedy_clean_estimate", False),
+    )

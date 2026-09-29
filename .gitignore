@@ -3,6 +3,9 @@
 .hf_cache
 test/
 outputs/
+/outputs
+# Local upstream checkouts and isolated dependencies for comparison runs.
+/external/
 new_runs/
 new_smoke_runs/
 wandb/

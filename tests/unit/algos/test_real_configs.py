@@ -40,6 +40,7 @@ ALGORITHM_CONFIGS = [
     ("sedd", ("sampling.predictor=analytic",)),
     ("cadd", ("sampling.predictor=cadd",)),
     ("candi", ("sampling.predictor=candi_cached",)),
+    ("candi_imle", ("sampling.predictor=candi_imle",)),
     ("candi_looped", ("sampling.predictor=candi_looped",)),
     ("candi_register_looped", ("sampling.predictor=candi_looped",)),
     ("candi_softmax_looped", ("sampling.predictor=candi_looped_entropy_bounded",)),
@@ -86,7 +87,7 @@ ALGORITHM_CONFIGS = [
 
 TIME_CONDITIONED_CONFIGS = [
     entry for entry in ALGORITHM_CONFIGS
-    if entry[0] not in {"ar", "block_diffusion", "mdlm_perm"}
+    if entry[0] not in {"ar", "block_diffusion", "mdlm_perm", "candi_imle"}
 ]
 
 

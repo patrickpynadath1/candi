@@ -14,8 +14,8 @@ storage_root=${DUO_STORAGE_ROOT:-/home/patrick/.cache/duo}
 "${repo_root}/.venv/bin/python" "${repo_root}/new_scripts/prepare_sudoku.py" \
   --cache-dir "${storage_root}/data_cache" \
   --difficulty hard \
-  --num-train 48000 \
-  --num-valid 2000 \
+  --num-train 200000 \
+  --num-valid 10000 \
   --workers 32
 
 "${repo_root}/new_scripts/launch_sudoku_hard_mdlm_candi_20k.sh" \

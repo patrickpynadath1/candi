@@ -17,6 +17,7 @@ import collections
 class DUO_BASE(UniformState):
     supported_samplers = frozenset({
         "ancestral", "ancestral_cache", "semi_ar", "uniform_entropy_bounded",
+        "uniform_entropy_bounded_renoise",
     })
     sampling_capabilities = UniformState.sampling_capabilities | {
         "ancestral_transition",

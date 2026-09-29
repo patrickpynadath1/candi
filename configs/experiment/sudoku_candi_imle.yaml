@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+  - sudoku_candi
+  - override /algo: candi_imle
+  - override /callbacks: [checkpoint_every_n_steps, checkpoint_monitor, learning_rate_monitor, sudoku_eval]
+
+data:
+  difficulty: hard
+
+trainer:
+  # Keep global batch 256 while limiting retained K-candidate activations.
+  accumulate_grad_batches: 16
+
+sampling:
+  predictor: candi_imle
+  greedy_clean_estimate: true
+  steps: 1
+
+callbacks:
+  sudoku_eval:
+    every_n_train_steps: 1000
+    num_steps: 1
+    full_eval_at_end: true
