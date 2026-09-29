@@ -1,0 +1,9 @@
+defaults:
+  - replaid
+name: replaid_hybrid
+self_condition_rate: 0.0
+clean_context: true
+# Gaussian endpoints use the likelihood gradient; clock uses second moment.
+endpoint_weight_decay: 0.0
+clock_bins: 64
+clock_uniform_mix: 0.01

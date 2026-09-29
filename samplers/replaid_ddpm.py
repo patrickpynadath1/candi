@@ -49,6 +49,8 @@ class RePlaidDDPMSampler(Sampler):
             prompt_noise = torch.randn_like(prompt_embeddings)
 
             def clamp_prompt(state, gamma):
+                if model.config.algo.get("clean_context", False):
+                    return torch.where(prompt_mask, prompt_embeddings, state)
                 alpha = torch.sigmoid(-gamma).sqrt().to(state)[:, None, None]
                 sigma = torch.sigmoid(gamma).sqrt().to(state)[:, None, None]
                 forward_prompt = alpha * prompt_embeddings + sigma * prompt_noise
@@ -61,26 +63,43 @@ class RePlaidDDPMSampler(Sampler):
         else:
             clamp_prompt = None
         self_condition = None
+        nfe = 0
+        use_self_condition = model.config.algo.get("self_condition_rate", 0.25) > 0
+        sc_mode = model.config.algo.get("sampling_self_condition", "previous")
+        if sc_mode not in {"bootstrap", "previous"}:
+            raise ValueError(f"unknown sampling self-conditioning mode: {sc_mode}")
+
+        def denoise_at(state, time):
+            nonlocal nfe
+            context = self_condition
+            if use_self_condition and sc_mode == "bootstrap":
+                _, context, _ = model.sample_replaid_denoise(state, time, None)
+                nfe += 1
+                if prompt_mask is not None:
+                    context = torch.where(prompt_mask, prompt_embeddings, context)
+            result = model.sample_replaid_denoise(state, time, context)
+            nfe += 1
+            return result
+
         for index in range(steps):
             t = times[index].expand(request.num_samples)
             s = times[index + 1].expand(request.num_samples)
-            log_probs, clean, gamma_t = model.sample_replaid_denoise(
-                z_t, t, self_condition
-            )
+            log_probs, clean, gamma_t = denoise_at(z_t, t)
             gamma_s = model.sampling_gamma(s)
-            noise = torch.zeros_like(z_t) if index == steps - 1 else torch.randn_like(z_t)
+            # The last transition still ends at nonzero sigma_0; Appendix D.1
+            # includes posterior noise here too.
+            noise = torch.randn_like(z_t)
             z_t = self.transition(z_t, clean, gamma_t, gamma_s, noise)
-            self_condition = clean
+            self_condition = clean if use_self_condition else None
             if clamp_prompt is not None:
                 z_t = clamp_prompt(z_t, gamma_s)
-                self_condition = torch.where(
-                    prompt_mask, prompt_embeddings, self_condition
-                )
-        final, _, _ = model.sample_replaid_denoise(
-            z_t, times[-1].expand(request.num_samples), self_condition
-        )
+                if self_condition is not None:
+                    self_condition = torch.where(
+                        prompt_mask, prompt_embeddings, self_condition
+                    )
+        final, _, _ = denoise_at(z_t, times[-1].expand(request.num_samples))
         tokens = preserve_prompt(final.argmax(-1), request)
-        return SamplingResult(tokens, {"nfe": steps + 1})
+        return SamplingResult(tokens, {"nfe": nfe})
 
 
 @sampler_registry.register("replaid_ddpm")

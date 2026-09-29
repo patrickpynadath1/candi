@@ -47,6 +47,54 @@ class MonotoneGammaSchedule(torch.nn.Module):
         delta = F.softplus(self.gamma_delta_raw)
         return self.gamma_min + delta * shape, delta * derivative
 
+    def bounds(self):
+        return self.gamma_min, self.gamma_min + F.softplus(self.gamma_delta_raw)
+
+    def endpoint_parameters(self):
+        return [self.gamma_min, self.gamma_delta_raw]
+
+
+class PlaidGammaSchedule(torch.nn.Module):
+    """Normalized positive-weight tanh MLP, as in the public Plaid model.
+
+    Unlike a positive softplus basis this can represent either curvature.
+    Endpoints are independent likelihood parameters; the normalized shape
+    receives the Appendix-I second-moment gradient in `_training_gamma`.
+    """
+
+    def __init__(self, gamma_min, gamma_max, hidden_dim=1024):
+        super().__init__()
+        if gamma_max <= gamma_min or hidden_dim < 1:
+            raise ValueError("require ordered gamma endpoints and positive width")
+        self.gamma_min = torch.nn.Parameter(torch.tensor(float(gamma_min)))
+        self.gamma_max = torch.nn.Parameter(torch.tensor(float(gamma_max)))
+        self.input_weight = torch.nn.Parameter(torch.randn(hidden_dim))
+        self.bias = torch.nn.Parameter(torch.randn(hidden_dim))
+        self.output_weight = torch.nn.Parameter(torch.randn(hidden_dim))
+
+    def shape_and_derivative(self, t):
+        t = t.to(self.gamma_min)
+        positive_in = F.softplus(self.input_weight)
+        positive_out = F.softplus(self.output_weight)
+        activation = torch.tanh((t[:, None] - 0.5) * positive_in + self.bias)
+        lower = torch.tanh(self.bias - 0.5 * positive_in)
+        upper = torch.tanh(self.bias + 0.5 * positive_in)
+        normalizer = ((upper - lower) * positive_out).sum()
+        shape = ((activation - lower) * positive_out).sum(-1) / normalizer
+        derivative = ((1 - activation.square()) * positive_in * positive_out).sum(-1) / normalizer
+        return shape, derivative
+
+    def bounds(self):
+        return self.gamma_min, self.gamma_max
+
+    def endpoint_parameters(self):
+        return [self.gamma_min, self.gamma_max]
+
+    def forward(self, t):
+        shape, derivative = self.shape_and_derivative(t)
+        width = self.gamma_max - self.gamma_min
+        return self.gamma_min + width * shape, width * derivative
+
 
 @algo_registry.register("replaid")
 class RePlaid(TrainerBase):
@@ -64,13 +112,20 @@ class RePlaid(TrainerBase):
 
     def __init__(self, config, tokenizer):
         super().__init__(config, tokenizer, vocab_size=len(tokenizer))
-        self.gamma_schedule = MonotoneGammaSchedule(
+        schedule_type = config.algo.get("schedule_type", "legacy")
+        schedules = {"legacy": MonotoneGammaSchedule, "plaid": PlaidGammaSchedule}
+        if schedule_type not in schedules:
+            raise ValueError(f"unknown RePlaid schedule: {schedule_type}")
+        self.gamma_schedule = schedules[schedule_type](
             config.algo.gamma_min,
             config.algo.gamma_max,
             config.algo.schedule_hidden_dim,
         ).double()
         self.register_buffer("recon_std_ema", torch.tensor(1.0))
         self.register_buffer("diff_std_ema", torch.tensor(1.0))
+        for component in ("recon", "diff"):
+            self.register_buffer(f"{component}_mean_ema", torch.tensor(0.0))
+            self.register_buffer(f"{component}_second_ema", torch.tensor(1.0))
         self.self_condition_rate = config.algo.self_condition_rate
         self.split_ema = config.algo.split_ema
         self.output_prior = config.algo.output_prior
@@ -100,6 +155,19 @@ class RePlaid(TrainerBase):
         super().optimizer_step(*args, **kwargs)
         self.backbone.project_embeddings_()
 
+    def training_step(self, batch, batch_idx):
+        loss = super().training_step(batch, batch_idx)
+        if self.config.algo.name == "replaid":
+            self.log_dict(self._last_replaid_metrics, on_step=True, on_epoch=False)
+        return loss
+
+    def on_before_optimizer_step(self, optimizer):
+        del optimizer
+        gradient = self.backbone.output_layer.linear.weight.grad
+        if gradient is None:
+            raise RuntimeError("RePlaid denoiser output head has no gradient; refusing to train a frozen transformer")
+        self.log("replaid/head_grad_norm", gradient.detach().norm(), on_step=True, on_epoch=False)
+
     def sample_t(self, count, device):
         if count == 0:
             return torch.empty(0, device=device)
@@ -109,8 +177,21 @@ class RePlaid(TrainerBase):
     def _split_size(self, batch_size):
         if batch_size < 2:
             return 0
-        ratio = self.recon_std_ema / (self.recon_std_ema + self.diff_std_ema)
+        ratio = self.recon_std_ema / (self.recon_std_ema + self.diff_std_ema).clamp_min(1e-12)
         return int(torch.round(batch_size * ratio).clamp(1, batch_size - 1).item())
+
+    @torch.no_grad()
+    def _update_split_statistics(self, reconstruction, diffusion):
+        # Estimate variance across updates, not just inside each sub-batch:
+        # a one-example reconstruction sub-batch has zero within-batch std.
+        for name, values in (("recon", reconstruction), ("diff", diffusion)):
+            mean = getattr(self, f"{name}_mean_ema")
+            second = getattr(self, f"{name}_second_ema")
+            mean.lerp_(values.mean().to(mean), 1 - self.split_ema)
+            second.lerp_(values.square().mean().to(second), 1 - self.split_ema)
+            getattr(self, f"{name}_std_ema").copy_(
+                (second - mean.square()).clamp_min(1e-12).sqrt()
+            )
 
     def _gamma(self, t):
         return self.gamma_schedule(t.double())
@@ -127,8 +208,9 @@ class RePlaid(TrainerBase):
         if shape.requires_grad:
             shape.register_hook(lambda gradient: gradient * variance_weight[0])
             shape_prime.register_hook(lambda gradient: gradient * variance_weight[0])
-        delta = F.softplus(self.gamma_schedule.gamma_delta_raw)
-        gamma = self.gamma_schedule.gamma_min + delta * shape
+        lower, upper = self.gamma_schedule.bounds()
+        delta = upper - lower
+        gamma = lower + delta * shape
         gamma_prime = delta * shape_prime
         return gamma, gamma_prime, variance_weight
 
@@ -164,6 +246,13 @@ class RePlaid(TrainerBase):
     ):
         del output_tokens, current_accumulation_step
         batch_size, length = x0.shape
+        # Both Monte Carlo terms must be present even for a final singleton
+        # batch. Use independent reconstruction/diffusion draws of that example.
+        if batch_size == 1:
+            mask = None if valid_tokens is None else valid_tokens.expand(2, -1)
+            return self.nll(
+                x0.expand(2, -1), None, train_mode=train_mode, valid_tokens=mask
+            ).mean(0, keepdim=True)
         recon_size = self._split_size(batch_size)
         diffusion_size = batch_size - recon_size
         t = torch.zeros(batch_size, device=x0.device)
@@ -179,7 +268,7 @@ class RePlaid(TrainerBase):
         )
         count = (
             batch_size
-            if not train_mode
+            if not train_mode and self.self_condition_rate > 0
             else min(batch_size, math.ceil(self.self_condition_rate * batch_size))
         )
         if count:
@@ -196,6 +285,10 @@ class RePlaid(TrainerBase):
             self_conditioned[:, None, None], clean.detach(), clean
         )
         z_t = self.q_sample(effective_clean, effective_gamma)
+        context_mask = None
+        if self.config.algo.get("clean_context", False) and valid_tokens is not None:
+            context_mask = ~valid_tokens.bool().unsqueeze(-1)
+            z_t = torch.where(context_mask, effective_clean, z_t)
 
         self_condition = torch.zeros_like(clean)
         if count:
@@ -206,6 +299,11 @@ class RePlaid(TrainerBase):
                 self_condition[indices] = self.backbone.embed_tokens(
                     bootstrap.exp()
                 ).to(self_condition)
+            if context_mask is not None:
+                self_condition = torch.where(
+                    context_mask & self_conditioned[:, None, None],
+                    effective_clean.detach(), self_condition,
+                )
         log_probs = self.denoise(
             z_t,
             effective_gamma.float(),
@@ -222,11 +320,15 @@ class RePlaid(TrainerBase):
         snr_prime = -effective_gamma_prime * torch.exp(-effective_gamma)
         squared_error = (predicted - effective_clean).double().square().sum(-1)
         diffusion = -0.5 * snr_prime[:, None] * squared_error
+        token_weights = torch.ones_like(token_ce) if valid_tokens is None else valid_tokens.to(token_ce)
+        def per_example(value):
+            return (value * token_weights).sum(-1) / token_weights.sum(-1).clamp_min(1)
+
         if variance_weight is not None:
             weights = torch.cat(
                 (
                     torch.zeros(recon_size, device=x0.device, dtype=torch.float64),
-                    2 * diffusion[recon_size:].mean(-1).detach().double(),
+                    2 * per_example(diffusion)[recon_size:].detach(),
                 )
             )
             weights[self_conditioned] = 0
@@ -240,6 +342,17 @@ class RePlaid(TrainerBase):
             * (sigma1_sq - 1 - torch.log(sigma1_sq))
         )
 
+        if train_mode:
+            lower, upper = self.gamma_schedule.bounds()
+            self._last_replaid_metrics = {
+                "replaid/reconstruction": per_example(token_ce)[:recon_size].mean().detach(),
+                "replaid/diffusion": per_example(diffusion)[recon_size:].mean().detach(),
+                "replaid/prior": per_example(prior).mean().detach(),
+                "replaid/gamma_min": lower.detach(),
+                "replaid/gamma_max": upper.detach(),
+                "replaid/reconstruction_fraction": recon_size / batch_size,
+                "replaid/head_weight_norm": self.backbone.output_layer.linear.weight.detach().norm(),
+            }
         losses = prior
         if recon_size:
             losses[:recon_size] += token_ce[:recon_size] * batch_size / recon_size
@@ -248,14 +361,9 @@ class RePlaid(TrainerBase):
                 diffusion[recon_size:] * batch_size / diffusion_size
             )
         if train_mode and recon_size and diffusion_size:
-            momentum = self.split_ema
-            recon_std = token_ce[:recon_size].mean(-1).std(unbiased=False)
-            diff_std = diffusion[recon_size:].mean(-1).std(unbiased=False)
-            self.recon_std_ema.lerp_(
-                recon_std.detach().to(self.recon_std_ema), 1 - momentum
-            )
-            self.diff_std_ema.lerp_(
-                diff_std.detach().to(self.diff_std_ema), 1 - momentum
+            self._update_split_statistics(
+                per_example(token_ce)[:recon_size].detach(),
+                per_example(diffusion)[recon_size:].detach(),
             )
         self._record_time_loss(t, losses, valid_tokens, train_mode)
         return losses
@@ -282,14 +390,10 @@ class RePlaid(TrainerBase):
 
     def configure_optimizers(self):
         embedding = [self.backbone.token_embedding]
-        schedule_shape = [
-            self.gamma_schedule.slope_raw,
-            self.gamma_schedule.centers,
-        ]
-        endpoints = [
-            self.gamma_schedule.gamma_min,
-            self.gamma_schedule.gamma_delta_raw,
-        ]
+        endpoints = self.gamma_schedule.endpoint_parameters()
+        endpoint_ids = {id(parameter) for parameter in endpoints}
+        schedule_shape = [parameter for parameter in self.gamma_schedule.parameters()
+                          if id(parameter) not in endpoint_ids]
         special_ids = {
             id(parameter)
             for parameter in [*embedding, *schedule_shape, *endpoints]

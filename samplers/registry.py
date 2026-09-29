@@ -68,6 +68,8 @@ def create_sampler(
         flm_euler,
         latent_fm,
         replaid_ddpm,
+        replaid_hybrid_ddpm,
+        replaid_hybrid_entropy_bounded,
         replaid_keep_ddpm,
         replaid_keep_entropy_bounded,
         renoising,

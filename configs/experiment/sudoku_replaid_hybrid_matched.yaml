@@ -1,0 +1,15 @@
+# @package _global_
+defaults:
+  - sudoku_replaid_matched
+  - override /algo: replaid_hybrid
+sampling:
+  predictor: replaid_hybrid_ddpm
+training:
+  sampling_eps: 0.0
+wandb:
+  name: replaid-hybrid-hard-d512-l8-50k-seed1
+  tags: [replaid_hybrid, sudoku_hard, matched_50k]
+# Preserve progress before each periodic Sudoku evaluation.
+callbacks:
+  checkpoint_every_n_steps:
+    every_n_train_steps: 1000

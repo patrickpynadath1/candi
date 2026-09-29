@@ -43,6 +43,8 @@ CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
     "spherical_logits": ("sampling_logits",),
     "latent_prior": ("prior_sample",),
     "latent_flow_map": ("sample_latent_flow_map",),
+    "hybrid_denoise": ("sample_hybrid_denoise",),
+    "hybrid_clock": ("sampling_mask_probability", "sampling_gamma"),
     "replaid_prior": ("prior_sample",),
     "replaid_denoise": ("sample_replaid_denoise",),
     "replaid_schedule": ("sampling_gamma",),

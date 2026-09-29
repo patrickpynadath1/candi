@@ -43,6 +43,8 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "frm_held",
         "latent_fm",
         "replaid_ddpm",
+        "replaid_hybrid_ddpm",
+        "replaid_hybrid_entropy_bounded",
         "replaid_keep_ddpm",
         "replaid_keep_entropy_bounded",
         "renoising",

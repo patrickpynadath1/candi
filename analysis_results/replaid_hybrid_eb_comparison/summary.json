@@ -1,0 +1,69 @@
+{
+  "wandb": "https://wandb.ai/rz-text-dlp/replaid-sudoku/runs/4my9nzfd",
+  "results": [
+    {
+      "sampler": "ancestral",
+      "checkpoint_step": 46000,
+      "seconds": 28.890811659395695,
+      "solve_rate": 0.6796875,
+      "cell_accuracy": 0.9392556184902787,
+      "valid_grid_rate": 0.6875,
+      "valid_row_rate": 0.9505208333333327,
+      "valid_column_rate": 0.9531249999999993,
+      "valid_box_rate": 0.967881944444444,
+      "num_correct": 87,
+      "num_total": 128,
+      "mean_nfe": 180.0,
+      "min_nfe": 180.0,
+      "max_nfe": 180.0
+    },
+    {
+      "sampler": "eb_0",
+      "checkpoint_step": 46000,
+      "seconds": 42.67524432390928,
+      "solve_rate": 0.9921875,
+      "cell_accuracy": 0.9988588481210172,
+      "valid_grid_rate": 0.9921875,
+      "valid_row_rate": 0.9991319444444444,
+      "valid_column_rate": 0.9991319444444444,
+      "valid_box_rate": 0.9991319444444444,
+      "num_correct": 127,
+      "num_total": 128,
+      "mean_nfe": 18.1171875,
+      "min_nfe": 3.0,
+      "max_nfe": 55.0
+    },
+    {
+      "sampler": "eb_0.1",
+      "checkpoint_step": 46000,
+      "seconds": 4.077876377850771,
+      "solve_rate": 0.9296875,
+      "cell_accuracy": 0.9935042141005397,
+      "valid_grid_rate": 0.9296875,
+      "valid_row_rate": 0.9921874999999998,
+      "valid_column_rate": 0.9913194444444442,
+      "valid_box_rate": 0.993923611111111,
+      "num_correct": 119,
+      "num_total": 128,
+      "mean_nfe": 2.28125,
+      "min_nfe": 1.0,
+      "max_nfe": 7.0
+    },
+    {
+      "sampler": "eb_1",
+      "checkpoint_step": 46000,
+      "seconds": 3.1880921255797148,
+      "solve_rate": 0.671875,
+      "cell_accuracy": 0.9770891880616546,
+      "valid_grid_rate": 0.671875,
+      "valid_row_rate": 0.9409722222222217,
+      "valid_column_rate": 0.9557291666666661,
+      "valid_box_rate": 0.9574652777777772,
+      "num_correct": 86,
+      "num_total": 128,
+      "mean_nfe": 1.9609375,
+      "min_nfe": 1.0,
+      "max_nfe": 4.0
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+# @package _global_
+# Match the September 22 hard-Sudoku MDLM/DUO/CANDI campaign.
+defaults:
+  - sudoku_replaid_hard
+  - override /strategy: single_gpu
+
+algo:
+  clean_context: true
+
+model:
+  n_blocks: 8
+  n_heads: 8
+  hidden_size: 512
+  cond_dim: 128
+  dropout: 0.1
+
+training:
+  warmup_steps: 2500
+  ema: 0.9999
+  sampling_eps: 0.0
+
+trainer:
+  devices: 1
+  accumulate_grad_batches: 4
+  precision: bf16-mixed
+  max_steps: 50000
+  check_val_every_n_epoch: null
+  # The comparison campaign disables likelihood validation during training.
+  limit_val_batches: 0
+  num_sanity_val_steps: 0
+
+callbacks:
+  checkpoint_every_n_steps:
+    every_n_train_steps: 5000
+    save_top_k: 0
+    save_last: true
+  checkpoint_monitor:
+    save_top_k: 0
+    monitor: null
+  sudoku_eval:
+    num_steps: 45
+    log_examples: 0
+    full_eval_at_end: false
+
+checkpointing:
+  resume_from_ckpt: false
+
+wandb:
+  project: replaid-sudoku
+  entity: rz-text-dlp
+  name: replaid-hard-d512-l8-50k-seed1
+  group: hard-sudoku-matched
+  job_type: train
+  tags: [replaid, sudoku_hard, matched_50k]

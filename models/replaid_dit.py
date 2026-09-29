@@ -54,6 +54,7 @@ class RePlaidDIT(nn.Module):
     def project_embeddings_(self):
         self.token_embedding.copy_(F.normalize(self.token_embedding, dim=-1))
 
+    @torch.autocast(device_type="cuda", enabled=False)
     def embed_tokens(self, tokens, detach_embedding_mask=None):
         if tokens.ndim == 2:
             return F.embedding(tokens, self.normalized_embedding)
@@ -71,6 +72,7 @@ class RePlaidDIT(nn.Module):
             )
         return embedded
 
+    @torch.autocast(device_type="cuda", enabled=False)
     def forward(
         self,
         z_t,
@@ -81,15 +83,29 @@ class RePlaidDIT(nn.Module):
     ):
         if self_condition is None:
             self_condition = torch.zeros_like(z_t)
+        noisy_input = z_t.float()
+        condition_input = self_condition.float()
+        if self.config.algo.get("input_preconditioning", False):
+            # Unit-norm embeddings have mean squared coordinate 1/d_e.
+            # Match Plaid's input and self-conditioning second-moment scaling.
+            alpha_sq = torch.sigmoid(-gamma_t.float())
+            sigma_sq = torch.sigmoid(gamma_t.float())
+            variance = alpha_sq / self.config.algo.embedding_dim + sigma_sq
+            noisy_input = noisy_input / variance.sqrt()[:, None, None]
+            condition_input = condition_input * self.config.algo.embedding_dim ** 0.5
         condition = F.silu(self.time_embedding(gamma_t.float()))
         hidden = (
-            self.noisy_projection(z_t.float())
-            + self.self_condition_projection(self_condition.float())
+            self.noisy_projection(noisy_input)
+            + self.self_condition_projection(condition_input)
             + self.time_input_projection(condition)[:, None, :]
         )
         rotary = self.rotary_emb(hidden)
         with torch.amp.autocast(
-            "cuda", dtype=torch.bfloat16, enabled=hidden.is_cuda
+            "cuda", dtype=torch.bfloat16, enabled=hidden.is_cuda,
+            # A no-grad bootstrap precedes the trainable pass inside Lightning's
+            # outer autocast scope. Reusing its cached BF16 weight casts would
+            # detach the transformer from autograd in the trainable pass too.
+            cache_enabled=False,
         ):
             for block in self.blocks:
                 hidden = block(hidden, rotary, c=condition)
