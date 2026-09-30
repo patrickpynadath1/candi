@@ -22,7 +22,10 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "block_diffusion_euler",
         "cadd",
         "candi",
+        "candi_imle",
         "candi_cached",
+        "candi_looped",
+        "candi_looped_entropy_bounded",
             "candi_embedding",
             "candi_embedding_entropy_bounded",
             "candi_entropy_bounded",
@@ -40,6 +43,8 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "frm_held",
         "latent_fm",
         "replaid_ddpm",
+        "replaid_hybrid_ddpm",
+        "replaid_hybrid_entropy_bounded",
         "replaid_keep_ddpm",
         "replaid_keep_entropy_bounded",
         "renoising",
@@ -47,6 +52,7 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "simplex",
         "paper_discrete",
         "uniform_entropy_bounded",
+        "uniform_entropy_bounded_renoise",
     }
 
 

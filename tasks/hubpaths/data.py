@@ -21,10 +21,14 @@ class HubPathsTokenizer:
     bos_token, eos_token = "<SEP>", "<PAD>"
     prompt_len = 3
 
-    def __init__(self, n_nodes, max_steps=77, n_waypoints=3):
+    def __init__(
+        self, n_nodes, max_steps=77, n_waypoints=3, *, seq_len=None, prompt_len=None
+    ):
         self.vocab_size = n_nodes + N_SPECIAL
-        self.prompt_len = n_waypoints + 1
-        self.seq_len = self.total_seq_len = max_steps + n_waypoints + 2
+        self.prompt_len = n_waypoints + 1 if prompt_len is None else prompt_len
+        self.seq_len = self.total_seq_len = (
+            max_steps + n_waypoints + 2 if seq_len is None else seq_len
+        )
 
     def __len__(self):
         return self.vocab_size
@@ -369,11 +373,19 @@ def get_tokenizer(config):
         (Path(config.data.prepared_dir) / "metadata.json").read_text()
     )
     c = metadata["config"]
-    if config.model.length != c["max_steps"] + c["n_waypoints"] + 2:
-        raise ValueError(
-            "model.length must equal generated max_steps + n_waypoints + 2"
-        )
-    return HubPathsTokenizer(c["n_nodes"], c["max_steps"], c["n_waypoints"])
+    if config.model.length != metadata["seq_len"]:
+        raise ValueError(f"model.length must equal saved seq_len={metadata['seq_len']}")
+    latent = metadata.get("task_mode") in {"latent_core", "grammar_core"}
+    tokenizer = HubPathsTokenizer(
+        c["n_nodes"],
+        c["max_steps"],
+        c["n_waypoints"],
+        seq_len=metadata["seq_len"],
+        prompt_len=1 if latent else None,
+    )
+    if latent:
+        tokenizer.sep_token = tokenizer.bos_token = "<BOS>"
+    return tokenizer
 
 
 def load_dataset(config, tokenizer, split):

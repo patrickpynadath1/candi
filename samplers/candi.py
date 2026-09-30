@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 from .base import Sampler, SamplerSpec, SamplingResult
 from .registry import sampler_registry
@@ -15,10 +16,15 @@ class CANDISampler(Sampler):
         }),
     )
 
-    def __init__(self, trace_argmax_changes=False):
+    def __init__(self, trace_argmax_changes=False, greedy_clean_estimate=False):
         self.trace_argmax_changes = bool(trace_argmax_changes)
+        self.greedy_clean_estimate = bool(greedy_clean_estimate)
+
+    def _transition_kwargs(self, model):
+        return {}
 
     def sample(self, model, request):
+        transition_kwargs = self._transition_kwargs(model)
         steps, times = continuous_time_grid(model, request)
         x = model.prior_sample(request.num_samples, model.num_tokens)
         prompt_state_fn = getattr(model, "sampling_prompt_state", None)
@@ -45,6 +51,7 @@ class CANDISampler(Sampler):
                 sigma_s=sigmas[i + 1] if conventional else sigmas[i],
                 sigma_t=sigmas[i] if conventional else sigmas[i + 1],
                 clean_mask=clean, time_s=discrete_times[i + 1],
+                **transition_kwargs,
             )
             if self.trace_argmax_changes:
                 current_argmax = clean_probs.argmax(dim=-1)
@@ -60,9 +67,16 @@ class CANDISampler(Sampler):
             if conventional and model.pure_continuous:
                 x = continuous
             else:
+                commit_probs = clean_probs
+                if self.greedy_clean_estimate:
+                    # Keep the model's reveal-time transition, but place all
+                    # clean-token mass on the predicted argmax.
+                    commit_probs = F.one_hot(
+                        clean_probs.argmax(-1), clean_probs.shape[-1]
+                    ).to(clean_probs)
                 x, clean = model.sample_candi_discrete_transition(
                     continuous,
-                    clean_probs,
+                    commit_probs,
                     discrete_times[i],
                     discrete_times[i] - discrete_times[i + 1],
                     prev_clean_mask=clean,
@@ -71,7 +85,7 @@ class CANDISampler(Sampler):
         tokens = state_tokens_fn(x) if callable(state_tokens_fn) else x.argmax(-1)
         if getattr(model, "conventional_sigma_order", False) and model.pure_continuous:
             tokens = clean_probs.argmax(-1)
-        metadata = {"nfe": steps}
+        metadata = {"nfe": steps, "greedy_clean_estimate": self.greedy_clean_estimate}
         if self.trace_argmax_changes:
             metadata.update({
                 "argmax_changes_per_sample": changes_per_sample.cpu().tolist(),
@@ -87,5 +101,6 @@ class CANDISampler(Sampler):
 @sampler_registry.register("candi")
 def _create(config):
     return CANDISampler(
-        getattr(config.sampling, "trace_argmax_changes", False)
+        getattr(config.sampling, "trace_argmax_changes", False),
+        getattr(config.sampling, "greedy_clean_estimate", False),
     )

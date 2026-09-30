@@ -52,6 +52,8 @@ loader:
   batch_size: ${div_up:${.global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes} * ${trainer.accumulate_grad_batches}}}
   eval_batch_size: ${div_up:${.eval_global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes} * ${trainer.accumulate_grad_batches}}}
   num_workers: 4
+  # Workers may start after CUDA initialization (especially during validation).
+  multiprocessing_context: spawn
   pin_memory: True
 
 sampling:

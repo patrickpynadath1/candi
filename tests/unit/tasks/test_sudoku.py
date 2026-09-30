@@ -41,6 +41,12 @@ def test_sudoku_generation_is_deterministic_and_unique():
     assert all(set(row) == set(range(1, 10)) for row in solution)
 
 
+def test_sudoku_generation_matches_across_worker_counts():
+    assert generate_grids(4, "easy", 7, num_workers=2) == generate_grids(
+        4, "easy", 7, num_workers=1
+    )
+
+
 def test_sudoku_encoding_has_answer_only_mask():
     tokenizer = SudokuTokenizer()
     puzzle, solution = generate_grids(1, "easy", 3)[0]

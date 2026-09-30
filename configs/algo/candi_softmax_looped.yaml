@@ -1,0 +1,6 @@
+defaults:
+  - candi_looped
+  - _self_
+
+name: candi_softmax_looped
+backbone: softmax_looped_cont_dit

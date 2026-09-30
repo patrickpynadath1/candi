@@ -10,9 +10,15 @@ ignore_bos: false
 embedding_dim: 16
 gamma_min: -13.3
 gamma_max: 5.0
-schedule_hidden_dim: 16
+schedule_type: plaid
+schedule_hidden_dim: 1024
+input_preconditioning: true
 self_condition_rate: 0.25
+# Appendix E.2: bootstrap at the current noise level, matching validation.
+sampling_self_condition: bootstrap
 split_ema: 0.99
 output_prior: true
+# Conditional tasks keep loss-masked context clean in training and sampling.
+clean_context: false
 special_lr: 1.0e-2
 endpoint_weight_decay: 0.1

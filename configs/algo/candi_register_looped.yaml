@@ -1,0 +1,7 @@
+defaults:
+  - candi_looped
+  - _self_
+
+name: candi_register_looped
+backbone: register_looped_cont_dit
+num_registers: 4

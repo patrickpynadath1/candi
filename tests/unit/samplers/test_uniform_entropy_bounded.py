@@ -4,7 +4,10 @@ import torch
 
 from samplers.base import SamplingRequest
 from samplers.runner import run_sampler
-from samplers.uniform_entropy_bounded import UniformEntropyBoundedSampler
+from samplers.uniform_entropy_bounded import (
+    UniformEntropyBoundedRenoiseSampler,
+    UniformEntropyBoundedSampler,
+)
 
 from .helpers import ModelBase
 
@@ -76,3 +79,20 @@ def test_greedy_uniform_eb_accepts_argmax_clean_tokens():
     assert torch.equal(result.samples, torch.zeros_like(result.samples))
     assert result.metadata["greedy_clean_estimate"] is True
     assert model.greedy_clean_estimate is True
+
+
+def test_renoise_variant_commits_passes_and_resets_every_rejection():
+    model = UniformEntropyModel()
+    result = run_sampler(
+        UniformEntropyBoundedRenoiseSampler(0.0), model,
+        SamplingRequest(num_samples=1, num_steps=3),
+    )
+
+    assert result.metadata["accepted_per_step"] == [[1], [1], [1]]
+    assert result.metadata["rejected_transition"] == "fresh_uniform_prior"
+    # The first accepted token remains as context. Unlike the posterior-path
+    # sampler, both rejected sites are fresh prior samples (zero here).
+    assert model.inputs[1][0, 0] == result.samples[0, 0]
+    assert torch.equal(model.inputs[1][0, 1:], torch.zeros(2, dtype=torch.long))
+    # No accepted mask was passed into the model's reverse transition.
+    assert len(model.inputs) == 3

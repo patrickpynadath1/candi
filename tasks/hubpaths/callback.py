@@ -31,6 +31,11 @@ class HubPathsEvaluationCallback(lightning.Callback):
     @torch.no_grad()
     def _run(self, trainer, model):
         root = Path(model.config.data.prepared_dir)
+        metadata = json.loads((root / "metadata.json").read_text())
+        if metadata.get("task_mode") in {"latent_core", "grammar_core"}:
+            raise ValueError(
+                "conditional waypoint evaluation cannot use latent-core sidecars as prompts; use hubpaths_latent_ar"
+            )
         graph = Graph.load(root / "graph.npz")
         view = "ar" if model.config.algo.name == "ar" else "infilling"
         model._eval_mode()

@@ -30,6 +30,15 @@ def main():
         "--set", action="append", default=[], metavar="KEY=JSON_VALUE"
     )
     generate.add_argument("--output", type=Path, required=True)
+    generate.add_argument(
+        "--mode", choices=["conditional", "latent_core"], default="conditional"
+    )
+    generate.add_argument(
+        "--latent-config", type=Path, help="JSON latent-core overrides"
+    )
+    generate.add_argument(
+        "--latent-set", action="append", default=[], metavar="KEY=JSON_VALUE"
+    )
     analysis = sub.add_parser("diagnose")
     analysis.add_argument("dataset", type=Path)
     analysis.add_argument("--output", type=Path)
@@ -64,7 +73,24 @@ def main():
         for item in args.set:
             key, value = item.split("=", 1)
             values[key] = json.loads(value)
-        report = build_dataset(HubPathsConfig(**values), args.output)
+        if args.mode == "latent_core":
+            from .latent import LatentCoreConfig, build_latent_dataset
+
+            latent = (
+                json.loads(args.latent_config.read_text()) if args.latent_config else {}
+            )
+            for item in args.latent_set:
+                key, value = item.split("=", 1)
+                latent[key] = json.loads(value)
+            report = build_latent_dataset(
+                HubPathsConfig(**values), LatentCoreConfig(**latent), args.output
+            )
+        else:
+            if args.latent_config or args.latent_set:
+                parser.error(
+                    "--latent-config and --latent-set require --mode latent_core"
+                )
+            report = build_dataset(HubPathsConfig(**values), args.output)
         print(json.dumps(report, indent=2))
     elif args.command == "diagnose":
         report = diagnose(
@@ -97,6 +123,11 @@ def main():
         from .rsp import RSP
         from .routes import RouteDistribution
 
+        metadata = json.loads((args.dataset / "metadata.json").read_text())
+        if metadata.get("task_mode") in {"latent_core", "grammar_core"}:
+            parser.error(
+                "sample --waypoints is for the conditional task; latent-core generation uses hidden sidecars"
+            )
         graph = Graph.load(args.dataset / "graph.npz")
         distribution = RouteDistribution(
             RSP(graph, cache_dir=args.dataset / "goal_cache"), args.waypoints

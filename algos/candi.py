@@ -307,6 +307,9 @@ class CANDI(Diffusion):
             model_output = self.backbone(**kwargs)
         return self._process_model_output(model_output=model_output, xt=kwargs['xt'], reveal_mask=kwargs['reveal_mask'])
 
+    def _denoise_for_loss(self, noisy_output, train_mode):
+        return self.forward(**noisy_output)
+
     def nll(self, x0, output_tokens, current_accumulation_step=None, train_mode=False,
             valid_tokens=None):
         del output_tokens
@@ -352,7 +355,7 @@ class CANDI(Diffusion):
             valid_tokens=valid_tokens,
             continuous_discrete_noise=rank_noise,
         )
-        log_x_theta = self.forward(**noisy_output)
+        log_x_theta = self._denoise_for_loss(noisy_output, train_mode)
 
         utils.print_nans(log_x_theta, "model_output")
         loss = self.nll_per_token(
@@ -614,6 +617,7 @@ class CANDI(Diffusion):
         clean_mask: torch.Tensor=None,
         is_embed=False,
         return_untempered=False,
+        denoise_fn=None,
     ) -> torch.Tensor:
 
         dt_cont_vec = torch.ones(x.shape[0], device=x.device) * (sigma_s - sigma_t).item()
@@ -621,7 +625,8 @@ class CANDI(Diffusion):
         sigma_t_vec = torch.ones(x.shape[0], device=x.device) * sigma_t.item()
         if clean_mask is None:
             clean_mask = torch.zeros(x.shape[:-1], device=x.device)
-        cond_denoised = self.forward(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec, is_embed=is_embed).double()
+        denoiser = self.forward if denoise_fn is None else denoise_fn
+        cond_denoised = denoiser(xt=x, discrete_noise=time_t_vec, reveal_mask=clean_mask, continuous_noise=sigma_t_vec, is_embed=is_embed).double()
         denoised = cond_denoised.exp()
         if self.is_embed:
             x0_hat = self.backbone.get_embedding(denoised)

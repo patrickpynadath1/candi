@@ -70,10 +70,9 @@ def method_specs(matrix):
                     label=str(entry.label),
                     experiment=experiment,
                     overrides=overrides,
+                    candi=entry.get("candi", True),
                 )
             )
-    if len(specs) != 19:
-        raise AssertionError(f"expected 19 method configurations, got {len(specs)}")
     return specs
 
 
@@ -87,6 +86,7 @@ def make_job(
     project,
     entity,
     hybrid_loss_weighting,
+    max_steps=None,
 ):
     method_name = f"{method['variant']}_{method['mode']}"
     directory = root / "runs" / task / method_name / f"seed_{seed}"
@@ -104,7 +104,7 @@ def make_job(
     run_id = hashlib.sha256(
         json.dumps(identity, sort_keys=True).encode()
     ).hexdigest()[:16]
-    max_steps = 20000 if task.startswith("sudoku_") else profiles[task].max_steps
+    max_steps = max_steps or (20000 if task.startswith("sudoku_") else profiles[task].max_steps)
     values = [
         f"+experiment={method['experiment']}",
         *method["overrides"],
@@ -134,7 +134,7 @@ def make_job(
         "wandb.job_type=train",
         f"wandb.tags=[core_ablation,{task},{method['variant']},{method['mode']}]",
     ]
-    if method["experiment"] != "sudoku_sfm_truncated_adaptive":
+    if method.get("candi", True) and method["experiment"] != "sudoku_sfm_truncated_adaptive":
         values += [
             f"algo.pure_continuous={str(method['mode'] == 'pure').lower()}",
             "+algo.input_embedding_dim=512",
@@ -170,6 +170,8 @@ def validate_overrides(jobs):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, default=ROOT / "configs/sweeps/sudoku_rank.yaml")
+    parser.add_argument("--max-steps", type=int)
     parser.add_argument(
         "--prepared", type=Path, default=ROOT / "data_cache/reasoning"
     )
@@ -198,15 +200,14 @@ def main():
     parser.add_argument(
         "--hard-cache",
         type=Path,
-        default=Path(
-            "/home/patrick/.cache/duo/data_cache/"
-            "sudoku_hard_train48000_valid2000_seed42"
-        ),
+        help="Optional prepared hard dataset matching configs/data/sudoku.yaml.",
     )
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--detach", action="store_true")
     args = parser.parse_args()
-    root = args.root.resolve()
+    # Preserve the public campaign path when outputs is moved behind a symlink;
+    # checkpoint paths and W&B identities must still match the saved manifest.
+    root = Path(os.path.abspath(args.root))
     prepared = args.prepared.resolve()
 
     if args.detach:
@@ -226,7 +227,7 @@ def main():
         print(process.pid)
         return
 
-    matrix = OmegaConf.load(ROOT / "configs/sweeps/sudoku_rank.yaml")
+    matrix = OmegaConf.load(args.manifest)
     profiles = OmegaConf.load(
         ROOT / "configs/sweeps/reasoning_tasks.yaml"
     ).profiles
@@ -248,6 +249,7 @@ def main():
             args.project,
             args.entity,
             args.hybrid_loss_weighting,
+            args.max_steps,
         )
         for seed in args.seeds
         for task in args.tasks
@@ -288,14 +290,20 @@ def main():
             raise FileNotFoundError(manifest)
     cache_root = root / "data"
     cache_root.mkdir(parents=True, exist_ok=True)
+    sudoku_data = OmegaConf.load(ROOT / "configs/data/sudoku.yaml")
     for task in args.tasks:
         if task not in {"sudoku_easy", "sudoku_medium", "sudoku_hard"}:
             continue
         difficulty = task.removeprefix("sudoku_")
-        name = f"sudoku_{difficulty}_train48000_valid2000_seed42"
+        name = (
+            f"sudoku_{difficulty}_train{sudoku_data.num_train}"
+            f"_valid{sudoku_data.num_valid}_seed{sudoku_data.data_seed}"
+        )
         destination = cache_root / name
         candidates = [
-            args.hard_cache if difficulty == "hard" else ROOT / "data_cache" / name,
+            args.hard_cache
+            if difficulty == "hard" and args.hard_cache is not None
+            else ROOT / "data_cache" / name,
             Path("/home/patrick/.cache/duo/data_cache") / name,
         ]
         source_cache = next((path for path in candidates if path.exists()), None)
@@ -310,10 +318,20 @@ def main():
                     difficulty,
                     "--cache-dir",
                     str(cache_root),
+                    "--num-train", str(sudoku_data.num_train),
+                    "--num-valid", str(sudoku_data.num_valid),
+                    "--seed", str(sudoku_data.data_seed),
                 ],
                 cwd=ROOT,
                 check=True,
             )
+        from datasets import load_from_disk
+
+        dataset = load_from_disk(str(destination))
+        if (len(dataset["train"]), len(dataset["validation"])) != (
+            sudoku_data.num_train, sudoku_data.num_valid
+        ):
+            raise ValueError(f"Sudoku cache split sizes do not match config: {destination}")
 
     states = {
         str(index): (

@@ -1,0 +1,30 @@
+# @package _global_
+# Ordinary language modeling of unmarked node streams; latent sidecars are not inputs.
+defaults:
+  - override /data: hubpaths
+  - override /model: tiny
+  - override /algo: ar
+  - override /callbacks: [checkpoint_every_n_steps, checkpoint_monitor, learning_rate_monitor]
+model:
+  length: 72  # BOS + 1 + (8 cores - 1) * 10 bridge steps
+  hidden_size: 512
+  cond_dim: 128
+  n_blocks: 8
+  n_heads: 8
+data:
+  prepared_dir: ${hydra:runtime.cwd}/data_cache/hubpaths/latent_core_debug
+loader:
+  global_batch_size: 256
+  eval_global_batch_size: 128
+trainer:
+  max_steps: 20000
+  val_check_interval: 1000
+  check_val_every_n_epoch: null
+sampling:
+  predictor: ar_cached
+eval:
+  generate_samples: false
+wandb:
+  project: hubpaths
+  group: latent-core-ar
+  name: hubpaths-latent-core-ar

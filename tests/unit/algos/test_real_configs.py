@@ -42,6 +42,10 @@ ALGORITHM_CONFIGS = [
     ("sedd", ("sampling.predictor=analytic",)),
     ("cadd", ("sampling.predictor=cadd",)),
     ("candi", ("sampling.predictor=candi_cached",)),
+    ("candi_imle", ("sampling.predictor=candi_imle",)),
+    ("candi_looped", ("sampling.predictor=candi_looped",)),
+    ("candi_register_looped", ("sampling.predictor=candi_looped",)),
+    ("candi_softmax_looped", ("sampling.predictor=candi_looped_entropy_bounded",)),
     ("candi_rank", ("sampling.predictor=candi", "noise=rank-adaptive")),
     ("candi_embedding", ("sampling.predictor=candi_embedding", "noise=rank-adaptive")),
     ("candi_blurred", ("sampling.predictor=candi_entropy_bounded",)),
@@ -86,7 +90,9 @@ ALGORITHM_CONFIGS = [
 TIME_CONDITIONED_CONFIGS = [
     entry for entry in ALGORITHM_CONFIGS
     # SDM uses the separate bucketed PaperTimeSampler, tested in test_simplex.
-    if entry[0] not in {"ar", "block_diffusion", "mdlm_perm", "simplex", "simplex_dmd"}
+    if entry[0] not in {
+        "ar", "block_diffusion", "mdlm_perm", "candi_imle", "simplex", "simplex_dmd"
+    }
 ]
 
 

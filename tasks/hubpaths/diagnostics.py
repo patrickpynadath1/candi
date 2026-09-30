@@ -87,13 +87,21 @@ def _plot(path, x, y, title, xlabel, ylabel, log=False):
         )
         for value in xticks:
             position = 70 + 660 * (value - xmin) / max(xmax - xmin, 1e-9)
-            label = f"{10**value:,.0f}" if log else f"{value:.3g}"
+            label = (
+                (f"{10**value:,.0f}" if value >= 0 else f"{10**value:g}")
+                if log
+                else f"{value:.3g}"
+            )
             elements.append(
                 f'<text x="{position:.0f}" y="390" text-anchor="middle" font-size="11">{label}</text>'
             )
         for value in yticks:
             position = 374 - 310 * (value - ymin) / max(ymax - ymin, 1e-9)
-            label = f"{10**value:,.0f}" if log else f"{value:.3g}"
+            label = (
+                (f"{10**value:,.0f}" if value >= 0 else f"{10**value:g}")
+                if log
+                else f"{value:.3g}"
+            )
             elements.append(
                 f'<text x="62" y="{position:.0f}" text-anchor="end" font-size="11">{label}</text>'
             )
@@ -133,9 +141,20 @@ def diagnose(
     root = Path(directory)
     out = Path(output) if output else root / f"diagnostics_{split}"
     out.mkdir(parents=True, exist_ok=True)
+    metadata = json.loads((root / "metadata.json").read_text())
+    if metadata.get("task_mode") == "grammar_core":
+        raise ValueError(
+            "Grammar corpora use variable core counts; use the report.json produced "
+            "by python -m tasks.hubpaths.grammar for grammar and n-gram diagnostics."
+        )
+    latent = metadata.get("task_mode") == "latent_core"
+    if latent and scope == "prompt":
+        raise ValueError(
+            "latent-core data has no model-visible waypoint prompt; use core_frequencies.tsv"
+        )
     graph = Graph.load(root / "graph.npz")
     c = graph.config
-    prefix = c.n_waypoints + 1
+    prefix = 1 if latent else c.n_waypoints + 1
     tokens = np.load(root / f"{split}_tokens.npy", mmap_mode="r")
     masks = np.load(root / f"{split}_mask.npy", mmap_mode="r")
     metrics = np.load(root / f"{split}_metrics.npy", mmap_mode="r")
@@ -234,6 +253,9 @@ def diagnose(
     )
     for index in sample_indices:
         row = tokens[index]
+        if latent:
+            entropy_values.append(float(metrics[index, 1]))
+            continue
         waypoints = tuple(int(v) - N_SPECIAL for v in row[: c.n_waypoints])
         saved = metrics[index, 1]
         if np.isfinite(saved):
@@ -267,7 +289,13 @@ def diagnose(
         "scope": scope,
         "examples_analyzed": count,
         "examples_available": len(tokens),
-        "n_waypoints": c.n_waypoints,
+        "n_waypoints": metadata["latent_config"]["n_cores"]
+        if latent
+        else c.n_waypoints,
+        "task_mode": "latent_core" if latent else "conditional_waypoint",
+        "entropy_conditioning": metadata.get(
+            "entropy_conditioning", "on model-visible waypoint prompt"
+        ),
         "ngrams_cross_example_boundaries": False,
         "pad_included": False,
         "unique_sequences": unique_sequences,
@@ -314,6 +342,13 @@ def diagnose(
             "edges_below_target": int((covered < c.min_edge_count).sum() // 2),
         },
     }
+    if latent:
+        from .latent_diagnostics import latent_report
+
+        report["latent_core"] = latent_report(root, out, split, max_examples)
+        report["exact_walk_statistics"] = False
+        report["exact_bridge_statistics"] = True
+        report["train_coverage"]["edges_below_target"] = None
     try:
         import powerlaw
     except ImportError:

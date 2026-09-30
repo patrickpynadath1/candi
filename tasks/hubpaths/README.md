@@ -1,5 +1,7 @@
 # HubPaths: ordered-waypoint graph navigation
 
+For the revised **unmarked latent-core language model**, see [LATENT_CORES.md](LATENT_CORES.md). It uses soft bridge-traffic avoidance, frozen low-rank pair factors, latent topics, and separate realized-prior diagnostics. The prompted task below remains available as a control.
+
 HubPaths trains a model to remember a fixed hidden graph and generate a continuous
 walk through a supplied list of nodes, in order. The graph is never included in
 the prompt. Multiple routes can be correct, with known probabilities under a
@@ -327,3 +329,8 @@ metadata, source path, and W&B URL. `status.json` records the training PID and
 completion/exit status, and `train.log` contains live training output. W&B uploads
 training/evaluation metrics and configuration; model checkpoints stay in the
 local run directory. The launch refuses to replace an existing run.
+
+## Experimental random grammar
+
+See [GRAMMAR.md](GRAMMAR.md) for recursive hidden-core grammars, agreement controls,
+generated corpora, and held-out visible-prefix probes.

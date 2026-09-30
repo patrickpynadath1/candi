@@ -16,7 +16,8 @@ import collections
 @algo_registry.register("duo_base")
 class DUO_BASE(UniformState):
     supported_samplers = frozenset({
-        "ancestral", "ancestral_cache", "semi_ar", "uniform_entropy_bounded", "paper_discrete",
+        "ancestral", "ancestral_cache", "semi_ar", "uniform_entropy_bounded",
+        "uniform_entropy_bounded_renoise", "paper_discrete",
     })
     sampling_capabilities = UniformState.sampling_capabilities | {
         "ancestral_transition",

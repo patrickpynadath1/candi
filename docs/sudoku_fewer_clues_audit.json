@@ -1,0 +1,1206 @@
+{
+  "verified_completions": 1200000,
+  "checks": "independent decoded-grid row, column, box, format, and retained-clue checks agree with every saved valid_solution flag",
+  "results": [
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_learned_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.0,
+      "mean_nfe": 4.5683,
+      "unique_outputs": 1,
+      "unique_valid_outputs": 0,
+      "most_frequent_count": 10000
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_learned_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.0,
+      "mean_nfe": 50.3714,
+      "unique_outputs": 8747,
+      "unique_valid_outputs": 0,
+      "most_frequent_count": 175
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_learned_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.6097,
+      "mean_nfe": 58.815,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 6097,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_learned_linear_fixed_hybrid",
+      "valid_solution_rate": 0.8419,
+      "mean_nfe": 55.0836,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 8419,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_onehot_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9406,
+      "mean_nfe": 58.4693,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9406,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_onehot_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.8826,
+      "mean_nfe": 54.659,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 8826,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_onehot_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.8628,
+      "mean_nfe": 55.035,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 8628,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_onehot_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9825,
+      "mean_nfe": 57.6702,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9825,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_spherical_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.7258,
+      "mean_nfe": 56.4748,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 7258,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_spherical_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.7418,
+      "mean_nfe": 49.4973,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 7418,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_spherical_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.06,
+      "mean_nfe": 55.6363,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 600,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "candi_spherical_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9701,
+      "mean_nfe": 52.1389,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9701,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "duo_baseline",
+      "valid_solution_rate": 0.0008,
+      "mean_nfe": 88.4834,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 8,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "mdlm_baseline",
+      "valid_solution_rate": 1.0,
+      "mean_nfe": 60.0,
+      "unique_outputs": 1,
+      "unique_valid_outputs": 1,
+      "most_frequent_count": 10000
+    },
+    {
+      "clues": 0,
+      "trained_on": "easy",
+      "method": "sfm_baseline",
+      "valid_solution_rate": 0.0,
+      "mean_nfe": 180.0,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 0,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_learned_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.4795,
+      "mean_nfe": 55.2798,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 4795,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_learned_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9686,
+      "mean_nfe": 49.999,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9686,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_learned_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9459,
+      "mean_nfe": 55.3844,
+      "unique_outputs": 9999,
+      "unique_valid_outputs": 9458,
+      "most_frequent_count": 2
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_learned_linear_fixed_hybrid",
+      "valid_solution_rate": 0.0,
+      "mean_nfe": 8.9244,
+      "unique_outputs": 103,
+      "unique_valid_outputs": 0,
+      "most_frequent_count": 9177
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_onehot_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.8688,
+      "mean_nfe": 53.7303,
+      "unique_outputs": 9998,
+      "unique_valid_outputs": 8686,
+      "most_frequent_count": 2
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_onehot_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9691,
+      "mean_nfe": 50.3092,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9691,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_onehot_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.737,
+      "mean_nfe": 53.5237,
+      "unique_outputs": 9728,
+      "unique_valid_outputs": 7152,
+      "most_frequent_count": 8
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_onehot_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9998,
+      "mean_nfe": 53.7325,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9998,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_spherical_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9289,
+      "mean_nfe": 53.9895,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9289,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_spherical_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9828,
+      "mean_nfe": 49.4583,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9828,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_spherical_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9607,
+      "mean_nfe": 52.6624,
+      "unique_outputs": 9995,
+      "unique_valid_outputs": 9602,
+      "most_frequent_count": 2
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "candi_spherical_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9984,
+      "mean_nfe": 52.8587,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9984,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "duo_baseline",
+      "valid_solution_rate": 0.0065,
+      "mean_nfe": 58.1537,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 65,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "mdlm_baseline",
+      "valid_solution_rate": 1.0,
+      "mean_nfe": 53.9984,
+      "unique_outputs": 2,
+      "unique_valid_outputs": 2,
+      "most_frequent_count": 9984
+    },
+    {
+      "clues": 0,
+      "trained_on": "hard",
+      "method": "sfm_baseline",
+      "valid_solution_rate": 0.0019,
+      "mean_nfe": 180.0,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 19,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_learned_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9519,
+      "mean_nfe": 41.4185,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9519,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_learned_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.2987,
+      "mean_nfe": 45.9275,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 2987,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_learned_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9291,
+      "mean_nfe": 42.6181,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9291,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_learned_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9869,
+      "mean_nfe": 43.2214,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9869,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_onehot_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9856,
+      "mean_nfe": 43.1622,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9856,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_onehot_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.954,
+      "mean_nfe": 42.0236,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9540,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_onehot_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9741,
+      "mean_nfe": 40.9541,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9741,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_onehot_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9974,
+      "mean_nfe": 43.9886,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9974,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_spherical_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9706,
+      "mean_nfe": 40.6849,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9706,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_spherical_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9575,
+      "mean_nfe": 37.7237,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9575,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_spherical_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.8569,
+      "mean_nfe": 39.1995,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 8569,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "candi_spherical_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9793,
+      "mean_nfe": 40.9323,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9793,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "duo_baseline",
+      "valid_solution_rate": 0.1564,
+      "mean_nfe": 81.7767,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 1564,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "mdlm_baseline",
+      "valid_solution_rate": 0.9992,
+      "mean_nfe": 50.1467,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9992,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "easy",
+      "method": "sfm_baseline",
+      "valid_solution_rate": 0.0435,
+      "mean_nfe": 180.0,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 435,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_learned_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.752,
+      "mean_nfe": 40.5159,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 7520,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_learned_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9788,
+      "mean_nfe": 38.6169,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9788,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_learned_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9871,
+      "mean_nfe": 40.6877,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9871,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_learned_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9988,
+      "mean_nfe": 41.9098,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9988,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_onehot_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.982,
+      "mean_nfe": 35.5209,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9820,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_onehot_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9904,
+      "mean_nfe": 39.4952,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9904,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_onehot_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9923,
+      "mean_nfe": 38.6388,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9923,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_onehot_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9999,
+      "mean_nfe": 41.9923,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9999,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_spherical_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.993,
+      "mean_nfe": 37.48,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9930,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_spherical_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9919,
+      "mean_nfe": 38.1901,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9919,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_spherical_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9935,
+      "mean_nfe": 37.2202,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9935,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "candi_spherical_linear_fixed_hybrid",
+      "valid_solution_rate": 0.999,
+      "mean_nfe": 41.1269,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9990,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "duo_baseline",
+      "valid_solution_rate": 0.3009,
+      "mean_nfe": 49.8887,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 3009,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "mdlm_baseline",
+      "valid_solution_rate": 0.9994,
+      "mean_nfe": 42.3183,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9994,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 12,
+      "trained_on": "hard",
+      "method": "sfm_baseline",
+      "valid_solution_rate": 0.3415,
+      "mean_nfe": 180.0,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 3415,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_learned_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9682,
+      "mean_nfe": 34.9082,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9682,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_learned_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.8706,
+      "mean_nfe": 35.8715,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 8706,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_learned_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9525,
+      "mean_nfe": 35.9149,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9525,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_learned_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9908,
+      "mean_nfe": 38.5456,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9908,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_onehot_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9893,
+      "mean_nfe": 36.5494,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9893,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_onehot_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9557,
+      "mean_nfe": 36.9336,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9557,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_onehot_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9841,
+      "mean_nfe": 35.1806,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9841,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_onehot_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9975,
+      "mean_nfe": 38.7216,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9975,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_spherical_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9843,
+      "mean_nfe": 34.4607,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9843,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_spherical_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9643,
+      "mean_nfe": 33.5606,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9643,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_spherical_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.947,
+      "mean_nfe": 32.7044,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9470,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "candi_spherical_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9839,
+      "mean_nfe": 36.4836,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9839,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "duo_baseline",
+      "valid_solution_rate": 0.3461,
+      "mean_nfe": 78.3615,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 3461,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "mdlm_baseline",
+      "valid_solution_rate": 0.9992,
+      "mean_nfe": 45.4677,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9992,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "easy",
+      "method": "sfm_baseline",
+      "valid_solution_rate": 0.1231,
+      "mean_nfe": 180.0,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 1231,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_learned_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9814,
+      "mean_nfe": 34.8633,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9814,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_learned_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9799,
+      "mean_nfe": 34.1414,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9799,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_learned_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9961,
+      "mean_nfe": 34.7543,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9961,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_learned_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9992,
+      "mean_nfe": 36.9969,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9992,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_onehot_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9871,
+      "mean_nfe": 29.2047,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9871,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_onehot_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.99,
+      "mean_nfe": 35.0371,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9900,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_onehot_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9927,
+      "mean_nfe": 31.9092,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9927,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_onehot_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9995,
+      "mean_nfe": 37.101,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9995,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_spherical_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9951,
+      "mean_nfe": 31.4332,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9951,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_spherical_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9899,
+      "mean_nfe": 33.6563,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9899,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_spherical_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9971,
+      "mean_nfe": 31.1925,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9971,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "candi_spherical_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9987,
+      "mean_nfe": 36.3061,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9987,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "duo_baseline",
+      "valid_solution_rate": 0.4398,
+      "mean_nfe": 47.925,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 4398,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "mdlm_baseline",
+      "valid_solution_rate": 0.9985,
+      "mean_nfe": 37.3422,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9985,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 16,
+      "trained_on": "hard",
+      "method": "sfm_baseline",
+      "valid_solution_rate": 0.4798,
+      "mean_nfe": 180.0,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 4798,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_learned_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9162,
+      "mean_nfe": 47.2221,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9162,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_learned_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.0001,
+      "mean_nfe": 71.032,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 1,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_learned_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.8802,
+      "mean_nfe": 48.5886,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 8802,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_learned_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9835,
+      "mean_nfe": 47.4579,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9835,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_onehot_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9801,
+      "mean_nfe": 48.7052,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9801,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_onehot_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.943,
+      "mean_nfe": 46.6266,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9430,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_onehot_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9705,
+      "mean_nfe": 45.9013,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9705,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_onehot_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9939,
+      "mean_nfe": 49.0121,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9939,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_spherical_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9436,
+      "mean_nfe": 45.9108,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9436,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_spherical_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9464,
+      "mean_nfe": 41.5064,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9464,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_spherical_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.7061,
+      "mean_nfe": 44.3835,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 7061,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "candi_spherical_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9819,
+      "mean_nfe": 44.8917,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9819,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "duo_baseline",
+      "valid_solution_rate": 0.0476,
+      "mean_nfe": 84.5795,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 476,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "mdlm_baseline",
+      "valid_solution_rate": 0.9995,
+      "mean_nfe": 53.2585,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9995,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "easy",
+      "method": "sfm_baseline",
+      "valid_solution_rate": 0.0102,
+      "mean_nfe": 180.0,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 102,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_learned_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.5825,
+      "mean_nfe": 46.0487,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 5825,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_learned_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.981,
+      "mean_nfe": 42.623,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9810,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_learned_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9471,
+      "mean_nfe": 45.8989,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9471,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_learned_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9701,
+      "mean_nfe": 46.0519,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9701,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_onehot_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9709,
+      "mean_nfe": 41.652,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9709,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_onehot_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.99,
+      "mean_nfe": 43.4189,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9900,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_onehot_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9871,
+      "mean_nfe": 44.0986,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9871,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_onehot_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9997,
+      "mean_nfe": 46.1059,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9997,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_spherical_geometric_adaptive_hybrid",
+      "valid_solution_rate": 0.9812,
+      "mean_nfe": 42.8027,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9812,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_spherical_geometric_fixed_hybrid",
+      "valid_solution_rate": 0.9915,
+      "mean_nfe": 42.2081,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9915,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_spherical_linear_adaptive_hybrid",
+      "valid_solution_rate": 0.9818,
+      "mean_nfe": 42.2604,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9818,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "candi_spherical_linear_fixed_hybrid",
+      "valid_solution_rate": 0.9984,
+      "mean_nfe": 45.2501,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9984,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "duo_baseline",
+      "valid_solution_rate": 0.1943,
+      "mean_nfe": 51.4318,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 1943,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "mdlm_baseline",
+      "valid_solution_rate": 0.9991,
+      "mean_nfe": 46.4492,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 9991,
+      "most_frequent_count": 1
+    },
+    {
+      "clues": 8,
+      "trained_on": "hard",
+      "method": "sfm_baseline",
+      "valid_solution_rate": 0.1906,
+      "mean_nfe": 180.0,
+      "unique_outputs": 10000,
+      "unique_valid_outputs": 1906,
+      "most_frequent_count": 1
+    }
+  ]
+}

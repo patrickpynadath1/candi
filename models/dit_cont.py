@@ -143,8 +143,12 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         else:
             return bias_dropout_add_scale_fused_inference
         
+    def _condition_hidden(self, hidden, previous_hidden):
+        if previous_hidden is not None:
+            raise ValueError("previous_hidden requires a looped backbone")
+        return hidden
+
     # clean mask: indicates which positions are clean with 1, which are corrupted with 0
-    # def forward(self, x, discrete_noise):
     def forward(self, xt, 
                 discrete_noise, 
                 reveal_mask, 
@@ -153,6 +157,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                 ret_embedding=False, 
                 is_embed=False, 
                 precond=True,
+                previous_hidden=None,
         **kwargs):
         x = xt 
         # The public time input is a corruption probability p. Preserve the
@@ -170,6 +175,7 @@ class ContDIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
 
         t_cond = F.silu(self.sigma_map(sigma))
         hidden = x if self.legacy_architecture else self.input_projection(x)
+        hidden = self._condition_hidden(hidden, previous_hidden)
         rotary_cos_sin = self.rotary_emb(hidden)
 
         with torch.amp.autocast(

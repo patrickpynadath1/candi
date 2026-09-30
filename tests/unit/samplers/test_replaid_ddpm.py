@@ -1,4 +1,5 @@
 import torch
+import pytest
 
 from samplers.base import SamplingRequest
 from samplers.replaid_ddpm import RePlaidDDPMSampler
@@ -31,12 +32,13 @@ def test_ddpm_transition_is_finite_for_a_reverse_step():
     assert torch.isfinite(result).all()
 
 
-def test_conditional_sampling_preserves_prompt_and_uses_one_forward_noise_path():
+@pytest.mark.parametrize("clean_context", [False, True])
+def test_conditional_sampling_preserves_prompt_and_uses_one_forward_noise_path(clean_context):
     class Model:
         device = torch.device("cpu")
         num_tokens = 3
         vocab_size = 4
-        config = type("Config", (), {"sampling": type("Sampling", (), {"steps": 2})()})()
+        config = type("Config", (), {"sampling": type("Sampling", (), {"steps": 2})(), "algo": {}})()
 
         def __init__(self):
             self.states = []
@@ -60,6 +62,7 @@ def test_conditional_sampling_preserves_prompt_and_uses_one_forward_noise_path()
 
     torch.manual_seed(4)
     model = Model()
+    model.config.algo = {"clean_context": clean_context}
     prompt_tokens = torch.tensor([[1, 2, 0]])
     prompt_mask = torch.tensor([[True, True, False]])
     result = RePlaidDDPMSampler().sample(
@@ -75,6 +78,10 @@ def test_conditional_sampling_preserves_prompt_and_uses_one_forward_noise_path()
 
     assert torch.equal(result.samples[0, :2], prompt_tokens[0, :2])
     embedding = model.sampling_embeddings(prompt_tokens)
+    if clean_context:
+        for state in model.states:
+            assert torch.equal(state[prompt_mask], embedding[prompt_mask])
+        return
     gamma_0 = model.sampling_gamma(torch.tensor([1.0]))
     gamma_1 = model.sampling_gamma(torch.tensor([0.55]))
     alpha_0, sigma_0 = torch.sigmoid(-gamma_0).sqrt(), torch.sigmoid(gamma_0).sqrt()

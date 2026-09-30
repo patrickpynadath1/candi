@@ -1,0 +1,237 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,hyperref}
+\newcommand{\E}{\mathbb E}
+\newcommand{\KL}{D_{\mathrm{KL}}}
+\title{A Hybrid Discrete--Continuous RePlaid ELBO}
+\author{Implementation and derivation notes}
+\date{September 29, 2026}
+\begin{document}
+\maketitle
+
+\paragraph{Scope.} This note derives a proposed combination of CADD's hybrid
+reverse kernel and RePlaid's likelihood objective and schedule learning.
+It is not a theorem claimed jointly by those papers. The implementation is
+\texttt{algos/replaid\_hybrid.py}, with sampler
+\texttt{samplers/replaid\_hybrid\_ddpm.py}. The existing RePlaid and
+RePlaidKeep implementations are separate baselines.
+
+\section{Forward process and assumptions}
+Let $X=(X_1,\ldots,X_n)$ be a discrete sequence and $e_i=E(X_i)$ a
+learned, token-local embedding. Embeddings are normalized as in our RePlaid
+backbone. Fixed conditioning tokens $C$ are always visible; every formula
+below can be read conditional on $C$, with sums over target positions only.
+Let $r(t)$ increase from zero to one and $s(t)=\exp(-\gamma(t))$ decrease.
+Independently across positions, $M_{t,i}=1$ indicates that a token has been
+masked, with probability $r(t)$. Its state is
+\[
+ Y_{t,i}=\begin{cases}
+ X_i,&M_{t,i}=0,\\
+ (\mathrm{MASK},Z_{t,i}),&M_{t,i}=1,
+ \end{cases}\qquad
+ Z_{t,i}=a(t)e_i+b(t)\epsilon_i,
+ \quad a^2=\operatorname{sigmoid}(-\gamma),\quad
+ b^2=\operatorname{sigmoid}(\gamma).
+\]
+This specifies a Markov process by using absorbing masking with forward
+hazard $r'(t)/(1-r(t))$. At the first masking time, initialize the latent
+from the Gaussian marginal at that global time, then continue the usual
+variance-preserving Gaussian process. Starting an independent Gaussian
+clock at the masking time would define a different process.
+
+The network predicts $\pi_{\theta,i}(v\mid Y_t)$ and uses the same head for
+\[
+ \widehat e_i(Y_t)=\sum_v\pi_{\theta,i}(v\mid Y_t)E(v).
+\]
+Visible tokens are copied in the reverse process. The clean-context input
+identifies visible positions. Since embeddings have unit norm, its zero
+value marks a masked position. Gaussian log-SNR identifies the physical
+path coordinate; the model is not conditioned on a separate arbitrary clock.
+A contextual encoder $e_i=E_i(X)$ is outside this derivation: revealing
+$X_i$ would not determine $e_i$, invalidating the deterministic reveal kernel.
+
+\section{Reverse-step KL and the continuous-time bound}
+For $v<t$, conditional on $M_{t,i}=1$, the reverse event probabilities are
+\[
+ \rho_{\rm reveal}=\frac{r(t)-r(v)}{r(t)},\qquad
+ \rho_{\rm stay}=\frac{r(v)}{r(t)}.
+\]
+Use these same event probabilities in the model. On reveal, predict a
+categorical token and set its embedding deterministically. On staying
+masked, use the Gaussian bridge variance and replace the true clean
+embedding in its mean by $\widehat e_i$. The resulting conditional KL is
+\[
+ \rho_{\rm reveal}[-\log\pi_{\theta,i}(X_i\mid Y_t)]
+ +\rho_{\rm stay}\frac{s(v)-s(t)}{2}\|e_i-\widehat e_i\|^2.
+\]
+Visible positions have zero KL. Taking $v=t-h$ and $h\downarrow0$ gives
+\begin{equation}\label{eq:bound}
+ \boxed{\mathcal L=\mathcal L_{\rm prior}+\mathcal L_{\rm rec}
+ +\int_0^1\E\sum_i M_{t,i}\left[
+ \frac{r'(t)}{r(t)}(-\log\pi_{\theta,i}(X_i\mid Y_t))
+ -\frac{s'(t)}2\|e_i-\widehat e_i\|^2\right]dt.}
+\end{equation}
+This is the continuous-time negative ELBO (an upper bound on expected NLL),
+under the standard limiting regularity/integrability assumptions. A finite
+step sampler approximates this continuous-time model. It does not make a
+finite-step likelihood bound numerically equal to the training integral.
+
+We choose $r(0)=0$: reconstruction at zero is deterministic and
+$\mathcal L_{\rm rec}=0$. With $r(1)=1$ the prior is all masked with
+independent standard Gaussian latents. For embedding dimension $d$ its
+per-position KL is retained exactly:
+\[
+ \mathcal L_{{\rm prior},i}=\tfrac12\left[
+ a_1^2\|e_i\|^2+d(b_1^2-1-\log b_1^2)\right].
+\]
+Finite terminal SNR does not exactly match the prior; this term accounts
+for it and supplies endpoint gradients. No forward-distribution-dependent
+``constants'' are dropped while learning embeddings or endpoints.
+
+Setting $r\equiv1$ removes the reveal term and recovers the continuous
+Plaid/RePlaid form, with its nonzero endpoint reconstruction restored.
+Setting $s\equiv0$ removes the Gaussian denoising term and recovers the
+absorbing discrete objective. CADD's practical CE-only surrogate is not
+Equation~\eqref{eq:bound}: we keep both weighted terms.
+
+\section{Information identity and the learned clock}
+Assume exact posterior categorical predictions and posterior-mean embedding
+predictions. Define $\ell^*(t)$ as the expected integrand in
+Equation~\eqref{eq:bound}. Then
+\begin{equation}\label{eq:info}
+ \ell^*(t)=\frac{d}{dt}H(X\mid Y_t)=-\frac{d}{dt}I(X;Y_t).
+\end{equation}
+For the jump contribution, hold all other observations $B=Y_{t,-i}$ fixed.
+Replacing visible $X_i$ by its noisy observation $Z_i$ increases expected
+conditional entropy by
+\[
+ H(X\mid B,Z_i)-H(X\mid B,X_i)=H(X_i\mid B,Z_i).
+\]
+The equality uses $Z_i\perp X_{-i}\mid X_i,B$, true for token-local
+independent Gaussian channels. Multiplying by jump hazard and visible
+probability yields $r'(t)\E[H(X_i\mid Y_t)\mid M_{t,i}=1]$.
+This equals the masked CE contribution in~\eqref{eq:bound}.
+For Gaussian evolution at fixed mask pattern, conditional vector I--MMSE
+gives $-s'(t)/2$ times the summed posterior embedding MSE at masked positions.
+Adding these first-order contributions proves~\eqref{eq:info}; simultaneous
+masking events have second-order probability away from endpoints.
+
+Specify a fixed path $r=R(u),\gamma=G(u)$ and a monotone clock $u=g(t)$.
+Let $A_\theta(u)$ be the expected ELBO density per unit $u$. Then
+\[
+ \ell_{\theta,g}(t)=g'(t)A_\theta(g(t)),\qquad
+ \int_0^1\ell_{\theta,g}(t)dt=\int_0^1A_\theta(u)du.
+\]
+For fixed model, embeddings, and path endpoints, the clock changes only
+sampling variance. Where $A_\theta>0$, the ideal mean-flattening clock obeys
+\[
+ t=\frac{\int_0^{g(t)}A_\theta(u)du}{\int_0^1A_\theta(u)du},
+ \qquad \ell_{\theta,g}(t)=\kappa.
+\]
+Together with Bayes optimality this implies
+$I(X;Y_t)=I(X;Y_0)-\kappa t$. For conditional generation replace information
+by conditional information given $C$. This does not imply linear
+masked-token CE or eliminate sequence dependencies.
+Learning two independent path functions changes the path itself and is not
+covered by the time-reparameterization invariance.
+
+\section{Implemented estimator and unbiased clock gradient}
+We use $R(u)=u$, $G(u)=\gamma_0+(\gamma_1-\gamma_0)u$ and ordered learnable
+endpoints, with positive width represented by softplus. Endpoint parameters
+and embeddings minimize the full NELBO. There is no extra CE coefficient.
+
+Direct masked estimation contains $M_i\,\mathrm{CE}_i/u$. Its second moment
+can diverge near zero when the predictor has nonzero clean-end CE. Instead
+choose a target position $J$ uniformly among the $N$ loss positions and
+sample the corruption conditional on $M_J=1$. Other masks remain independent
+Bernoulli($u$). With $w(u)=\tfrac12(\gamma_1-\gamma_0)e^{-G(u)}$,
+\[
+ \widehat A(u)=\mathrm{CE}_J+u\,w(u)\|e_J-\widehat e_J\|^2,
+ \qquad \E\widehat A(u)=\frac1N A_\theta(u).
+\]
+This follows from $\E[M_i f(Y)]=u\E[f(Y)\mid M_i=1]$ and uniform target
+selection. It remains unbiased for arbitrarily correlated tokens. The initial implementation retained only this selected-target loss. The
+corrected implementation Rao--Blackwellizes over the selected target:
+given the observed mask with $K$ masked positions, the posterior of $J$
+is uniform on those positions. Therefore use
+\[
+ \widehat A_{\rm RB}(u)=\frac1K\sum_{i:M_i=1}
+ [\mathrm{CE}_i+u w(u)\|e_i-\widehat e_i\|^2].
+\]
+The forced-target proposal has mask density ratio $K/(Nu)$ relative to the
+original Bernoulli process. Thus this estimator is unbiased and has no larger
+conditional variance than retaining the randomly chosen target. Code assigns
+$N/K$ times each masked-position contribution before valid-token reduction.
+This uses all predictions from the same forward pass, with no extra network
+compute. All-context rows contribute zero. Binary loss
+masks are required, and loss-excluded positions are fixed conditioning.
+
+Represent a density $p_\phi(u)$ with $K$ equal-width bins and probabilities
+\[
+ P_k=(1-\eta)\operatorname{softmax}(h)_k+\eta/K,
+ \qquad p_\phi(u)=KP_k \text{ in bin }k.
+\]
+We use $K=64$, $\eta=0.01$. The clock is $g_\phi=F_\phi^{-1}$; its derivative
+is $1/p_\phi(g_\phi(t))$ almost everywhere. Training draws one random point in each equal-probability clock stratum,
+randomly permutes those points across examples, and applies the inverse CDF.
+Each row retains the correct marginal density; stratification reduces time
+sampling noise. The likelihood estimator is
+$L=\widehat A(u)/p_\phi(u)$, using detached density in likelihood gradients.
+Sampling uses the same inverse CDF to set both masking and Gaussian noise.
+
+For fixed non-clock parameters, the second moment and its gradient are
+\[
+ J(\phi)=\int\frac{\E[\widehat A(u)^2]}{p_\phi(u)}du,
+ \qquad
+ \nabla_\phi J=-\E_{u\sim p_\phi}
+ [L^2\nabla_\phi\log p_\phi(u)].
+\]
+The implementation adds a zero-valued surrogate
+$S-\operatorname{stopgrad}(S)$, where
+$S=-\operatorname{stopgrad}(L^2)\log p_\phi(u)$.
+It changes only clock gradients, not reported NELBO values, model gradients,
+or endpoint gradients. This avoids incorrect pathwise differentiation
+through sampled discrete masks. The prior does not depend on the clock and
+is excluded from its variance objective.
+
+\paragraph{Exact versus approximate information linearity.}
+The ideal mean-flattening density is proportional to $A_\theta(u)$.
+The per-example stochastic second-moment optimum instead satisfies
+$p^*(u)\propto\sqrt{\E[\widehat A(u)^2]}$. The implemented clock score minimizes this per-example second moment, not
+the full stratified batch variance with its cross-example covariances.
+Conditional sampling noise,
+finite bins, the uniform floor, and an imperfect denoiser prevent a claim of
+exact linear information in this implementation. The mean-level theorem
+survives; empirical linearity is a diagnostic, not a guaranteed outcome.
+
+\section{Sampling and verification}
+Start from all-masked standard Gaussian latents. At reverse clock times
+$t>v$, compute $u_t=g(t),u_v=g(v)$, reveal with probability
+$(u_t-u_v)/u_t$, and draw revealed tokens categorically. Remaining continuous
+positions use the Gaussian bridge with the same endpoint schedule and soft
+embedding prediction. Already visible positions and prompts remain fixed.
+The grid ends exactly at zero, where all remaining tokens reveal; no extra
+argmax decoder is used. Nonzero sampling epsilon is rejected.
+
+Tests cover the importance integral, the exact expected score-gradient
+against analytic differentiation, conditional-estimator equivalence by
+mask enumeration, endpoint reveal probabilities, singleton batches,
+embedding/head/endpoint/clock gradients, clean prompt preservation,
+all-context rows, composition of the matched Sudoku configuration, fresh-process sampler
+registration, default public generation endpoints, and exact enumeration
+of the Rao--Blackwellized mask estimator.
+The matched experiment is \texttt{sudoku\_replaid\_hybrid\_matched}, using
+W\&B project \texttt{replaid-sudoku}. Implementation validation is not a
+claim of Sudoku performance; that requires a separate training run.
+
+\begin{thebibliography}{9}
+\bibitem{cadd} Zheng et al. \emph{Continuously Augmented Discrete Diffusion
+model for Categorical Generative Modeling}, equations 4.14--4.17.
+\url{https://arxiv.org/html/2510.01329}
+\bibitem{replaid} \emph{Continuous Diffusion Scales Competitively with
+Discrete Diffusion for Language}, Section 5.2.
+\url{https://arxiv.org/html/2605.18530v1}
+\bibitem{plaid} Gulrajani and Hashimoto. \emph{Likelihood-Based Diffusion
+Language Models}. \url{https://arxiv.org/abs/2305.18619}
+\end{thebibliography}
+\end{document}

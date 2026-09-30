@@ -1,0 +1,10 @@
+# @package _global_
+defaults:
+  - hubpaths_latent_ar
+data:
+  prepared_dir: ${hydra:runtime.cwd}/data_cache/hubpaths/grammar_pilot/seed0_grammar
+model:
+  length: 314  # BOS + 1 + (40 maximum cores - 1) * 8 bridge steps
+wandb:
+  group: grammar-core-ar
+  name: hubpaths-grammar-core-ar
