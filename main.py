@@ -1,6 +1,7 @@
 from tqdm import tqdm
 
 from collections import Counter
+from contextlib import contextmanager
 import json
 import importlib
 import math
@@ -60,7 +61,7 @@ def _load_from_checkpoint(diffusion_model, config, tokenizer):
     state_dict = {
         key.replace("_orig_mod.", ""): value
         for key, value in checkpoint["state_dict"].items()
-        if "teacher" not in key
+        if "teacher" not in key or config.algo.name == "simplex_dmd"
     }
     # PositionRotary was added after the published S-FLM checkpoints. Its
     # inv_freq buffer is deterministic (and unused by these non-causal
@@ -485,14 +486,36 @@ def _dataset_entropy(config, logger, tokenizer):
     print("Dataset entropy stats saved at:", output_path)
 
 
-def _train(diffusion_model, config, logger, tokenizer):
-    logger.info("Starting Training.")
-    wandb_logger = None
-    if config.get("wandb", None) is not None:
-        wandb_logger = L.pytorch.loggers.WandbLogger(
+@contextmanager
+def _wandb_experiment(config):
+    """Connect before work starts and finalize even if experiment setup fails."""
+    experiment_logger = None
+    if config.get("wandb") is not None:
+        experiment_logger = L.pytorch.loggers.WandbLogger(
             config=omegaconf.OmegaConf.to_object(config), **config.wandb
         )
+    elif config.get("require_wandb", False):
+        raise ValueError("This experiment requires W&B logging")
+    try:
+        if experiment_logger is not None:
+            _ = experiment_logger.experiment
+        yield experiment_logger
+    except BaseException:
+        if experiment_logger is not None:
+            experiment_logger.finalize("failed")
+        raise
+    else:
+        if experiment_logger is not None:
+            experiment_logger.finalize("success")
 
+
+def _train(diffusion_model, config, logger, tokenizer):
+    logger.info("Starting Training.")
+    with _wandb_experiment(config) as wandb_logger:
+        _fit(diffusion_model, config, tokenizer, wandb_logger)
+
+
+def _fit(diffusion_model, config, tokenizer, wandb_logger):
     if (
         config.checkpointing.resume_from_ckpt
         and config.checkpointing.resume_ckpt_path is not None
@@ -542,6 +565,16 @@ def _train(diffusion_model, config, logger, tokenizer):
         logger=wandb_logger,
     )
     trainer.fit(model, train_ds, valid_ds, ckpt_path=ckpt_path)
+    if config.checkpointing.get("save_final", False):
+        final_checkpoint = os.path.join(
+            config.checkpointing.save_dir, "checkpoints", "final.ckpt"
+        )
+        trainer.save_checkpoint(final_checkpoint)
+        if trainer.is_global_zero and wandb_logger is not None:
+            wandb_logger.experiment.summary["final_checkpoint"] = final_checkpoint
+    if trainer.is_global_zero and wandb_logger is not None:
+        wandb_logger.experiment.summary["completed_training_steps"] = trainer.global_step
+
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(config):
@@ -567,7 +600,17 @@ def main(config):
         from tasks.reasoning import evaluate_reasoning
         evaluate_reasoning(load_checkpoint=_load_from_checkpoint, **kwargs)
     elif config.mode == "sudoku_eval":
-        evaluate_sudoku(load_checkpoint=_load_from_checkpoint, **kwargs)
+        with _wandb_experiment(config) as evaluation_logger:
+            results = evaluate_sudoku(load_checkpoint=_load_from_checkpoint, **kwargs)
+            if evaluation_logger is not None:
+                evaluation_logger.log_metrics({
+                    f"sudoku/{key}": value for key, value in results.items()
+                    if isinstance(value, (int, float))
+                })
+                import wandb
+                artifact = wandb.Artifact("sudoku-evaluation", type="evaluation")
+                artifact.add_file(os.path.join(config.sudoku.output_dir, "results.json"))
+                evaluation_logger.experiment.log_artifact(artifact)
     elif config.mode == "gsm8k_eval":
         evaluate_gsm8k(load_checkpoint=_load_from_checkpoint, **kwargs)
     elif config.mode == "ppl_eval":

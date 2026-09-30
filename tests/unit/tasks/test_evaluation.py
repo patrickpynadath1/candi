@@ -9,7 +9,7 @@ import torch
 from samplers import SamplingResult
 
 from tasks import evaluation
-from tasks.sudoku import SudokuTokenizer, encode_example
+from tasks.sudoku import SudokuTokenizer, PaperSudokuTokenizer, encode_example
 from tasks.sudoku_generator import generate_grids
 
 
@@ -18,8 +18,8 @@ class Logger:
         pass
 
 
-def test_sudoku_evaluation_preserves_prompt(monkeypatch, tmp_path):
-    tokenizer = SudokuTokenizer()
+@pytest.mark.parametrize("tokenizer", [SudokuTokenizer(), PaperSudokuTokenizer()])
+def test_sudoku_evaluation_preserves_prompt(monkeypatch, tmp_path, tokenizer):
     puzzle, solution = generate_grids(1, "easy", 11)[0]
     ids, mask = encode_example(puzzle, solution, tokenizer)
     dataset = datasets.DatasetDict(

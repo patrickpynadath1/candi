@@ -1,0 +1,7 @@
+defaults:
+  - simplex
+name: simplex_dmd
+teacher_checkpoint: null
+teacher_use_ema: true
+auxiliary_lr: 0.0003
+generator_weight: 1.0

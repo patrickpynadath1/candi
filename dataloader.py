@@ -13,6 +13,7 @@ import zipfile
 from typing import Optional
 
 import datasets
+import omegaconf
 import fsspec
 import requests
 import tokenizers
@@ -929,9 +930,13 @@ def get_tokenizer(config):
 
         tokenizer = get_hubpaths_tokenizer(config)
     elif config.data.tokenizer_name_or_path == "sudoku":
-        from tasks.sudoku import SudokuTokenizer
+        from tasks.sudoku import SudokuTokenizer, PaperSudokuTokenizer
 
-        tokenizer = SudokuTokenizer()
+        tokenizer_class = (
+            PaperSudokuTokenizer if config.data.get("paper_protocol", False)
+            else SudokuTokenizer
+        )
+        tokenizer = tokenizer_class()
     elif config.data.tokenizer_name_or_path in {"sudoku_extreme", "sudoku_shah", "maze_unique", "zebra"}:
         from tasks.reasoning import get_reasoning_tokenizer
         tokenizer = get_reasoning_tokenizer(config.data.tokenizer_name_or_path)
@@ -979,7 +984,15 @@ def get_dataloaders(
 ):
     skip_valid = skip_valid or config.data.get("full_training", False)
     # A CPU process is a single data-parallel worker for batch-size purposes.
-    num_gpus = max(1, torch.cuda.device_count())
+    devices = getattr(config.trainer, "devices", "auto")
+    if getattr(config.trainer, "accelerator", "auto") == "cpu":
+        num_gpus = 1
+    elif isinstance(devices, (list, omegaconf.ListConfig)):
+        num_gpus = len(devices)
+    elif isinstance(devices, int) and devices > 0:
+        num_gpus = devices
+    else:
+        num_gpus = max(1, torch.cuda.device_count())
     if config.trainer.accumulate_grad_batches > 1:
         # assert config.loader.global_batch_size == (
         #     config.loader.batch_size
@@ -993,7 +1006,7 @@ def get_dataloaders(
             != 0
         ):
             raise ValueError(
-                f"Train Batch Size {config.training.batch_size}"
+                f"Train Batch Size {config.loader.global_batch_size}"
                 f"not divisible by {num_gpus} gpus with accumulation "
                 f"{config.trainer.accumulate_grad_batches}."
             )
@@ -1003,13 +1016,13 @@ def get_dataloaders(
         != 0
     ):
         raise ValueError(
-            f"Train Batch Size {config.training.batch_size}"
+            f"Train Batch Size {config.loader.global_batch_size}"
             f"not divisible by {num_gpus} gpus with accumulation "
             f"{config.trainer.accumulate_grad_batches}."
         )
     if config.loader.eval_global_batch_size % num_gpus != 0:
         raise ValueError(
-            f"Eval Batch Size for {config.eval.batch_size} "
+            f"Eval Batch Size for {config.loader.eval_global_batch_size} "
             f"not divisible by {num_gpus}."
         )
     if skip_train:

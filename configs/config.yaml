@@ -32,6 +32,17 @@ gsm8k:
   subset_seed: 42
 
 seed: 1
+self_conditioning:
+  enabled: false
+  probability: 0.9
+time_sampling:
+  adaptive: false
+  buffer_size: 65536
+  bins: 50
+  grid_size: 1000
+  warmup: 1000
+  refit_every: 50
+  momentum: 0.9
 scratch_dir:  /home/patrick/.cache/discrete_diffusion
 batch_size: 512
 loader:
@@ -44,6 +55,7 @@ loader:
   pin_memory: True
 
 sampling:
+  predict_correct: false
   predictor: ancestral_cache  # ancestral_cache (only for MDLM), ancestral, analytic
   steps: 1024
   noise_removal: ancestral  # 'ancestral', 'greedy', 'none'
@@ -123,6 +135,7 @@ hydra:
     chdir: true
 
 checkpointing:
+  save_final: false
   # Use custom `save_dir` if, e.g., saving to S3 bucket, otherwise leave this parameter as is
   save_dir: ${cwd:}
   # Note: `checkpoints` path should correspond to `checkpoint_every_n_steps.dirpath`

@@ -33,6 +33,8 @@ def _tokenizer_for(algo):
     return Text8Tokenizer()
 
 ALGORITHM_CONFIGS = [
+    ("simplex", ("sampling.predictor=simplex",)),
+    ("simplex_dmd", ("sampling.predictor=simplex",)),
     ("ar", ("sampling.predictor=ar",)),
     ("block_diffusion", ("sampling.predictor=block_diffusion",)),
     ("mdlm", ("sampling.predictor=ancestral_cache",)),
@@ -83,7 +85,8 @@ ALGORITHM_CONFIGS = [
 
 TIME_CONDITIONED_CONFIGS = [
     entry for entry in ALGORITHM_CONFIGS
-    if entry[0] not in {"ar", "block_diffusion", "mdlm_perm"}
+    # SDM uses the separate bucketed PaperTimeSampler, tested in test_simplex.
+    if entry[0] not in {"ar", "block_diffusion", "mdlm_perm", "simplex", "simplex_dmd"}
 ]
 
 
@@ -118,6 +121,10 @@ def test_shipping_algorithm_config_constructs_real_backbone_and_sampler(algo, ov
     assert len(model.backbone.blocks) == expected_blocks
     assert model.backbone.blocks[0].attn_qkv.weight.shape[1] == 8
     sampler.validate_model(model)
+
+    if algo in {"mdlm", "ar"}:
+        assert getattr(model, "paper_time_sampler", None) is None
+        assert not any(key.startswith("paper_time_sampler.") for key in model.state_dict())
 
 
 def test_real_mdlm_training_path_reaches_output_projection():

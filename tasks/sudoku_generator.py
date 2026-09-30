@@ -34,22 +34,59 @@ def _fill_grid(grid, rng):
 
 
 def count_solutions(grid, limit=2):
-    count = 0
+    """Count up to limit using bit masks and minimum-remaining-values search.
 
-    def solve():
+    Does not modify the caller's grid. The search order changes only the cost of
+    uniqueness verification, not puzzle generation or its random-number stream.
+    """
+    count = 0
+    rows, columns, boxes = [0] * 9, [0] * 9, [0] * 9
+    empty = []
+    for row in range(9):
+        for column in range(9):
+            value = grid[row][column]
+            box = row // 3 * 3 + column // 3
+            if value == 0:
+                empty.append((row, column, box))
+            else:
+                bit = 1 << (value - 1)
+                if (rows[row] | columns[column] | boxes[box]) & bit:
+                    return 0
+                rows[row] |= bit
+                columns[column] |= bit
+                boxes[box] |= bit
+
+    def solve(depth=0):
         nonlocal count
         if count >= limit:
             return
-        for row in range(9):
-            for column in range(9):
-                if grid[row][column] == 0:
-                    for number in range(1, 10):
-                        if is_valid(grid, row, column, number):
-                            grid[row][column] = number
-                            solve()
-                            grid[row][column] = 0
-                    return
-        count += 1
+        if depth == len(empty):
+            count += 1
+            return
+        best, candidates, size = depth, 0, 10
+        for index in range(depth, len(empty)):
+            row, column, box = empty[index]
+            choices = 511 & ~(rows[row] | columns[column] | boxes[box])
+            n = choices.bit_count()
+            if n < size:
+                best, candidates, size = index, choices, n
+                if n <= 1:
+                    break
+        if not candidates:
+            return
+        empty[depth], empty[best] = empty[best], empty[depth]
+        row, column, box = empty[depth]
+        while candidates and count < limit:
+            bit = candidates & -candidates
+            candidates ^= bit
+            rows[row] |= bit
+            columns[column] |= bit
+            boxes[box] |= bit
+            solve(depth + 1)
+            rows[row] ^= bit
+            columns[column] ^= bit
+            boxes[box] ^= bit
+        empty[depth], empty[best] = empty[best], empty[depth]
 
     solve()
     return count
@@ -76,7 +113,7 @@ def _generate_one(arguments):
     return puzzle, solution
 
 
-def generate_grids(count, difficulty, seed, num_workers=1):
+def generate_grids(count, difficulty, seed, num_workers=1, exact_clues=False):
     if difficulty not in DIFFICULTY_TO_CLUES:
         raise ValueError(f"unknown Sudoku difficulty: {difficulty}")
     clues = DIFFICULTY_TO_CLUES[difficulty]
@@ -91,6 +128,11 @@ def generate_grids(count, difficulty, seed, num_workers=1):
         else:
             candidates = map(_generate_one, jobs)
         for puzzle, solution in candidates:
+            if (
+                exact_clues
+                and sum(value != 0 for row in puzzle for value in row) != clues
+            ):
+                continue
             key = tuple(value for row in solution for value in row)
             if key not in seen:
                 seen.add(key)

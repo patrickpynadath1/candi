@@ -69,6 +69,13 @@ class TrainerBase(L.LightningModule):
             backbone_cls = model_registry.get(self.config.algo.backbone)
             self.backbone = backbone_cls(self.config, vocab_size=self.vocab_size)
 
+        sc = config.get("self_conditioning", {})
+        if sc.get("enabled", False):
+            from models.self_conditioning import install_self_conditioning
+            install_self_conditioning(
+                self.backbone, config.model.hidden_size, sc.get("probability", 0.9)
+            )
+
         self.T = self.config.algo.T
         self.num_tokens = self.config.model.length
         self.softplus = torch.nn.Softplus()
@@ -92,7 +99,8 @@ class TrainerBase(L.LightningModule):
 
         if self.config.training.ema > 0:
             self.ema = ExponentialMovingAverage(
-                self._get_parameters(), decay=self.config.training.ema
+                self._get_parameters(), decay=self.config.training.ema,
+                use_num_updates=self.config.training.get("ema_use_num_updates", True),
             )
         else:
             self.ema = None
@@ -127,17 +135,21 @@ class TrainerBase(L.LightningModule):
         return itertools.chain(self.backbone.parameters(), self.noise.parameters())
 
     def _eval_mode(self):
-        if self.ema:
+        if self._uses_ema_for_evaluation():
             self.ema.store(self._get_parameters())
             self.ema.copy_to(self._get_parameters())
         self.backbone.eval()
         self.noise.eval()
 
     def _train_mode(self):
-        if self.ema:
+        if self._uses_ema_for_evaluation():
             self.ema.restore(self._get_parameters())
         self.backbone.train()
         self.noise.train()
+
+    def _uses_ema_for_evaluation(self):
+        evaluation = getattr(self.config, "eval", None)
+        return self.ema is not None and not getattr(evaluation, "disable_ema", False)
 
     def on_load_checkpoint(self, checkpoint):
         self._resume_random_state = checkpoint.get("sampler", {}).get("random_state")
@@ -157,7 +169,7 @@ class TrainerBase(L.LightningModule):
             cleaned_state_dict = {}
             
             for key, value in state_dict.items():
-                if "teacher" not in key: 
+                if "teacher" not in key or getattr(getattr(self.config, "algo", None), "name", None) == "simplex_dmd":
                     cleaned_key = key
                     # Remove _orig and other modifiers
                     cleaned_key = cleaned_key.replace('_orig_mod.', '') 

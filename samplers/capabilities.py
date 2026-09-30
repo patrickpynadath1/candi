@@ -1,6 +1,11 @@
 """Runtime method contracts advertised by algorithm classes."""
 
 CAPABILITY_METHODS: dict[str, tuple[str, ...]] = {
+    "discrete_reverse_probs": ("reverse_transition_probs",),
+    "discrete_corruption": ("q_xt",),
+    "simplex_denoise": ("forward",),
+    "simplex_prior": ("prior_sample",),
+    "simplex_concentration": ("concentration",),
     "next_token_logits": ("next_token_logits",),
     "cached_next_token_logits": ("next_token_logits_cached",),
     "permuted_logits": ("permuted_logits",),

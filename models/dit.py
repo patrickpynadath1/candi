@@ -88,6 +88,7 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         if getattr(config.model, "tie_word_embeddings", False):
             self.output_layer.linear.weight = self.vocab_embed.embedding
         self.scale_by_sigma = config.model.scale_by_sigma
+        self.output_dropout = nn.Dropout(getattr(config.model, "output_dropout", 0.0))
 
     def _get_bias_dropout_scale(self):
         if self.training:
@@ -99,18 +100,20 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         x = self.get_embedding(x)
         if self.adaLN:
             t_cond = F.silu(self.sigma_map(sigma))
+            if getattr(self.config.algo, "paper_time_conditioning", False) and not self.config.algo.time_conditioning:
+                t_cond = torch.zeros_like(t_cond)
         else:
             t_cond = None
 
         rotary_cos_sin = self.rotary_emb(x)
 
         with torch.amp.autocast(
-            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()
+            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available() and not getattr(self.config.model, "full_precision", False)
         ):
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
             if get_logits:
-                x = self.output_layer(x, c=t_cond)
+                x = self.output_layer(self.output_dropout(x), c=t_cond)
         return x
 
     def allocate_kv_cache(self, batch_size, capacity, *, device=None, dtype=None):
@@ -194,12 +197,12 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         rotary_cos_sin = self.rotary_emb(x_emb)
 
         with torch.amp.autocast(
-            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available()
+            "cuda", dtype=torch.bfloat16, enabled=torch.cuda.is_available() and not getattr(self.config.model, "full_precision", False)
         ):
             x = x_emb
             for i in range(len(self.blocks)):
                 x = self.blocks[i](x, rotary_cos_sin, c=t_cond)
-            x = self.output_layer(x, c=t_cond)
+            x = self.output_layer(self.output_dropout(x), c=t_cond)
 
         return x
 

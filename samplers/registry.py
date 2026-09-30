@@ -70,6 +70,8 @@ def create_sampler(
         replaid_keep_entropy_bounded,
         renoising,
         sfm,
+        simplex,
+        paper_discrete,
         uniform_entropy_bounded,
     )
 
@@ -78,6 +80,11 @@ def create_sampler(
 
         config = OmegaConf.merge(config, {"sampling": sampling_overrides})
     predictor = default or getattr(config.sampling, "predictor", None)
+    sc = getattr(config, "self_conditioning", None)
+    if sc is not None and sc.enabled:
+        # Latent feedback modifies the embedded prefix on every call, making
+        # stored attention keys/values stale.
+        predictor = {"ar_cached": "ar", "permuted_ar": "permuted_ar_uncached"}.get(predictor, predictor)
     if predictor is None:
         raise ValueError("sampling.predictor must select a registered sampler")
     return sampler_registry.create(predictor, config)

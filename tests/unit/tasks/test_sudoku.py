@@ -4,6 +4,33 @@ from tasks.sudoku import SudokuTokenizer, encode_example, solution_grid, sudoku_
 from tasks.sudoku_generator import count_solutions, generate_grids
 
 
+def test_paper_layout_and_exact_clue_generation():
+    from tasks.sudoku import PaperSudokuTokenizer
+
+    tokenizer = PaperSudokuTokenizer()
+    puzzle, solution = generate_grids(1, "hard", 42, exact_clues=True)[0]
+    ids, mask = encode_example(puzzle, solution, tokenizer)
+    assert (
+        len(tokenizer) == 14
+        and tokenizer.pad_token_id == 12
+        and tokenizer.mask_token_id == 13
+    )
+    assert mask == [0] * 90 + [1] * 90 and ids[90] == 11
+    assert sum(value != 0 for row in puzzle for value in row) == 30
+    assert count_solutions(puzzle) == 1
+    truth = torch.tensor(ids[90:])
+    result = sudoku_metrics(truth, truth, torch.tensor(ids[1:90]))
+    assert result["exact"] and result["valid_solution"]
+
+
+def test_uniqueness_counter_rejects_conflicts_and_does_not_mutate():
+    grid = [[0] * 9 for _ in range(9)]
+    assert count_solutions(grid) == 2
+    assert grid == [[0] * 9 for _ in range(9)]
+    grid[0][0] = grid[0][1] = 1
+    assert count_solutions(grid) == 0
+
+
 def test_sudoku_generation_is_deterministic_and_unique():
     first = generate_grids(1, "easy", 7)
     second = generate_grids(1, "easy", 7)
@@ -79,4 +106,4 @@ def test_valid_grid_must_obey_clues_and_digit_accuracy_excludes_separators():
     wrong = truth.clone()
     wrong[0] = 0
     result = sudoku_metrics(wrong, truth, clue_tokens)
-    assert abs(result["digit_accuracy"] - 80/81) < 1e-6
+    assert abs(result["digit_accuracy"] - 80 / 81) < 1e-6

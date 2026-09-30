@@ -18,6 +18,7 @@ class SudokuTokenizer:
     mask_token_id = None
     vocab_size = 12
     grid_size = 9
+    grid_token_count = grid_size * grid_size + grid_size - 1
     seq_len = 89
     prompt_len = 91
     total_seq_len = 180
@@ -40,6 +41,21 @@ class SudokuTokenizer:
 
     def batch_decode(self, sequences, skip_special_tokens=False):
         return [self.decode(sequence, skip_special_tokens) for sequence in sequences]
+
+    def puzzle_tokens(self, sequence):
+        """Puzzle digits and row separators, independent of the target layout."""
+        return sequence[1 : 1 + self.grid_token_count]
+
+
+class PaperSudokuTokenizer(SudokuTokenizer):
+    """The 14-symbol, 90+90 layout in SDM Appendix J.4."""
+    pad_token_id = 12
+    mask_token = "[MASK]"
+    mask_token_id = 13
+    vocab_size = 14
+    prompt_len = 90
+    seq_len = 90
+    _symbols = {**SudokuTokenizer._symbols, 12: "[PAD]", 13: "[MASK]"}
 
 
 def encode_grid(grid, separator=10):
@@ -70,6 +86,8 @@ def get_sudoku_dataset(config, tokenizer):
         f"sudoku_{data.difficulty}_train{data.num_train}_valid{data.num_valid}"
         f"_seed{data.data_seed}"
     )
+    if isinstance(tokenizer, PaperSudokuTokenizer):
+        cache = cache.with_name(cache.name + "_paper14_exactclues")
     if cache.exists():
         return datasets.load_from_disk(str(cache)).with_format("torch")
     pairs = generate_grids(
@@ -77,6 +95,7 @@ def get_sudoku_dataset(config, tokenizer):
         data.difficulty,
         data.data_seed,
         data.sudoku_num_workers,
+        exact_clues=isinstance(tokenizer, PaperSudokuTokenizer),
     )
     records = [
         encode_example(puzzle, solution, tokenizer) for puzzle, solution in pairs
@@ -104,6 +123,8 @@ def get_sudoku_dataset(config, tokenizer):
 
 
 def solution_grid(tokens):
+    if len(tokens) == 90 and int(tokens[0]) == SudokuTokenizer.bos_token_id:
+        tokens = tokens[1:]
     values = [
         int(token) for token in tokens if int(token) != SudokuTokenizer.row_separator_id
     ]
@@ -121,6 +142,8 @@ def sudoku_metrics(generated, ground_truth, puzzle=None):
     extras = {}
     if puzzle is not None:
         puzzle = torch.as_tensor(puzzle)
+        if len(ground_truth) == 90:
+            puzzle = torch.cat((puzzle.new_tensor([SudokuTokenizer.bos_token_id]), puzzle))
         digits = (ground_truth >= 1) & (ground_truth <= 9)
         clues = (puzzle >= 1) & (puzzle <= 9)
         extras = {

@@ -16,12 +16,15 @@ import collections
 @algo_registry.register("duo_base")
 class DUO_BASE(UniformState):
     supported_samplers = frozenset({
-        "ancestral", "ancestral_cache", "semi_ar", "uniform_entropy_bounded",
+        "ancestral", "ancestral_cache", "semi_ar", "uniform_entropy_bounded", "paper_discrete",
     })
     sampling_capabilities = UniformState.sampling_capabilities | {
         "ancestral_transition",
         "zero_time_denoise",
         "uniform_entropy_transition",
+        "denoising_log_probs",
+        "discrete_reverse_probs",
+        "discrete_corruption",
     }
     def __init__(self, config, tokenizer):
         self.temp = config.algo.get("temp", 1.0)
@@ -47,6 +50,10 @@ class DUO_BASE(UniformState):
     def _process_model_output(self, model_output, xt, sigma):
         del xt, sigma
         return (model_output / self.temp).log_softmax(dim=-1)
+
+    def reverse_transition_probs(self, clean_probs, xt, alpha_s, alpha_t):
+        """Public sampler interface for the uniform reverse distribution."""
+        return self._compute_posterior(clean_probs, xt, alpha_s, alpha_t)
 
     def _compute_posterior(self, x, xt, alpha_s, alpha_t):
         """Computes the posterior / approximate posterior.

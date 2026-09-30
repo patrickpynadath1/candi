@@ -14,6 +14,21 @@ class Diffusion(TrainerBase):
         "noise_schedule",
         "greedy_denoise",
     })
+
+    def __init__(self, config, tokenizer, vocab_size=None):
+        super().__init__(config, tokenizer, vocab_size=vocab_size)
+        self.paper_time_sampler = None
+        time_config = config.get("time_sampling", {})
+        if (
+            time_config.get("adaptive", False)
+            or config.algo.get("paper_time_conditioning", False)
+            or config.sampling.predictor == "paper_discrete"
+            or self.sampling_family == "simplex"
+        ):
+            from .paper_time_sampler import PaperTimeSampler
+
+            self.paper_time_sampler = PaperTimeSampler(**dict(time_config))
+
     def _validate_configuration(self):
         super()._validate_configuration()
         assert self.config.sampling.noise_removal in {"none", "ancestral", "greedy"}
@@ -45,6 +60,8 @@ class Diffusion(TrainerBase):
             offset = torch.arange(n, device=self.device) / n
             _eps_t = (_eps_t / n + offset) % 1
         t = (1 - self.sampling_eps) * _eps_t + self.sampling_eps
+        if getattr(getattr(self, "paper_time_sampler", None), "adaptive", False):
+            t = self.paper_time_sampler(t)
         if accum_step is not None:
             t = t.chunk(self.trainer.num_nodes)[self.trainer.node_rank]
             t = t.chunk(self.trainer.num_devices)[self.trainer.local_rank]
@@ -54,6 +71,8 @@ class Diffusion(TrainerBase):
         return t
 
     def _sigma_from_alphat(self, alpha_t):
+        if getattr(getattr(getattr(self, "config", None), "algo", None), "paper_time_conditioning", False):
+            return 1 - alpha_t
         return -torch.log(alpha_t)
 
     def _reconstruction_loss(self, x0):
@@ -96,7 +115,12 @@ class Diffusion(TrainerBase):
             dalpha_t=dalpha_t,
             low_var=train_mode and self.loss_type == "low_var",
         )
+        if self.loss_type == "ce":
+            loss = -log_x_theta.gather(-1, x0[..., None]).squeeze(-1)
         self._record_time_loss(t, loss, valid_tokens, train_mode)
+        if train_mode and getattr(getattr(self, "paper_time_sampler", None), "adaptive", False):
+            ce = -log_x_theta.gather(-1, x0[..., None]).squeeze(-1)
+            self.paper_time_sampler.observe(t, ce, valid_tokens, self.global_step)
         return loss
 
     def _get_score(self, **kwargs):

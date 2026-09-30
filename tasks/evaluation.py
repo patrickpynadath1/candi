@@ -89,7 +89,7 @@ def evaluate_sudoku(diffusion_model, config, tokenizer, load_checkpoint, logger)
         truth = batch[:, prompt_length:]
         predictions = generated[:, prompt_length : prompt_length + truth.shape[1]]
         for prediction, target, example in zip(predictions, truth, batch):
-            metrics = sudoku_metrics(prediction, target, example[1:prompt_length-1])
+            metrics = sudoku_metrics(prediction, target, tokenizer.puzzle_tokens(example))
             records.append(
                 {
                     "generated": tokenizer.decode(prediction),

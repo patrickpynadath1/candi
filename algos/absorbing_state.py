@@ -10,7 +10,7 @@ class AbsorbingState(Diffusion):
     sampling_family = "absorbing_diffusion"
     supported_samplers = frozenset({
         "ancestral", "ancestral_cache", "analytic", "entropy_bounded",
-        "semi_ar",
+        "semi_ar", "paper_discrete",
     })
     sampling_capabilities = Diffusion.sampling_capabilities | {
         "ancestral_transition",
@@ -18,6 +18,8 @@ class AbsorbingState(Diffusion):
         "denoiser_transition",
         "zero_time_denoise",
         "denoising_log_probs",
+        "discrete_reverse_probs",
+        "discrete_corruption",
     }
     def __init__(self, config, tokenizer):
         self.temp = config.algo.get("temp", 1.0)
@@ -46,6 +48,13 @@ class AbsorbingState(Diffusion):
         self.subs_masking = config.algo.subs_masking
         super().__init__(config, tokenizer, vocab_size=vocab_size)
         self.save_hyperparameters()
+
+    def reverse_transition_probs(self, clean_probs, xt, alpha_s, alpha_t):
+        """Masked reverse probabilities; observed tokens remain fixed."""
+        masked = clean_probs * ((alpha_s - alpha_t) / (1 - alpha_t))[..., None]
+        masked[..., self.mask_index] = ((1 - alpha_s) / (1 - alpha_t)).expand_as(xt)
+        observed = F.one_hot(xt, self.vocab_size).to(masked)
+        return torch.where((xt == self.mask_index)[..., None], masked, observed)
 
     def _validate_configuration(self):
         super()._validate_configuration()

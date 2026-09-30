@@ -1,0 +1,62 @@
+# @package _global_
+defaults:
+  - override /data: sudoku
+  - override /model: tiny
+  - override /algo: simplex
+  - override /noise: log-linear
+  - override /callbacks: [checkpoint_every_n_steps, checkpoint_monitor, learning_rate_monitor, sudoku_eval]
+
+require_wandb: true
+checkpointing:
+  save_final: true
+
+data:
+  paper_protocol: true
+  difficulty: hard
+  num_train: 200000
+  num_valid: 5000
+noise:
+  eps: 0.0
+model:
+  length: 180
+  hidden_size: 512
+  n_blocks: 8
+  n_heads: 8
+  full_precision: true
+  # DDiTBlock already drops attention/MLP output projections at model.dropout.
+  output_dropout: 0.0
+loader:
+  global_batch_size: 256
+trainer:
+  max_steps: 50000
+  precision: 32-true
+  val_check_interval: 5000
+  check_val_every_n_epoch: null
+  # Keep every optimizer update at the specified global batch size.
+  limit_train_batches: ${eval:'(${data.num_train} // ${loader.global_batch_size}) * ${trainer.accumulate_grad_batches}'}
+training:
+  ema_use_num_updates: false
+  warmup_steps: 2500
+  sampling_eps: 0.00001
+sampling:
+  predictor: simplex
+  steps: 180
+  churn: 1.0
+  time_grid: linear
+  guidance_scale: null
+  confidence_power: null
+eval:
+  generate_samples: false
+callbacks:
+  checkpoint_every_n_steps:
+    save_top_k: 0
+  checkpoint_monitor:
+    save_top_k: 0
+  sudoku_eval:
+    num_steps: 180
+    full_eval_at_end: true
+wandb:
+  project: simplex-sudoku
+  name: simplex
+  group: simplex-paper
+  mode: online

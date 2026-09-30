@@ -1,0 +1,11 @@
+# @package _global_
+defaults:
+  - sudoku_simplex
+  - override /algo: duo_base
+algo:
+  paper_time_conditioning: true
+sampling:
+  predictor: paper_discrete
+  predict_correct: false
+wandb:
+  name: uniform-paper

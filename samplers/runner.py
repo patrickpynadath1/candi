@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import torch
+from contextlib import nullcontext
 
 from .base import Sampler, SamplingRequest, SamplingResult
 
@@ -23,4 +24,7 @@ def run_sampler(
         if request.prompt_tokens.shape[0] != request.num_samples:
             raise ValueError("prompt batch size must equal num_samples")
     sampler.validate_model(model)
-    return sampler.sample(model, request)
+    conditioning = getattr(getattr(model, "backbone", None),
+                           "latent_self_conditioning", None)
+    with conditioning.trajectory() if conditioning is not None else nullcontext():
+        return sampler.sample(model, request)

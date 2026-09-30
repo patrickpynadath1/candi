@@ -1,0 +1,9 @@
+# @package _global_
+defaults:
+  - sudoku_simplex
+self_conditioning:
+  enabled: true
+trainer:
+  max_steps: 38462
+wandb:
+  name: simplex-sc

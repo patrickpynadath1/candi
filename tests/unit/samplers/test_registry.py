@@ -44,6 +44,8 @@ def test_every_concrete_sampler_has_a_unique_registry_name():
         "replaid_keep_entropy_bounded",
         "renoising",
         "sfm",
+        "simplex",
+        "paper_discrete",
         "uniform_entropy_bounded",
     }
 

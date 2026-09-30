@@ -39,7 +39,8 @@ class CachedAncestralSampler(Sampler):
             if model.sampling_family == "uniform_diffusion":
                 transition_args["greedy_clean_estimate"] = self.greedy_clean_estimate
             cache, x_next = model.sample_ancestral_transition(**transition_args)
-            if not torch.allclose(x_next, x) or model.time_conditioning:
+            if (not torch.allclose(x_next, x) or model.time_conditioning
+                    or hasattr(getattr(model, "backbone", None), "latent_self_conditioning")):
                 cache = None
             x = x_next
         nfe = steps
