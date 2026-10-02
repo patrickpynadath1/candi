@@ -1,6 +1,7 @@
 """Posterior-derived tangent flow and manifold integration."""
 
 import torch
+from .loop import FixedGridLoop
 from core.processes.spherical import log_map
 from core.modifiers.self_conditioning.session import prediction_session
 
@@ -48,13 +49,16 @@ class SphericalFlowSampler:
             else torch.float32
         )
         embeddings = algo.representation.codebook().to(dtype)
-        for index in range(self.steps):
-            keep, _ = algo.schedule(times[index].expand(len(state)))
+        prediction = None
+
+        def update(state, time, next_time, index):
+            nonlocal prediction
+            keep, _ = algo.schedule(time.expand(len(state)))
             prediction = algo.sampling_prediction(state, keep)
             if self.use_float64:
                 prediction = prediction.double()
             if index == self.steps - 1:
-                break
+                return state
             probabilities = algo.predictor.probabilities(
                 prediction.to(dtype).log_softmax(-1)
             )
@@ -65,7 +69,7 @@ class SphericalFlowSampler:
                 self.velocity,
                 algo.process.eps,
             )
-            next_keep, _ = algo.schedule(times[index + 1].expand(len(state)))
+            next_keep, _ = algo.schedule(next_time.expand(len(state)))
             delta = ((next_keep - keep) / (1 - keep).clamp_min(algo.process.eps))[
                 :, None, None
             ]
@@ -73,6 +77,9 @@ class SphericalFlowSampler:
                 clean.dtype
             )
             state = torch.where(mask, clean, state)
+            return state
+
+        state = FixedGridLoop()(state, times, update)
         probabilities = algo.predictor.probabilities(prediction, apply_commitment=True)
         tokens = torch.multinomial(
             probabilities.reshape(-1, probabilities.shape[-1]), 1

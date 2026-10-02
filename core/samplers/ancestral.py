@@ -1,10 +1,12 @@
 import torch
+from .discrete import DiscreteSampler
 
 from .utils import initialize_state
-from core.modifiers.self_conditioning.session import prediction_session
 
 
-class AncestralSampler:
+class AbsorbingAncestralUpdate:
+    prediction_feedback = True
+
     def __init__(self, steps=180, epsilon=1e-5, final_denoise="greedy"):
         if steps <= 0 or not 0 < epsilon < 1:
             raise ValueError("positive steps and epsilon in (0, 1) required")
@@ -30,19 +32,39 @@ class AncestralSampler:
             state, posterior, state.eq(algo.process.mask_index), deterministic=True
         )
 
-    def sample(self, algo, prompt_tokens, prompt_mask):
-        algo = prediction_session(algo)
-        state = initialize_state(algo, prompt_tokens, prompt_mask)
-        times = torch.linspace(1, self.epsilon, self.steps + 1, device=state.device)
-        # Matches the historical ancestral_cache trajectory: all requested
-        # reverse steps, followed by a separate final denoising evaluation.
-        for t, s in zip(times[:-1], times[1:]):
-            state = self.reverse_step(algo, state, t, s)
-        nfe = self.steps
+    def initialize(self, algo, prompt_tokens, prompt_mask):
+        return initialize_state(algo, prompt_tokens, prompt_mask)
+
+    def update(self, algo, state, time, next_time, prompt_tokens, prompt_mask):
+        return self.reverse_step(algo, state, time, next_time), 1
+
+    def finalize(self, algo, state, time, prompt_tokens, prompt_mask):
         if self.final_denoise == "greedy":
-            state = self.greedy_denoise(algo, state, times[-1])
-            nfe += 1
-        elif self.final_denoise == "ancestral":
-            state = self.ancestral_denoise(algo, state, times[-1])
-            nfe += 1
-        return state, {"nfe": nfe, "nfe_per_sample": [nfe] * len(state)}
+            return self.greedy_denoise(algo, state, time), 1
+        if self.final_denoise == "ancestral":
+            return self.ancestral_denoise(algo, state, time), 1
+        return state, 0
+
+
+class AncestralSampler(DiscreteSampler):
+    def __init__(
+        self,
+        steps=180,
+        epsilon=1e-5,
+        final_denoise="greedy",
+        *,
+        update_rule=None,
+        time_grid=None,
+    ):
+        rule = update_rule or AbsorbingAncestralUpdate(steps, epsilon, final_denoise)
+        super().__init__(rule, steps, epsilon, time_grid)
+        self.final_denoise = final_denoise
+
+    def reverse_step(self, algo, state, source_time, destination_time):
+        return self.update_rule.reverse_step(algo, state, source_time, destination_time)
+
+    def ancestral_denoise(self, algo, state, time):
+        return self.update_rule.ancestral_denoise(algo, state, time)
+
+    def greedy_denoise(self, algo, state, time):
+        return self.update_rule.greedy_denoise(algo, state, time)

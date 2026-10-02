@@ -5,7 +5,11 @@ from contextlib import nullcontext
 import torch
 
 from core.parameterizations.posterior import PosteriorParameterization
-from core.modifiers.self_conditioning.session import PredictionSession, prediction_session
+from core.modifiers.self_conditioning.session import (
+    PredictionSession,
+    prediction_session,
+)
+from .loop import FixedGridLoop, LinearTimeGrid
 from .decoding import PosteriorDecoding, RepresentationDecoding
 
 
@@ -95,20 +99,36 @@ class ContinuousSampler:
 class FixedStepSampler(ContinuousSampler):
     supports_prediction_feedback = True
 
-    def __init__(self, steps=180, **kwargs):
+    def __init__(self, steps=180, update_rule=None, time_grid=None, **kwargs):
         if isinstance(steps, bool) or not isinstance(steps, int) or steps <= 0:
             raise ValueError("steps must be a positive integer")
         super().__init__(**kwargs)
         self.steps = steps
+        self.update_rule = update_rule
+        self.time_grid = time_grid or LinearTimeGrid(
+            self.start_time, self.epsilon, steps
+        )
+        self.loop = FixedGridLoop()
 
     def integrate(self, field, state):
-        times = torch.linspace(
-            self.start_time, self.epsilon, self.steps + 1, device=state.device
+        times = self.time_grid(state.device)
+        if not (
+            torch.isclose(times[0], times.new_tensor(self.start_time))
+            and torch.isclose(times[-1], times.new_tensor(self.epsilon))
+        ):
+            raise ValueError(
+                "integration grid must preserve start_time and epsilon endpoints"
+            )
+        return self.loop(
+            state,
+            times,
+            lambda value, time, next_time, index: self.step(
+                field, value, time, next_time
+            ),
+            step_context=getattr(field, "step_context", nullcontext),
         )
-        for time, next_time in zip(times[:-1], times[1:]):
-            with getattr(field, "step_context", nullcontext)():
-                state = self.step(field, state, time, next_time)
-        return state
 
     def step(self, field, state, time, next_time):
-        raise NotImplementedError
+        if self.update_rule is None:
+            raise NotImplementedError("provide an update_rule or override step")
+        return self.update_rule(field, state, time, next_time)

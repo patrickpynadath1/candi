@@ -73,3 +73,47 @@ When adding a sampler, keep reverse mathematics in the process and orchestration
 here. Test prompt preservation, NFE including final calls, local state cleanup on
 failure, deterministic limit cases, and predictor compatibility. Config knobs
 that shape logits belong in the predictor, not duplicated in the sampler.
+
+## Composing loops and update rules
+
+[FixedGridLoop](../../core/samplers/loop.py) runs an update callable over a supplied
+time grid. It does not inspect predictions or states, so the same loop executes
+tensor states and tuples of hybrid branch states. Fixed ancestral, analytic,
+Gaussian DDPM, blurring, spherical, simplex, and hybrid samplers use this loop.
+Their initialization and terminal policies remain explicit: spherical and simplex
+use their last iteration for decoding, whereas Gaussian and ancestral recipes
+can evaluate an additional terminal prediction. No extra model evaluation is
+introduced by sharing the loop.
+
+[DiscreteSampler](../../core/samplers/discrete.py) provides a composable discrete
+lifecycle. Its rule supplies `initialize`, `update`, and `finalize`; the latter two
+return `(state, nfe)`, so a custom rule can report multiple model evaluations.
+`AbsorbingAncestralUpdate`, `UniformAncestralUpdate`, and `AbsorbingAnalyticUpdate`
+request predictions through the algorithm and delegate transition equations to
+the appropriate process. Existing Hydra sampler targets are presets for these
+rules, and retain their previous constructor defaults.
+
+```python
+from core.samplers.discrete import DiscreteSampler
+from core.samplers.ancestral import AbsorbingAncestralUpdate
+from core.samplers.loop import LinearTimeGrid
+
+sampler = DiscreteSampler(
+    update_rule=AbsorbingAncestralUpdate(final_denoise="greedy"),
+    time_grid=LinearTimeGrid(start=1.0, end=1e-5, steps=180),
+)
+# tokens, metadata = sampler.sample(algo, prompt_tokens, prompt_mask)
+```
+
+Continuous `FixedStepSampler` likewise accepts an `update_rule` (`EulerUpdate` or
+`HeunUpdate`) and optional `time_grid`. The rule may evaluate the field multiple
+times; the field counts actual calls. A prediction-session context freezes feedback
+across all stages of an accepted step. Custom grids must retain the configured
+`start_time` and `epsilon` endpoints, which also control initialization and decoding.
+
+The shared loop is not a universal stopping policy. Entropy-bound completion,
+adaptive ODE acceptance/rejection, and autoregressive cache traversal retain
+specialized loops. Their APIs and behavior are unchanged. Likewise, specialized
+DDPM/blur/hybrid updates currently use local update callables rather than the
+discrete rule protocol; sharing execution does not assert mathematical
+interchangeability between those processes.
