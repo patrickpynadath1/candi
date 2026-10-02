@@ -15,6 +15,9 @@ BF16 mixed precision, AdamW at `3e-4`, 2,500 warmup steps, and EMA decay `0.9999
 The smoke experiment deliberately overrides these settings for a tiny CPU check.
 Task availability and preparation requirements are listed in [tasks](../tasks/overview.md).
 
+For Python-defined method grids and local GPU scheduling, see
+[programmatic sweeps](programmatic-sweeps.md).
+
 ## Batches and optimization
 
 `loader.global_batch_size` is the effective batch across devices and accumulated

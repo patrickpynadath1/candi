@@ -17,6 +17,7 @@ and `frontier.py`. This documentation describes the current implementation.
 
 - [Training](guides/training.md)
 - [Sampling and evaluation](guides/sampling-and-evaluation.md)
+- [Programmatic sweeps](guides/programmatic-sweeps.md)
 - [Frontier sweeps](guides/frontier-sweeps.md)
 - [Checkpointing](guides/checkpointing.md)
 - [Distributed training](guides/distributed-training.md)
