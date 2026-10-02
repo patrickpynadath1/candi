@@ -2,9 +2,13 @@
 
 import math
 import torch
+from .loop import FixedGridLoop
 
 from core.parameterizations.posterior import PosteriorParameterization
-from core.modifiers.self_conditioning.session import PredictionSession, prediction_session
+from core.modifiers.self_conditioning.session import (
+    PredictionSession,
+    prediction_session,
+)
 
 
 class GaussianDDPMSampler:
@@ -89,7 +93,8 @@ class GaussianDDPMSampler:
 
         path = algo.schedule(times[0].expand(len(state)))
         state = clamp_prompt(state, path)
-        for index, (time, next_time) in enumerate(zip(times[:-1], times[1:])):
+
+        def update(state, time, next_time, index):
             time = time.expand(len(state))
             next_time = next_time.expand(len(state))
             path_t, path_s = algo.schedule(time), algo.schedule(next_time)
@@ -102,6 +107,9 @@ class GaussianDDPMSampler:
             )
             state = algo.process.reverse_posterior(state, mean, path_t, path_s, noise)
             state = clamp_prompt(state, path_s)
+            return state
+
+        state = FixedGridLoop()(state, times, update)
         final_time = times[-1].expand(len(state))
         final = predict(state, final_time, algo.schedule(final_time))
         tokens = torch.where(prompt_mask.bool(), prompt_tokens, final.argmax(-1))

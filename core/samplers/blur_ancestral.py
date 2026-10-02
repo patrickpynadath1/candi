@@ -1,6 +1,7 @@
 """Stochastic reverse Gaussian bridge sampler for blurring diffusion."""
 
 import torch
+from .loop import FixedGridLoop
 from core.sequences import resolve_sequence_layout
 from core.modifiers.self_conditioning.session import (
     PredictionSession,
@@ -49,7 +50,7 @@ class BlurAncestralSampler:
             nfe += 1
             return result
 
-        for current, target in zip(times[:-1], times[1:]):
+        def update(state, current, target, index):
             time = current.expand(len(state))
             next_time = target.expand(len(state))
             probabilities = predict(state, time).float().exp()
@@ -66,6 +67,9 @@ class BlurAncestralSampler:
             )
             state = algo.process.reverse(state, estimate, current_path, target_path)
             state = torch.where(prompt_mask.bool()[..., None], clean_prompt, state)
+            return state
+
+        state = FixedGridLoop()(state, times, update)
         final_time = torch.zeros(len(state), device=state.device, dtype=state.dtype)
         final = predict(state, final_time)
         tokens = torch.where(prompt_mask.bool(), prompt_tokens, final.argmax(-1))

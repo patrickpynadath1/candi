@@ -1,12 +1,12 @@
 """Ancestral uniform sampling with matched plug-in or posterior transitions."""
 
 import torch
+from .discrete import DiscreteSampler
 from core.parameterizations.plug_in import PlugInParameterization
 from core.processes.uniform import UniformProcess
 from core.processes.uniform_posterior import PosteriorUniformProcess
 from core.parameterizations.posterior import PosteriorParameterization
 from core.parameterizations.constraints import UnconstrainedPosterior
-from core.modifiers.self_conditioning.session import prediction_session
 
 
 def initialize_uniform(algo, prompt_tokens, prompt_mask):
@@ -34,7 +34,9 @@ def initialize_uniform(algo, prompt_tokens, prompt_mask):
     return torch.where(prompt_mask.bool(), prompt_tokens, state)
 
 
-class UniformAncestralSampler:
+class UniformAncestralUpdate:
+    prediction_feedback = True
+
     def __init__(
         self, steps=1024, epsilon=1e-3, final_denoise="ancestral", use_float64=True
     ):
@@ -48,29 +50,52 @@ class UniformAncestralSampler:
     def _probabilities(self, prediction):
         return (prediction.double() if self.use_float64 else prediction.float()).exp()
 
-    @torch.no_grad()
-    def sample(self, algo, prompt_tokens, prompt_mask):
-        algo = prediction_session(algo)
-        state = initialize_uniform(algo, prompt_tokens, prompt_mask)
-        times = torch.linspace(1, self.epsilon, self.steps + 1, device=state.device)
-        for time, next_time in zip(times[:-1], times[1:]):
-            keep, _ = algo.schedule(time.expand(len(state)))
-            next_keep, _ = algo.schedule(next_time.expand(len(state)))
+    def initialize(self, algo, prompt_tokens, prompt_mask):
+        return initialize_uniform(algo, prompt_tokens, prompt_mask)
+
+    def update(self, algo, state, time, next_time, prompt_tokens, prompt_mask):
+        keep, _ = algo.schedule(time.expand(len(state)))
+        next_keep, _ = algo.schedule(next_time.expand(len(state)))
+        prediction = algo.sampling_prediction(state, keep)
+        state = algo.process.reverse(
+            state, self._probabilities(prediction), keep, next_keep
+        )
+        return torch.where(prompt_mask.bool(), prompt_tokens, state), 1
+
+    def finalize(self, algo, state, time, prompt_tokens, prompt_mask):
+        if self.final_denoise == "none":
+            return state, 0
+        keep, _ = algo.schedule(time.expand(len(state)))
+        if self.final_denoise == "greedy":
+            state = algo.greedy_prediction(state, keep).argmax(-1)
+        else:
             prediction = algo.sampling_prediction(state, keep)
             state = algo.process.reverse(
-                state, self._probabilities(prediction), keep, next_keep
+                state, self._probabilities(prediction), keep, torch.ones_like(keep)
             )
-            state = torch.where(prompt_mask.bool(), prompt_tokens, state)
-        nfe = self.steps
-        if self.final_denoise != "none":
-            keep, _ = algo.schedule(times[-1].expand(len(state)))
-            if self.final_denoise == "greedy":
-                state = algo.greedy_prediction(state, keep).argmax(-1)
-            else:
-                prediction = algo.sampling_prediction(state, keep)
-                state = algo.process.reverse(
-                    state, self._probabilities(prediction), keep, torch.ones_like(keep)
-                )
-            state = torch.where(prompt_mask.bool(), prompt_tokens, state)
-            nfe += 1
-        return state, {"nfe": nfe, "nfe_per_sample": [nfe] * len(state)}
+        return torch.where(prompt_mask.bool(), prompt_tokens, state), 1
+
+
+class UniformAncestralSampler(DiscreteSampler):
+    def __init__(
+        self,
+        steps=1024,
+        epsilon=1e-3,
+        final_denoise="ancestral",
+        use_float64=True,
+        *,
+        update_rule=None,
+        time_grid=None,
+    ):
+        rule = update_rule or UniformAncestralUpdate(
+            steps, epsilon, final_denoise, use_float64
+        )
+        super().__init__(rule, steps, epsilon, time_grid)
+        self.final_denoise, self.use_float64 = final_denoise, use_float64
+
+    def _probabilities(self, prediction):
+        return self.update_rule._probabilities(prediction)
+
+    @torch.no_grad()
+    def sample(self, algo, prompt_tokens, prompt_mask):
+        return super().sample(algo, prompt_tokens, prompt_mask)

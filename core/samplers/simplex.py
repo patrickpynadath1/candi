@@ -2,6 +2,7 @@
 
 import math
 import torch
+from .loop import FixedGridLoop
 from core.modifiers.self_conditioning.session import prediction_session
 from core.time_sampling.simplex_grid import SimplexInferenceGrid
 from .simplex_utils import guided_log_probs, confidence_commit
@@ -56,9 +57,12 @@ class SimplexBridgeSampler:
                 raise ValueError(
                     "classifier-free guidance requires condition-dropout training"
                 )
-        for index in range(self.steps):
+        tokens = None
+
+        def update(state, time, next_time, index):
+            nonlocal tokens
             state = torch.where(mask, prompt, state)
-            t = times[index].expand(batch)
+            t = time.expand(batch)
             prediction = conditional.sampling_prediction(state, t.float())
             if self.guidance is not None:
                 unconditioned = unconditional.sampling_prediction(
@@ -69,12 +73,15 @@ class SimplexBridgeSampler:
             if index == self.steps - 1:
                 if self.confidence_power is not None:
                     tokens = prediction.argmax(-1)
-                break
-            s = times[index + 1].expand_as(t)
+                return state
+            s = next_time.expand_as(t)
             state = algo.process.reverse(
                 state, tokens, algo.schedule(s), algo.schedule(t), self.churn
             )
             state = confidence_commit(state, prediction, s, mask, self.confidence_power)
+            return state
+
+        state = FixedGridLoop()(state, times, update)
         tokens = torch.where(prompt_mask.bool(), prompt_tokens, tokens)
         nfe = self.steps * (2 if self.guidance is not None else 1)
         return tokens, {"nfe": nfe, "nfe_per_sample": [nfe] * batch}
