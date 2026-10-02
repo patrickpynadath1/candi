@@ -6,8 +6,9 @@ means that a specified fixture or integration ran. **Reproduced** means a
 comparison against a defined reference succeeded. A short pilot is evidence
 that a method can learn, not proof of convergence or paper-level performance.
 
-The latest reported regression suite before this documentation consolidation
-passed **402 tests**. That total is a snapshot, not a promise that every method,
+The regression suite after merging the model and sampler composition refactors
+passed **417 tests**, including available CUDA checks (402 before these changes).
+That total is a snapshot, not a promise that every method,
 task, precision, sampler, modifier and distributed strategy combination has
 been tested. Run the current suite from the repository root:
 
@@ -17,6 +18,27 @@ uv run python -m pytest core/tests -q
 
 GPU and real sandbox checks require those facilities; skipped tests do not
 establish their behavior on the current machine.
+
+## Model and sampler composition audit
+
+The shared `TextDiT` and fixed-grid sampler refactors were developed on separate
+branches from `babad72`, then merged and compared against that baseline. A CPU
+audit instantiated 16 small method presets with fixed seeds and dropout disabled,
+performed two AdamW updates, and generated prompted sequences. Losses, final
+gradients, updated state dictionaries, generated tokens and sampling metadata
+matched exactly after both refactors were merged.
+
+The audit covered MDLM, uniform plug-in and posterior diffusion, SEDD, DUO's
+discrete phase, D3PM, one-hot and embedding Gaussian diffusion, spherical flow,
+simplex, blurring, RePlaid, autoregressive and permuted autoregressive models,
+CANDI and uniform/simplex hybrids. This is refactor equivalence on small fixtures,
+not a new training-quality or convergence result.
+
+Permanent regression tests additionally compare discrete sampling against frozen
+pre-refactor loops, including intermediate prediction inputs and RNG state, and
+compare shared model execution and gradients with the original direct block/head
+calculation. Existing modifier, mixed-precision, cache and checkpoint tests remain
+part of the complete suite.
 
 ## Methods and tasks
 

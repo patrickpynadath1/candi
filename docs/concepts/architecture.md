@@ -78,6 +78,27 @@ The predictor owns inference shaping. The model owns architecture and conditioni
 The Task scores final token sequences; it does not need to know whether generation
 was discrete diffusion, a continuous solver, or autoregressive decoding.
 
+## Shared execution components
+
+Mathematical ownership is separate from execution reuse. Fixed-grid samplers share
+a loop that accepts an update callable; discrete reverse rules and continuous
+integration rules obtain predictions through the algorithm and use process
+mathematics. A multi-stage integration rule can make multiple model calls within
+one accepted-step feedback context. EB completion, adaptive ODE integration and
+autoregressive cache progression retain their specialized control flow.
+
+Models share `TextDiT` execution with replaceable input, output and conditioning
+components. A representation still defines the space where corruption happens;
+the model input adapter maps that noisy state to transformer hidden vectors.
+Continuous input projections remain in place. Causal models retain a distinct
+block execution policy for their KV caches and query/key positions, while hybrid
+and block-diffusion wrappers use the shared hidden-state entrypoints.
+
+The public model constructors retain their parameter paths and initialization so
+existing checkpoints and config targets remain usable. These two execution layers
+are independent: changing a sampling rule does not require changing the model,
+and changing a model input adapter does not require changing the sampler.
+
 ## Shared features
 
 [Self-conditioning](../modifiers/self-conditioning.md) coordinates a bootstrap or
