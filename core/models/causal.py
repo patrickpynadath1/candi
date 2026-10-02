@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 from torch.nn import functional as F
+from .text_dit import TextDiT
+from .components import TokenInput, CausalBlocks
 from .layers import DDiTBlock, DDiTFinalLayer, EmbeddingLayer, rotate_half
 
 
@@ -91,7 +93,7 @@ class CausalBlock(DDiTBlock):
         )
 
 
-class CausalDiT(nn.Module):
+class CausalDiT(TextDiT):
     def __init__(
         self,
         vocab_size,
@@ -100,12 +102,17 @@ class CausalDiT(nn.Module):
         n_heads=8,
         dropout=0.1,
         tie_word_embeddings=False,
+        input_adapter=None,
+        output_adapter=None,
+        block_execution=None,
     ):
         super().__init__()
         if n_blocks < 1 or hidden_size % n_heads or (hidden_size // n_heads) % 2:
             raise ValueError(
                 "require blocks and even integral attention head dimensions"
             )
+        self.input_adapter = TokenInput()
+        self.block_execution = CausalBlocks()
         self.vocab_size, self.n_heads = vocab_size, n_heads
         self.head_dim = hidden_size // n_heads
         self.vocab_embed = EmbeddingLayer(hidden_size, vocab_size)
@@ -119,6 +126,11 @@ class CausalDiT(nn.Module):
         self.output_layer = DDiTFinalLayer(hidden_size, vocab_size, None, False)
         if tie_word_embeddings:
             self.output_layer.linear.weight = self.vocab_embed.embedding
+
+        self.configure_components(
+            input_adapter=input_adapter,
+            output_adapter=output_adapter, block_execution=block_execution,
+        )
 
     def allocate_kv_cache(self, batch_size, capacity, *, device=None, dtype=None):
         if batch_size <= 0 or capacity <= 0:
@@ -157,7 +169,7 @@ class CausalDiT(nn.Module):
         ):
             raise ValueError("KV cache capacity exceeded")
         with torch.autocast(tokens.device.type, enabled=False):
-            hidden = self.vocab_embed(tokens)
+            hidden = self.input_adapter(tokens, self.vocab_embed)
             positions = torch.arange(
                 offset, offset + tokens.shape[1], device=tokens.device
             )[None]
@@ -187,11 +199,7 @@ class CausalDiT(nn.Module):
                 if query_positions is key_positions
                 else make_rotary(query_positions)
             )
-        for index, block in enumerate(self.blocks):
-            hidden = block(
-                hidden,
-                rotary,
-                None if cache is None else cache.layers[index],
-                query_rotary,
-            )
-        return self.output_layer(hidden, None)
+        hidden = self.block_execution(
+            hidden, self.blocks, rotary, cache=cache, query_rotary=query_rotary
+        )
+        return self.project_hidden(hidden, None)

@@ -81,3 +81,59 @@ vocabulary dimension. Implement optional hidden-feature and stream interfaces
 only when their semantics are defined, and test cached/uncached equivalence where
 applicable. A new architecture alone does not establish compatibility with every
 modifier.
+
+## Shared backbone and replaceable components
+
+[TextDiT](../../core/models/text_dit.py) shares transformer execution across the
+public construction recipes. [Components](../../core/models/components.py)
+separate token/simplex/dense input mapping, time embedding, block execution, and
+output projection. `DiT`, `ContinuousDiT`, `SphereDiT`, and `CausalDiT` retain their
+public signatures and learned parameter layouts. `SimplexDiT` selects a simplex
+input component, and hybrid fusion continues to enter the backbone through
+`forward_hidden`.
+
+The constructors accept `input_adapter`, `output_adapter`, and `block_execution`;
+noncausal models also accept `time_adapter`. Hydra recursively instantiates these
+arguments. For example, ordinary DiT can consume simplex log probabilities without
+a new subclass:
+
+```yaml
+_target_: core.models.dit.DiT
+vocab_size: 10
+hidden_size: 128
+n_heads: 4
+n_blocks: 4
+input_adapter:
+  _target_: core.models.components.SimplexExpectationInput
+```
+
+This changes the model input only; select an algorithm/process that supplies
+simplex states separately. It does not make MDLM's integer input a simplex state.
+
+Replacement components follow the relevant call signature:
+
+| Component | Inputs |
+| --- | --- |
+| Token/simplex input | State and the model's `vocab_embed` module |
+| Continuous input | State, projection, embedding tensor, optional preconditioner |
+| Time adapter | Prepared scalar coordinate and timestep embedder |
+| Layer output | Hidden state, condition, and output layer |
+| Embedding output | Hidden state, condition, projection, embedding table, bias |
+| Diffusion block execution | Hidden state, blocks, RoPE, condition, attention mask |
+| Causal block execution | Hidden state, blocks, RoPE, KV cache, query RoPE |
+
+The defaults are parameter-free strategies: learned tensors stay registered at
+historical model paths, avoiding checkpoint migrations and preserving shared
+embedding identities. A custom learned adapter can register its own parameters;
+that intentionally changes the checkpoint schema. Input/output replacements must
+match the learned architecture selected by the recipe. For example, an embedding
+output adapter needs the projection and table created by
+`output_architecture=embedding_projection`.
+
+The shared backbone preserves differences that matter: continuous execution
+turns off autocast weight caching for detached bootstraps; spherical models can
+retain their learned temperature output head; causal execution uses a distinct
+block policy and explicit query/key positions. There is no attempt to substitute
+ordinary diffusion attention for causal KV-cache behavior. Representation
+encoding/decoding remains outside these input components, and Gaussian models
+retain the additional input projection.

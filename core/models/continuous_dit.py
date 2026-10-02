@@ -2,8 +2,9 @@
 
 import torch
 from torch import nn
-from torch.nn import functional as F
-from .prediction import ModelPrediction, make_conditioning
+from .prediction import make_conditioning
+from .text_dit import TextDiT
+from .components import LinearStateInput, EmbeddedStateInput, EmbeddingOutput
 from .layers import DDiTBlock, DDiTFinalLayer, Rotary, TimestepEmbedder
 from .gaussian_conditioning import (
     INPUT_PRECONDITIONING,
@@ -12,7 +13,7 @@ from .gaussian_conditioning import (
 )
 
 
-class ContinuousDiT(nn.Module):
+class ContinuousDiT(TextDiT):
     def __init__(
         self,
         vocab_size,
@@ -35,8 +36,12 @@ class ContinuousDiT(nn.Module):
         time_input=False,
         conditioning_scale=1.0,
         input_projection_bias=False,
+        input_adapter=None,
+        time_adapter=None,
+        output_adapter=None,
+        block_execution=None,
     ):
-        super().__init__()
+        super().__init__(autocast_cache=False)
         if hidden_size % n_heads or (hidden_size // n_heads) % 2:
             raise ValueError("hidden_size must give even integral head dimensions")
         if not 0 < epsilon < 1:
@@ -64,6 +69,8 @@ class ContinuousDiT(nn.Module):
             raise ValueError("unknown input architecture")
         if output_architecture not in {"embedding_projection", "adaln"}:
             raise ValueError("unknown output architecture")
+        self.input_adapter = (LinearStateInput() if input_architecture == "linear"
+                              else EmbeddedStateInput())
         self.input_architecture = input_architecture
         self.output_architecture = output_architecture
         if input_architecture == "linear":
@@ -94,6 +101,7 @@ class ContinuousDiT(nn.Module):
         if output_architecture == "adaln":
             self.output_layer = DDiTFinalLayer(hidden_size, vocab_size, cond_dim, True)
         else:
+            self.output_adapter = EmbeddingOutput()
             self.output_projection = nn.Linear(hidden_size, output_dim, bias=False)
             self.output_embedding = nn.Parameter(torch.empty(vocab_size, output_dim))
             nn.init.normal_(self.output_embedding, std=output_dim**-0.5)
@@ -111,6 +119,11 @@ class ContinuousDiT(nn.Module):
             )
             if self_conditioning
             else None
+        )
+
+        self.configure_components(
+            input_adapter=input_adapter, time_adapter=time_adapter,
+            output_adapter=output_adapter, block_execution=block_execution,
         )
 
     def forward(
@@ -140,15 +153,13 @@ class ContinuousDiT(nn.Module):
         self, state, time, sigma, alpha, *, self_condition=None, apply_conditioning=True
     ):
         with torch.autocast(state.device.type, enabled=False):
-            if self.input_architecture == "linear":
-                hidden = state.float()
-            else:
-                embedding = F.normalize(self.input_embedding.float(), dim=-1)
-                hidden = state.float() @ embedding
-            hidden = INPUT_PRECONDITIONING[self.input_preconditioning](
-                hidden, alpha.float(), sigma.float()
+            hidden = self.input_adapter(
+                state, self.input_projection,
+                embedding=getattr(self, "input_embedding", None),
+                precondition=lambda value: INPUT_PRECONDITIONING[
+                    self.input_preconditioning
+                ](value, alpha.float(), sigma.float()),
             )
-            hidden = self.input_projection(hidden)
             if self.conditioning_adapter is not None and apply_conditioning:
                 hidden = self.conditioning_adapter(
                     hidden,
@@ -161,7 +172,7 @@ class ContinuousDiT(nn.Module):
             coordinate = TIME_CONDITIONING[self.time_conditioning](
                 time.float(), sigma.float(), alpha.float(), self.epsilon
             )
-            condition = F.silu(self.sigma_map(coordinate))
+            condition = self.time_adapter(coordinate, self.sigma_map)
             if self.time_input_projection is not None:
                 hidden = hidden + self.time_input_projection(condition)[:, None, :]
         return hidden, condition
@@ -171,32 +182,10 @@ class ContinuousDiT(nn.Module):
         ones = torch.ones_like(zeros)
         return self.prepare_hidden(state, zeros, zeros, ones, apply_conditioning=False)
 
-    def forward_hidden(
-        self,
-        hidden,
-        condition,
-        *,
-        return_features=False,
-        attention_mask=None,
-        position_ids=None,
-    ):
-        with torch.autocast(hidden.device.type, enabled=False):
-            rotary = self.rotary_emb(hidden, position_ids=position_ids)
-        # Bootstrap casts must not leak detached weights into the trainable pass.
-        with torch.autocast(
-            hidden.device.type,
-            enabled=torch.is_autocast_enabled(hidden.device.type),
-            cache_enabled=False,
-        ):
-            for block in self.blocks:
-                hidden = block(hidden, rotary, condition, attention_mask)
-            logits = self.project_hidden(hidden, condition)
-        return ModelPrediction(logits, hidden) if return_features else logits
-
     def project_hidden(self, hidden, condition):
         if self.output_architecture == "adaln":
-            return self.output_layer(hidden, condition)
-        return (
-            self.output_projection(hidden) @ self.output_embedding.t()
-            + self.output_bias
+            return super().project_hidden(hidden, condition)
+        return self.output_adapter(
+            hidden, condition, projection=self.output_projection,
+            embedding=self.output_embedding, bias=self.output_bias,
         )
