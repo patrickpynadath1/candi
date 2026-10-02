@@ -2,6 +2,7 @@
 
 import torch
 from .dit import DiT
+from .components import SimplexExpectationInput, SimplexArgmaxInput
 
 
 class SimplexDiT(DiT):
@@ -9,18 +10,15 @@ class SimplexDiT(DiT):
         if input_mode not in {"expectation", "argmax"}:
             raise ValueError("simplex input_mode must be expectation or argmax")
         super().__init__(vocab_size, **kwargs)
+        if kwargs.get("input_adapter") is None:
+            self.input_adapter = (SimplexExpectationInput() if input_mode == "expectation"
+                                  else SimplexArgmaxInput())
         self.input_mode = input_mode
         self.vocab_size = vocab_size
 
     def embed_state(self, log_state):
         with torch.autocast(log_state.device.type, enabled=False):
-            if self.input_mode == "argmax":
-                embedded = self.vocab_embed(log_state.argmax(-1))
-                return embedded.masked_fill(
-                    ~torch.isfinite(log_state).any(-1)[..., None], 0
-                )
-            probabilities = log_state.exp().to(self.vocab_embed.embedding.dtype)
-            return probabilities @ self.vocab_embed.embedding
+            return self.input_adapter(log_state, self.vocab_embed)
 
     def forward(self, log_state, time, *, self_condition=None, return_features=False,
                 attention_mask=None, position_ids=None):

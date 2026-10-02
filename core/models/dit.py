@@ -2,14 +2,15 @@
 
 import torch
 from torch import nn
-from torch.nn import functional as F
 
-from .prediction import ModelPrediction, make_conditioning
+from .prediction import make_conditioning
+from .text_dit import TextDiT
+from .components import TokenInput
 
 from .layers import DDiTBlock, DDiTFinalLayer, EmbeddingLayer, Rotary, TimestepEmbedder
 
 
-class DiT(nn.Module):
+class DiT(TextDiT):
     def __init__(
         self,
         vocab_size,
@@ -22,10 +23,15 @@ class DiT(nn.Module):
         tie_word_embeddings=False,
         self_conditioning=False,
         self_conditioning_source="posterior_mean",
+        input_adapter=None,
+        time_adapter=None,
+        output_adapter=None,
+        block_execution=None,
     ):
         super().__init__()
         if hidden_size % n_heads or (hidden_size // n_heads) % 2:
             raise ValueError("hidden_size must give an even integral head dimension")
+        self.input_adapter = TokenInput()
         self.adaLN = adaLN
         self.vocab_embed = EmbeddingLayer(hidden_size, vocab_size)
         # Retain the unused time embedder for exact baseline checkpoint loading.
@@ -47,12 +53,17 @@ class DiT(nn.Module):
             else None
         )
 
+        self.configure_components(
+            input_adapter=input_adapter, time_adapter=time_adapter,
+            output_adapter=output_adapter, block_execution=block_execution,
+        )
+
     def forward(
         self, tokens, conditioning, *, self_condition=None, return_features=False,
         attention_mask=None, position_ids=None
     ):
         with torch.autocast(tokens.device.type, enabled=False):
-            embedded = self.vocab_embed(tokens)
+            embedded = self.input_adapter(tokens, self.vocab_embed)
         return self.forward_with_embeddings(
             embedded,
             conditioning,
@@ -83,18 +94,5 @@ class DiT(nn.Module):
                 hidden = self.conditioning_adapter(hidden, self_condition)
             elif self_condition is not None:
                 raise ValueError("model does not enable self-conditioning")
-            condition = F.silu(self.sigma_map(conditioning)) if self.adaLN else None
+            condition = self.time_adapter(conditioning, self.sigma_map) if self.adaLN else None
         return hidden, condition
-
-    def forward_hidden(self, hidden, condition, *, return_features=False,
-                       attention_mask=None, position_ids=None):
-        with torch.autocast(hidden.device.type, enabled=False):
-            rotary = self.rotary_emb(hidden, position_ids=position_ids)
-        # Precision is selected by the trainer or evaluation entrypoint.
-        for block in self.blocks:
-            hidden = block(hidden, rotary, condition, attention_mask)
-        logits = self.project_hidden(hidden, condition)
-        return ModelPrediction(logits, hidden) if return_features else logits
-
-    def project_hidden(self, hidden, condition):
-        return self.output_layer(hidden, condition)
