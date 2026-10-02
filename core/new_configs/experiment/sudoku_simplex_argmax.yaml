@@ -1,0 +1,5 @@
+# @package _global_
+defaults:
+- sudoku_simplex
+model:
+  input_mode: argmax

@@ -1,0 +1,14 @@
+cache_dir: ${hydra:runtime.cwd}/core/data_cache/openwebtext
+dataset_name: Skylion007/openwebtext
+revision: null
+train_split: train[:-100000]
+validation_split: train[-100000:]
+num_proc: 1
+files_train: null
+files_validation: null
+prepared_train: null
+prepared_validation: null
+limit_documents_train: null
+limit_documents_validation: null
+limit_train: null
+limit_validation: null

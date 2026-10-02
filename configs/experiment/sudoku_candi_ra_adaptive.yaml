@@ -1,9 +1,0 @@
-# @package _global_
-defaults:
-  - sudoku_candi_adaptive
-  - override /algo: candi_ra_change
-
-algo:
-  spatial_blurring:
-    bandwidth: 0.5
-    include_self: true

@@ -1,0 +1,3 @@
+_target_: core.processes.dirichlet.DirichletProcess
+vocab_size: ${token_space.model_vocab_size}
+reference: null

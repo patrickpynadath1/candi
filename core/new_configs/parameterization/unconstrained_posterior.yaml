@@ -1,0 +1,7 @@
+_target_: core.parameterizations.posterior.PosteriorParameterization
+temperature: 1.0
+softcap: null
+top_k: 0
+top_p: 1.0
+constraints:
+  _target_: core.parameterizations.constraints.UnconstrainedPosterior

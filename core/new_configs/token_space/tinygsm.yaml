@@ -1,0 +1,6 @@
+model_vocab_size:
+  _target_: operator.add
+  _args_:
+  - ${task.vocab_size}
+  - 1
+mask_index: ${task.vocab_size}

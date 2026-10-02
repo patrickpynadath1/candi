@@ -1,0 +1,80 @@
+defaults:
+- algorithm: mdlm
+- model: dit
+- parameterization: posterior
+- prediction: posterior
+- representation: one_hot
+- process: absorbing
+- objective: weighted_ce
+- time_sampler: antithetic
+- noise_schedule: log_linear
+- task: sudoku
+- datamodule: task
+- evaluator: generation
+- callback: task
+- sampler: entropy_bounded
+- lr_scheduler: constant_warmup
+- strategy: null
+- _self_
+self_conditioning:
+  enabled: false
+  source: posterior_mean
+  probability: 0.9
+  evaluation_probability: 1.0
+block_diffusion:
+  enabled: false
+  block_size: 32
+  clean_loss: none
+  clean_loss_weight: 1.0
+  cache_clean_prefix: true
+mode: train
+seed: 1
+output_dir: ${hydra:runtime.output_dir}
+loader:
+  global_batch_size: 256
+  eval_batch_size: 64
+  num_workers: 4
+  pin_memory: true
+training:
+  ema: 0.9999
+  warmup_steps: 2500
+optimizer:
+  lr: 0.0003
+  beta1: 0.9
+  beta2: 0.999
+  epsilon: 1.0e-08
+  weight_decay: 0.0
+trainer:
+  accelerator: gpu
+  devices: 1
+  num_nodes: 1
+  strategy: auto
+  precision: bf16-mixed
+  accumulate_grad_batches: 4
+  max_steps: 20000
+  gradient_clip_val: 1.0
+  log_every_n_steps: 10
+  num_sanity_val_steps: 2
+  val_check_interval: 20000
+  check_val_every_n_epoch: null
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  enable_progress_bar: true
+checkpoint:
+  resume: null
+  every_n_steps: 5000
+evaluation:
+  checkpoint: null
+  legacy: false
+  use_ema: true
+  device: cuda
+  max_examples: null
+wandb: null
+hydra:
+  run:
+    dir: core/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: core/outputs/sweeps/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: false

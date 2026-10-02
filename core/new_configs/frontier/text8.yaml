@@ -1,0 +1,13 @@
+# Word diversity/coherence frontiers at each fixed step budget.
+axes:
+- parameter: parameterization.temperature
+  values: [0.7, 0.85, 1.0]
+- parameter: sampler.steps
+  values: [16, 32, 64, 128]
+seeds: [1]
+objectives:
+  generated/words/counts/unique: max
+  generated/words/counts/valid: max
+group_by: [seed, sampler.steps]
+resume: true
+dry_run: false

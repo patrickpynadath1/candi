@@ -1,0 +1,17 @@
+# @package _global_
+defaults:
+- gaussian_base
+- override /noise_schedule: rescaled_gaussian
+- override /noise_schedule@noise_schedule.base: argmax_error
+- _self_
+noise_schedule:
+  path_type: linear
+  base:
+    sigma_min: 0.2
+    sigma_max: 4.0
+    coupling: linear
+model:
+  input_preconditioning: none
+  time_conditioning: time
+parameterization:
+  softcap: null

@@ -1,9 +1,0 @@
-defaults:
-  - candi
-  - _self_
-
-name: candi_ra_change
-
-spatial_blurring:
-  bandwidth: 0.5
-  include_self: true

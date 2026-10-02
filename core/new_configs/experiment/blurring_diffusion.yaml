@@ -1,0 +1,19 @@
+# @package _global_
+defaults:
+- override /algorithm: blurring_diffusion
+- override /model: continuous_dit
+- override /parameterization: gaussian_posterior
+- override /process: blurring
+- override /noise_schedule: blurring
+- override /representation: centered_embedding
+- override /objective: cross_entropy
+- override /sampler: blur_ancestral
+- override /token_space@token_space: data_only
+- _self_
+model:
+  input_preconditioning: none
+  time_conditioning: time
+  input_projection_bias: true
+  input_architecture: linear
+  output_architecture: embedding_projection
+  output_dim: 256

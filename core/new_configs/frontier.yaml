@@ -1,0 +1,8 @@
+defaults:
+- config
+- frontier: sudoku
+- _self_
+mode: evaluate
+hydra:
+  run:
+    dir: core/outputs/frontiers/${now:%Y-%m-%d}/${now:%H-%M-%S}

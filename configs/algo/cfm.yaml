@@ -1,8 +1,0 @@
-name: semicat
-backbone: cfm_dit
-label_smoothing: 0.0
-temp: 1.0
-parameterization: mean
-T: 0 # continuous time  
-discretize_start_time: 1.0
-time_conditioning: true

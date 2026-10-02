@@ -1,0 +1,2 @@
+_target_: core.objectives.uniform.UniformDiffusionObjective
+vocab_size: ${task.vocab_size}

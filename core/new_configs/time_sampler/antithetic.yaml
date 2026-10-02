@@ -1,0 +1,3 @@
+_target_: core.time_sampling.uniform.UniformTimeSampler
+epsilon: 0.001
+antithetic: true

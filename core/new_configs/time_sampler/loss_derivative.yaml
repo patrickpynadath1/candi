@@ -1,0 +1,10 @@
+_target_: core.time_sampling.loss_derivative.LossDerivativeTimeSampler
+adaptive: false
+buffer_size: 65536
+bins: 50
+grid_size: 1000
+warmup: 1000
+refit_every: 50
+momentum: 0.9
+epsilon: 1.0e-05
+antithetic: true

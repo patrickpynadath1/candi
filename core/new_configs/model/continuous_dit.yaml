@@ -1,0 +1,12 @@
+_target_: core.models.continuous_dit.ContinuousDiT
+vocab_size: ${task.vocab_size}
+hidden_size: 512
+cond_dim: 128
+n_blocks: 8
+n_heads: 8
+dropout: 0.1
+state_dim: ${representation.dimension}
+input_preconditioning: gaussian
+time_conditioning: log_one_minus_time
+self_conditioning: ${self_conditioning.enabled}
+self_conditioning_source: ${self_conditioning.source}

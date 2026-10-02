@@ -1,0 +1,16 @@
+_target_: core.noise_schedules.blurring.BlurringSchedule
+basis: dct
+feature_rho: 0.5
+feature_lambda_min: 0.25
+feature_lambda_max: 1000000000.0
+feature_tau_min: 1.0e-09
+feature_tau_max: 20.0
+time_warp: linearized_crossings
+linearized_crossing_min: 0.05
+linearized_crossing_max: 0.95
+tau_min_attenuation: 0.01
+terminal_nonzero_mode: 0.01
+terminal_mean: 0.03
+lambda_scale: 1.0
+noise_power: 2.0
+crossing_max_decile_fraction: 0.15

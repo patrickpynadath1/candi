@@ -1,0 +1,7 @@
+# @package _global_
+defaults:
+- override /algorithm: autoregressive
+- override /model: causal_dit
+- override /parameterization: autoregressive
+- override /objective: cross_entropy
+- override /sampler: autoregressive

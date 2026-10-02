@@ -1,0 +1,11 @@
+# @package _global_
+defaults:
+- override /algorithm: uniform_posterior
+- override /model: dit_conditioned
+- override /parameterization: unconstrained_posterior
+- override /process: uniform_posterior
+- override /objective: cross_entropy
+- override /noise_schedule: log_linear
+- override /time_sampler: antithetic
+- override /sampler: uniform_ancestral
+- override /token_space@token_space: data_only

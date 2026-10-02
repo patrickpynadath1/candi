@@ -1,0 +1,19 @@
+# @package _global_
+defaults:
+- override /algorithm: uniform_diffusion
+- override /model: dit_conditioned
+- override /parameterization: plug_in
+- override /process: uniform
+- override /objective: uniform
+- override /noise_schedule: log_linear
+- override /time_sampler: antithetic
+- override /sampler: uniform_ancestral
+- override /token_space@token_space: data_only
+loader:
+  global_batch_size: 512
+  eval_batch_size: 128
+training:
+  warmup_steps: 2500
+trainer:
+  max_steps: 1000000
+  val_check_interval: 10000

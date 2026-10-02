@@ -1,0 +1,6 @@
+_target_: core.parameterizations.plug_in.PlugInParameterization
+temperature: 1.0
+softcap: null
+top_k: 0
+top_p: 1.0
+commitment: sample

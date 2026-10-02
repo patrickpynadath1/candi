@@ -1,0 +1,6 @@
+cache_dir: ${hydra:runtime.cwd}/core/data_cache/text8
+raw_dir: ${data.cache_dir}/raw
+download: false
+limit_train: null
+limit_validation: null
+limit_test: null

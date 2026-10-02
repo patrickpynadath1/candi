@@ -1,0 +1,9 @@
+# @package _global_
+defaults:
+- replaid
+data:
+  difficulty: hard
+algorithm:
+  corrupt_all: false
+sampler:
+  prompt_mode: clean

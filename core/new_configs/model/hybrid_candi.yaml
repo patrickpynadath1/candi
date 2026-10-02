@@ -1,0 +1,52 @@
+_target_: core.models.hybrid.HybridModel
+backbone:
+  _target_: core.models.dit.DiT
+  vocab_size: ${token_space.model_vocab_size}
+  hidden_size: 512
+  cond_dim: 128
+  n_blocks: 8
+  n_heads: 8
+  dropout: 0.1
+  adaLN: true
+  tie_word_embeddings: false
+branches:
+- _target_: core.hybrid.branches.DiscreteBranch
+  name: masking
+  process:
+    _target_: core.processes.candi_masking.CANDIMaskingProcess
+    mask_index: ${token_space.mask_index}
+  schedule:
+    _target_: core.noise_schedules.log_linear.LogLinear
+    epsilon: 0.001
+  adapter:
+    _target_: core.models.hybrid.TokenEmbeddingAdapter
+    vocab_size: ${token_space.model_vocab_size}
+    hidden_size: 512
+    scale: 0.5
+    normalize: true
+- _target_: core.hybrid.branches.GaussianBranch
+  name: gaussian
+  process:
+    _target_: core.processes.candi_gaussian.CANDIGaussianProcess
+  schedule:
+    _target_: core.noise_schedules.candi_rank.CANDIRankSchedule
+    vocab_size: ${task.vocab_size}
+    min_percentile: 0.05
+    max_percentile: 0.4
+  time_map:
+    _target_: core.hybrid.time_maps.LinearTimeMap
+    scale: 0.999
+  representation:
+    _target_: core.representations.one_hot.OneHotRepresentation
+    vocab_size: ${task.vocab_size}
+  adapter:
+    _target_: core.models.hybrid.CANDIContinuousAdapter
+    state_dim: ${task.vocab_size}
+    scale: 0.5
+self_conditioning: ${self_conditioning.enabled}
+self_conditioning_source: ${self_conditioning.source}
+fusion:
+  _target_: core.models.hybrid.CANDIFusion
+  mask_index: ${token_space.mask_index}
+time_conditioning: negative_log_keep
+output_vocab_size: ${task.vocab_size}

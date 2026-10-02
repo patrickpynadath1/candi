@@ -1,0 +1,6 @@
+_target_: core.training.schedules.cosine_decay_warmup
+total_steps: ${trainer.max_steps}
+warmup_fraction: 0.1
+warmup_steps: null
+warmup_lr_init: 1.0e-6
+lr_min: 1.0e-6

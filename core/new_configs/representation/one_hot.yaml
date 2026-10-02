@@ -1,0 +1,3 @@
+_target_: core.representations.one_hot.OneHotRepresentation
+vocab_size: ${task.vocab_size}
+dimension: ${task.vocab_size}

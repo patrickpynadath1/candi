@@ -1,0 +1,10 @@
+_target_: core.noise_schedules.argmax_error.OneHotArgmaxErrorSchedule
+vocab_size: ${task.vocab_size}
+sigma_min: 0.2
+sigma_max: 4.0
+error_min: null
+error_max: null
+coupling: linear
+num_points: 1000
+quadrature_order: 512
+training_epsilon: 0.0

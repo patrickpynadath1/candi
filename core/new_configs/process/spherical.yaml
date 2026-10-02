@@ -1,0 +1,3 @@
+_target_: core.processes.spherical.SphericalProcess
+eps: 1.0e-06
+precision: float64

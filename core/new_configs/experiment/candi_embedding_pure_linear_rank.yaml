@@ -1,0 +1,10 @@
+# @package _global_
+defaults:
+- embedding_flow_matching
+- override /noise_schedule: embedding_sphere_rank
+- _self_
+noise_schedule:
+  coupling: linear
+  rank_min: 0.01
+  rank_max: 0.49
+  endpoint_width: 0.0

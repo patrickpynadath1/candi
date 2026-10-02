@@ -1,0 +1,48 @@
+# @package _global_
+defaults:
+- override /algorithm: replaid
+- override /representation: embedding
+- override /model: continuous_dit
+- override /parameterization: gaussian_prior
+- override /process: gaussian
+- override /noise_schedule: plaid_log_snr
+- override /time_sampler: adaptive_allocation
+- override /objective: replaid
+- override /sampler: gaussian_ddpm
+- override /token_space@token_space: data_only
+representation:
+  dimension: 16
+  trainable: true
+  project_after_update: true
+model:
+  input_preconditioning: unit_embedding
+  conditioning_scale: unit_embedding
+  time_conditioning: negative_log_snr
+  input_architecture: linear
+  output_architecture: adaln
+  time_input: true
+  conditioning_initialization: default
+self_conditioning:
+  enabled: true
+  source: posterior_mean
+  probability: 0.25
+  evaluation_probability: 1.0
+prediction:
+  selection: fixed_count
+optimizer:
+  groups:
+  - patterns:
+    - representation.table
+    - schedule.input_weight
+    - schedule.bias
+    - schedule.output_weight
+    lr: 0.01
+    weight_decay: 0.0
+  - patterns:
+    - schedule.gamma_min
+    - schedule.gamma_max
+    lr: 0.01
+    weight_decay: 0.1
+sampler:
+  self_conditioning_mode: bootstrap
+  final_transition_noise: true

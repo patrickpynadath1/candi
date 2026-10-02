@@ -1,0 +1,1 @@
+_target_: core.noise_schedules.linear_interpolation.LinearInterpolationSchedule

@@ -1,0 +1,6 @@
+_target_: core.samplers.hybrid.HybridSampler
+steps: 180
+epsilon: 1.0e-05
+final_denoise: greedy
+final_transition_noise: false
+synchronize_committed: false

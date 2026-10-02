@@ -1,0 +1,4 @@
+_target_: core.samplers.blur_ancestral.BlurAncestralSampler
+steps: 64
+greedy_clean_estimate: false
+self_conditioning_mode: previous

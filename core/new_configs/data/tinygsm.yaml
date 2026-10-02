@@ -1,0 +1,15 @@
+cache_dir: ${hydra:runtime.cwd}/core/data_cache/tinygsm
+tokenizer_name_or_path: HuggingFaceTB/SmolLM-135M
+local_files_only: false
+data_path: null
+separator: '
+
+  '
+wrap: false
+streaming: false
+train_on_prompt: false
+train_on_pad: true
+filter_too_long: true
+max_examples: null
+val_ratio: 0.01
+val_seed: 42

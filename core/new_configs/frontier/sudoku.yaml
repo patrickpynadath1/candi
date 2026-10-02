@@ -1,0 +1,13 @@
+# Entropy-bounded quality versus measured network evaluations.
+axes:
+- parameter: parameterization.temperature
+  values: [0.8, 1.0]
+- parameter: sampler.entropy_bound
+  values: [0.0, 0.1, 0.3]
+seeds: [1]
+objectives:
+  mean_nfe: min
+  accuracy: max
+group_by: [seed]
+resume: true
+dry_run: false

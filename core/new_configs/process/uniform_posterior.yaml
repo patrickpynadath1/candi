@@ -1,0 +1,2 @@
+_target_: core.processes.uniform_posterior.PosteriorUniformProcess
+vocab_size: ${token_space.model_vocab_size}

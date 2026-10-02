@@ -1,0 +1,400 @@
+{
+  "date": "2026-10-01",
+  "checkpoint": "/home/patrick/.cache/duo/new_sudoku_runs/hard_eb_0p1/mdlm/checkpoints/last.ckpt",
+  "device": "NVIDIA RTX A6000",
+  "torch": "2.5.1+cu121",
+  "seed": 1,
+  "evaluations": {
+    "entropy_bounded": {
+      "reference_artifact": "/home/patrick/.cache/duo/new_eval_results/sudoku_hard_eb_0p1_greedy/mdlm/results.json",
+      "new_artifact": "outputs/baseline_eb_verified/results.json",
+      "matching_generated_sequences": 2000,
+      "num_total": 2000,
+      "num_correct": 1809,
+      "accuracy": 0.9045,
+      "cell_accuracy": 0.9848876408338547,
+      "mean_nfe": 3.1525,
+      "min_nfe": 1,
+      "max_nfe": 11,
+      "evaluation_seconds": 10.232452716678381
+    },
+    "ancestral": {
+      "reference_artifact": "/home/patrick/.cache/duo/outputs/sudoku_hard_paired_samplers_20260919/mdlm/standard/results.json",
+      "new_artifact": "outputs/baseline_ancestral_verified/results.json",
+      "matching_generated_sequences": 2000,
+      "num_total": 2000,
+      "num_correct": 910,
+      "accuracy": 0.455,
+      "cell_accuracy": 0.9044494383335113,
+      "mean_nfe": 181.0,
+      "min_nfe": 181,
+      "max_nfe": 181,
+      "evaluation_seconds": 108.64967209845781
+    }
+  },
+  "controlled_training_comparison": {
+    "legacy_loss": 8.334506034851074,
+    "core_loss": 8.334506034851074,
+    "maximum_parameter_gradient_difference": 0.0
+  },
+  "fresh_training_optimizer_steps_verified": 100,
+  "fresh_20000_step_training_completed": false,
+  "posterior_sampler_refactor": {
+    "cuda_tests_passed": 27,
+    "entropy_bounded": {
+      "artifact": "outputs/sampler_orchestration_parity/0/results.json",
+      "identical_per_puzzle_records": 2000
+    },
+    "ancestral": {
+      "artifact": "outputs/sampler_orchestration_parity/1/results.json",
+      "identical_per_puzzle_records": 2000
+    }
+  },
+  "recursive_config_construction": {
+    "cuda_tests_passed": 28,
+    "full_baseline_evaluations_repeated": false
+  },
+  "task_independent_entrypoint": {
+    "cuda_tests_passed": 30,
+    "non_sudoku_training_and_evaluation": true,
+    "configured_sudoku_callback_verified": true,
+    "full_baseline_evaluations_repeated": false
+  },
+  "sudoku_task": {
+    "cuda_tests_passed": 34,
+    "collation_loss_and_gradients_exact": true,
+    "evaluations": {
+      "entropy_bounded": {
+        "artifact": "core/outputs/task_sudoku_parity/0/results.json",
+        "original_reference": "/home/patrick/.cache/duo/new_eval_results/sudoku_hard_eb_0p1_greedy/mdlm/results.json",
+        "matching_generated_sequences": 2000,
+        "typed_metric_records_rechecked": 2000,
+        "accuracy": 0.9045,
+        "mean_nfe": 3.1525
+      },
+      "ancestral": {
+        "artifact": "core/outputs/task_sudoku_parity/1/results.json",
+        "original_reference": "/home/patrick/.cache/duo/outputs/sudoku_hard_paired_samplers_20260919/mdlm/standard/results.json",
+        "matching_generated_sequences": 2000,
+        "typed_metric_records_rechecked": 2000,
+        "accuracy": 0.455,
+        "mean_nfe": 181.0
+      }
+    },
+    "typed_metric_rescoring_exact": true,
+    "fresh_20000_step_training_completed": false
+  },
+  "text8_task": {
+    "cuda_tests_passed": 39,
+    "legacy_token_ids_match": 35,
+    "legacy_packing_reference_sequences_match": 25,
+    "preprocessing_shards": 1,
+    "real_corpus_training_steps": 2,
+    "real_corpus_vocabulary_size": 239973,
+    "generation_evaluation_examples_per_sampler": 4,
+    "smoke_training_artifact": "outputs/text8_task_smoke",
+    "generation_artifacts": [
+      "outputs/text8_task_eval/0/results.json",
+      "outputs/text8_task_eval/1/results.json"
+    ],
+    "pretrained_checkpoint_parity_verified": false,
+    "smoke_model_parameters_approx": 19200
+  },
+  "openwebtext_task": {
+    "task_tests_passed": 6,
+    "legacy_metric_comparison": {
+      "negative_log_likelihood": 15.615314483642578,
+      "scored_tokens": 8,
+      "exact_match": true
+    },
+    "cached_gpt2_reference_scoring_verified": true,
+    "fixture_training_steps": 2,
+    "pretrained_diffusion_checkpoint_parity_verified": false
+  },
+  "tinygsm_task": {
+    "task_tests_passed": 8,
+    "legacy_fixture_token_ids_and_attention_masks_match": true,
+    "cached_smollm_tokenizer_verified": true,
+    "cpu_smoke_training_steps": 2,
+    "standalone_evaluation_without_training_data_verified": true,
+    "real_bubblewrap_execution_verified": true,
+    "streaming_supported": false,
+    "pretrained_checkpoint_parity_verified": false
+  },
+  "integrated_regression": {
+    "tests_passed": 97,
+    "cuda_available": true,
+    "real_bubblewrap_tests_passed": true,
+    "ruff_lint_passed": true,
+    "ruff_format_passed": true,
+    "elapsed_seconds": 36.02
+  },
+  "gaussian_diffusion_onehot": {
+    "algorithm": "gaussian_diffusion_onehot",
+    "dataset": "Sudoku hard: 48000 train / 2000 validation; seed42",
+    "training": {
+      "seed": 1,
+      "steps": 2000,
+      "global_batch_size": 256,
+      "accumulation_steps": 4,
+      "model_hidden": 512,
+      "model_blocks": 8,
+      "model_heads": 8,
+      "precision": "bf16-mixed",
+      "lr": 0.0003,
+      "warmup_steps": 250,
+      "ema": 0.999,
+      "gpu": 4,
+      "wall_seconds_config_to_last_checkpoint": 607.1288497447968,
+      "final_logged_train_loss": 0.2182002067565918,
+      "last_validation_loss_step": 1002,
+      "last_logged_validation_loss": 0.09033408761024475
+    },
+    "schedule": {
+      "sigma_min": 0.2,
+      "sigma_max": 4.0,
+      "min_percentile": 0.01,
+      "max_percentile": 0.4,
+      "num_points": 1000,
+      "sigma_at_time_0_0999_1": [
+        0.30828747153282166,
+        3.9999992847442627,
+        3.9999992847442627
+      ],
+      "training_corruption_time": "(1-0.001)*sampled_time",
+      "output_fields": [
+        "alpha",
+        "sigma",
+        "dalpha_dt",
+        "dsigma_dt"
+      ],
+      "alpha": 1
+    },
+    "sampler": {
+      "name": "EulerSampler",
+      "steps": 180,
+      "nfe": 181,
+      "start_time": 0.999,
+      "epsilon": 1e-05,
+      "integration": "time Euler: dx/dt=dalpha_dt*posterior_mean+(dsigma_dt/sigma)*(x-alpha*posterior_mean)"
+    },
+    "intentional_changes": [
+      "Explicit probability-flow time Euler with schedule derivatives, replacing legacy swapped sigma endpoints and sigma-squared divisor.",
+      "Conditioned positions restored after every Euler update and final decode.",
+      "Posterior temperature/filtering inference only.",
+      "No unused mask embedding or output coordinate in pure Gaussian model.",
+      "Extra final denoiser evaluation at final sigma; NFE steps+1."
+    ],
+    "tests": {
+      "suite_passed": 62,
+      "suite_warnings": 14,
+      "suite_seconds": 28.81,
+      "legacy_algo_utilities_exact_fixture_matches": 9
+    },
+    "note": "Running pilot retained pre-generalization VE code (alpha=1 identical forward/loss, fixed-RNG exact test). In-training callbacks used sigma-grid Euler and first time1. Final standalone evaluation uses final time-Euler with start.999.",
+    "additional_schedule": "LinearInterpolationSchedule: alpha=1-t,sigma=t,derivatives(-1,1); smoke-tested forward/loss/backward/sample, not trained.",
+    "evaluations": {
+      "ema": {
+        "accuracy": 0.197,
+        "cell_accuracy": 0.8578539338409901,
+        "digit_accuracy": 0.8438148162662983,
+        "valid_grid_rate": 0.206,
+        "valid_row_rate": 0.894833333333349,
+        "valid_column_rate": 0.8273888888889085,
+        "valid_box_rate": 0.9060555555555693,
+        "valid_solution_rate": 0.197,
+        "clue_consistency_rate": 0.969,
+        "num_correct": 394,
+        "num_total": 2000,
+        "mean_nfe": 181.0,
+        "min_nfe": 181,
+        "max_nfe": 181,
+        "evaluation_seconds": 117.67400561645627,
+        "primary_metric": {
+          "name": "accuracy",
+          "mode": "max",
+          "dataset": "validation"
+        },
+        "checkpoint_step": 2000,
+        "seed": 1,
+        "parameterization": {
+          "_target_": "core.parameterizations.posterior.PosteriorParameterization",
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0,
+          "constraints": {
+            "_target_": "core.parameterizations.constraints.UnconstrainedPosterior"
+          }
+        },
+        "sampler": {
+          "_target_": "core.samplers.euler.EulerSampler",
+          "steps": 180,
+          "epsilon": 1e-05,
+          "start_time": 0.999
+        }
+      },
+      "raw": {
+        "accuracy": 0.1725,
+        "cell_accuracy": 0.8555898884832859,
+        "digit_accuracy": 0.8413271619379521,
+        "valid_grid_rate": 0.1775,
+        "valid_row_rate": 0.8970555555555707,
+        "valid_column_rate": 0.800777777777797,
+        "valid_box_rate": 0.8811666666666816,
+        "valid_solution_rate": 0.1725,
+        "clue_consistency_rate": 0.982,
+        "num_correct": 345,
+        "num_total": 2000,
+        "mean_nfe": 181.0,
+        "min_nfe": 181,
+        "max_nfe": 181,
+        "evaluation_seconds": 117.56453362852335,
+        "primary_metric": {
+          "name": "accuracy",
+          "mode": "max",
+          "dataset": "validation"
+        },
+        "checkpoint_step": 2000,
+        "seed": 1,
+        "parameterization": {
+          "_target_": "core.parameterizations.posterior.PosteriorParameterization",
+          "temperature": 1.0,
+          "top_k": 0,
+          "top_p": 1.0,
+          "constraints": {
+            "_target_": "core.parameterizations.constraints.UnconstrainedPosterior"
+          }
+        },
+        "sampler": {
+          "_target_": "core.samplers.euler.EulerSampler",
+          "steps": 180,
+          "epsilon": 1e-05,
+          "start_time": 0.999
+        }
+      }
+    },
+    "commands": {
+      "training": "CUDA_VISIBLE_DEVICES=4 OMP_NUM_THREADS=2 /home/patrick/duo/.venv/bin/python -m core.main +experiment=gaussian_diffusion_onehot_sudoku data.cache_dir=/home/patrick/.cache/duo/data_cache output_dir=core/outputs/gaussian_sudoku_pilot trainer.max_steps=2000 training.warmup_steps=250 training.ema=0.999 checkpoint.every_n_steps=1000 callback.every_n_steps=1000 callback.subset_size=128 trainer.enable_progress_bar=false trainer.val_check_interval=4000 trainer.limit_val_batches=8 loader.num_workers=2",
+      "evaluation": "CUDA_VISIBLE_DEVICES=4 OMP_NUM_THREADS=2 /home/patrick/duo/.venv/bin/python -m core.main +experiment=gaussian_diffusion_onehot_sudoku mode=evaluate data.cache_dir=/home/patrick/.cache/duo/data_cache output_dir=core/outputs/gaussian_sudoku_pilot/evaluate_ema evaluation.checkpoint=core/outputs/gaussian_sudoku_pilot/checkpoints/last.ckpt training.ema=0.999 loader.num_workers=2",
+      "raw_evaluation_difference": "evaluation.use_ema=false; GPU7; output_dir=evaluate_raw",
+      "tests": "CUDA_VISIBLE_DEVICES=7 OMP_NUM_THREADS=2 /home/patrick/duo/.venv/bin/python -m pytest core/tests -q"
+    }
+  },
+  "continuous_samplers": {
+    "checkpoint": "core/outputs/gaussian_sudoku_pilot/checkpoints/last.ckpt",
+    "checkpoint_step": 2000,
+    "use_ema": true,
+    "seed": 1,
+    "num_examples": 2000,
+    "temperature": 1.0,
+    "top_k": 0,
+    "top_p": 1.0,
+    "notes": "One prespecified setting per sampler. No temperature tuning. Adaptive NFE includes every stage/rejection plus final decoding; all samples in a batch share integration steps. Runtime is observed wall time on shared hardware.",
+    "samplers": {
+      "euler": {
+        "accuracy": 0.197,
+        "digit_accuracy": 0.8438148162662983,
+        "num_correct": 394,
+        "num_total": 2000,
+        "mean_nfe": 181.0,
+        "min_nfe": 181,
+        "max_nfe": 181,
+        "evaluation_seconds": 117.67400561645627,
+        "sampler": {
+          "_target_": "core.samplers.euler.EulerSampler",
+          "steps": 180,
+          "epsilon": 1e-05,
+          "start_time": 0.999
+        },
+        "results_file": "core/outputs/gaussian_sudoku_pilot/evaluate_ema/results.json",
+        "command": "CUDA_VISIBLE_DEVICES=4 OMP_NUM_THREADS=2 /home/patrick/duo/.venv/bin/python -m core.main +experiment=gaussian_diffusion_onehot_sudoku mode=evaluate sampler=euler data.cache_dir=/home/patrick/.cache/duo/data_cache evaluation.checkpoint=core/outputs/gaussian_sudoku_pilot/checkpoints/last.ckpt training.ema=.999 output_dir=core/outputs/gaussian_sudoku_pilot/evaluate_ema"
+      },
+      "heun": {
+        "accuracy": 0.1925,
+        "digit_accuracy": 0.8415432114899158,
+        "num_correct": 385,
+        "num_total": 2000,
+        "mean_nfe": 181.0,
+        "min_nfe": 181,
+        "max_nfe": 181,
+        "evaluation_seconds": 117.7079380005598,
+        "sampler": {
+          "_target_": "core.samplers.heun.HeunSampler",
+          "steps": 90,
+          "epsilon": 1e-05,
+          "start_time": 0.999
+        },
+        "results_file": "core/outputs/gaussian_heun_final/results.json",
+        "command": "CUDA_VISIBLE_DEVICES=4 OMP_NUM_THREADS=2 /home/patrick/duo/.venv/bin/python -m core.main +experiment=gaussian_diffusion_onehot_sudoku mode=evaluate sampler=heun data.cache_dir=/home/patrick/.cache/duo/data_cache evaluation.checkpoint=core/outputs/gaussian_sudoku_pilot/checkpoints/last.ckpt training.ema=.999 output_dir=core/outputs/gaussian_heun_final"
+      },
+      "ode": {
+        "accuracy": 0.178,
+        "digit_accuracy": 0.8369197544753552,
+        "num_correct": 356,
+        "num_total": 2000,
+        "mean_nfe": 75.0,
+        "min_nfe": 75,
+        "max_nfe": 75,
+        "evaluation_seconds": 52.33798625692725,
+        "sampler": {
+          "_target_": "core.samplers.ode.ODESampler",
+          "rtol": 0.001,
+          "atol": 0.0001,
+          "max_nfe": 2000,
+          "max_steps": 1000,
+          "epsilon": 1e-05,
+          "start_time": 0.999
+        },
+        "results_file": "core/outputs/gaussian_ode_final/results.json",
+        "command": "CUDA_VISIBLE_DEVICES=7 OMP_NUM_THREADS=2 /home/patrick/duo/.venv/bin/python -m core.main +experiment=gaussian_diffusion_onehot_sudoku mode=evaluate sampler=ode data.cache_dir=/home/patrick/.cache/duo/data_cache evaluation.checkpoint=core/outputs/gaussian_sudoku_pilot/checkpoints/last.ckpt training.ema=.999 output_dir=core/outputs/gaussian_ode_final"
+      }
+    }
+  },
+  "representation_refactor": {
+    "one_hot_regression": {
+      "old_config_and_state_load_strictly": true,
+      "fixed_rng_loss_and_all_gradients_exact": true,
+      "generated_fixture_tokens_exact": true,
+      "identical_sudoku_records": 2000,
+      "accuracy": 0.197,
+      "mean_nfe": 181,
+      "artifact": "outputs/representation_onehot_parity/results.json"
+    },
+    "embedding_rank_reference": {
+      "legacy_class": "SphereRankSchedule",
+      "dimensions": [
+        2,
+        16,
+        128
+      ],
+      "couplings": [
+        "linear",
+        "geometric"
+      ],
+      "endpoint_widths": [
+        0,
+        0.01
+      ],
+      "times_per_configuration": 1001,
+      "maximum_absolute_difference": 0.0
+    },
+    "embedding_smoke": {
+      "training_steps": 3,
+      "dimension": 16,
+      "trainable_codebook": true,
+      "model_parameters_approx": 144000,
+      "device": "CUDA",
+      "precision": "bf16-mixed",
+      "artifact": "outputs/representation_embedding_smoke",
+      "evaluated_samplers": [
+        "euler",
+        "heun",
+        "ode"
+      ],
+      "examples_per_sampler": 4,
+      "decoding": "representation",
+      "generation_quality_verified": false
+    },
+    "tests_passed": 97
+  }
+}

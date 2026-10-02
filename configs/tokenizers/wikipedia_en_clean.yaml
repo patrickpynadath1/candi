@@ -1,8 +1,0 @@
-wikipedia_en_clean_128: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/tokenizers/wikipedia_en_clean/bpe_vocab128"
-wikipedia_en_clean_256: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/tokenizers/wikipedia_en_clean/bpe_vocab256"
-wikipedia_en_clean_512: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/tokenizers/wikipedia_en_clean/bpe_vocab512"
-wikipedia_en_clean_1024: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/tokenizers/wikipedia_en_clean/bpe_vocab1024"
-wikipedia_en_clean_2048: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/tokenizers/wikipedia_en_clean/bpe_vocab2048"
-wikipedia_en_clean_4096: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/tokenizers/wikipedia_en_clean/bpe_vocab4096"
-wikipedia_en_clean_8192: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/tokenizers/wikipedia_en_clean/bpe_vocab8192"
-wikipedia_en_clean_16384: "/home/patrick/.cache/discrete_diffusion/wikipedia_en_clean/tokenizers/wikipedia_en_clean/bpe_vocab16384"

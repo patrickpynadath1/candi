@@ -1,0 +1,6 @@
+# Requires training.ema=0, callback.every_n_steps=0, trainer.gradient_clip_val=0.
+# Full checkpoints can be consumed by the standalone evaluator/frontier runner.
+_target_: lightning.pytorch.strategies.FSDPStrategy
+sharding_strategy: SHARD_GRAD_OP
+use_orig_params: true
+state_dict_type: full

@@ -1,0 +1,7 @@
+_target_: core.algorithms.permuted_autoregressive.PermutedAutoregressive
+model: ${model}
+predictor: ${parameterization}
+objective: ${objective}
+order: ${generation_order}
+condition_on_observed: false
+length: ${task.length}

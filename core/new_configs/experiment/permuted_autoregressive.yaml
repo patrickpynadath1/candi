@@ -1,0 +1,8 @@
+# @package _global_
+defaults:
+- /generation_order: random
+- override /algorithm: permuted_autoregressive
+- override /model: causal_dit
+- override /parameterization: autoregressive
+- override /objective: cross_entropy
+- override /sampler: permuted_autoregressive

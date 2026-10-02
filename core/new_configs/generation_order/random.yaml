@@ -1,0 +1,4 @@
+_target_: core.generation_order.GenerationOrder
+mode: random
+block_size: null
+ar_probability: 0.0

@@ -1,0 +1,8 @@
+defaults:
+- /data@_global_.data: sudoku_hard
+- /token_space@_global_.token_space: append_mask
+- _self_
+_target_: core.tasks.sudoku.SudokuTask
+data: ${data}
+vocab_size: 12
+length: 180

@@ -1,8 +1,0 @@
-hubpaths_eval:
-  _target_: tasks.hubpaths.callback.HubPathsEvaluationCallback
-  every_n_train_steps: 1000
-  subset_size: 16
-  samples_per_prompt: 16
-  num_steps: 32
-  output_dir: ${cwd:}/hubpaths_eval
-  full_eval_at_end: true

@@ -1,0 +1,5 @@
+_target_: core.samplers.analytic.AnalyticSampler
+steps: 1024
+epsilon: 0.001
+final_denoise: ancestral
+use_float64: true

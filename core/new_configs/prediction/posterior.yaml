@@ -1,0 +1,5 @@
+_target_: core.modifiers.self_conditioning.prediction.PredictionCoordinator
+enabled: ${self_conditioning.enabled}
+source: ${self_conditioning.source}
+probability: ${self_conditioning.probability}
+evaluation_probability: ${self_conditioning.evaluation_probability}

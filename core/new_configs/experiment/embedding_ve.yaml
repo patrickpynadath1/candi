@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+- gaussian_base
+- override /representation: embedding
+- override /noise_schedule: exponential_ve
+- _self_
+representation:
+  trainable: true
+  unit_normalized: true
+noise_schedule:
+  sigma_min: 0.01
+  sigma_max: 2.0
+  training_epsilon: 0.001

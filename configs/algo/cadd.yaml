@@ -1,9 +1,0 @@
-name: cadd
-backbone: cont_dit
-causal_attention: False
-parameterization: mean
-T: 0 # continuous time  
-discretize_start_time: 1.0
-time_conditioning: true
-temp: 1.0
-mixed_coeff: .5

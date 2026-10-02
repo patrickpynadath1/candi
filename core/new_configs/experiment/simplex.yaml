@@ -1,0 +1,15 @@
+# @package _global_
+defaults:
+- override /algorithm: simplex_diffusion
+- override /model: simplex_dit
+- override /parameterization: gaussian_posterior
+- override /process: dirichlet
+- override /noise_schedule: simplex
+- override /time_sampler: loss_derivative
+- override /objective: cross_entropy
+- override /sampler: simplex
+- override /token_space@token_space: data_only
+self_conditioning:
+  source: hidden
+trainer:
+  precision: 32-true

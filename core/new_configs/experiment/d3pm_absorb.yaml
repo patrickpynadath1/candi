@@ -1,0 +1,14 @@
+# @package _global_
+defaults:
+- override /algorithm: d3pm_absorb
+- override /model: dit_conditioned
+- override /parameterization: d3pm
+- override /process: absorbing
+- override /objective: d3pm
+- override /time_sampler: discrete
+- override /noise_schedule: log_linear
+- override /sampler: ancestral
+sampler:
+  steps: ${time_sampler.steps}
+  epsilon: 0.001
+  final_denoise: ancestral

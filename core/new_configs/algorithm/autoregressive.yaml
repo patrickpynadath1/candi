@@ -1,0 +1,5 @@
+_target_: core.algorithms.autoregressive.Autoregressive
+model: ${model}
+predictor: ${parameterization}
+objective: ${objective}
+length: ${task.length}

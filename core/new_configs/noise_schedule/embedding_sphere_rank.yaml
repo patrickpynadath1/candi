@@ -1,0 +1,8 @@
+_target_: core.noise_schedules.embedding_rank.EmbeddingSphereRankSchedule
+dimension: ${representation.dimension}
+rank_min: 0.01
+rank_max: 0.49
+endpoint_width: 0.01
+grid_size: 8193
+quadrature_order: 256
+coupling: geometric

@@ -1,0 +1,6 @@
+# @package _global_
+defaults:
+- onehot_gaussian
+- _self_
+objective:
+  label_smoothing: 0.0

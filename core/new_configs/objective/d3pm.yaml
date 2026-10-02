@@ -1,0 +1,3 @@
+_target_: core.objectives.d3pm.D3PMAbsorbingObjective
+mask_index: ${token_space.mask_index}
+steps: ${time_sampler.steps}

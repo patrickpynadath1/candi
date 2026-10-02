@@ -1,0 +1,11 @@
+# @package _global_
+defaults:
+- sudoku_spherical_adaptive
+noise_schedule:
+  base:
+    auto_truncation: true
+loader:
+  num_workers: 8
+trainer:
+  accumulate_grad_batches: 1
+  limit_val_batches: 0.0

@@ -1,7 +1,0 @@
-# @package _global_
-defaults:
-  - sudoku_candi_adaptive
-
-algo:
-  factorized_adaptive_schedule: true
-  joint_loss_probe: true

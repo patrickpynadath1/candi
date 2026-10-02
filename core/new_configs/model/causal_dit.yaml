@@ -1,0 +1,7 @@
+_target_: core.models.causal.CausalDiT
+vocab_size: ${task.vocab_size}
+hidden_size: 512
+n_blocks: 8
+n_heads: 8
+dropout: 0.1
+tie_word_embeddings: false

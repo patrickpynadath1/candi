@@ -1,5 +1,0 @@
-defaults:
-  - log-linear-adaptive
-
-eps: 0.0
-adaptive_coordinate: physical

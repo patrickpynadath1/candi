@@ -1,0 +1,4 @@
+# @package _global_
+defaults:
+- embedding_flow_matching
+- _self_

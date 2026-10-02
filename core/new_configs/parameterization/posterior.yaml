@@ -1,0 +1,7 @@
+_target_: core.parameterizations.posterior.PosteriorParameterization
+mask_index: ${token_space.mask_index}
+temperature: 1.0
+softcap: null
+top_k: 0
+top_p: 1.0
+commitment: greedy

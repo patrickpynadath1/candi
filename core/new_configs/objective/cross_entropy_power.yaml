@@ -1,0 +1,8 @@
+_target_: core.objectives.cross_entropy.CrossEntropy
+label_smoothing: 0.0
+weighting:
+  _target_: core.objectives.weighting.PowerLossWeighting
+  coordinate: sigma
+  exponent: 0.0
+  scale: 1.0
+  epsilon: 1.0e-06

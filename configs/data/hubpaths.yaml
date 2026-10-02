@@ -1,9 +1,0 @@
-train: hubpaths
-valid: hubpaths
-tokenizer_name_or_path: hubpaths
-cache_dir: ${hydra:runtime.cwd}/data_cache
-prepared_dir: ${.cache_dir}/hubpaths/tiny_debug
-wrap: false
-streaming: false
-insert_train_eos: false
-insert_valid_eos: false

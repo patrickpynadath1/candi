@@ -1,0 +1,7 @@
+_target_: core.noise_schedules.spherical.SphericalSchedule
+epsilon: 0.001
+alpha_max: 1.0
+auto_truncation: false
+vocab_size: ${task.vocab_size}
+dimension: ${representation.dimension}
+truncation_delta: 0.1

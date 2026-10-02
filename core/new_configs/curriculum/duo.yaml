@@ -1,0 +1,5 @@
+_target_: core.curricula.duo.DuoCurriculum
+start_step: 100000
+end_step: 200000
+log10_temperature_start: -1.0
+log10_temperature_end: -2.0

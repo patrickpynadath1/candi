@@ -1,0 +1,9 @@
+_target_: core.training.evaluation_callback.TaskEvaluation
+_recursive_: false
+every_n_steps: 1000
+subset_size: 128
+seed: 42
+sampler_config: ${sampler}
+batch_size: ${loader.eval_batch_size}
+precision: ${trainer.precision}
+output_dir: ${output_dir}/task_callback

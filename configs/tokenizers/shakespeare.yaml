@@ -1,4 +1,0 @@
-shakespeare_10: "/home/patrick/.cache/discrete_diffusion/tiny_shakespeare/tokenizers/tiny_shakespeare/bpe_vocab10"
-shakespeare_100: "/home/patrick/.cache/discrete_diffusion/tiny_shakespeare/tokenizers/tiny_shakespeare/bpe_vocab100"
-shakespeare_1000: "/home/patrick/.cache/discrete_diffusion/tiny_shakespeare/tokenizers/tiny_shakespeare/bpe_vocab1000"
-shakespeare_10000: "/home/patrick/.cache/discrete_diffusion/tiny_shakespeare/tokenizers/tiny_shakespeare/bpe_vocab10000"

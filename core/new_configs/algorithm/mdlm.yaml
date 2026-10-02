@@ -1,0 +1,10 @@
+_target_: core.algorithms.mdlm.MDLM
+model: ${model}
+predictor: ${parameterization}
+process: ${process}
+schedule: ${noise_schedule}
+time_sampler: ${time_sampler}
+objective: ${objective}
+length: ${task.length}
+time_conditioning: false
+prediction: ${prediction}

@@ -1,0 +1,10 @@
+_target_: core.noise_schedules.duo_calibration.DuoCalibration
+vocab_size: ${task.vocab_size}
+cache_path: ${hydra:runtime.cwd}/core/data_cache/duo_integrals/v${task.vocab_size}_100000.npz
+gamma_min: -3.5
+gamma_max: -1.75
+table_gamma_min: -5.0
+table_gamma_max: -1.0
+num_points: 100000
+quadrature_order: 512
+derivative_step: 0.001

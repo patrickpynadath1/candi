@@ -1,0 +1,2 @@
+_target_: core.time_sampling.adaptive_allocation.AdaptiveTimeAllocation
+momentum: 0.99

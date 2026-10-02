@@ -1,0 +1,6 @@
+_target_: core.parameterizations.gaussian_prior.GaussianPriorPosterior
+output_prior: true
+temperature: 1.0
+softcap: null
+top_k: 0
+top_p: 1.0

@@ -1,0 +1,4 @@
+_target_: core.noise_schedules.exponential_ve.ExponentialVESchedule
+sigma_min: 0.01
+sigma_max: 10.0
+training_epsilon: 0.0

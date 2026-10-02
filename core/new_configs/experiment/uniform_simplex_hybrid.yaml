@@ -1,0 +1,14 @@
+# @package _global_
+defaults:
+- override /algorithm: hybrid_diffusion
+- override /model: hybrid_uniform_simplex
+- override /sampler: hybrid
+- override /parameterization: unconstrained_posterior
+- override /objective: cross_entropy
+- override /token_space@token_space: data_only
+algorithm:
+  synchronize_committed: false
+sampler:
+  steps: 180
+  epsilon: 1.0e-05
+  final_denoise: greedy

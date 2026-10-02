@@ -1,0 +1,12 @@
+# @package _global_
+defaults:
+- blurring_diffusion
+- _self_
+data:
+  difficulty: hard
+block_diffusion:
+  enabled: false
+  block_size: 32
+trainer:
+  max_steps: 20000
+  val_check_interval: 20000

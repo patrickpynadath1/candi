@@ -1,0 +1,11 @@
+# @package _global_
+defaults:
+- override /algorithm: gaussian_diffusion
+- override /representation: one_hot
+- override /model: continuous_dit
+- override /parameterization: gaussian_posterior
+- override /process: gaussian
+- override /noise_schedule: one_hot_rank
+- override /objective: cross_entropy
+- override /sampler: euler
+- override /token_space@token_space: data_only

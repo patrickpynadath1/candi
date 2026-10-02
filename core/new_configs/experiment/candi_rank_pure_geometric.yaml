@@ -1,0 +1,6 @@
+# @package _global_
+defaults:
+- candi_rank_pure_linear
+- _self_
+noise_schedule:
+  coupling: geometric

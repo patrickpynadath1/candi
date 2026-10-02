@@ -1,0 +1,15 @@
+defaults:
+- /noise_schedule@base: log_linear
+- _self_
+_target_: core.noise_schedules.adaptive.SFLMAdaptiveSchedule
+buffer_size: 12800
+refit_every: 50
+n_grid: 1000
+n_knots: 20
+spline_degree: 3
+ridge_alpha: 0.001
+uniform_mix: 0.001
+warmup_steps: 1000
+ema: 0.9
+coordinate: legacy_time
+loss_signal: objective

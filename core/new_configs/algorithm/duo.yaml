@@ -1,0 +1,13 @@
+_target_: core.algorithms.duo.Duo
+model: ${model}
+predictor: ${parameterization}
+process: ${process}
+schedule: ${noise_schedule}
+time_sampler: ${time_sampler}
+objective: ${objective}
+length: ${task.length}
+calibration: ${calibration}
+curriculum: ${curriculum}
+representation: ${representation}
+relaxation_process:
+  _target_: core.processes.gaussian.GaussianProcess

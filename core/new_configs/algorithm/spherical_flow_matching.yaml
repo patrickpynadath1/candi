@@ -1,0 +1,10 @@
+_target_: core.algorithms.spherical_flow_matching.SphericalFlowMatching
+model: ${model}
+predictor: ${parameterization}
+process: ${process}
+schedule: ${noise_schedule}
+time_sampler: ${time_sampler}
+objective: ${objective}
+representation: ${representation}
+length: ${task.length}
+prediction: ${prediction}

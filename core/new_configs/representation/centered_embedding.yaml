@@ -1,0 +1,6 @@
+_target_: core.representations.centered_embedding.CenteredEmbeddingRepresentation
+vocab_size: ${task.vocab_size}
+dimension: 4
+feature_lambda_min: ${noise_schedule.feature_lambda_min}
+feature_lambda_max: ${noise_schedule.feature_lambda_max}
+column_init_alpha: 0.25

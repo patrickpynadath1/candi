@@ -1,0 +1,11 @@
+_target_: core.models.spherical.SphereDiT
+vocab_size: ${task.vocab_size}
+state_dim: ${representation.dimension}
+hidden_size: 512
+cond_dim: 128
+n_heads: 8
+n_blocks: 8
+dropout: 0.1
+learn_temperature_scaling: false
+self_conditioning: ${self_conditioning.enabled}
+self_conditioning_source: ${self_conditioning.source}

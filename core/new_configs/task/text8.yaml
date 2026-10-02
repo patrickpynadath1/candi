@@ -1,0 +1,15 @@
+defaults:
+- /data@_global_.data: text8
+- /token_space@_global_.token_space: text8
+- _self_
+_target_: core.tasks.text8.Text8Task
+data: ${data}
+vocab_size: 35
+length: 256
+min_word_lengths:
+- 3
+- 5
+- 7
+evaluation_split: validation
+num_eval_samples: 128
+evaluation_seed: 23

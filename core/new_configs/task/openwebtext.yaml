@@ -1,0 +1,19 @@
+defaults:
+- /data@_global_.data: openwebtext
+- /token_space@_global_.token_space: append_mask
+- _self_
+_target_: core.tasks.openwebtext.OpenWebTextTask
+data: ${data}
+vocab_size: 50257
+length: 1024
+tokenizer_name: gpt2
+local_files_only: false
+num_eval_samples: 128
+scorer:
+  _target_: core.tasks.metrics.generative.CausalReferenceScorer
+  model_name: gpt2-large
+  batch_size: 8
+  context_size: 1024
+  device: ${evaluation.device}
+  local_files_only: false
+  ignore_initial_bos: true

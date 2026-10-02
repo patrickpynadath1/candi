@@ -1,0 +1,5 @@
+_target_: core.samplers.spherical.SphericalFlowSampler
+steps: 180
+epsilon: 1.0e-05
+velocity: exact
+use_float64: true

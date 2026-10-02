@@ -1,0 +1,5 @@
+defaults:
+- /noise_schedule@base: one_hot_rank
+- _self_
+_target_: core.noise_schedules.rescaled_gaussian.RescaledGaussianSchedule
+path_type: vp

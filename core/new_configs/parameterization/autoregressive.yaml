@@ -1,0 +1,9 @@
+_target_: core.parameterizations.posterior.PosteriorParameterization
+softcap: null
+temperature: 1.0
+top_k: 0
+top_p: 1.0
+commitment: sample
+constraints:
+  _target_: core.parameterizations.constraints.TokenExclusion
+  token_id: ${token_space.mask_index}

@@ -1,0 +1,9 @@
+# @package _global_
+defaults:
+- onehot_gaussian
+- override /noise_schedule: sflm_gaussian_adaptive
+- override /noise_schedule@noise_schedule.base: linear_interpolation
+- _self_
+noise_schedule:
+  coordinate: legacy_time
+  loss_signal: cross_entropy

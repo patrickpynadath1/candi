@@ -1,8 +1,0 @@
-train: wikipedia_en_clean
-valid: wikipedia_en_clean
-tokenizer_name_or_path: ${tokenizers.wikipedia_en_clean_2048}
-cache_dir: /home/patrick/.cache/discrete_diffusion/wikipedia_en_clean
-wrap: True
-streaming: False
-insert_train_eos: True
-insert_valid_eos: True

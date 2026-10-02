@@ -1,0 +1,10 @@
+_target_: core.algorithms.simplex_diffusion.SimplexDiffusion
+model: ${model}
+predictor: ${parameterization}
+process: ${process}
+schedule: ${noise_schedule}
+time_sampler: ${time_sampler}
+objective: ${objective}
+length: ${task.length}
+prediction: ${prediction}
+condition_dropout: 0.0

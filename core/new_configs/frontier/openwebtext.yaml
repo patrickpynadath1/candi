@@ -1,0 +1,13 @@
+# Select sampler=ancestral (or another sampler exposing steps).
+axes:
+- parameter: parameterization.temperature
+  values: [0.7, 0.85, 1.0]
+- parameter: sampler.steps
+  values: [16, 32, 64, 128]
+seeds: [1]
+objectives:
+  entropy: max
+  generative_perplexity: min
+group_by: [seed, sampler.steps]
+resume: true
+dry_run: false

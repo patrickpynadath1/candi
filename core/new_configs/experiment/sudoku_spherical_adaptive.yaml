@@ -1,0 +1,6 @@
+# @package _global_
+defaults:
+- sudoku_spherical
+- override /noise_schedule: spherical_adaptive
+noise_schedule:
+  coordinate: physical

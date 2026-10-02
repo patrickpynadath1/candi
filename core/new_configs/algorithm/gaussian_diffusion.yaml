@@ -1,0 +1,10 @@
+_target_: core.algorithms.gaussian_diffusion.GaussianDiffusion
+model: ${model}
+predictor: ${parameterization}
+process: ${process}
+schedule: ${noise_schedule}
+time_sampler: ${time_sampler}
+objective: ${objective}
+length: ${task.length}
+representation: ${representation}
+prediction: ${prediction}

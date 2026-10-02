@@ -1,0 +1,11 @@
+_target_: core.algorithms.blurring_diffusion.BlurringDiffusion
+model: ${model}
+predictor: ${parameterization}
+process: ${process}
+schedule: ${noise_schedule}
+time_sampler: ${time_sampler}
+objective: ${objective}
+representation: ${representation}
+length: ${task.length}
+prediction: ${prediction}
+detach_forward_embedding: false

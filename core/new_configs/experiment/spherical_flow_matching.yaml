@@ -1,0 +1,17 @@
+# @package _global_
+defaults:
+- override /algorithm: spherical_flow_matching
+- override /representation: embedding
+- override /model: sphere_dit
+- override /parameterization: gaussian_posterior
+- override /process: spherical
+- override /noise_schedule: spherical
+- override /objective: cross_entropy
+- override /sampler: spherical
+- override /token_space@token_space: data_only
+representation:
+  dimension: 512
+  trainable: true
+  unit_normalized: true
+parameterization:
+  commitment: sample

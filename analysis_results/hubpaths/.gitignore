@@ -1,4 +1,0 @@
-# Keep portable JSON/TSV/SVG reports; regenerate large binary counting/data artifacts.
-*.sqlite
-*.npy
-*.npz

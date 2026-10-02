@@ -1,0 +1,10 @@
+_target_: core.samplers.permuted_autoregressive.PermutedAutoregressiveSampler
+use_cache: true
+bos_token_id: null
+eos_token_id: null
+pad_token_id: null
+order:
+  _target_: core.generation_order.GenerationOrder
+  mode: random
+  block_size: null
+  ar_probability: 0.0

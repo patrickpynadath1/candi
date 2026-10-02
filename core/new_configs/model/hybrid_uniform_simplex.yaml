@@ -1,0 +1,48 @@
+_target_: core.models.hybrid.HybridModel
+backbone:
+  _target_: core.models.dit.DiT
+  vocab_size: ${task.vocab_size}
+  hidden_size: 512
+  cond_dim: 128
+  n_blocks: 8
+  n_heads: 8
+  dropout: 0.1
+  adaLN: true
+  tie_word_embeddings: false
+branches:
+- _target_: core.hybrid.branches.DiscreteBranch
+  name: uniform
+  process:
+    _target_: core.processes.uniform_posterior.PosteriorUniformProcess
+    vocab_size: ${task.vocab_size}
+  schedule:
+    _target_: core.noise_schedules.log_linear.LogLinear
+    epsilon: 0.0
+  adapter:
+    _target_: core.models.hybrid.TokenEmbeddingAdapter
+    vocab_size: ${task.vocab_size}
+    hidden_size: ${model.backbone.hidden_size}
+    scale: 0.5
+    normalize: true
+- _target_: core.hybrid.branches.SimplexBranch
+  name: simplex
+  process:
+    _target_: core.processes.dirichlet.DirichletProcess
+    vocab_size: ${task.vocab_size}
+    reference: null
+  schedule:
+    _target_: core.noise_schedules.simplex.SimplexSchedule
+    kind: constant_linear
+    nu0: 0.4
+    nu1: 0.75
+    pivot: 0.8
+    epsilon: 1.0
+  adapter:
+    _target_: core.models.hybrid.SimplexInputAdapter
+    vocab_size: ${task.vocab_size}
+    hidden_size: ${model.backbone.hidden_size}
+    scale: 0.5
+    normalize: true
+self_conditioning: ${self_conditioning.enabled}
+self_conditioning_source: ${self_conditioning.source}
+time_conditioning: identity

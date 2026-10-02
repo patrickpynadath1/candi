@@ -1,0 +1,17 @@
+defaults:
+- /noise_schedule@base: gaussian_rank
+- _self_
+_target_: core.noise_schedules.adaptive.CDCDGaussianSchedule
+buffer_size: 12800
+refit_every: 50
+n_grid: 1000
+n_knots: 20
+spline_degree: 3
+ridge_alpha: 0.001
+uniform_mix: 0.01
+warmup_steps: 1000
+ema: 0.9
+coordinate: physical
+loss_signal: cross_entropy
+bins: 100
+max_importance: 100.0

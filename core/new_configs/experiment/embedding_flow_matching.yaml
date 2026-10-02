@@ -1,0 +1,8 @@
+# @package _global_
+defaults:
+- onehot_gaussian
+- override /representation: embedding
+- _self_
+representation:
+  trainable: true
+  unit_normalized: true

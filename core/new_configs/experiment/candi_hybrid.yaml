@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+- override /algorithm: hybrid_diffusion
+- override /model: hybrid_candi
+- override /sampler: hybrid_entropy_bounded
+- override /parameterization: posterior
+- override /objective: cross_entropy
+parameterization:
+  mask_index: null
+algorithm:
+  synchronize_committed: true
+evaluation:
+  use_ema: true
