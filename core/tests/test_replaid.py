@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def config(*overrides):
     with initialize_config_dir(
-        version_base=None, config_dir=str(ROOT / "core/new_configs")
+        version_base=None, config_dir=str(ROOT / "configs")
     ):
         return compose(
             config_name="config",

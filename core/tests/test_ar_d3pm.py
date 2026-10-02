@@ -14,7 +14,7 @@ from core.training.module import TrainingModule
 
 def config(method, *extra):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         args = [
             f"+experiment={method}",

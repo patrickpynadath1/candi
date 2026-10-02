@@ -42,7 +42,7 @@ def test_pareto_directions_ties_and_grouping():
 @pytest.mark.parametrize("preset", ["sudoku", "text8", "openwebtext"])
 def test_frontier_presets_compose(preset):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         overrides = [f"frontier={preset}", "output_dir=/tmp/frontier_test"]
         if preset != "sudoku":

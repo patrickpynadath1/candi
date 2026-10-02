@@ -8,16 +8,17 @@ representations, spherical flow matching, autoregressive generation, and hybrid
 combinations of discrete and continuous processes, including CANDI.
 
 This document records the agreed design and component data flow; see `README.md` for
-entrypoints, `new_configs/` for Hydra configuration, and `VALIDATION.md` for
+entrypoints, root `configs/` for Hydra configuration, and `VALIDATION.md` for
 verification. Formal typing is deferred; constructor checks currently enforce
 component compatibility.
 
 ## Self containment
 
 Library implementations live inside `core/`: models and supporting layers,
-mathematical components, utilities, Hydra configs, checkpoint handling, EMA,
+mathematical components, utilities, checkpoint handling, EMA,
 training, evaluation, and sweep support. The root `main.py` and `frontier.py`
-provide command-line entrypoints and delegate to the library.
+provide command-line entrypoints and delegate to the library. Hydra configs
+live in root `configs/`.
 
 Code in `core/` must not import legacy repository modules or load configuration
 files from legacy directories, directly or indirectly. Copying the existing DiT
@@ -26,8 +27,8 @@ adapted to the new boundaries. Installed third-party libraries remain external
 dependencies. Datasets and checkpoints can be supplied through explicit paths.
 
 The old implementation remains available in Git history. The current checkout
-runs with `core/`, its root entrypoints, the uv dependency files, and explicitly
-supplied data or artifacts. No removed repository modules are required.
+runs with `core/`, root `configs/` and entrypoints, the uv dependency files, and
+explicitly supplied data or artifacts. No removed repository modules are required.
 
 ## Training and sampling orchestration
 
@@ -226,7 +227,7 @@ checkpointing, restoring, or applying EMA.
 Training, standalone sampling, and evaluation use the root `main.py`; pretrained
 frontier sweeps use `frontier.py`. Both use recursive Hydra construction and
 delegate execution to `core/`. Maintained config groups live in
-`core/new_configs/`. An algorithm config group declares its `_target_` and
+`configs/`. An algorithm config group declares its `_target_` and
 references the selected component configs. The training wrapper calls
 `instantiate(config.algorithm)`; the evaluator instantiates the sampler config
 directly. Adding a component or algorithm requires its implementation and YAML

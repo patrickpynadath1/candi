@@ -131,7 +131,7 @@ def test_euler_preserves_prompts_and_matches_constant_mean_solution():
 @pytest.mark.parametrize("schedule", ["gaussian_rank", "linear_interpolation"])
 def test_gaussian_hydra_single_example_loss_and_sampling(schedule):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         cfg = compose(
             config_name="config",

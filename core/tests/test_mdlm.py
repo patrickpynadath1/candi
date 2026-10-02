@@ -24,7 +24,7 @@ from core.data.sudoku import SudokuTokenizer, encode_example, sudoku_metrics
 
 def config(*overrides):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         return compose(
             config_name="config",

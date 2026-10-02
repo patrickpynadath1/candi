@@ -21,22 +21,22 @@ Run commands from the directory containing `core/`:
 python main.py --cfg job
 ```
 
-Hydra configs live in `core/new_configs/`. There is one construction and
+Hydra configs live in `configs/`. There is one construction and
 execution path; `mode=train`, `mode=evaluate`, and `mode=sample` select the
 workflow. Sampling writes generated outputs and task metrics using the shared
 evaluator. Hydra multirun supplies sweeps.
 
 The root `main.py` and `frontier.py` are the command-line entrypoints. To move
-the implementation, copy those runners, `core/`, `pyproject.toml`, and `uv.lock`.
-Provide external datasets or checkpoints through their explicit configuration
-fields. The former legacy implementation is available in Git history.
+the implementation, copy those runners, `core/`, `configs/`, `pyproject.toml`, and
+`uv.lock`. Provide external datasets or checkpoints through their explicit
+configuration fields. The former legacy implementation is available in Git history.
 
 ## Config-driven construction
 
 Hydra constructs the component graph recursively. The training wrapper calls
 `instantiate(config.algorithm)` and evaluation calls `instantiate(config.sampler)`.
 
-`algorithm=mdlm` selects `new_configs/algorithm/mdlm.yaml`, which declares the
+`algorithm=mdlm` selects `configs/algorithm/mdlm.yaml`, which declares the
 model, predictor, process, schedule, time sampler, and objective through config
 references. Component groups remain independently selectable and overridable:
 
@@ -656,7 +656,7 @@ python main.py +experiment=gaussian_diffusion_embedding_sudoku \
 Use `+experiment=onehot_gaussian`, `embedding_flow_matching`, `embedding_ve`,
 `candi_embedding_pure_linear_rank`, `candi_embedding_pure_geometric_rank`,
 `candi_rank_pure_linear`, `candi_rank_pure_geometric`, or the other named
-[Gaussian presets](new_configs/experiment/GAUSSIAN_PRESETS.md). The table documents
+[Gaussian presets](../configs/experiment/GAUSSIAN_PRESETS.md). The table documents
 all 13 presets, configuration-only approximations, and the deliberately retained
 sigma=4 cap for one-hot rank paths. Tasks remain independently configurable.
 
@@ -705,7 +705,7 @@ python main.py +experiment=permuted_autoregressive_text8 data.download=true
 
 Spherical flow matching combines unit-normalized trainable embeddings, SphereDiT,
 spherical corruption, posterior prediction, and a manifold sampler. The
-[spherical presets](new_configs/experiment/SPHERICAL_PRESETS.md) preserve the
+[spherical presets](../configs/experiment/SPHERICAL_PRESETS.md) preserve the
 original Sudoku architecture and describe fixed, adaptive, and truncated-adaptive
 schedules. The adaptive component defaults to original S-FLM time coordinates;
 the named Sudoku presets explicitly preserve their physical-coordinate setting.

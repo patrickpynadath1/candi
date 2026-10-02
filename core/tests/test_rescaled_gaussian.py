@@ -134,7 +134,7 @@ def test_representation_requirements_and_hydra_base():
             RepresentationSpec("embedding", 8, 12, True), "test"
         )
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         config = compose(
             config_name="config",

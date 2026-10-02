@@ -43,7 +43,7 @@ def table_path(tmp_path_factory):
 
 def config(method, table_path=None, *overrides):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         args = [
             f"+experiment={method}",
@@ -320,7 +320,7 @@ def test_integral_generation_matches_reference_quadrature():
 
 def test_composed_recipes_retain_reference_defaults():
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         for method in ("uniform_diffusion", "sedd_absorb", "duo"):
             c = compose(config_name="config", overrides=[f"+experiment={method}"])

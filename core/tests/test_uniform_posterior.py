@@ -62,7 +62,7 @@ def test_posterior_does_not_recondition_clean_prediction():
 @pytest.mark.parametrize("self_conditioning", [False, True])
 def test_config_training_sampling_and_unconstrained_observations(self_conditioning):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         config = compose(
             config_name="config",

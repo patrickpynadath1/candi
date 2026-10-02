@@ -5,7 +5,7 @@ import hydra
 from core.sweeps.frontier import run
 
 
-@hydra.main(version_base=None, config_path="core/new_configs", config_name="frontier")
+@hydra.main(version_base=None, config_path="configs", config_name="frontier")
 def main(config):
     run(config, evaluation_entrypoint=Path(__file__).with_name("main.py"))
 

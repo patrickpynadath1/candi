@@ -12,7 +12,7 @@ from core.samplers.spherical import posterior_velocity
 
 def config(experiment="sudoku_spherical_truncated_adaptive"):
     with initialize_config_dir(
-        config_dir=str(Path("core/new_configs").resolve()), version_base=None
+        config_dir=str(Path("configs").resolve()), version_base=None
     ):
         return compose(
             config_name="config",
@@ -120,7 +120,7 @@ def test_truncation_and_adaptive_coordinate():
 
 def test_default_adaptation_uses_sampled_time():
     with initialize_config_dir(
-        config_dir=str(Path("core/new_configs").resolve()), version_base=None
+        config_dir=str(Path("configs").resolve()), version_base=None
     ):
         cfg = compose(
             config_name="config",

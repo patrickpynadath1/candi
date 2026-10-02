@@ -1,7 +1,8 @@
 # CANDI v2.1
 
-Composable diffusion models for discrete data. Implementations, tasks, Hydra
-configs, and tests live in `core/`; the root scripts provide the entrypoints.
+Composable diffusion models for discrete data. Implementations, tasks, and tests
+live in `core/`. Hydra configs live in `configs/`; the root scripts provide the
+entrypoints.
 There are no dependencies on the removed legacy algorithm folders.
 
 ## Setup
@@ -41,7 +42,7 @@ uv run python main.py --multirun seed=1,2,3
 
 `mode=sample` uses the same generation and task-metric pipeline as evaluation.
 For resume, pass `checkpoint.resume=/path/to/last.ckpt` with matching training
-settings. Select experiments and component groups from `core/new_configs/`.
+settings. Select experiments and component groups from `configs/`.
 
 ## Pretrained frontier sweeps
 

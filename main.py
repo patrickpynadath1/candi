@@ -4,7 +4,7 @@ import hydra
 from core.training.runner import run
 
 
-@hydra.main(version_base=None, config_path="core/new_configs", config_name="config")
+@hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(config):
     run(config)
 

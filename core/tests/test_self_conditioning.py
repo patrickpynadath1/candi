@@ -19,7 +19,7 @@ from core.training.module import TrainingModule
 
 def config(source="posterior_mean", *overrides):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         return compose(
             config_name="config",
@@ -343,7 +343,7 @@ def test_time_conditioned_mdlm_uses_same_bootstrap_coordinate():
 )
 def test_unsupported_method_rejects_requested_flag(experiment):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         cfg = compose(
             config_name="config",
@@ -379,7 +379,7 @@ def continuous_algorithm(experiment, source, device="cpu"):
     if experiment != "gaussian_diffusion_sudoku":
         overrides.append("representation.dimension=8")
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         cfg = compose(config_name="config", overrides=overrides)
     algo = instantiate(cfg.algorithm).to(device)
@@ -574,7 +574,7 @@ def test_default_bootstrap_probability():
 
     assert PredictionCoordinator().probability == 0.9
     with initialize_config_dir(
-        config_dir=str(Path(__file__).resolve().parents[1] / "new_configs"),
+        config_dir=str(Path(__file__).resolve().parents[2] / "configs"),
         version_base=None,
     ):
         cfg = compose(config_name="config")

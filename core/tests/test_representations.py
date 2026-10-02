@@ -25,7 +25,7 @@ from core.samplers.ode import ODESampler
 
 def configuration(*overrides):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         return compose(
             config_name="config",

@@ -155,7 +155,7 @@ def test_gaussian_chain_rule_representation_and_training_clock(cls):
 )
 def test_hydra_schedule_configs(name):
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         config = compose(config_name="config", overrides=[f"noise_schedule={name}"])
         schedule = instantiate(config.noise_schedule)
@@ -208,7 +208,7 @@ def test_cdcd_flat_loss_fallback_and_finite_buffer_filter():
 
 def test_gaussian_base_is_a_replaceable_hydra_group():
     with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[1] / "new_configs")
+        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
         config = compose(
             config_name="config",

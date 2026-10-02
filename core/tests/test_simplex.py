@@ -30,7 +30,7 @@ def tiny_config(sc=False, **overrides):
     ]
     entries.extend(f"{key}={value}" for key, value in overrides.items())
     with initialize_config_dir(
-        config_dir=str(Path(__file__).resolve().parents[1] / "new_configs"),
+        config_dir=str(Path(__file__).resolve().parents[2] / "configs"),
         version_base=None,
     ):
         return compose(config_name="config", overrides=entries)
@@ -248,7 +248,7 @@ def test_training_bootstrap_shares_state_time_and_detaches_feedback():
 )
 def test_presets_compose(preset):
     with initialize_config_dir(
-        config_dir=str(Path(__file__).resolve().parents[1] / "new_configs"),
+        config_dir=str(Path(__file__).resolve().parents[2] / "configs"),
         version_base=None,
     ):
         config = compose(
