@@ -6,8 +6,8 @@ means that a specified fixture or integration ran. **Reproduced** means a
 comparison against a defined reference succeeded. A short pilot is evidence
 that a method can learn, not proof of convergence or paper-level performance.
 
-The regression suite after merging the model and sampler composition refactors
-passed **417 tests**, including available CUDA checks (402 before these changes).
+The regression suite with programmatic configuration sweeps passed **437 tests**,
+including available CUDA checks (417 before adding sweeps).
 That total is a snapshot, not a promise that every method,
 task, precision, sampler, modifier and distributed strategy combination has
 been tested. Run the current suite from the repository root:
@@ -39,6 +39,26 @@ pre-refactor loops, including intermediate prediction inputs and RNG state, and
 compare shared model execution and gradients with the original direct block/head
 calculation. Existing modifier, mixed-precision, cache and checkpoint tests remain
 part of the complete suite.
+
+## Programmatic sweep execution
+
+All 45 existing experiment presets composed and planned through the Python sweep
+API without launching training. A separate check instantiated the four Gaussian
+combinations of one-hot/embedding representations and Euler/Heun samplers with an
+exponential VE schedule.
+
+In the merged worktree, small MDLM and autoregressive trials trained concurrently
+for two steps on distinct A6000 GPUs using BF16 and synthetic data. Each wrote a
+checkpoint; separate evaluation trials loaded those checkpoints and generated
+four records each. Repeating the completed training sweep skipped both workers
+without modifying their logs. This checks execution and restart behavior, not
+generation quality. The executor supports local CPU or one-GPU trials; multi-GPU
+trials, cluster backends and automatic partial-checkpoint resume are not included.
+
+Regression tests cover independent configs, nested Hydra overrides, visibility
+restrictions, queue reuse, failures/retries, output conflicts, coordinator locking,
+Ctrl+C cleanup and aggregate-only evaluation results. See the
+[programmatic sweep guide](../guides/programmatic-sweeps.md) for the API and limits.
 
 ## Methods and tasks
 

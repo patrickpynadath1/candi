@@ -142,7 +142,7 @@ Each sweep has a `manifest.json` and coordinator lock. Each trial has its own
 `trial.yaml`, `run.log`, normal runner `config.yaml`, metrics and checkpoints.
 Training metrics report the latest nonempty value of each CSV metric (potentially
 from different steps); evaluation metrics come from `results.json`, flattened with slash-separated keys
-(e.g. `word_accuracy/by_length/4/count`). Only numeric aggregates enter the
+(e.g. `generated/words/counts/valid`). Only numeric evaluation aggregates enter the
 manifest; generated records stay in the per-trial `results.json`.
 
 Rerunning the same sweep skips successful matching trials and retries failed or
@@ -157,9 +157,10 @@ A retry starts the runner again with the same config. It does **not** automatica
 resume training from a partially written checkpoint; set `checkpoint.resume`
 explicitly in a new sweep if that is desired. Logs append across attempts.
 `SweepFailed` exposes all `results`, including successful trials; remaining trials
-continue after an individual failure. Interrupting the coordinator terminates
-its active child process groups and records interrupted status. SIGKILL or host
-failure cannot run cleanup; ensure surviving workers are stopped before restart.
+continue after an individual failure. Ctrl+C in the coordinator terminates its
+active child process groups and records interrupted status. External termination
+(including an unhandled SIGTERM, SIGKILL or host failure) can bypass cleanup;
+ensure surviving workers are stopped before restart.
 
 Only one coordinator may operate on a sweep directory at a time. Distinct sweep
 directories do not share a resource registry, so give concurrent sweeps disjoint
