@@ -9,10 +9,8 @@ from hydra.utils import instantiate
 
 from core.processes.uniform import UniformProcess
 from core.processes.uniform_posterior import PosteriorUniformProcess
-from core.hybrid.branches import (
-    BranchPoint,
-    DiscreteBranch,
-)
+from core.modifiers.hybrid.views import ViewPoint, DiffusionView
+from core.samplers.hybrid_updates import DiscretePosteriorUpdate
 
 
 @pytest.mark.parametrize(
@@ -96,19 +94,21 @@ def test_config_training_sampling_and_unconstrained_observations(self_conditioni
 
 def test_hybrid_branch_selects_posterior_reverse():
     process = PosteriorUniformProcess(3)
-    branch = DiscreteBranch(process, None, None)
+    branch = DiffusionView(process, None, None, DiscretePosteriorUpdate())
     state = torch.tensor([[2, 2]])
     posterior = torch.tensor([[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]])
-    source = BranchPoint(torch.tensor([0.5]), (torch.tensor([0.5]), None))
-    destination = BranchPoint(torch.tensor([0.0]), (torch.tensor([1.0]), None))
+    source = ViewPoint(torch.tensor([0.5]), (torch.tensor([0.5]), None))
+    destination = ViewPoint(torch.tensor([0.0]), (torch.tensor([1.0]), None))
     assert torch.equal(
-        branch.update(state, posterior, source, destination), torch.tensor([[0, 1]])
+        branch.update(process, None, state, posterior, source, destination),
+        torch.tensor([[0, 1]]),
     )
 
 
 def test_hybrid_uniform_posterior_training_sampling_and_plugin_rejection():
-    from core.algorithms.hybrid_diffusion import HybridDiffusion
-    from core.models.hybrid import HybridModel, TokenEmbeddingAdapter
+    from core.modifiers.hybrid.training import HybridDiffusion
+    from core.modifiers.hybrid.model import HybridModel
+    from core.representations.noisy_inputs import TokenRepresentation
     from core.models.dit import DiT
     from core.noise_schedules.log_linear import LogLinear
     from core.objectives.cross_entropy import CrossEntropy
@@ -117,7 +117,12 @@ def test_hybrid_uniform_posterior_training_sampling_and_plugin_rejection():
     from core.time_sampling.uniform import UniformTimeSampler
 
     def build(process):
-        branch = DiscreteBranch(process, LogLinear(0.001), TokenEmbeddingAdapter(4, 16))
+        branch = DiffusionView(
+            process,
+            LogLinear(0.001),
+            TokenRepresentation(4, 16),
+            DiscretePosteriorUpdate(),
+        )
         backbone = DiT(4, 16, 8, 1, 2, dropout=0, adaLN=False)
         model = HybridModel(backbone, [branch])
         return HybridDiffusion(
@@ -166,3 +171,76 @@ def test_entropy_bounded_rejected_update_keeps_full_posterior():
         algo, tokens, tokens.bool()
     )
     torch.testing.assert_close(captured[0], probabilities.double())
+
+
+@pytest.mark.parametrize("freeze", [False, True])
+def test_uniform_eb_revisits_previously_committed_positions(freeze):
+    from types import SimpleNamespace
+    from core.parameterizations.posterior import PosteriorParameterization
+    from core.samplers.uniform_entropy_bounded import UniformEntropyBoundedSampler
+
+    process = PosteriorUniformProcess(3)
+    states = []
+    transitions = []
+    # Step one selects position 1; step two selects position 2. Position 1
+    # must still receive the reverse transition after its earlier commitment.
+    predictions = [
+        torch.tensor([[[.2, .3, .5], [.001, .998, .001], [.3, .3, .4]]]),
+        torch.tensor([[[.2, .3, .5], [.3, .3, .4], [.001, .001, .998]]]),
+    ]
+
+    def predict(state, keep):
+        states.append(state.clone())
+        return predictions[len(states) - 1].log()
+
+    def reverse(state, probabilities, keep_t, keep_s):
+        transitions.append(state.clone())
+        return torch.zeros_like(state)
+
+    process.reverse = reverse
+    algo = SimpleNamespace(
+        process=process, predictor=PosteriorParameterization(),
+        schedule=lambda t: (1 - t * .999, None), sampling_prediction=predict,
+    )
+    tokens = torch.tensor([[2, 0, 0]])
+    sample, info = UniformEntropyBoundedSampler(steps=2, freeze=freeze).sample(
+        algo, tokens, torch.tensor([[True, False, False]])
+    )
+    assert len(states) == len(transitions) == 2
+    assert states[1][0, 1] == 1  # previously committed token enters next step
+    assert sample.tolist() == [[2, 1 if freeze else 0, 2]]
+    assert info["completed_per_sample"] == [freeze]
+    assert all(state[0, 0] == 2 for state in states)
+    assert info['nfe_per_sample'] == [2]
+
+
+
+def test_uniform_eb_stops_only_on_simultaneous_acceptance():
+    from types import SimpleNamespace
+    from core.parameterizations.posterior import PosteriorParameterization
+    from core.samplers.uniform_entropy_bounded import UniformEntropyBoundedSampler
+
+    calls = []
+    def predict(state, keep):
+        calls.append(state.clone())
+        probabilities = [
+            [[[.02, .96, .02], [.3, .3, .4]]],
+            [[[.3, .3, .4], [.02, .02, .96]]],
+            [[[.001, .001, .998], [.001, .998, .001]]],
+        ][len(calls) - 1]
+        return torch.tensor(probabilities).log()
+
+    algo = SimpleNamespace(
+        process=PosteriorUniformProcess(3), predictor=PosteriorParameterization(),
+        schedule=lambda t: (1 - t * .999, None), sampling_prediction=predict,
+    )
+    tokens = torch.zeros(1, 2, dtype=torch.long)
+    sample, info = UniformEntropyBoundedSampler(entropy_bound=.1, steps=5).sample(
+        algo, tokens, tokens.bool()
+    )
+    assert info['accepted_per_step'] == [[1], [1], [2]]
+    assert sample.tolist() == [[2, 1]]
+    assert info['nfe_per_sample'] == [3]
+    assert info['completed_per_sample'] == [True]
+    _, empty = UniformEntropyBoundedSampler(steps=2).sample(algo, tokens, ~tokens.bool())
+    assert empty['nfe_per_sample'] == [0]

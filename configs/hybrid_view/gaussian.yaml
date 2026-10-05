@@ -1,0 +1,25 @@
+_target_: core.modifiers.hybrid.views.DiffusionView
+process:
+  _target_: core.processes.gaussian.GaussianProcess
+schedule:
+  _target_: core.noise_schedules.embedding_rank.EmbeddingSphereRankSchedule
+  dimension: 128
+  rank_min: 0.01
+  rank_max: 0.49
+  endpoint_width: 0.01
+  grid_size: 8193
+  quadrature_order: 256
+  coupling: linear
+representation:
+  _target_: core.representations.noisy_inputs.ProjectedRepresentation
+  state_dim: 128
+  hidden_size: ${model.backbone.hidden_size}
+  embedding_projection: true
+  state_representation:
+    _target_: core.representations.embedding.EmbeddingRepresentation
+    vocab_size: ${task.vocab_size}
+    dimension: 128
+    trainable: false
+    unit_normalized: true
+update:
+  _target_: core.samplers.hybrid_updates.GaussianPosteriorUpdate

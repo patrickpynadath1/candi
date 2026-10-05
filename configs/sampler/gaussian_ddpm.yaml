@@ -1,4 +1,7 @@
 _target_: core.samplers.gaussian_ddpm.GaussianDDPMSampler
 steps: 180
 epsilon: 1.0e-05
-prior_mode: standard_normal
+prior_mode: schedule
+prompt_mode: clean
+self_conditioning_mode: previous
+final_transition_noise: false

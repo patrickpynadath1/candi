@@ -6,6 +6,7 @@ schedule: ${noise_schedule}
 time_sampler: ${time_sampler}
 objective: ${objective}
 length: ${task.length}
+prediction: ${prediction}
 calibration: ${calibration}
 curriculum: ${curriculum}
 representation: ${representation}

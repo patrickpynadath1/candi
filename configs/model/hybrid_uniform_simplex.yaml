@@ -1,4 +1,4 @@
-_target_: core.models.hybrid.HybridModel
+_target_: core.modifiers.hybrid.model.HybridModel
 backbone:
   _target_: core.models.dit.DiT
   vocab_size: ${task.vocab_size}
@@ -9,8 +9,10 @@ backbone:
   dropout: 0.1
   adaLN: true
   tie_word_embeddings: false
-branches:
-- _target_: core.hybrid.branches.DiscreteBranch
+views:
+- _target_: core.modifiers.hybrid.views.DiffusionView
+  update:
+    _target_: core.samplers.hybrid_updates.DiscretePosteriorUpdate
   name: uniform
   process:
     _target_: core.processes.uniform_posterior.PosteriorUniformProcess
@@ -18,13 +20,15 @@ branches:
   schedule:
     _target_: core.noise_schedules.log_linear.LogLinear
     epsilon: 0.0
-  adapter:
-    _target_: core.models.hybrid.TokenEmbeddingAdapter
+  representation:
+    _target_: core.representations.noisy_inputs.TokenRepresentation
     vocab_size: ${task.vocab_size}
     hidden_size: ${model.backbone.hidden_size}
     scale: 0.5
     normalize: true
-- _target_: core.hybrid.branches.SimplexBranch
+- _target_: core.modifiers.hybrid.views.DiffusionView
+  update:
+    _target_: core.samplers.hybrid_updates.SimplexPosteriorUpdate
   name: simplex
   process:
     _target_: core.processes.dirichlet.DirichletProcess
@@ -37,8 +41,8 @@ branches:
     nu1: 0.75
     pivot: 0.8
     epsilon: 1.0
-  adapter:
-    _target_: core.models.hybrid.SimplexInputAdapter
+  representation:
+    _target_: core.representations.noisy_inputs.SimplexRepresentation
     vocab_size: ${task.vocab_size}
     hidden_size: ${model.backbone.hidden_size}
     scale: 0.5

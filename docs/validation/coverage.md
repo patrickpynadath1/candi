@@ -6,8 +6,8 @@ means that a specified fixture or integration ran. **Reproduced** means a
 comparison against a defined reference succeeded. A short pilot is evidence
 that a method can learn, not proof of convergence or paper-level performance.
 
-The regression suite with programmatic configuration sweeps passed **437 tests**,
-including available CUDA checks (417 before adding sweeps).
+The regression suite with Ray Tune sweeps passed **476 tests**, including
+available CUDA checks (417 before adding sweeps).
 That total is a snapshot, not a promise that every method,
 task, precision, sampler, modifier and distributed strategy combination has
 been tested. Run the current suite from the repository root:
@@ -42,23 +42,41 @@ part of the complete suite.
 
 ## Programmatic sweep execution
 
-All 45 existing experiment presets composed and planned through the Python sweep
-API without launching training. A separate check instantiated the four Gaussian
-combinations of one-hot/embedding representations and Euler/Heun samplers with an
-exponential VE schedule.
+All 45 experiment presets resolve through the Hydra/Ray Tune adapter without
+launching training. The sweep API, scheduling and experiment state now belong
+to Ray Tune; the previous custom executor has been removed.
 
-In the merged worktree, small MDLM and autoregressive trials trained concurrently
-for two steps on distinct A6000 GPUs using BF16 and synthetic data. Each wrote a
-checkpoint; separate evaluation trials loaded those checkpoints and generated
-four records each. Repeating the completed training sweep skipped both workers
-without modifying their logs. This checks execution and restart behavior, not
-generation quality. The executor supports local CPU or one-GPU trials; multi-GPU
-trials, cluster backends and automatic partial-checkpoint resume are not included.
+Small MDLM and autoregressive trials trained on distinct A6000 GPUs through
+Ray Tune for two steps using BF16 and synthetic data. Both saved durable Tune
+checkpoints containing the runner's Lightning checkpoints and resolved config.
+Separate evaluation trials loaded these checkpoints and generated four records
+each. An additional check evaluated the same MDLM checkpoint with ancestral and
+entropy-bounded samplers as independent inference trials. Restoring the training
+sweep did not rewrite completed checkpoints.
+This verifies execution and restoration, not generation quality.
 
-Regression tests cover independent configs, nested Hydra overrides, visibility
-restrictions, queue reuse, failures/retries, output conflicts, coordinator locking,
-Ctrl+C cleanup and aggregate-only evaluation results. See the
-[programmatic sweep guide](../guides/programmatic-sweeps.md) for the API and limits.
+The dynamic job queue additionally passed a two-GPU interruption/resume check
+using the dataclass job definitions: an MDLM training job produced ancestral and
+entropy-bounded inference while an autoregressive training job remained open.
+After an intentional SIGINT, `Tuner.restore` finished five unique jobs without
+rerunning the completed training or inference jobs. Queue unit tests cover
+pending/issued state, duplicate completion notifications, inference priority,
+failed parents, and independent configuration snapshots.
+
+The [base algorithm sweep](../guides/base-algorithm-sweep.md) has 11 additional
+catalogue tests. The reduced single-seed plan composes 66 supported training configurations;
+all instantiate with small model dimensions, and all 360 associated inference
+sampler configurations instantiate. Preview/no-launch and unsupported-combination
+checks pass. This is construction coverage, not training or quality validation of
+the full catalogue. Uniform plug-in self-conditioning remains explicitly blocked.
+
+Regression tests cover all preset configs, independent editable configs, nested
+Hydra overrides, unsupported resource/config combinations, aggregate-only
+metrics, real CPU Tune training, failure reporting, durable checkpoint artifacts,
+and restoration. The adapter supports CPU or one-GPU trials and reports final
+metrics; it does not implement intermediate reporting, automatic partial-training
+resume or distributed training within a trial. See the
+[programmatic sweep guide](../guides/programmatic-sweeps.md) for examples and limits.
 
 ## Methods and tasks
 

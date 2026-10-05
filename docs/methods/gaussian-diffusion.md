@@ -48,6 +48,49 @@ uv run python main.py +experiment=flm_gaussian parameterization.softcap=30 objec
 
 Fixed Gaussian presets default to Euler. Euler and Heun integrate posterior-derived velocity; the adaptive ODE solver counts rejected stages against its budget. Solvers preserve prompts at every internal stage and include final posterior decoding in NFE. They support both tokenwise representations. The Gaussian DDPM sampler is also available for suitable monotone-SNR paths; its prior policy must match the intended terminal distribution.
 
+### Stochastic Gaussian DDPM updates
+
+The stochastic reverse bridge originally used by RePlaid is shared by every
+Gaussian method; it needs only the schedule's alpha/sigma coefficients and the
+representation's posterior mean. It does not depend on RePlaid's objective or
+learned schedule. Select it for an existing checkpoint with `sampler=gaussian_ddpm`.
+
+```bash
+uv run python main.py +experiment=gaussian_diffusion_embedding_sudoku sampler=gaussian_ddpm
+uv run python main.py +experiment=onehot_gaussian sampler=gaussian_ddpm
+```
+
+For a hybrid, keep its shared sampling loop and select the update on its Gaussian
+view (replace `first` with that view's name):
+
+```text
+model.views.first.update._target_=core.samplers.hybrid_updates.GaussianPosteriorUpdate
+```
+
+`GaussianProcess.reverse_posterior` owns the bridge mathematics. Both callers
+convert the shared clean-token posterior through `representation.posterior_mean`.
+The transition samples a Gaussian bridge around that mean; it is not an exact
+sample from the mixture over all clean-token posteriors. With forward gain
+$r=\alpha_t/\alpha_s$, its reverse state coefficient is
+$r\sigma_s^2/\sigma_t^2$ and variance is
+$\sigma_s^2(1-r^2\sigma_s^2/\sigma_t^2)$.
+
+VE, VP, interpolation, rank schedules, and monotone adaptive Gaussian clocks are
+supported. Reverse-time SNR must not decrease; invalid steps raise an error.
+Pure-noise starts (`alpha=0`), clean endpoints (`sigma=0`), and constant-SNR
+segments are handled without dividing by the source alpha. For an exactly
+zero-SNR plateau the convention is deterministic rescaling of the same noise.
+
+The generic Hydra preset uses a schedule-scaled Gaussian prior, clean prompts,
+and previous-step self-conditioning. As with other noise priors, this is an
+approximation if the terminal alpha is nonzero. Noise is injected at each reverse
+step except the last by default; `sampler.final_transition_noise=true` includes
+that step too. Zero noise on the last step still uses the DDPM conditional mean,
+not the Euler/ODE update. RePlaid explicitly retains its standard-normal prior,
+noisy-prompt policy (clean prompts for its Sudoku preset), fresh bootstrap feedback,
+and stochastic final transition. The sampler constructor's historical defaults
+remain unchanged so old saved configurations continue to load identically.
+
 Changing a preset does not reproduce every original finite-step update or endpoint grid. [RePlaid](replaid.md), [blurring](blurring-diffusion.md), [spherical](spherical-flow-matching.md), and [hybrids](hybrids.md) have specialized assemblies, despite sharing some Gaussian components.
 
 ## Validation

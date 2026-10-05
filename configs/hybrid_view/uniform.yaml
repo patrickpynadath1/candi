@@ -1,0 +1,13 @@
+_target_: core.modifiers.hybrid.views.DiffusionView
+process:
+  _target_: core.processes.uniform_posterior.PosteriorUniformProcess
+  vocab_size: ${task.vocab_size}
+schedule:
+  _target_: core.noise_schedules.log_linear.LogLinear
+  epsilon: 0.001
+representation:
+  _target_: core.representations.noisy_inputs.TokenRepresentation
+  vocab_size: ${task.vocab_size}
+  hidden_size: ${model.backbone.hidden_size}
+update:
+  _target_: core.samplers.hybrid_updates.DiscretePosteriorUpdate

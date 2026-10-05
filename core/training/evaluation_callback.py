@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import lightning as L
+from lightning.pytorch.loggers import WandbLogger
 
 from core.evaluation.generation import evaluate
 from core.evaluation.reporting import scalar_metrics
@@ -62,15 +63,44 @@ class TaskEvaluation(L.Callback):
                     precision=self.precision,
                 )
             self.output_dir.mkdir(parents=True, exist_ok=True)
-            (self.output_dir / f"step_{step:08d}.json").write_text(
-                json.dumps(result, indent=2)
-            )
-            if trainer.logger:
-                trainer.logger.log_metrics(
+            result_path = self.output_dir / f"step_{step:08d}.json"
+            result_path.write_text(json.dumps(result, indent=2))
+            for logger in trainer.loggers:
+                logger.log_metrics(
                     {
                         f"{self.task.name}/{key}": value
                         for key, value in scalar_metrics(result)
                     },
                     step=step,
                 )
+                if isinstance(logger, WandbLogger):
+                    import wandb
+
+                    records = result.get("records", [])
+                    if records:
+                        columns = list(
+                            dict.fromkeys(key for row in records for key in row)
+                        )
+                        data = [
+                            [
+                                json.dumps(row.get(key))
+                                if isinstance(row.get(key), (dict, list))
+                                else row.get(key)
+                                for key in columns
+                            ]
+                            for row in records
+                        ]
+                        logger.log_table(
+                            key=f"{self.task.name}/samples",
+                            columns=columns,
+                            data=data,
+                            step=step,
+                        )
+                    artifact = wandb.Artifact(
+                        f"{self.task.name}-generation",
+                        type="evaluation",
+                        metadata={"step": step, "task": self.task.name},
+                    )
+                    artifact.add_file(str(result_path))
+                    logger.experiment.log_artifact(artifact)
         trainer.strategy.barrier("task-evaluation")

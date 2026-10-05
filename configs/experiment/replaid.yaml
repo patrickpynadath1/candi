@@ -44,5 +44,7 @@ optimizer:
     lr: 0.01
     weight_decay: 0.1
 sampler:
+  prior_mode: standard_normal
+  prompt_mode: noisy
   self_conditioning_mode: bootstrap
   final_transition_noise: true

@@ -16,6 +16,13 @@ def dct_matrix(length, *, device=None, dtype=torch.float32):
 
 
 class BlurringProcess:
+    def corrupt_state(self, clean, coefficients, corruption_mask):
+        # The schedule encodes the active spans and leaves all other sites clean.
+        return self.corrupt(clean, coefficients)
+
+    def prior_state(self, clean, coefficients):
+        return self.prior(clean)
+
     def __init__(self):
         self._basis_cache = {}
 

@@ -63,7 +63,7 @@ rather than introduce method-specific bootstrap logic. Sequence-wide operations
 must honor the segment metadata needed by block diffusion; see
 [blurring diffusion](../methods/blurring-diffusion.md).
 
-For hybrids, implement a branch/adapter only if the desired process lacks one.
+For hybrids, compose the process, representation, schedule, time map, and sampler update in a `DiffusionView`; no branch adapter class is needed.
 Each branch maintains its own noisy view, clock, and reverse update. Shared model
 fusion and posterior interpretation must remain compatible; the current CE hybrid
 framework does not implement a RePlaid hybrid objective.

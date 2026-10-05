@@ -1,4 +1,4 @@
-_target_: core.algorithms.hybrid_diffusion.HybridDiffusion
+_target_: core.modifiers.hybrid.training.HybridDiffusion
 model: ${model}
 predictor: ${parameterization}
 time_sampler: ${time_sampler}

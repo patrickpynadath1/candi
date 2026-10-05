@@ -6,6 +6,12 @@ from core.samplers.utils import sample_categorical
 
 
 class UniformProcess:
+    def corrupt_state(self, clean, coefficients, corruption_mask):
+        return self.corrupt(clean, coefficients[0], corruption_mask)
+
+    def prior_state(self, clean, coefficients):
+        return self.prior(clean.shape, clean.device)
+
     prediction_kind = "plug_in"
 
     def __init__(self, vocab_size):

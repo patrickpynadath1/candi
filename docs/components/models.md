@@ -20,7 +20,7 @@ modifiers without requiring an extra inference pass.
 | `sphere_dit` | Spherical states and spherical conditioning |
 | `simplex_dit` | Simplex state input, with expectation/argmax input options in the implementation |
 | `causal_dit` | Causal token prediction with explicit KV-cache support |
-| `hybrid_candi`, `hybrid_uniform_simplex` | Branch adapters, fusion, and one shared DiT backbone |
+| `hybrid_candi`, `hybrid_uniform_simplex` | Representation-owned input mappings, fusion, and one shared DiT backbone |
 
 See [model configs](../../configs/model/) and
 [implementations](../../core/models/). Hidden width, head count, block count,

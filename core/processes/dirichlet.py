@@ -7,6 +7,12 @@ from .simplex_math import corruption_parameters, log_dirichlet_sample, reverse_b
 
 
 class DirichletProcess(nn.Module):
+    def corrupt_state(self, clean, coefficients, corruption_mask):
+        return self.corrupt(clean, coefficients, corruption_mask)
+
+    def prior_state(self, clean, coefficients):
+        return self.prior(len(clean), clean.shape[1], coefficients)
+
     def __init__(self, vocab_size, reference=None):
         super().__init__()
         prior = (

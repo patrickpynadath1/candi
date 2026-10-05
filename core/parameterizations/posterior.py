@@ -68,10 +68,14 @@ class PosteriorParameterization:
         return self._constrain(self._model_values(logits), observed)
 
     def _model_values(self, logits):
+        # Shaping and softcapping also precede normalization: do their arithmetic
+        # in at least FP32, even when the backbone produces BF16/FP16 logits.
+        if logits.dtype in (torch.float16, torch.bfloat16):
+            logits = logits.float()
         return self.constraints.exclude(softcap_logits(logits, self.softcap))
 
     def sampling_posterior(self, logits, observed):
-        """Configured shaping, normalized at the baseline inference precision."""
+        """Configured shaping and stable normalization in at least FP32."""
         with torch.autocast(logits.device.type, enabled=False):
             values = self._shape(self._model_values(logits))
             return self._constrain(values, observed)

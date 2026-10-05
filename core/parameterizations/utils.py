@@ -55,8 +55,11 @@ def greedy_probabilities(log_probs):
 
 
 def normalize_log_probs(values):
-    # Preserve the baseline's explicit logsumexp operation and input precision.
-    return values - torch.logsumexp(values, dim=-1, keepdim=True)
+    # Normalize before probabilities/losses consume the values. Promoting after
+    # a low-precision logsumexp subtraction cannot recover lost information.
+    # Preserve FP64 for callers that explicitly request higher precision.
+    dtype = torch.float64 if values.dtype == torch.float64 else torch.float32
+    return torch.nn.functional.log_softmax(values, dim=-1, dtype=dtype)
 
 
 def fix_observed_tokens(log_probs, observed, mask_index):

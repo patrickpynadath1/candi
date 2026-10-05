@@ -27,6 +27,12 @@ block_diffusion:
   clean_loss: none
   clean_loss_weight: 1.0
   cache_clean_prefix: true
+token_feedback:
+  enabled: false
+  depth: 3
+  loss_weight: 1.0
+  gate: scalar
+  detach: false
 mode: train
 seed: 1
 output_dir: ${hydra:runtime.output_dir}
@@ -51,7 +57,7 @@ trainer:
   strategy: auto
   precision: bf16-mixed
   accumulate_grad_batches: 4
-  max_steps: 20000
+  max_steps: 50000
   gradient_clip_val: 1.0
   log_every_n_steps: 10
   num_sanity_val_steps: 2

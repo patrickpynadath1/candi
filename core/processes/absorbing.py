@@ -5,6 +5,15 @@ from core.samplers.utils import sample_categorical
 
 
 class AbsorbingProcess:
+    def corrupt_state(self, clean, coefficients, corruption_mask):
+        return self.corrupt(clean, coefficients[0], corruption_mask)
+
+    def prior_state(self, clean, coefficients):
+        return self.prior(clean.shape, clean.device)
+
+    def observed_tokens(self, state):
+        return state, state.ne(self.mask_index)
+
     def __init__(self, mask_index):
         self.mask_index = mask_index
 
@@ -23,6 +32,9 @@ class AbsorbingProcess:
             raise ValueError("reverse transition requires 0 <= keep_t <= keep_s <= 1")
         if torch.any((keep_t >= 1) & state.eq(self.mask_index).any(-1)):
             raise ValueError("a clean source cannot contain absorbing masks")
+        # Hybrid heads may predict only data tokens, excluding the mask class.
+        if posterior.shape[-1] == self.mask_index:
+            posterior = torch.nn.functional.pad(posterior, (0, 1))
         # Joint categorical matches the existing native MDLM reverse kernel
         # and its random-number consumption, rather than two separate draws.
         probabilities = posterior.double() * (keep_s - keep_t)[:, None, None]

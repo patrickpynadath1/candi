@@ -268,7 +268,7 @@ def test_duo_curriculum_boundaries_validation_and_trainer_context(table_path):
 
     def loss(*args, **kwargs):
         contexts.append(kwargs)
-        return {"loss": torch.tensor(1.0)}
+        return {"loss": torch.tensor(1.0), "num_tokens": mask.sum()}
 
     module.algorithm.loss = loss
     module.training_step({"input_ids": tokens, "loss_mask": mask}, 0)

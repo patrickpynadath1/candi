@@ -336,7 +336,6 @@ def test_time_conditioned_mdlm_uses_same_bootstrap_coordinate():
     "experiment",
     [
         "autoregressive",
-        "uniform_diffusion",
         "sedd_absorb",
         "d3pm_absorb",
     ],

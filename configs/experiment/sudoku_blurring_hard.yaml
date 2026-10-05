@@ -8,5 +8,5 @@ block_diffusion:
   enabled: false
   block_size: 32
 trainer:
-  max_steps: 20000
+  max_steps: 50000
   val_check_interval: 20000

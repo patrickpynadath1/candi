@@ -43,15 +43,15 @@ class PlugInParameterization:
         values = scale_temperature(logits, self.temperature)
         return filter_top_p(filter_top_k(values, self.top_k), self.top_p)
 
-    def training_plugin(self, logits):
+    def training_plugin(self, logits, observed=None):
         """Apply model softcapping, without inference-only shaping."""
         return softcap_logits(logits, self.softcap).log_softmax(-1)
 
-    def sampling_plugin(self, logits):
+    def sampling_plugin(self, logits, observed=None):
         with torch.autocast(logits.device.type, enabled=False):
             return self._shape(softcap_logits(logits, self.softcap)).log_softmax(-1)
 
-    def greedy_plugin(self, logits):
+    def greedy_plugin(self, logits, observed=None):
         with torch.autocast(logits.device.type, enabled=False):
             return greedy_projection(self._shape(softcap_logits(logits, self.softcap)))
 

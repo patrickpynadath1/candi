@@ -1,0 +1,22 @@
+_target_: core.modifiers.hybrid.views.DiffusionView
+process:
+  _target_: core.processes.spherical.SphericalProcess
+schedule:
+  _target_: core.noise_schedules.spherical.SphericalSchedule
+  epsilon: 0.001
+  auto_truncation: true
+  vocab_size: ${task.vocab_size}
+  dimension: 512
+representation:
+  _target_: core.representations.noisy_inputs.ProjectedRepresentation
+  state_dim: 512
+  hidden_size: ${model.backbone.hidden_size}
+  precondition: false
+  state_representation:
+    _target_: core.representations.embedding.EmbeddingRepresentation
+    vocab_size: ${task.vocab_size}
+    dimension: 512
+    trainable: true
+    unit_normalized: true
+update:
+  _target_: core.samplers.hybrid_updates.SphericalPosteriorUpdate

@@ -10,12 +10,13 @@ uv run python main.py +experiment=smoke
 uv run python main.py +experiment=openwebtext lr_scheduler=cosine_decay_warmup
 ```
 
-The default is MDLM on Sudoku hard: 20,000 optimizer steps, effective batch 256,
+The default is MDLM on Sudoku hard: 200,000 training puzzles, 10,000 validation
+puzzles, 50,000 optimizer steps, effective batch 256,
 BF16 mixed precision, AdamW at `3e-4`, 2,500 warmup steps, and EMA decay `0.9999`.
 The smoke experiment deliberately overrides these settings for a tiny CPU check.
 Task availability and preparation requirements are listed in [tasks](../tasks/overview.md).
 
-For Python-defined method grids and local GPU scheduling, see
+For Python-defined method grids and GPU scheduling through Ray Tune, see
 [programmatic sweeps](programmatic-sweeps.md).
 
 ## Batches and optimization
@@ -104,3 +105,35 @@ See [checkpointing](checkpointing.md) for saved configs, raw-vs-EMA selection, a
 mid-epoch replay limits. Use [distributed training](distributed-training.md) for
 DDP/FSDP and [frontier sweeps](frontier-sweeps.md) to evaluate pretrained models
 without training.
+
+When W&B is configured, periodic task evaluations log scalar metrics to every
+logger, plus a `<task>/samples` table and the complete evaluation JSON as a W&B
+artifact. The resolved training configuration and final checkpoint/step summary
+are recorded too. Install the optional SDK with `uv sync --extra tracking`, and
+retain `--extra tracking` when invoking `uv run`.
+
+Metric names are not identical to the legacy trainer: training loss is
+`train/loss` (formerly `trainer/loss`), while periodic generation metrics use the
+task name as their prefix. `val/nll` is the validation objective's historical
+label; it is not necessarily a log likelihood for every method.
+## Intermediate token feedback
+
+An optional single-pass token-feedback branch can be enabled with
+`token_feedback.enabled=true`. After backbone block `token_feedback.depth`
+(zero based), one additional transformer block predicts auxiliary clean-token
+logits through the model's shared token output head. Their softmax expectation
+under the input token embedding table is normalized and added to the residual
+stream through a zero-initialized scalar gate. `token_feedback.gate=channel`
+uses one zero-initialized gate per hidden channel instead. The main objective is
+unchanged and training adds masked clean-token cross entropy weighted by
+`token_feedback.loss_weight`. Prompt and padding positions remain excluded by
+the existing `loss_mask`.
+
+The branch stays active during inference, while its auxiliary loss is only
+computed for training loss calls. Gradients flow through the softmax and token
+embedding by default; `token_feedback.detach=true` provides a feedback-path
+ablation without detaching the auxiliary loss. The current implementation uses
+a fixed configured depth for deterministic behavior across distributed ranks;
+random training depth is not supported. Models whose output is a score or
+velocity require an explicit token readout and are rejected rather than treated
+as token logits. Cached causal decoding is not currently supported.

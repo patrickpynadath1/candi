@@ -1,10 +1,18 @@
 import torch
 
-from core.algorithms.hybrid_diffusion import HybridDiffusion
-from core.hybrid.branches import DiscreteBranch, GaussianBranch
-from core.hybrid.time_maps import IdentityTimeMap, PowerTimeMap
+from core.modifiers.hybrid.training import HybridDiffusion
+from core.modifiers.hybrid.views import DiffusionView
+from core.samplers.hybrid_updates import (
+    DiscretePosteriorUpdate,
+    GaussianPosteriorUpdate,
+)
+from core.modifiers.hybrid.time_maps import IdentityTimeMap, PowerTimeMap
 from core.models.dit import DiT
-from core.models.hybrid import HybridModel, TokenEmbeddingAdapter, ContinuousInputAdapter
+from core.modifiers.hybrid.model import HybridModel
+from core.representations.noisy_inputs import (
+    TokenRepresentation,
+    ProjectedRepresentation,
+)
 from core.modifiers.self_conditioning.prediction import PredictionCoordinator
 from core.noise_schedules.candi_rank import CANDIRankSchedule
 from core.noise_schedules.linear_interpolation import LinearInterpolationSchedule
@@ -16,22 +24,32 @@ from core.processes.candi_gaussian import CANDIGaussianProcess
 from core.processes.gaussian import GaussianProcess
 from core.representations.one_hot import OneHotRepresentation
 from core.samplers.hybrid import HybridSampler
-from core.samplers.hybrid_entropy_bounded import HybridEntropyBoundedSampler
+from core.samplers.hybrid_entropy_bounded import CANDIEntropyBoundedSampler
 from core.time_sampling.uniform import UniformTimeSampler
 
 
-def make_algorithm(*, self_conditioning=False, second_process=None,
-                   second_schedule=None, time_map=None):
+def make_algorithm(
+    *, self_conditioning=False, second_process=None, second_schedule=None, time_map=None
+):
     vocab, hidden = 5, 16
-    discrete = DiscreteBranch(
-        CANDIMaskingProcess(vocab), LogLinear(0),
-        TokenEmbeddingAdapter(vocab + 1, hidden, .5), IdentityTimeMap(),
+    discrete = DiffusionView(
+        CANDIMaskingProcess(vocab),
+        LogLinear(0),
+        TokenRepresentation(vocab + 1, hidden, 0.5),
+        DiscretePosteriorUpdate(),
+        IdentityTimeMap(),
     )
-    gaussian = GaussianBranch(
+    gaussian = DiffusionView(
         second_process or GaussianProcess(),
         second_schedule or LinearInterpolationSchedule(),
-        OneHotRepresentation(vocab),
-        ContinuousInputAdapter(vocab, hidden, .5, bias=False),
+        ProjectedRepresentation(
+            vocab,
+            hidden,
+            0.5,
+            bias=False,
+            state_representation=OneHotRepresentation(vocab),
+        ),
+        GaussianPosteriorUpdate(),
         time_map or IdentityTimeMap(),
     )
     backbone = DiT(vocab, hidden, 8, 1, 4, dropout=0, adaLN=False)
@@ -42,8 +60,12 @@ def make_algorithm(*, self_conditioning=False, second_process=None,
         enabled=self_conditioning, probability=1, evaluation_probability=1
     )
     return HybridDiffusion(
-        model, PosteriorParameterization(), UniformTimeSampler(1e-3, False),
-        CrossEntropy(), length=7, prediction=prediction,
+        model,
+        PosteriorParameterization(),
+        UniformTimeSampler(1e-3, False),
+        CrossEntropy(),
+        length=7,
+        prediction=prediction,
     )
 
 
@@ -59,7 +81,7 @@ def test_parallel_loss_corrupts_two_views_and_backpropagates():
 
 def test_local_time_maps_are_applied_per_branch():
     algo = make_algorithm(time_map=PowerTimeMap(2))
-    time = torch.tensor([.2, .7])
+    time = torch.tensor([0.2, 0.7])
     points = algo.points(time)
     assert torch.equal(points[0].time, time)
     assert torch.allclose(points[1].time, time.square())
@@ -94,9 +116,9 @@ def test_sampling_self_conditioning_has_one_fused_feedback_vector():
 
 
 def test_candi_rank_schedule_and_historical_step_formula():
-    schedule = CANDIRankSchedule(12, .05, .4)
+    schedule = CANDIRankSchedule(12, 0.05, 0.4)
     source = schedule(torch.tensor([1.0]))
-    destination = schedule(torch.tensor([.5]))
+    destination = schedule(torch.tensor([0.5]))
     assert source.sigma > destination.sigma
     state = torch.ones(1, 2, 12)
     clean = torch.zeros_like(state)
@@ -122,7 +144,7 @@ def test_alternate_absorbing_plus_standard_gaussian_composition():
     algo = make_algorithm(
         second_process=GaussianProcess(),
         second_schedule=LinearInterpolationSchedule(),
-        time_map=PowerTimeMap(.5),
+        time_map=PowerTimeMap(0.5),
     )
     prompt = torch.randint(0, 5, (1, 7))
     fixed = torch.tensor([[True, True, False, False, False, False, False]])
@@ -133,7 +155,7 @@ def test_alternate_absorbing_plus_standard_gaussian_composition():
 def test_hybrid_entropy_bounded_accepts_without_discrete_branch_updates():
     algo = make_algorithm()
     prompt = torch.zeros(2, 7, dtype=torch.long)
-    result, metadata = HybridEntropyBoundedSampler(
+    result, metadata = CANDIEntropyBoundedSampler(
         entropy_bound=100.0, steps=1, greedy_clean_estimate=True
     ).sample(algo, prompt, torch.zeros_like(prompt, dtype=torch.bool))
     assert result.shape == prompt.shape

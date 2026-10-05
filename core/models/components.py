@@ -8,6 +8,13 @@ modules explicitly; they never inspect a representation or predictor.
 import torch
 from torch import nn
 from torch.nn import functional as F
+from dataclasses import dataclass
+
+
+@dataclass
+class BlockExecutionOutput:
+    hidden: torch.Tensor
+    auxiliary_logits: torch.Tensor | None = None
 
 
 class TokenInput(nn.Module):
@@ -66,8 +73,18 @@ class TemperatureOutput(LayerOutput):
 
 
 class DiffusionBlocks(nn.Module):
-    def forward(self, hidden, blocks, rotary, *, condition=None,
-                attention_mask=None):
+    def forward(
+        self,
+        hidden,
+        blocks,
+        rotary,
+        *,
+        condition=None,
+        attention_mask=None,
+        project=None,
+        feedback_embedding=None,
+    ):
+        del project, feedback_embedding
         for block in blocks:
             hidden = block(hidden, rotary, condition, attention_mask)
         return hidden
@@ -76,7 +93,10 @@ class DiffusionBlocks(nn.Module):
 class CausalBlocks(nn.Module):
     def forward(self, hidden, blocks, rotary, *, cache=None, query_rotary=None):
         for index, block in enumerate(blocks):
-            hidden = block(hidden, rotary,
-                           None if cache is None else cache.layers[index],
-                           query_rotary)
+            hidden = block(
+                hidden,
+                rotary,
+                None if cache is None else cache.layers[index],
+                query_rotary,
+            )
         return hidden

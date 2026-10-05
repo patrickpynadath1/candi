@@ -1,0 +1,5 @@
+_target_: core.samplers.hybrid_entropy_bounded.MaskedHybridEntropyBoundedSampler
+entropy_bound: 0.1
+steps: 180
+epsilon: 1.0e-5
+greedy_clean_estimate: true

@@ -6,5 +6,5 @@ data:
 loader:
   global_batch_size: 256
 trainer:
-  max_steps: 20000
+  max_steps: 50000
   val_check_interval: 20000

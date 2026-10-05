@@ -1,23 +1,7 @@
-"""Programmatic training/evaluation sweeps and frontier analysis."""
+"""Hydra configuration composition and the Ray Tune training adapter."""
 
-from core.sweeps.programmatic import (
-    Resources,
-    Sweep,
-    SweepFailed,
-    Trial,
-    TrialResult,
-    compose,
-    grid,
-    run_sweep,
-)
+from core.sweeps.configuration import compose
+from core.sweeps.jobs import InferenceJob, TrainingJob
+from core.sweeps.tune import run_trial
 
-__all__ = [
-    "Resources",
-    "Sweep",
-    "SweepFailed",
-    "Trial",
-    "TrialResult",
-    "compose",
-    "grid",
-    "run_sweep",
-]
+__all__ = ["InferenceJob", "TrainingJob", "compose", "run_trial"]

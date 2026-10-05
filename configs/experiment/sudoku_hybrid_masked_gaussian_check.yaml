@@ -1,0 +1,45 @@
+# @package _global_
+defaults:
+- hybrid
+
+# Best measured Gaussian embedding recipe, combined with standard masking.
+# This is a 2k-step trainability check, not a matched 20k-step benchmark.
+seed: 1
+data:
+  difficulty: hard
+  num_train: 48000
+  num_valid: 2000
+  cache_dir: /home/patrick/.cache/duo/data_cache
+model:
+  time_conditioning: log_one_minus_time
+  views:
+    first:
+      update:
+        _target_: core.samplers.hybrid_updates.GaussianVelocityEulerUpdate
+self_conditioning:
+  enabled: true
+  source: hidden
+  probability: 0.9
+  evaluation_probability: 1.0
+loader:
+  global_batch_size: 256
+  eval_batch_size: 64
+  num_workers: 2
+trainer:
+  max_steps: 2000
+  val_check_interval: 8000
+  enable_progress_bar: false
+checkpoint:
+  every_n_steps: 2000
+callback:
+  every_n_steps: 500
+  subset_size: 128
+sampler:
+  steps: 180
+wandb:
+  project: candi
+  entity: rz-text-dlp
+  group: hybrid-masked-gaussian-2k-check
+  name: masked-gaussian-embedding-rank-linear-hidden-sc
+  job_type: train
+  mode: online

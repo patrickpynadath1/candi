@@ -61,7 +61,7 @@ class PredictionCoordinator:
             else torch.rand(batch, device=device) < probability
         )
 
-    def validate(self, model, predictor):
+    def validate(self, model, predictor, training_pathway="training_posterior"):
         architectural = getattr(model, "conditioning_adapter", None) is not None
         if self.enabled != architectural:
             raise ValueError(
@@ -71,17 +71,25 @@ class PredictionCoordinator:
             self.enabled
             and self.source == "posterior_mean"
             and not (
-                callable(getattr(predictor, "training_posterior", None))
+                callable(getattr(predictor, training_pathway, None))
                 and callable(getattr(predictor, "probabilities", None))
             )
         ):
             raise TypeError(
                 f"self-conditioning source={self.source!r} requires clean-token probabilities; "
-                f"{type(predictor).__name__} does not expose training_posterior and probabilities. "
+                f"{type(predictor).__name__} does not expose {training_pathway} and probabilities. "
                 "Use source=hidden where hidden-state conditioning is integrated, or provide an explicit clean-token probability conversion."
             )
 
-    def feedback(self, output, predictor, observed, mean, logits_transform):
+    def feedback(
+        self,
+        output,
+        predictor,
+        observed,
+        mean,
+        logits_transform,
+        training_pathway="training_posterior",
+    ):
         if not isinstance(output, ModelPrediction):
             raise TypeError(
                 "self-conditioning requires logits and hidden model outputs"
@@ -90,7 +98,9 @@ class PredictionCoordinator:
             if self.source == "hidden":
                 return final_hidden(output.hidden).detach()
             probabilities = predictor.probabilities(
-                predictor.training_posterior(logits_transform(output.logits), observed)
+                getattr(predictor, training_pathway)(
+                    logits_transform(output.logits), observed
+                )
             )
             return mean(probabilities).detach()
 
@@ -107,6 +117,7 @@ class PredictionCoordinator:
         selected=None,
         bootstrap_logits_transform=None,
         bootstrap_feedback_transform=lambda value: value,
+        training_pathway="training_posterior",
     ):
         parameterize = getattr(predictor, pathway)
         if not self.enabled:
@@ -117,9 +128,7 @@ class PredictionCoordinator:
         )
         if trajectory is not None:
             conditioning = trajectory.conditioning
-        elif pathway == "training_posterior" and (
-            selected is not None or probability > 0
-        ):
+        elif pathway == training_pathway and (selected is not None or probability > 0):
             batch = len(observed)
             if selected is None:
                 selected = self.select(batch, observed.device, model.training)
@@ -140,7 +149,7 @@ class PredictionCoordinator:
                     with context:
                         bootstrap = model(
                             *(_select_batch(value, selected) for value in inputs),
-                            return_features=True
+                            return_features=True,
                         )
                     feedback = self.feedback(
                         bootstrap,
@@ -148,6 +157,7 @@ class PredictionCoordinator:
                         observed[selected],
                         mean,
                         bootstrap_logits_transform or logits_transform,
+                        training_pathway,
                     )
                     feedback = bootstrap_feedback_transform(feedback)
                     conditioning = feedback.new_zeros((batch, *feedback.shape[1:]))
@@ -155,7 +165,14 @@ class PredictionCoordinator:
         output = model(*inputs, self_condition=conditioning, return_features=True)
         if trajectory is not None:
             trajectory.update(
-                self.feedback(output, predictor, observed, mean, logits_transform)
+                self.feedback(
+                    output,
+                    predictor,
+                    observed,
+                    mean,
+                    logits_transform,
+                    training_pathway,
+                )
             )
         return parameterize(logits_transform(output.logits), observed)
 
@@ -169,8 +186,11 @@ def _select_batch(value, selected):
     if isinstance(value, list):
         return [_select_batch(item, selected) for item in value]
     if is_dataclass(value):
-        return replace(value, **{
-            field.name: _select_batch(getattr(value, field.name), selected)
-            for field in fields(value)
-        })
+        return replace(
+            value,
+            **{
+                field.name: _select_batch(getattr(value, field.name), selected)
+                for field in fields(value)
+            },
+        )
     return value

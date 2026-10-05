@@ -7,7 +7,7 @@ from torch import nn
 
 from core.models.continuous_dit import ContinuousDiT
 from core.models.dit import DiT
-from core.models.hybrid import HybridModel
+from core.modifiers.hybrid.model import HybridModel
 from core.models.prediction import ModelPrediction
 from .layout import make_layout
 
@@ -52,10 +52,21 @@ class BlockDiffusionModel(nn.Module):
             self._clean.reset(token)
 
     def _split_output(self, output, length):
-        clean_hidden, noisy_hidden = output.hidden[:, :length], output.hidden[:, length:]
-        clean_logits, noisy_logits = output.logits[:, :length], output.logits[:, length:]
+        clean_hidden, noisy_hidden = (
+            output.hidden[:, :length],
+            output.hidden[:, length:],
+        )
+        clean_logits, noisy_logits = (
+            output.logits[:, :length],
+            output.logits[:, length:],
+        )
         self.last_clean_logits = clean_logits
-        return ModelPrediction(noisy_logits, noisy_hidden, clean_logits, clean_hidden)
+        auxiliary = output.auxiliary_logits
+        if auxiliary is not None:
+            auxiliary = auxiliary[:, length:]
+        return ModelPrediction(
+            noisy_logits, noisy_hidden, clean_logits, clean_hidden, auxiliary
+        )
 
     def forward(self, *inputs, self_condition=None, return_features=False):
         current = self._clean.get()
@@ -70,31 +81,57 @@ class BlockDiffusionModel(nn.Module):
             raise ValueError("clean block context must match model batch")
         clean_length = clean.shape[1]
         layout = make_layout(
-            length, self.block_size, noisy.device,
-            batch_size=len(inputs[0]), offset=offset, clean_length=clean_length
+            length,
+            self.block_size,
+            noisy.device,
+            batch_size=len(inputs[0]),
+            offset=offset,
+            clean_length=clean_length,
         )
-        if cache is not None and not self.training:
+        if (
+            cache is not None
+            and not self.training
+            and not getattr(
+                self.model.block_execution, "uses_intermediate_feedback", False
+            )
+        ):
             return self._cached_forward(
                 inputs, clean, offset, cache, layout, self_condition, return_features
             )
-        clean_hidden, clean_condition, noisy_hidden, noisy_condition = self._stream_inputs(
-            inputs, clean, self_condition
+        clean_hidden, clean_condition, noisy_hidden, noisy_condition = (
+            self._stream_inputs(inputs, clean, self_condition)
         )
         condition = None
         if clean_condition is not None:
             condition = torch.cat(
-                [clean_condition[:, None].expand(-1, clean_length, -1),
-                 noisy_condition[:, None].expand(-1, length, -1)], 1
+                [
+                    clean_condition[:, None].expand(-1, clean_length, -1),
+                    noisy_condition[:, None].expand(-1, length, -1),
+                ],
+                1,
             )
         output = self.model.forward_hidden(
-            torch.cat([clean_hidden, noisy_hidden], 1), condition,
-            return_features=True, attention_mask=layout.attention_mask,
+            torch.cat([clean_hidden, noisy_hidden], 1),
+            condition,
+            return_features=True,
+            attention_mask=layout.attention_mask,
             position_ids=layout.position_ids,
         )
-        clean_logits, noisy_logits = output.logits[:, :clean_length], output.logits[:, clean_length:]
-        clean_hidden, noisy_hidden = output.hidden[:, :clean_length], output.hidden[:, clean_length:]
+        clean_logits, noisy_logits = (
+            output.logits[:, :clean_length],
+            output.logits[:, clean_length:],
+        )
+        clean_hidden, noisy_hidden = (
+            output.hidden[:, :clean_length],
+            output.hidden[:, clean_length:],
+        )
         self.last_clean_logits = clean_logits
-        result = ModelPrediction(noisy_logits, noisy_hidden, clean_logits, clean_hidden)
+        auxiliary = output.auxiliary_logits
+        if auxiliary is not None:
+            auxiliary = auxiliary[:, clean_length:]
+        result = ModelPrediction(
+            noisy_logits, noisy_hidden, clean_logits, clean_hidden, auxiliary
+        )
         return result if return_features else result.logits
 
     def _stream_inputs(self, inputs, clean, self_condition):
@@ -131,14 +168,17 @@ class BlockDiffusionModel(nn.Module):
             clean_condition = (
                 torch.nn.functional.silu(
                     self.model.sigma_map(torch.zeros(len(clean), device=clean.device))
-                ) if self.model.adaLN else None
+                )
+                if self.model.adaLN
+                else None
             )
         return clean_hidden, clean_condition, noisy_hidden, noisy_condition
 
-    def _cached_forward(self, inputs, clean, offset, cache, layout,
-                        self_condition, return_features):
-        clean_hidden, clean_condition, noisy_hidden, noisy_condition = self._stream_inputs(
-            inputs, clean, self_condition
+    def _cached_forward(
+        self, inputs, clean, offset, cache, layout, self_condition, return_features
+    ):
+        clean_hidden, clean_condition, noisy_hidden, noisy_condition = (
+            self._stream_inputs(inputs, clean, self_condition)
         )
         clean_length = clean.shape[1]
         if "layers" not in cache:
@@ -157,8 +197,11 @@ class BlockDiffusionModel(nn.Module):
                 ):
                     for block in self.model.blocks:
                         clean_hidden, key_value = block(
-                            clean_hidden, clean_rotary, clean_condition, causal,
-                            return_key_value=True
+                            clean_hidden,
+                            clean_rotary,
+                            clean_condition,
+                            causal,
+                            return_key_value=True,
                         )
                         layers.append(key_value)
             cache["layers"] = layers
@@ -176,8 +219,11 @@ class BlockDiffusionModel(nn.Module):
             for index, block in enumerate(self.model.blocks):
                 prefix = cache["layers"][index] if clean_length else None
                 noisy_hidden = block(
-                    noisy_hidden, noisy_rotary, noisy_condition, noisy_mask,
-                    key_value_prefix=prefix
+                    noisy_hidden,
+                    noisy_rotary,
+                    noisy_condition,
+                    noisy_mask,
+                    key_value_prefix=prefix,
                 )
             noisy_logits = self.model.project_hidden(noisy_hidden, noisy_condition)
         result = ModelPrediction(noisy_logits, noisy_hidden)

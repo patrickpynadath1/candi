@@ -14,7 +14,14 @@ from .ema import ExponentialMovingAverage
 class TrainingModule(L.LightningModule):
     def __init__(self, config):
         super().__init__()
-        self.config = OmegaConf.create(config)
+        from core.modifiers.hybrid.checkpoint import upgrade_config
+
+        raw = (
+            OmegaConf.to_container(config, resolve=False)
+            if OmegaConf.is_config(config)
+            else config
+        )
+        self.config = OmegaConf.create(upgrade_config(raw))
         self.save_hyperparameters(
             {"config": OmegaConf.to_container(self.config, resolve=True)}
         )
@@ -30,6 +37,17 @@ class TrainingModule(L.LightningModule):
                 clean_loss_weight=block.get("clean_loss_weight", 1.0),
                 cache_clean_prefix=block.get("cache_clean_prefix", True),
             )
+        feedback = self.config.get("token_feedback", {})
+        if feedback.get("enabled", False):
+            from core.modifiers.token_feedback import TokenFeedback
+
+            self.algorithm = TokenFeedback(
+                self.algorithm,
+                depth=feedback.depth,
+                loss_weight=feedback.get("loss_weight", 1.0),
+                gate=feedback.get("gate", "scalar"),
+                detach=feedback.get("detach", False),
+            )
         if self.config.get("self_conditioning", {}).get("enabled", False):
             policy = getattr(self.algorithm, "prediction", None)
             if policy is None or not policy.enabled:
@@ -44,6 +62,7 @@ class TrainingModule(L.LightningModule):
             else None
         )
         self._pending_rng = None
+        self._train_metric_totals = {}
 
     def on_fit_start(self):
         if self.ema:
@@ -72,14 +91,31 @@ class TrainingModule(L.LightningModule):
             accumulation_steps=self.trainer.accumulate_grad_batches,
             accumulation_index=batch_idx % self.trainer.accumulate_grad_batches,
         )
-        self.log(
-            "train/loss",
-            result["loss"],
-            on_step=True,
-            sync_dist=True,
-            batch_size=len(batch["input_ids"]),
-        )
+        # Accumulate detached, token-weighted metrics across microbatches.
+        # Logging only the last microbatch aliases the stratified time ranges.
+        count = result["num_tokens"].detach().float()
+        for key in ("loss", "main_loss", "token_feedback_loss"):
+            if key in result:
+                value = result[key].detach().float() * count
+                previous_sum, previous_count = self._train_metric_totals.get(
+                    key, (0, 0)
+                )
+                self._train_metric_totals[key] = (
+                    previous_sum + value,
+                    previous_count + count,
+                )
         return result["loss"]
+
+    def on_before_optimizer_step(self, optimizer):
+        for name, (total, count) in self._train_metric_totals.items():
+            self.log(
+                f"train/{name}",
+                total / count.clamp_min(1),
+                on_step=True,
+                on_epoch=False,
+                sync_dist=True,
+            )
+        self._train_metric_totals.clear()
 
     @contextmanager
     def evaluation_weights(self, use_ema=True):

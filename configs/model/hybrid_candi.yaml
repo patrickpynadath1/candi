@@ -1,4 +1,4 @@
-_target_: core.models.hybrid.HybridModel
+_target_: core.modifiers.hybrid.model.HybridModel
 backbone:
   _target_: core.models.dit.DiT
   vocab_size: ${token_space.model_vocab_size}
@@ -9,8 +9,10 @@ backbone:
   dropout: 0.1
   adaLN: true
   tie_word_embeddings: false
-branches:
-- _target_: core.hybrid.branches.DiscreteBranch
+views:
+- _target_: core.modifiers.hybrid.views.DiffusionView
+  update:
+    _target_: core.samplers.hybrid_updates.DiscretePosteriorUpdate
   name: masking
   process:
     _target_: core.processes.candi_masking.CANDIMaskingProcess
@@ -18,13 +20,15 @@ branches:
   schedule:
     _target_: core.noise_schedules.log_linear.LogLinear
     epsilon: 0.001
-  adapter:
-    _target_: core.models.hybrid.TokenEmbeddingAdapter
+  representation:
+    _target_: core.representations.noisy_inputs.TokenRepresentation
     vocab_size: ${token_space.model_vocab_size}
     hidden_size: 512
     scale: 0.5
     normalize: true
-- _target_: core.hybrid.branches.GaussianBranch
+- _target_: core.modifiers.hybrid.views.DiffusionView
+  update:
+    _target_: core.samplers.hybrid_updates.GaussianPosteriorUpdate
   name: gaussian
   process:
     _target_: core.processes.candi_gaussian.CANDIGaussianProcess
@@ -34,19 +38,16 @@ branches:
     min_percentile: 0.05
     max_percentile: 0.4
   time_map:
-    _target_: core.hybrid.time_maps.LinearTimeMap
+    _target_: core.modifiers.hybrid.time_maps.LinearTimeMap
     scale: 0.999
   representation:
-    _target_: core.representations.one_hot.OneHotRepresentation
-    vocab_size: ${task.vocab_size}
-  adapter:
-    _target_: core.models.hybrid.CANDIContinuousAdapter
+    _target_: core.representations.noisy_inputs.CANDIRepresentation
     state_dim: ${task.vocab_size}
     scale: 0.5
 self_conditioning: ${self_conditioning.enabled}
 self_conditioning_source: ${self_conditioning.source}
 fusion:
-  _target_: core.models.hybrid.CANDIFusion
+  _target_: core.modifiers.hybrid.model.CANDIFusion
   mask_index: ${token_space.mask_index}
 time_conditioning: negative_log_keep
 output_vocab_size: ${task.vocab_size}

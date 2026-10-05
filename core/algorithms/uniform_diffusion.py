@@ -4,11 +4,22 @@ from .discrete import DiscreteDiffusion
 from core.parameterizations.plug_in import PlugInParameterization
 from core.processes.uniform import UniformProcess
 from core.objectives.uniform import UniformDiffusionObjective
+from core.modifiers.self_conditioning.prediction import PredictionCoordinator
+from core.modifiers.self_conditioning.sources import posterior_mean
 
 
 class UniformDiffusion(DiscreteDiffusion):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, prediction=None, **kwargs):
+        super().__init__(
+            *args,
+            prediction=prediction
+            if prediction is not None
+            else PredictionCoordinator(),
+            **kwargs,
+        )
+        self.prediction.validate(
+            self.model, self.predictor, training_pathway="training_plugin"
+        )
         if not isinstance(self.predictor, PlugInParameterization):
             raise TypeError("UniformDiffusion requires PlugInParameterization")
         if not isinstance(self.process, UniformProcess) or not isinstance(
@@ -23,11 +34,26 @@ class UniformDiffusion(DiscreteDiffusion):
                 "uniform model, process and objective vocabulary sizes must agree"
             )
 
+    def prediction_mean(self, probabilities):
+        return posterior_mean(probabilities, self.model.vocab_embed.embedding)
+
+    def _prediction(self, pathway, state, keep, trajectory=None):
+        return self.prediction.predict(
+            self.model,
+            self.predictor,
+            (state, -keep.log()),
+            state,
+            pathway,
+            mean=self.prediction_mean,
+            trajectory=trajectory,
+            training_pathway="training_plugin",
+        )
+
     def training_prediction(self, state, keep):
-        return self.predictor.training_plugin(self.model_logits(state, keep))
+        return self._prediction("training_plugin", state, keep)
 
-    def sampling_prediction(self, state, keep):
-        return self.predictor.sampling_plugin(self.model_logits(state, keep))
+    def sampling_prediction(self, state, keep, trajectory=None):
+        return self._prediction("sampling_plugin", state, keep, trajectory)
 
-    def greedy_prediction(self, state, keep):
-        return self.predictor.greedy_plugin(self.model_logits(state, keep))
+    def greedy_prediction(self, state, keep, trajectory=None):
+        return self._prediction("greedy_plugin", state, keep, trajectory)

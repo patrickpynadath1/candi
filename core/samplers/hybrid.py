@@ -1,6 +1,7 @@
-"""Joint reverse sampler for independent parallel branch states."""
+"""Joint reverse sampler for independent parallel view states."""
 
 import torch
+from core.modifiers.hybrid.views import prior, clamp
 from .loop import FixedGridLoop
 from core.modifiers.self_conditioning.session import prediction_session
 
@@ -30,10 +31,10 @@ class HybridSampler:
         device = prompt_tokens.device
         times = torch.linspace(1, self.epsilon, self.steps + 1, device=device)
         first = times[0].expand(batch)
-        points = algo.points(first)
+        points = algo.points(first, corruption_mask=~prompt_mask.bool())
         states = tuple(
-            branch.prior(prompt_tokens, point, prompt_mask)
-            for branch, point in zip(algo.branches, points)
+            prior(view, prompt_tokens, point, prompt_mask)
+            for view, point in zip(algo.views, points)
         )
         nfe = 0
 
@@ -42,16 +43,16 @@ class HybridSampler:
             source_time = source_time.expand(batch)
             destination_time = destination_time.expand(batch)
             source, destination = (
-                algo.points(source_time),
-                algo.points(destination_time),
+                algo.points(source_time, corruption_mask=~prompt_mask.bool()),
+                algo.points(destination_time, corruption_mask=~prompt_mask.bool()),
             )
             posterior = (
                 algo.sampling_prediction(states, source, source_time).float().exp()
             )
             nfe += 1
             updated = []
-            for branch, state, point_t, point_s in zip(
-                algo.branches, states, source, destination
+            for view, state, point_t, point_s in zip(
+                algo.views, states, source, destination
             ):
                 noise = (
                     torch.zeros_like(state)
@@ -60,10 +61,16 @@ class HybridSampler:
                     and not self.final_transition_noise
                     else None
                 )
-                value = branch.update(state, posterior, point_t, point_s, noise=noise)
-                updated.append(
-                    branch.clamp_prompt(value, prompt_tokens, prompt_mask, point_s)
+                value = view.update(
+                    view.process,
+                    view.representation,
+                    state,
+                    posterior,
+                    point_t,
+                    point_s,
+                    noise=noise,
                 )
+                updated.append(clamp(view, value, prompt_tokens, prompt_mask))
             states = tuple(updated)
             if self.synchronize_committed:
                 states = algo._synchronize_committed(states)
@@ -71,7 +78,7 @@ class HybridSampler:
 
         states = FixedGridLoop()(states, times, update)
         final_time = times[-1].expand(batch)
-        final_points = algo.points(final_time)
+        final_points = algo.points(final_time, corruption_mask=~prompt_mask.bool())
         prediction = (
             algo.greedy_prediction(states, final_points, final_time)
             if self.final_denoise == "greedy"

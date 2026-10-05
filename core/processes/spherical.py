@@ -45,6 +45,12 @@ def exp_map(x: torch.Tensor, delta: torch.Tensor, eps: float = 1e-6) -> torch.Te
 
 
 class SphericalProcess:
+    def corrupt_state(self, clean, coefficients, corruption_mask):
+        return self.corrupt(clean, coefficients[0], corruption_mask)
+
+    def prior_state(self, clean, coefficients):
+        return self.prior(clean)
+
     def __init__(self, eps=1e-6, precision="float64"):
         if precision not in {"float32", "float64"}:
             raise ValueError("unknown spherical precision")

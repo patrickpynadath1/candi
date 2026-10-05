@@ -66,3 +66,12 @@ Uniform, SEDD, and DUO presets retain long reference training budgets (one milli
 MDLM has historical Sudoku reproduction checks and pretrained OpenWebText execution checks. The other discrete ports have mathematical, configuration, gradient, and sampling regression coverage; this does not establish matched full-budget task quality. See [coverage](../validation/coverage.md) and [recorded results](../validation/reproduction-results.md).
 
 Implementation entrypoints: [algorithms](../../core/algorithms/), [processes](../../core/processes/), and [experiments](../../configs/experiment/).
+
+Uniform EB uses **step-local acceptance**: selected positions take the clean-token
+prediction for that step, while unselected positions take the uniform reverse
+transition. All generated positions are reconsidered on the next step, including
+previously selected positions. Only prompt tokens remain fixed within an active sequence. A sequence stops when
+all generated positions are selected in the **same step**; acceptance accumulated
+over earlier steps does not count. Unfinished sequences continue up to
+`sampler.steps`; endpoint outputs are returned with `completed_per_sample=false`
+if they have not met the simultaneous-acceptance criterion.

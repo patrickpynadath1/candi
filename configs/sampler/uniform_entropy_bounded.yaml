@@ -3,3 +3,4 @@ steps: 1024
 epsilon: 0.001
 entropy_bound: 0.0
 use_float64: true
+freeze: false

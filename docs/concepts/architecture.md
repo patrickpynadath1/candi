@@ -42,7 +42,7 @@ branch states; autoregressive generation has no diffusion schedule.
 | `core/models/`, `core/parameterizations/` | Architectures and predictor meanings. |
 | `core/processes/`, `core/noise_schedules/`, `core/time_sampling/` | Corruption dynamics and time/noise choices. |
 | `core/representations/`, `core/objectives/`, `core/samplers/` | Continuous encodings, losses, generation updates. |
-| `core/modifiers/`, `core/hybrid/` | Shared modifiers and parallel process branches. |
+| `core/modifiers/` | Shared modifiers, including hybrid view composition. |
 | `core/tests/` | Mathematical, configuration, and execution checks. |
 
 The library does not import the removed legacy repository modules. Third-party

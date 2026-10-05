@@ -31,7 +31,9 @@ def run(config):
                 dirpath=output / "checkpoints",
                 every_n_train_steps=config.checkpoint.every_n_steps,
                 save_last=True,
-                save_top_k=-1,
+                save_top_k=config.checkpoint.get("save_top_k", -1),
+                monitor="step" if config.checkpoint.get("save_top_k", -1) > 0 else None,
+                mode="max",
                 filename="step_{step:08d}",
                 auto_insert_metric_name=False,
             ),
@@ -48,8 +50,14 @@ def run(config):
         if config.get("callback") is not None:
             callbacks.append(instantiate(config.callback, task=task))
         loggers = [CSVLogger(str(output), name="metrics")]
+        tracking = None
         if config.wandb is not None:
-            loggers.append(WandbLogger(save_dir=str(output), **dict(config.wandb)))
+            tracking = WandbLogger(
+                save_dir=str(output),
+                config=OmegaConf.to_container(config, resolve=True),
+                **dict(config.wandb),
+            )
+            loggers.append(tracking)
         trainer_options = OmegaConf.to_container(config.trainer, resolve=True)
         trainer_options["strategy"] = build_strategy(config, module.algorithm)
         trainer = L.Trainer(
@@ -58,8 +66,21 @@ def run(config):
             callbacks=callbacks,
             **trainer_options,
         )
-        trainer.fit(module, datamodule=data, ckpt_path=config.checkpoint.resume)
-        trainer.save_checkpoint(output / "checkpoints" / "last.ckpt")
+        tracking_run = None
+        exit_code = 1
+        try:
+            if tracking is not None and trainer.is_global_zero:
+                tracking_run = tracking.experiment
+            trainer.fit(module, datamodule=data, ckpt_path=config.checkpoint.resume)
+            final_checkpoint = output / "checkpoints" / "last.ckpt"
+            trainer.save_checkpoint(final_checkpoint)
+            if tracking_run is not None:
+                tracking_run.summary["final_checkpoint"] = str(final_checkpoint)
+                tracking_run.summary["completed_training_steps"] = trainer.global_step
+            exit_code = 0
+        finally:
+            if tracking_run is not None:
+                tracking_run.finish(exit_code=exit_code)
     elif config.mode in {"evaluate", "sample"}:
         if not config.evaluation.checkpoint:
             raise ValueError(

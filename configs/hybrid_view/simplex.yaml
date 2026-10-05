@@ -1,0 +1,18 @@
+_target_: core.modifiers.hybrid.views.DiffusionView
+process:
+  _target_: core.processes.dirichlet.DirichletProcess
+  vocab_size: ${task.vocab_size}
+schedule:
+  _target_: core.noise_schedules.simplex.SimplexSchedule
+  kind: constant_linear
+  nu0: 0.4
+  nu1: 0.75
+  pivot: 0.8
+  epsilon: 1.0
+representation:
+  _target_: core.representations.noisy_inputs.SimplexRepresentation
+  vocab_size: ${task.vocab_size}
+  hidden_size: ${model.backbone.hidden_size}
+update:
+  _target_: core.samplers.hybrid_updates.SimplexPosteriorUpdate
+  churn: 1.0

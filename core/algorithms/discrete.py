@@ -21,7 +21,15 @@ def reduce_token_loss(per_token, loss_mask):
 
 class DiscreteDiffusion(nn.Module):
     def __init__(
-        self, model, predictor, process, schedule, time_sampler, objective, length=180
+        self,
+        model,
+        predictor,
+        process,
+        schedule,
+        time_sampler,
+        objective,
+        length=180,
+        prediction=None,
     ):
         super().__init__()
         self.model, self.predictor, self.process = model, predictor, process
@@ -31,7 +39,11 @@ class DiscreteDiffusion(nn.Module):
             objective,
         )
         self.length = length
-        if getattr(model, "conditioning_adapter", None) is not None:
+        self.prediction = prediction
+        if (
+            prediction is None
+            and getattr(model, "conditioning_adapter", None) is not None
+        ):
             raise ValueError(
                 "self-conditioning prediction is not yet integrated for this algorithm"
             )
