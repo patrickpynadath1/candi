@@ -62,7 +62,7 @@ def report(output_root, report_dir):
     (report_dir / 'report.md').write_text('\n'.join(lines))
     if rows:
         with (report_dir / 'summary.csv').open('w') as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
     print(f'Refreshed report: {len(rows)} completed cells')
