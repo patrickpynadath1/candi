@@ -1,6 +1,6 @@
 # Results
 
-**[Markdown results summary](SUMMARY.md)** — side-by-side model/sampler tables, with links to the complete hint-removal tables.
+**[Markdown results summary](SUMMARY.md)** — side-by-side model/sampler tables for normal hidden-representation self-conditioning, with links to the complete hint-removal tables.
 
 ## Sudoku Hard, 5,000 training steps
 
