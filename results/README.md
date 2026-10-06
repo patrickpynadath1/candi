@@ -1,5 +1,7 @@
 # Results
 
+**[Markdown results summary](SUMMARY.md)** — side-by-side model/sampler tables, with links to the complete hint-removal tables.
+
 ## Sudoku Hard, 5,000 training steps
 
 All runs use 48,000 training puzzles, training seed 1, and EMA checkpoints at step 5,000. The comparisons include standalone discrete methods, continuous methods, their hybrids, and feedback variants. `hidden` denotes normal hidden self-conditioning; `token` denotes intermediate token feedback. Detached token-feedback ablations use depths 3 and 0 (after transformer blocks 4 and 1).
