@@ -141,3 +141,39 @@ def test_incompatible_model_has_clear_error():
 
     with pytest.raises(TypeError, match="token embedding table"):
         TokenFeedback(Algorithm(), depth=0)
+
+
+@pytest.mark.parametrize("detach", [False, True])
+def test_detach_blocks_main_loss_through_auxiliary_logits_only(detach):
+    from core.modifiers.token_feedback.model import TokenFeedbackBlocks
+
+    torch.manual_seed(17)
+    net = model().eval()
+    net.block_execution = TokenFeedbackBlocks(net.blocks[1], 1, 16, detach=detach)
+    # Enable feedback and a nonzero head so zero initialization cannot hide
+    # a missing gradient path.
+    torch.nn.init.normal_(net.output_layer.linear.weight, std=0.1)
+    with torch.no_grad():
+        net.block_execution.gate.fill_(0.5)
+    tokens, time = torch.randint(0, 11, (2, 7)), torch.rand(2)
+    output = net(tokens, time, return_features=True)
+    main_gradient = torch.autograd.grad(
+        output.logits.square().mean(), output.auxiliary_logits,
+        retain_graph=True, allow_unused=True,
+    )[0]
+    if detach:
+        assert main_gradient is None
+    else:
+        assert main_gradient.abs().sum() > 0
+    auxiliary_loss = torch.nn.functional.cross_entropy(
+        output.auxiliary_logits.transpose(1, 2), tokens
+    )
+    auxiliary_gradient = torch.autograd.grad(
+        auxiliary_loss, output.auxiliary_logits, retain_graph=True
+    )[0]
+    assert auxiliary_gradient.abs().sum() > 0
+    extractor_gradients = torch.autograd.grad(
+        auxiliary_loss, tuple(net.block_execution.extractor.parameters()),
+        allow_unused=True,
+    )
+    assert any(g is not None and g.abs().sum() > 0 for g in extractor_gradients)

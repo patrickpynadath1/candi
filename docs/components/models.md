@@ -137,3 +137,16 @@ block policy and explicit query/key positions. There is no attempt to substitute
 ordinary diffusion attention for causal KV-cache behavior. Representation
 encoding/decoding remains outside these input components, and Gaussian models
 retain the additional input projection.
+
+### Intermediate token-feedback gradients
+
+Set `token_feedback.detach=true` to stop the main loss from backpropagating
+through the intermediate prediction used as feedback. The feedback uses
+`softmax(auxiliary_logits).detach()`; the auxiliary cross-entropy still uses the
+attached logits and trains the extractor and shared output head. The default is
+`false`, which lets both losses train the intermediate prediction.
+
+This detaches the predicted probabilities, not the entire feedback branch: the
+embedding table and feedback gate still receive main-loss gradients, and the
+backbone and shared output head still train through their normal final-output
+paths. Changing this flag does not change forward values or inference behavior.

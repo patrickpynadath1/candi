@@ -32,6 +32,7 @@ token_feedback:
   depth: 3
   loss_weight: 1.0
   gate: scalar
+  # Stop main-loss gradients through feedback probabilities; auxiliary CE stays attached.
   detach: false
 mode: train
 seed: 1
