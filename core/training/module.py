@@ -79,17 +79,26 @@ class TrainingModule(L.LightningModule):
             self._pending_rng = None
 
     def training_step(self, batch, batch_idx):
+        accumulation = self.trainer.accumulate_grad_batches
+        window_start = (batch_idx // accumulation) * accumulation
+        # Lightning flushes the remaining microbatches at the epoch boundary.
+        # Stratify over that actual window, otherwise it only sees low times.
+        window_size = int(
+            min(accumulation, self.trainer.num_training_batches - window_start)
+        )
         result = self.algorithm.loss(
             batch["input_ids"],
             batch["loss_mask"],
             corruption_mask=batch.get("corruption_mask"),
             step=self.global_step,
             training=True,
-            global_batch_size=self.config.loader.global_batch_size,
+            global_batch_size=batch["input_ids"].shape[0]
+            * self.trainer.world_size
+            * window_size,
             world_size=self.trainer.world_size,
             rank=self.global_rank,
-            accumulation_steps=self.trainer.accumulate_grad_batches,
-            accumulation_index=batch_idx % self.trainer.accumulate_grad_batches,
+            accumulation_steps=window_size,
+            accumulation_index=batch_idx - window_start,
         )
         # Accumulate detached, token-weighted metrics across microbatches.
         # Logging only the last microbatch aliases the stratified time ranges.
@@ -104,7 +113,10 @@ class TrainingModule(L.LightningModule):
                     previous_sum + value,
                     previous_count + count,
                 )
-        return result["loss"]
+        # Lightning divides every backward loss by the configured accumulation
+        # count, including the short final window. Correct that divisor without
+        # changing the raw losses logged above.
+        return result["loss"] * (accumulation / window_size)
 
     def on_before_optimizer_step(self, optimizer):
         for name, (total, count) in self._train_metric_totals.items():

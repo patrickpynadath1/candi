@@ -56,7 +56,8 @@ Architectural/sequence modifiers have dedicated references:
 
 See [task conventions](tasks/overview.md), then
 [Sudoku](tasks/sudoku.md), [Text8](tasks/text8.md),
-[OpenWebText](tasks/openwebtext.md), or [TinyGSM](tasks/tinygsm.md).
+[OpenWebText](tasks/openwebtext.md), [TinyGSM](tasks/tinygsm.md), or
+[single-cell gene expression](tasks/single-cell.md).
 
 ## Extend and assess
 

@@ -20,6 +20,9 @@ class TaskEvaluation(L.Callback):
         batch_size,
         precision,
         output_dir,
+        every_n_epochs=0,
+        evaluation_name=None,
+        save_records=True,
     ):
         self.task = task
         self.every_n_steps, self.subset_size, self.seed = (
@@ -30,16 +33,31 @@ class TaskEvaluation(L.Callback):
         self.sampler_config, self.batch_size = sampler_config, batch_size
         self.precision, self.output_dir = precision, Path(output_dir)
         self.last_step = -1
+        self.every_n_epochs = every_n_epochs
+        self.evaluation_name = evaluation_name
+        self.save_records = save_records
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         step = trainer.global_step
         every = self.every_n_steps
         if not every or step == 0 or step == self.last_step or step % every:
             return
+        self._evaluate(trainer, pl_module)
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        if (
+            self.every_n_epochs
+            and (trainer.current_epoch + 1) % self.every_n_epochs == 0
+        ):
+            self._evaluate(trainer, pl_module)
+
+    def _evaluate(self, trainer, pl_module):
+        step = trainer.global_step
         self.last_step = step
         if trainer.is_global_zero:
-            self.task.prepare_evaluation(self.task.primary_metric.dataset)
-            dataset = self.task.evaluation_dataset(self.task.primary_metric.dataset)
+            evaluation_name = self.evaluation_name or self.task.primary_metric.dataset
+            self.task.prepare_evaluation(evaluation_name)
+            dataset = self.task.evaluation_dataset(evaluation_name)
             rng = np.random.default_rng(self.seed)
             indices = sorted(
                 rng.choice(
@@ -61,7 +79,12 @@ class TaskEvaluation(L.Callback):
                     batch_size=self.batch_size,
                     indices=indices,
                     precision=self.precision,
+                    evaluation_name=evaluation_name,
                 )
+            result["evaluation_split"] = evaluation_name
+            result["epoch"] = trainer.current_epoch + 1
+            if not self.save_records:
+                result.pop("records", None)
             self.output_dir.mkdir(parents=True, exist_ok=True)
             result_path = self.output_dir / f"step_{step:08d}.json"
             result_path.write_text(json.dumps(result, indent=2))

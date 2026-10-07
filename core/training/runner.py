@@ -30,6 +30,7 @@ def run(config):
             ModelCheckpoint(
                 dirpath=output / "checkpoints",
                 every_n_train_steps=config.checkpoint.every_n_steps,
+                every_n_epochs=config.checkpoint.get("every_n_epochs", None),
                 save_last=True,
                 save_top_k=config.checkpoint.get("save_top_k", -1),
                 monitor="step" if config.checkpoint.get("save_top_k", -1) > 0 else None,
@@ -115,6 +116,9 @@ def run(config):
         )
         result["sampler"] = OmegaConf.to_container(config.sampler, resolve=True)
         (output / "results.json").write_text(json.dumps(result, indent=2))
+        from core.training.evaluation_tracking import log_evaluation
+
+        log_evaluation(config, result, output)
         print(json.dumps({k: v for k, v in result.items() if k != "records"}, indent=2))
     else:
         raise ValueError("mode must be train, evaluate or sample")

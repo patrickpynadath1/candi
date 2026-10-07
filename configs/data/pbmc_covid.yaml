@@ -1,0 +1,5 @@
+# Shape defaults from the paper; the sweep replaces them with prepared metadata.
+dataset: pbmc_covid
+cache_dir: ${hydra:runtime.cwd}/core/data_cache/single_cell
+num_genes: 2000
+vocab_size: ???

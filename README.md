@@ -36,6 +36,7 @@ uv run python frontier.py evaluation.checkpoint=/path/to/last.ckpt
 - [Architecture and ownership](docs/concepts/architecture.md)
 - [Training](docs/guides/training.md), [distributed training](docs/guides/distributed-training.md), and [checkpointing](docs/guides/checkpointing.md)
 - [Sampling/evaluation](docs/guides/sampling-and-evaluation.md) and [frontier sweeps](docs/guides/frontier-sweeps.md)
+- [Single-cell datasets and Sudoku-matched sweep](docs/tasks/single-cell.md)
 - [All component, method, modifier, and task references](docs/index.md)
 - [Coverage and limitations](docs/validation/coverage.md) and [recorded results](docs/validation/reproduction-results.md)
 

@@ -21,12 +21,15 @@ def select_prefix(entropy, active, bound):
 
 
 class EntropyBoundedSampler:
-    def __init__(self, entropy_bound=0.1, max_steps=180):
+    def __init__(self, entropy_bound=0.1, max_steps=180, final_denoise="error"):
         if not math.isfinite(entropy_bound) or entropy_bound < 0 or max_steps <= 0:
             raise ValueError(
                 "finite nonnegative entropy bound and positive max_steps required"
             )
         self.bound, self.max_steps = entropy_bound, max_steps
+        if final_denoise not in {"error", "greedy"}:
+            raise ValueError("final_denoise must be error or greedy")
+        self.final_denoise = final_denoise
 
     def sample(self, algo, prompt_tokens, prompt_mask):
         algo = prediction_session(algo)
@@ -60,9 +63,23 @@ class EntropyBoundedSampler:
             if complete.all():
                 break
             if nfe >= self.max_steps:
-                raise RuntimeError(
-                    "entropy-bounded sampling exceeded max_steps before completion"
+                if self.final_denoise == "error":
+                    raise RuntimeError(
+                        "entropy-bounded sampling exceeded max_steps before completion"
+                    )
+                active = state.eq(algo.process.mask_index)
+                keep, _ = algo.schedule(active.sum(-1) / generated_count)
+                prediction = algo.sampling_prediction(state, keep)
+                probabilities = algo.predictor.probabilities(
+                    prediction.float(), apply_commitment=True
                 )
+                state = algo.process.commit(
+                    state, probabilities, active, deterministic=True
+                )
+                nfe += 1
+                per_sample[active.any(-1)] = nfe
+                accepted.append(active.sum(-1).cpu().tolist())
+                break
         return state, {
             "nfe": nfe,
             "nfe_per_sample": per_sample.cpu().tolist(),

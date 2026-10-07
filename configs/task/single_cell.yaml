@@ -1,0 +1,9 @@
+defaults:
+- /data@_global_.data: pbmc3k
+- /token_space@_global_.token_space: append_mask
+- _self_
+_target_: core.tasks.single_cell.SingleCellTask
+data: ${data}
+vocab_size: ${data.vocab_size}
+length: ${data.num_genes}
+conditional: false

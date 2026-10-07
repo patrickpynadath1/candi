@@ -1,6 +1,9 @@
 _target_: core.training.evaluation_callback.TaskEvaluation
 _recursive_: false
 every_n_steps: 1000
+every_n_epochs: 0
+evaluation_name: null
+save_records: true
 subset_size: 128
 seed: 42
 sampler_config: ${sampler}

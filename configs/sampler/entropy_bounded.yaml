@@ -1,3 +1,4 @@
 _target_: core.samplers.entropy_bounded.EntropyBoundedSampler
 entropy_bound: 0.1
 max_steps: ${task.length}
+final_denoise: error

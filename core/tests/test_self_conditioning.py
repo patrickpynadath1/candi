@@ -578,3 +578,24 @@ def test_default_bootstrap_probability():
     ):
         cfg = compose(config_name="config")
     assert cfg.self_conditioning.probability == 0.9
+
+
+def test_entropy_budget_readout_preserves_prompts_and_counts_actual_calls():
+    algo = algorithm("hidden")
+    tokens = torch.ones(3, 7, dtype=torch.long)
+    mask = torch.zeros_like(tokens, dtype=torch.bool)
+    mask[0, :] = True
+    mask[1, :6] = True
+    mask[2, :2] = True
+    calls, handle = recorder(algo.model)
+    generated, metadata = algo.generate(
+        EntropyBoundedSampler(entropy_bound=0, max_steps=1, final_denoise="greedy"),
+        tokens,
+        mask,
+    )
+    assert metadata["nfe"] == len(calls) == 2
+    assert metadata["nfe_per_sample"] == [0, 1, 2]
+    torch.testing.assert_close(generated[mask], tokens[mask])
+    assert not generated.eq(algo.process.mask_index).any()
+    assert calls[1][1]["self_condition"] is not None
+    handle.remove()

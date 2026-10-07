@@ -1,0 +1,5 @@
+# Shape defaults from the paper; the sweep replaces them with prepared metadata.
+dataset: dentategyrus
+cache_dir: ${hydra:runtime.cwd}/core/data_cache/single_cell
+num_genes: 17002
+vocab_size: ???
