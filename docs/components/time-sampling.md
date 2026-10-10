@@ -11,7 +11,7 @@ generation grid or introduce an importance correction.
 | --- | --- |
 | `antithetic` | UniformTimeSampler; bounded uniform draws, optionally stratified |
 | `discrete` | Wraps a base sampler and rounds onto positive D3PM steps |
-| `loss_derivative` | Simplex's optional fitted inverse-CDF training-time sampler |
+| `loss_derivative` | Fitted inverse-CDF training-time sampler, used by simplex and compatible view/insertion assemblies |
 | `adaptive_allocation` | RePlaid reconstruction/diffusion allocation plus stratified times |
 
 [UniformTimeSampler](../../core/time_sampling/uniform.py) draws in
@@ -48,6 +48,36 @@ diffusion standard deviations and allocates a leading reconstruction subset at
 time zero. Remaining examples receive stratified diffusion times. RePlaid's
 objective accounts for subset sizes; this object is not a drop-in replacement for
 a sampler returning only a tensor. Its EMA statistics are checkpointed buffers.
+
+## Insertion-loss feedback
+
+[Variable-length diffusion](../modifiers/variable-length.md) preserves the
+loss-derivative sampler's observation hook. Select it with
+`time_sampler=loss_derivative time_sampler.adaptive=true`.
+
+By default, the sampler observes loss averaged over surviving target tokens;
+fully deleted examples do not contribute token-only observations. Set
+`variable_length.time_sampling_include_aux=true` to instead observe, per example,
+
+```text
+(surviving-token loss sum + weighted insertion-count loss
+                         + weighted insertion-content loss)
+/ original target-token count
+```
+
+This retains fully deleted examples, excludes examples without targets, and
+uses the insertion objective's existing count/content weights. Feedback is
+detached and updated only during training. The option does not change the
+optimization objective, does not add importance weighting, and does not change
+per-view adaptive noise-schedule feedback. Under block insertion, every block supplies an observation using its own loss
+and original target count; all blocks are trained together. Blocks from one
+example share the global time sampled for that example.
+
+The insertion sampler still uses a fixed descending inference grid. Fitting a
+training-time distribution does not enable adaptive insertion inference or
+learn the structural survival schedule. Specialized allocation samplers such
+as RePlaid's `adaptive_allocation` are not interchangeable with this tensor-time
+interface.
 
 ## Extending
 

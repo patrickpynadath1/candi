@@ -78,6 +78,8 @@ class SampleAccumulator:
 
 
 class Text8Metrics:
+    supports_variable_length = True
+
     def __init__(
         self, tokenizer, vocabulary, min_lengths, reference_split, vocabulary_sha256
     ):
@@ -88,9 +90,11 @@ class Text8Metrics:
         self.vocabulary_size = len(vocabulary)
         self.records: list[Text8Record] = []
 
-    def update(self, samples, examples, indices):
-        for sample, example, index in zip(samples, examples, indices):
-            if len(sample) != len(example["input_ids"]):
+    def update(self, samples, examples, indices, *, lengths=None):
+        for row, (sample, example, index) in enumerate(zip(samples, examples, indices)):
+            if lengths is not None:
+                sample = sample[: lengths[row]]
+            if lengths is None and len(sample) != len(example["input_ids"]):
                 raise ValueError(
                     "generated and held-out token windows must have equal length"
                 )

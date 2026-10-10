@@ -24,12 +24,21 @@ class BlockDiffusionModel(nn.Module):
         self.clean_encoder = clean_encoder
         self._clean = ContextVar("block_diffusion_clean", default=None)
         self.last_clean_logits = None
+        self._parallel_clean = ContextVar("parallel_block_clean", default=None)
 
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
         except AttributeError:
             return getattr(self.model, name)
+
+    @contextmanager
+    def parallel_clean_context(self, tokens, blocks):
+        context = self._parallel_clean.set((tokens, blocks))
+        try:
+            yield
+        finally:
+            self._parallel_clean.reset(context)
 
     @contextmanager
     def clean_context(self, tokens, *, offset=0, cache=None):
@@ -133,6 +142,185 @@ class BlockDiffusionModel(nn.Module):
             noisy_logits, noisy_hidden, clean_logits, clean_hidden, auxiliary
         )
         return result if return_features else result.logits
+
+    def forward_sequence_features(
+        self, head, states, points, time, valid, conditioning=None
+    ):
+        """Variable-length feature path with a completed clean prefix.
+
+        The gap head's left boundary belongs to the noisy stream. Completed
+        blocks are re-encoded as clean tokens on every call; this deliberately
+        avoids reusing KV entries after a preceding block changed length.
+        """
+        parallel = self._parallel_clean.get()
+        if parallel is not None:
+            return self._parallel_sequence_features(
+                head, states, points, time, valid, conditioning, *parallel
+            )
+        current = self._clean.get()
+        if current is None:
+            return None
+        clean, offset, _cache = current
+        noisy_hidden, noisy_condition = self.model.prepare_fused(
+            states, points, time, self_condition=conditioning
+        )
+        boundary = head.left_boundary.to(noisy_hidden).expand(len(noisy_hidden), 1, -1)
+        noisy_hidden = torch.cat([boundary, noisy_hidden], 1)
+        probabilities = torch.nn.functional.one_hot(
+            clean,
+            self.model.output_vocab_size or self.model.output_layer.linear.out_features,
+        ).float()
+        clean_hidden, clean_condition = self.model.clean_state_hidden(probabilities)
+        clean_length, noisy_length = clean.shape[1], noisy_hidden.shape[1]
+        condition = None
+        if clean_condition is not None:
+            condition = torch.cat(
+                [
+                    clean_condition[:, None].expand(-1, clean_length, -1),
+                    noisy_condition[:, None].expand(-1, noisy_length, -1),
+                ],
+                1,
+            )
+        # Logical block identity is explicit here: every clean token belongs to
+        # a completed block and every noisy position belongs to the active one,
+        # even when earlier insertions changed physical prefix length.
+        clean_causal = torch.ones(
+            clean_length,
+            clean_length,
+            dtype=torch.bool,
+            device=noisy_hidden.device,
+        ).tril()
+        visible = torch.cat(
+            [
+                torch.cat(
+                    [
+                        clean_causal,
+                        torch.zeros(
+                            clean_length,
+                            noisy_length,
+                            dtype=torch.bool,
+                            device=noisy_hidden.device,
+                        ),
+                    ],
+                    1,
+                ),
+                torch.ones(
+                    noisy_length,
+                    clean_length + noisy_length,
+                    dtype=torch.bool,
+                    device=noisy_hidden.device,
+                ),
+            ],
+            0,
+        )[None, None].expand(len(clean), 1, -1, -1)
+        key_valid = torch.cat(
+            [
+                torch.ones(
+                    len(clean),
+                    clean_length + 1,
+                    dtype=torch.bool,
+                    device=clean.device,
+                ),
+                valid,
+            ],
+            1,
+        )
+        visible = visible & key_valid[:, None, None, :]
+        positions = torch.cat(
+            [
+                torch.arange(clean_length, device=clean.device),
+                torch.arange(offset, offset + noisy_length, device=clean.device),
+            ]
+        )[None].expand(len(clean), -1)
+        output = self.model.forward_hidden(
+            torch.cat([clean_hidden, noisy_hidden], 1),
+            condition,
+            return_features=True,
+            attention_mask=visible,
+            position_ids=positions,
+        )
+        active = output.hidden[:, clean_length:]
+        expected, gap_logits = head(active, valid)
+        logits = output.logits[:, clean_length + 1 :, : head.vocab_size]
+        return ModelPrediction(logits, active[:, 1:]), expected, gap_logits
+
+    def _parallel_sequence_features(
+        self, head, states, points, time, valid, conditioning, clean, blocks
+    ):
+        batch, clean_length = clean.shape
+        noisy, noisy_condition = self.model.prepare_fused(
+            states, points, time, self_condition=conditioning
+        )
+        boundary = head.left_boundary.to(noisy).expand(len(noisy), 1, -1)
+        noisy = torch.cat([boundary, noisy], 1)
+        width = noisy.shape[1]
+        probabilities = torch.nn.functional.one_hot(
+            clean,
+            self.model.output_vocab_size or self.model.output_layer.linear.out_features,
+        ).float()
+        clean_hidden, clean_condition = self.model.clean_state_hidden(probabilities)
+        hidden = torch.cat([clean_hidden, noisy.reshape(batch, blocks * width, -1)], 1)
+        condition = None
+        if clean_condition is not None:
+            condition = torch.cat(
+                [
+                    clean_condition[:, None].expand(-1, clean_length, -1),
+                    noisy_condition[:, None]
+                    .expand(-1, width, -1)
+                    .reshape(batch, blocks * width, -1),
+                ],
+                1,
+            )
+        device = clean.device
+        clean_pos = torch.arange(clean_length, device=device)
+        block_ids = torch.arange(blocks, device=device).repeat_interleave(width)
+        starts = block_ids * self.block_size
+        visible = torch.cat(
+            [
+                torch.cat(
+                    [
+                        clean_pos[None, :] <= clean_pos[:, None],
+                        torch.zeros(
+                            clean_length,
+                            blocks * width,
+                            dtype=torch.bool,
+                            device=device,
+                        ),
+                    ],
+                    1,
+                ),
+                torch.cat(
+                    [
+                        clean_pos[None, :] < starts[:, None],
+                        block_ids[:, None] == block_ids[None, :],
+                    ],
+                    1,
+                ),
+            ],
+            0,
+        )[None, None]
+        noisy_valid = torch.nn.functional.pad(valid, (1, 0), value=True).reshape(
+            batch, -1
+        )
+        keys = torch.cat([torch.ones_like(clean, dtype=torch.bool), noisy_valid], 1)
+        visible = visible & keys[:, None, None, :]
+        noisy_pos = starts + torch.arange(width, device=device).repeat(blocks)
+        positions = torch.cat([clean_pos, noisy_pos])[None].expand(batch, -1)
+        output = self.model.forward_hidden(
+            hidden,
+            condition,
+            return_features=True,
+            attention_mask=visible,
+            position_ids=positions,
+        )
+        active = output.hidden[:, clean_length:].reshape(batch * blocks, width, -1)
+        logits = output.logits[:, clean_length:].reshape(batch * blocks, width, -1)
+        expected, gap_logits = head(active, valid)
+        return (
+            ModelPrediction(logits[:, 1:, : head.vocab_size], active[:, 1:]),
+            expected,
+            gap_logits,
+        )
 
     def _stream_inputs(self, inputs, clean, self_condition):
         if isinstance(self.model, HybridModel):

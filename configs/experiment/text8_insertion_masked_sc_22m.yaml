@@ -1,0 +1,7 @@
+# @package _global_
+defaults:
+- text8_insertion_sc_22m
+- override /hybrid_view@model.views.content: masked
+- _self_
+variable_length:
+  time_sampling_include_aux: false

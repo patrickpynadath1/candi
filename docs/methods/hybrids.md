@@ -116,3 +116,18 @@ paper-native sampler. The historical CANDI sampler remains separate.
 regular evaluations and evaluates both EB bounds (0.1 and 0.01), with frozen and
 revisable variants for uniform hybrids. Its output includes per-puzzle JSON,
 checkpoint/config provenance, and a compiled CSV/Markdown comparison.
+
+## Variable-length views
+
+The [insertion modifier](../modifiers/variable-length.md) applies one shared
+sequence edit to every view. New continuous positions are forward-corrupted from
+a gap clean-content estimate at the current global noise level; absorbing views
+receive aligned masks. The same contract supports a single content view; a
+masked branch is not required. Insertion uses one global time for structure and
+per-view time maps/schedules for content, rather than a separate age clock for
+new tokens.
+
+The modifier can also be wrapped in [block diffusion](../modifiers/block-diffusion.md).
+All views share active-block boundaries, while completed blocks are frozen clean
+context. See the insertion reference for birth policies, self-conditioning,
+adaptive feedback, length semantics and approximation limits.

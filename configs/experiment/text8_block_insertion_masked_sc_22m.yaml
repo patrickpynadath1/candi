@@ -1,0 +1,15 @@
+# @package _global_
+defaults:
+- text8_insertion_masked_sc_22m
+- _self_
+block_diffusion:
+  enabled: true
+  block_size: 32
+  max_length: 64
+  clean_loss: none
+  cache_clean_prefix: false
+# Variable blocks currently sample each example separately for exact prefix isolation.
+callback:
+  subset_size: 8
+task:
+  num_eval_samples: 32

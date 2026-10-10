@@ -1,0 +1,510 @@
+{
+  "experiment": "text8_parallel_block_insertion_gaussian_sc_22m",
+  "checkpoint_step": 5000,
+  "seed": 23,
+  "split": "test",
+  "use_ema": true,
+  "token_temperature": 0.7,
+  "gap_temperature": 0.7,
+  "metrics": {
+    "source": "core/outputs/text8_parallel_block_insertion_gaussian_sc_22m/test_temp0p7_seed23/results.json",
+    "sha256": "9cafa1f05bde6fc3e53629b4e569b81e511262da91119f592583f65941495c3a",
+    "samples": 32,
+    "valid_word_rate": 0.75,
+    "valid_word_rate_min_length_5": 0.37404580152671757,
+    "length_mean": 258.78125,
+    "length_range": [
+      255,
+      264
+    ],
+    "block_length_mean": 32.34765625,
+    "block_length_range": [
+      31,
+      37
+    ],
+    "truncated_samples": 0,
+    "unique_sequences": 32
+  },
+  "samples": [
+    {
+      "index": 0,
+      "text": "[BOS]ference and note[EOS]rn to their seven the defection resence left to recontributors while it al former apasing he isrused with two three zero onen like and in the one nine five seven at esinting in the sumeeral and universitary a amilisited that indefination w[EOS]",
+      "length": 258,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        33,
+        32,
+        32,
+        32,
+        33
+      ]
+    },
+    {
+      "index": 1,
+      "text": "[BOS]ly singrs in t[EOS]he lrewiged would revelope lanks an decchering three two four three laized where and two twozero zero  zero three zeero zero six to zer x zero zero zero c zro six zero zero zeero whre three zero six years then the four three years zero zero zer[EOS]",
+      "length": 261,
+      "block_lengths": [
+        33,
+        32,
+        32,
+        33,
+        32,
+        33,
+        32,
+        34
+      ]
+    },
+    {
+      "index": 2,
+      "text": "[BOS]s and equ[EOS]ercial of the culature was a minstinfoluents had was they dvenviredent the notical plongs from this appeanted as west with flave on theprotoical plactfy two for marfine frest complited all drade the nurovestification five but licharmetic prommin[EOS]",
+      "length": 257,
+      "block_lengths": [
+        33,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 3,
+      "text": "[BOS] one nine eight two was air in alterslat gloit especial promomins aclesting to prograt one niine one three one five sigh sesible one nine five nine nine seven two er esition none nine six two zero one one nine nine six four one nine four  five envel one n[EOS]",
+      "length": 257,
+      "block_lengths": [
+        32,
+        32,
+        33,
+        32,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 4,
+      "text": "[BOS]ro zero [EOS]ero three four zeo zeo p one two zero two zero zero zero zero one nine mandrese government w two two three two six zero zero zero one five ee two zero zero one zero zero  zero zero threeee two zero m p two zero zero seven eight zero zero zero zero prece[EOS]",
+      "length": 264,
+      "block_lengths": [
+        32,
+        32,
+        33,
+        32,
+        34,
+        36,
+        32,
+        33
+      ]
+    },
+    {
+      "index": 5,
+      "text": "[BOS]such asage deli[EOS]be that balictions of the buddestibility re eiegine ned is then world which he was couldd eplayed thereword an once the abmost of the soluder anaterial contrissum of the fist his bord of mustion one eight nine six they virlable crimition ton[EOS]",
+      "length": 259,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        33,
+        33,
+        32,
+        32,
+        33
+      ]
+    },
+    {
+      "index": 6,
+      "text": "[BOS]peyle[EOS]ks ked  is the arew sairth follonds cet alward to way the peach europeatedly to that and land is firste test of a collections of their are spie or enter which a opheed two substure s alst these the rade of nutworking thomses of the considers of hou[EOS]",
+      "length": 256,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 7,
+      "text": "[BOS] of th[EOS]e artiies of up by colusers a pridiction it is use an atstrectly as the regular had they have be mined inby the four sseven a later of the soperates in the three of our the adio revelsing gods the there of the wyster at a suffic of transconentey side th[EOS]",
+      "length": 262,
+      "block_lengths": [
+        34,
+        33,
+        32,
+        33,
+        33,
+        32,
+        33,
+        32
+      ]
+    },
+    {
+      "index": 8,
+      "text": "[BOS]ssvands d[EOS]are some offect to not four as his by man nonguried in also one the when importation of the umactic frm telert these was that he petrestreed the angungery and of dytes elisting they wave it way the inssimilar of number to wareign schowers lanking w[EOS]",
+      "length": 260,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        32,
+        33,
+        34,
+        33,
+        32
+      ]
+    },
+    {
+      "index": 9,
+      "text": "[BOS]cke at van other arces more collegers one nine five three an runifictions aferican reek of old acts rejection trowor and no fligh chark early realized ever historic hrosmest in showerely the computing of sorts desient from deforder one even zerro in was[EOS]",
+      "length": 255,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        31
+      ]
+    },
+    {
+      "index": 10,
+      "text": "[BOS]rtuals al[EOS]tislands this ischnofhies the regress meaning in fathers when the right to beill a prince to laew a bohn of hitfluning which referenced an are not any mrailley as the sells fom the hold scieptist and lits in devienced atastifies were finally for[EOS]",
+      "length": 257,
+      "block_lengths": [
+        32,
+        33,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 11,
+      "text": "[BOS]is[EOS]t ointors to that programm how was distorstion booths to many from its verement of mibor thas the features forced used is a member of niction pared that were lo and seve ne wasss counted by the constrician cultersity a win an the elect of admor repeasstive",
+      "length": 260,
+      "block_lengths": [
+        32,
+        33,
+        32,
+        32,
+        32,
+        34,
+        32,
+        33
+      ]
+    },
+    {
+      "index": 12,
+      "text": "[BOS] as coovied [EOS]are incoduction explands accourroque is opentishhed that her lobe are minded of a periopusality the crit s not argham oer tthe government restraphill aguaprected inprodicial liter for the spaking dead in a smean as cleft reomorch prols air this so[EOS]",
+      "length": 262,
+      "block_lengths": [
+        31,
+        37,
+        33,
+        32,
+        33,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 13,
+      "text": "[BOS]y sach what a g[EOS]xed retember one nine eight phears lax by rage though respited fuer t player times are decoveredor which gaveled the ore almors of sportical thouring livered yount luxingor cifi the bent on out actions in the point bewas in warchuming the [EOS]",
+      "length": 257,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        33,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 14,
+      "text": "[BOS]ore have fompl[EOS]ement tho at the time of the mong the toper require in it kooks with the llllike t ssige of a assustation at tim the omilit aimlie instiratureesses iio the attanies amonages to channaga is mens of an overnment tand there is hr as the modelner[EOS]",
+      "length": 259,
+      "block_lengths": [
+        32,
+        32,
+        35,
+        32,
+        32,
+        32,
+        33,
+        31
+      ]
+    },
+    {
+      "index": 15,
+      "text": "[BOS]ilit is sometime a[EOS] chieved is hound to its winthinger was the scopity hule of made discontuins wer one by in the have muid life blow in he some experation of the i s days to termy to the politic fice of the prossed at most used more over male that spep[EOS]",
+      "length": 255,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        31,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 16,
+      "text": "[BOS]ort an[EOS]d spacked brough noted hap using regain and ebgrams froom slaft arcentosiation the syrreation of moche making one nine zero eiiight views of the legent serable at nother two s releading the ane ecomay one eight he was own mattled one fires live styles [EOS]",
+      "length": 261,
+      "block_lengths": [
+        32,
+        33,
+        34,
+        32,
+        34,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 17,
+      "text": "[BOS]n[EOS]e b[EOS]ew of the l class metarning selves by a forgal cool or requart to a cabyar cral ugaing it hiistory of the county and a the blied earare the eyaboth of remand mred esperally in oneeeeee nine eight of other ibs can credured the greacy of lilagations in a l ow",
+      "length": 264,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        33,
+        34,
+        37,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 18,
+      "text": "[BOS]and ression of pahences two one nine seven four de long where his mareas one nine two thrree benate d monumanted the coint of the usion one  nne nine one leian to other can french prequirences oone nine six three two five years three were s for eight bc x t[EOS]",
+      "length": 259,
+      "block_lengths": [
+        32,
+        32,
+        33,
+        32,
+        33,
+        32,
+        33,
+        32
+      ]
+    },
+    {
+      "index": 19,
+      "text": "[BOS]ercion of m[EOS]ausked winth e aurper one inide in while carree and the inluvations and spec and one nine four one a tronary which is quale that s were july in lies of one ears become reject to stand games of resence to sugnsta may and other batging one nine [EOS]",
+      "length": 257,
+      "block_lengths": [
+        33,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 20,
+      "text": "[BOS]st three two zero [EOS]f see by at somme the great us but the other to anceined tant of atcemption one nine three  four furth use to word a ago is for timely in the fbm of he deak ficture and vise are ad concents who upt for the tamling a call one one wassing [EOS]",
+      "length": 258,
+      "block_lengths": [
+        32,
+        34,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 21,
+      "text": "[BOS]haded by[EOS] inicial preicationated of it equipted the majoha largism of the constripment matess have you dypstable that tthery juskipia a tap marians cemmon cit loss thoo the dovery east sond junesh sharves were accounted at to main to the one intif acives thi[EOS]",
+      "length": 260,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        33,
+        33,
+        32,
+        32,
+        34
+      ]
+    },
+    {
+      "index": 22,
+      "text": "[BOS]er numberter no[EOS]w pregurs sevants in one nine seven seven modin impliages by nuberalizia i is regard in acter one nine oe eight om the fastimation one nine nine six a i the compater onviversion  and one nine eight nine one nine nine seven and and ge cial [EOS]",
+      "length": 257,
+      "block_lengths": [
+        32,
+        33,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 23,
+      "text": "[BOS]ed t[EOS]hey meeted not inationly the parent of herci diffined sermas an inquide base in recorders drass which way incovided way be many ta o one and vareness to areands that the older other in syllemment usay in simes this were been blecaked by chardstultii[EOS]",
+      "length": 256,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        33,
+        32,
+        32,
+        32,
+        31
+      ]
+    },
+    {
+      "index": 24,
+      "text": "[BOS]riabo[EOS]rg plased this own orher anclest nathuries a an early of the went and early to age of all a perisin ake goovernot of thinng this heasting rong seated it dystems now loage one nine two eight in one nine seveen one king one nine eight eight and these the [EOS]",
+      "length": 261,
+      "block_lengths": [
+        32,
+        33,
+        32,
+        36,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 25,
+      "text": "[BOS]fame[EOS]n three m eight nine the sumpict work a c sx b three m zero zero eight six seven tc one six zero zero four zero yeur reportonment two zero foour one eight acto zero three six zero three zero ero three stays worl s falmx at mainst eight zero zeero zero [EOS]",
+      "length": 259,
+      "block_lengths": [
+        34,
+        32,
+        32,
+        32,
+        33,
+        31,
+        32,
+        33
+      ]
+    },
+    {
+      "index": 26,
+      "text": "[BOS]o one on[EOS]e nine one nine five zero lasis no repenant desceby eight two one zero ero four and one zero zero zero five member holin one six o one two two zerro two zero zero zero dudch one three zero seven five one one zero zero zzro zero zero seven two zero zer[EOS]",
+      "length": 262,
+      "block_lengths": [
+        34,
+        32,
+        32,
+        33,
+        34,
+        32,
+        33,
+        32
+      ]
+    },
+    {
+      "index": 27,
+      "text": "[BOS] x five f[EOS]or zero fr est agui in over on zero replated elvensines a jections anding is not protect th spetdeeen wero autoparty by the duringer of geis charles times alk whote shew undere to attemeties in the w r contricity dedict to accular the lessers sorvi[EOS]",
+      "length": 260,
+      "block_lengths": [
+        32,
+        32,
+        33,
+        34,
+        32,
+        32,
+        32,
+        33
+      ]
+    },
+    {
+      "index": 28,
+      "text": "[BOS]ination b[EOS]rough mestical of seels briefe for comember of the molover color events sizingly the name the georel and pirchads of eriestess viicled dven to refers the may his pardited but or this with amerc could to siros ortson frictions nation which is be[EOS]",
+      "length": 256,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 29,
+      "text": "[BOS]e one one eight on[EOS]e zero ight one nine eight eight seven two nine wo zeroo manope curan serty growng heater hriavitton two zero zero miito the awar two zero zeo three tw three two four two might hamagainst one eight three six of this accide that leader[EOS]",
+      "length": 255,
+      "block_lengths": [
+        32,
+        32,
+        32,
+        31,
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "index": 30,
+      "text": "[BOS]ic prinsperss have belea shomed in one botth to be conselving avariations on some requent in the ite minalitary and even ache as the face marchase thome one four one wo chinales in the one nine three four of the hughl labsur resson was fagie the wart of t[EOS]",
+      "length": 257,
+      "block_lengths": [
+        33,
+        33,
+        32,
+        32,
+        32,
+        32,
+        31,
+        32
+      ]
+    },
+    {
+      "index": 31,
+      "text": "[BOS]ected best prove[EOS]ntshends divests here was delated by the series delegeriess iccusses all defensiencature of ial with welk socies jawan arra in the lieder of  out  of are arcence the world the the was prefered to booking he gough as the we lift in dediaredp [EOS]",
+      "length": 260,
+      "block_lengths": [
+        34,
+        32,
+        33,
+        32,
+        32,
+        33,
+        32,
+        32
+      ]
+    }
+  ]
+}

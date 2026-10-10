@@ -12,3 +12,22 @@ All runs use 48,000 training puzzles, training seed 1, and EMA checkpoints at st
 All-hint cells report success / mean NFE. Reduced-hint cells report distinct valid boards divided by total generations, with repetitions counted once within each prompt's 32 samples. At zero hints, all prompts are identical, so uniqueness is pooled over all 2,048 samples. Validity requires Sudoku constraints and agreement with retained clues, not the original answer. Regular 32/180 refers to update steps; exact 4/8-NFE runs are labeled separately. Continuous-only EB is an experimental commitment policy.
 
 Raw generations, logs, datasets, and checkpoints remain in the local output cache and are not committed. Refresh the hint-removal tables with `python examples/report_hint_removal.py` when those cached outputs are available. Sweep definitions are in `examples/`.
+
+## Text8 insertion/deletion pilots
+
+[Run summary](text8-insertion/summary.json) records the completed and stopped
+experiments, with historical single-block training identified separately.
+[Parallel-block Gaussian 5k evaluation](text8-insertion/parallel-block-gaussian-5k.json)
+contains all 32 generated test samples, lengths, and aggregate metrics: 75% valid
+words, 37.4% valid words of length at least five, mean block length 32.35, and no
+truncated sequences. Sampling used EMA, seed 23, and temperature 0.7 for both
+token and gap-content predictions. Text remains imperfect; word validity alone
+is not a language-quality benchmark.
+
+Reproduce the current training recipe with
+`python main.py +experiment=text8_parallel_block_insertion_gaussian_sc_22m`.
+The [mechanism documentation](../docs/modifiers/variable-length.md) explains
+composition, limitations, and the distinction between historical block pilots
+and the corrected all-block parallel training implementation. Machine-specific
+launch metadata, original configs, and source manifests remain under the ignored
+`core/outputs/insertion_provenance/` cache. Checkpoints are not committed.

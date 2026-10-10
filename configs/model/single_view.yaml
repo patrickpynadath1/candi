@@ -1,0 +1,17 @@
+defaults:
+- /hybrid_view@views.content: gaussian
+
+# A single process uses exactly the same view contract as a hybrid.
+_target_: core.modifiers.hybrid.model.HybridModel
+backbone:
+  _target_: core.models.dit.DiT
+  vocab_size: ${task.vocab_size}
+  hidden_size: 512
+  cond_dim: 128
+  n_blocks: 8
+  n_heads: 8
+  dropout: 0.1
+  adaLN: true
+self_conditioning: ${self_conditioning.enabled}
+self_conditioning_source: ${self_conditioning.source}
+time_conditioning: identity

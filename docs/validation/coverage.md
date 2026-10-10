@@ -114,6 +114,14 @@ probability outputs; that is checked at construction/use boundaries.
 Block diffusion has attention, masks, loss-routing, prefix-cache and combination
 tests. It does not imply every sampler or model can consume the modifier.
 Consult [block diffusion](../modifiers/block-diffusion.md) for supported paths.
+Block-local forward deletion/reverse insertion now has training, generation,
+future-token isolation, padding, protected-prefix and per-block capacity tests.
+Approximately 22M masked and Gaussian Text8 models with self-conditioning passed
+GPU smoke tests and produced trained block samples. Gaussian, masked, simplex
+and spherical whole-sequence insertion runs also executed training and sampling.
+These demonstrate composition and trainability, not converged language quality.
+See the [recorded insertion pilot evidence](../modifiers/variable-length.md#what-has-been-demonstrated)
+for a checkpoint-specific snapshot and its limitations.
 
 | Infrastructure | Executed check | Remaining qualification |
 | --- | --- | --- |

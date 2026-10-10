@@ -1,0 +1,10 @@
+# @package _global_
+defaults:
+- text8_insertion_sc_22m
+- override /hybrid_view@model.views.content: gaussian
+- override /time_sampler: loss_derivative
+- _self_
+time_sampler:
+  adaptive: true
+variable_length:
+  time_sampling_include_aux: false

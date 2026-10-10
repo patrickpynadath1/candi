@@ -48,6 +48,8 @@ class TinyGSMAggregate:
 
 
 class TinyGSMMetrics:
+    supports_variable_length = True
+
     def __init__(
         self, tokenizer, scoring="code", timeout=3.0, bootstrap_size=1, seed=1
     ):
@@ -59,8 +61,10 @@ class TinyGSMMetrics:
         self.bootstrap_size, self.seed = bootstrap_size, seed
         self.records = []
 
-    def update(self, samples, examples, indices):
-        for sample, example, index in zip(samples, examples, indices):
+    def update(self, samples, examples, indices, *, lengths=None):
+        for row, (sample, example, index) in enumerate(zip(samples, examples, indices)):
+            if lengths is not None:
+                sample = sample[: lengths[row]]
             prompt_length = min(len(example["input_ids"]), len(sample))
             completion = sample[prompt_length:].tolist()
             hit_eos = self.tokenizer.eos_token_id in completion

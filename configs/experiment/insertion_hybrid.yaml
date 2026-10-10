@@ -1,0 +1,8 @@
+# @package _global_
+defaults:
+- override /algorithm: hybrid_diffusion
+- override /model: hybrid
+- override /sampler: insertion
+- override /parameterization: unconstrained_posterior
+- override /objective: cross_entropy
+- override /variable_length: insertion

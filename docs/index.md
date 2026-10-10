@@ -38,8 +38,11 @@ and `frontier.py`. This documentation describes the current implementation.
 | [Samplers](components/samplers.md) | Own generation state and update loops. |
 
 Architectural/sequence modifiers have dedicated references:
-[self-conditioning](modifiers/self-conditioning.md) and
-[block diffusion](modifiers/block-diffusion.md).
+[self-conditioning](modifiers/self-conditioning.md),
+[block diffusion](modifiers/block-diffusion.md), and
+[insertion/deletion and variable-length diffusion](modifiers/variable-length.md).
+The insertion reference explains per-process birth states, shared hybrid edits,
+block-local generation, adaptive-time feedback, and the current Text8 evidence.
 
 ## Method recipes
 

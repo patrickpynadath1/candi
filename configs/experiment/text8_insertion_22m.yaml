@@ -1,0 +1,9 @@
+# @package _global_
+defaults:
+- insertion_hybrid
+- text8_22m_common
+- override /task: text8
+- _self_
+sampler:
+  max_length: 512
+  overflow: truncate

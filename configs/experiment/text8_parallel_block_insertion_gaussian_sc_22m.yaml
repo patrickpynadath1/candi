@@ -1,0 +1,5 @@
+# @package _global_
+# Fresh all-block parallel training; separate output name from historical cycling runs.
+defaults:
+- text8_block_insertion_gaussian_sc_22m
+- _self_

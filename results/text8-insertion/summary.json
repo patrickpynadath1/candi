@@ -1,0 +1,300 @@
+{
+  "note": "Exploratory Text8 runs, not converged benchmarks. Callback sample sizes and checkpoint steps differ. Historical cycling block runs are not equal-step baselines for all-block parallel training. Composite training objectives are not comparable likelihoods.",
+  "runs": [
+    {
+      "experiment": "text8_insertion_22m",
+      "config": "configs/experiment/text8_insertion_22m.yaml",
+      "historical_single_block_training": false,
+      "last_logged_optimizer_step_zero_based": 4999,
+      "latest_callback": {
+        "source": "core/outputs/text8_insertion_22m/task_callback/step_00005000.json",
+        "sha256": "fd0ab261df37a2c3b1a544031fc9db97be0d7ba968fd71d7f6731318ef73288e",
+        "samples": 64,
+        "valid_word_rate": 0.6038700255567725,
+        "valid_word_rate_min_length_5": 0.1582014987510408,
+        "length_mean": 263.296875,
+        "length_range": [
+          256,
+          285
+        ],
+        "block_length_mean": null,
+        "block_length_range": null,
+        "truncated_samples": 0,
+        "unique_sequences": 64
+      }
+    },
+    {
+      "experiment": "text8_hybrid_22m",
+      "config": "configs/experiment/text8_hybrid_22m.yaml",
+      "historical_single_block_training": false,
+      "last_logged_optimizer_step_zero_based": 4719
+    },
+    {
+      "experiment": "text8_insertion_gaussian_sc_22m",
+      "config": "configs/experiment/text8_insertion_gaussian_sc_22m.yaml",
+      "historical_single_block_training": false,
+      "status": "stopped_by_user",
+      "last_logged_optimizer_step_zero_based": 3079,
+      "latest_callback": {
+        "source": "core/outputs/text8_insertion_gaussian_sc_22m/task_callback/step_00003000.json",
+        "sha256": "9b83c2d5d17df5088063f627b064db4502ff55bd56c64a9253d7c3053d96b4a9",
+        "samples": 64,
+        "valid_word_rate": 0.7249581239530988,
+        "valid_word_rate_min_length_5": 0.2742574257425743,
+        "length_mean": 259.515625,
+        "length_range": [
+          256,
+          273
+        ],
+        "block_length_mean": null,
+        "block_length_range": null,
+        "truncated_samples": 0,
+        "unique_sequences": 64
+      }
+    },
+    {
+      "experiment": "text8_insertion_masked_sc_22m",
+      "config": "configs/experiment/text8_insertion_masked_sc_22m.yaml",
+      "historical_single_block_training": false,
+      "status": "stopped_by_user",
+      "last_logged_optimizer_step_zero_based": 4039,
+      "latest_callback": {
+        "source": "core/outputs/text8_insertion_masked_sc_22m/task_callback/step_00004000.json",
+        "sha256": "cad45d435c5afa2e7e7f82eb1f0a5b8686765d55798d06c114ae76c32582698f",
+        "samples": 64,
+        "valid_word_rate": 0.7690322580645161,
+        "valid_word_rate_min_length_5": 0.33157894736842103,
+        "length_mean": 261.15625,
+        "length_range": [
+          256,
+          279
+        ],
+        "block_length_mean": null,
+        "block_length_range": null,
+        "truncated_samples": 0,
+        "unique_sequences": 64
+      }
+    },
+    {
+      "experiment": "text8_insertion_simplex_sc_22m",
+      "config": "configs/experiment/text8_insertion_simplex_sc_22m.yaml",
+      "historical_single_block_training": false,
+      "status": "stopped_by_user",
+      "last_logged_optimizer_step_zero_based": 3259,
+      "latest_callback": {
+        "source": "core/outputs/text8_insertion_simplex_sc_22m/task_callback/step_00003000.json",
+        "sha256": "5158c66019648c8d43a6666189427fd4b7c5ae35966de30de7484b1da097aa68",
+        "samples": 64,
+        "valid_word_rate": 0.8765432098765432,
+        "valid_word_rate_min_length_5": 0.35929203539823007,
+        "length_mean": 273.28125,
+        "length_range": [
+          228,
+          298
+        ],
+        "block_length_mean": null,
+        "block_length_range": null,
+        "truncated_samples": 0,
+        "unique_sequences": 64
+      }
+    },
+    {
+      "experiment": "text8_insertion_spherical_sc_22m",
+      "config": "configs/experiment/text8_insertion_spherical_sc_22m.yaml",
+      "historical_single_block_training": false,
+      "status": "stopped_by_user",
+      "last_logged_optimizer_step_zero_based": 2779,
+      "latest_callback": {
+        "source": "core/outputs/text8_insertion_spherical_sc_22m/task_callback/step_00002000.json",
+        "sha256": "a92389b6a6615dc1d523a30fe3ffc0d17080330f36b3ed5165a5f9407e2f97d0",
+        "samples": 64,
+        "valid_word_rate": 0.7135598602731026,
+        "valid_word_rate_min_length_5": 0.28936170212765955,
+        "length_mean": 281.828125,
+        "length_range": [
+          259,
+          307
+        ],
+        "block_length_mean": null,
+        "block_length_range": null,
+        "truncated_samples": 0,
+        "unique_sequences": 64
+      }
+    },
+    {
+      "experiment": "text8_block_insertion_masked_sc_22m",
+      "config": "configs/experiment/text8_block_insertion_masked_sc_22m.yaml",
+      "historical_single_block_training": true,
+      "status": "stopped_by_user",
+      "last_logged_optimizer_step_zero_based": 2859,
+      "latest_callback": {
+        "source": "core/outputs/text8_block_insertion_masked_sc_22m/task_callback/step_00002000.json",
+        "sha256": "a84848245461bafa1958b5b1f1ce030b93aea8d829f741cf5c133b2bdfe43a2a",
+        "samples": 8,
+        "valid_word_rate": 0.684863523573201,
+        "valid_word_rate_min_length_5": 0.07272727272727272,
+        "length_mean": 259,
+        "length_range": [
+          255,
+          266
+        ],
+        "block_length_mean": 32.375,
+        "block_length_range": [
+          30,
+          39
+        ],
+        "truncated_samples": 0,
+        "unique_sequences": 8
+      }
+    },
+    {
+      "experiment": "text8_block_insertion_gaussian_sc_22m",
+      "config": "configs/experiment/text8_block_insertion_gaussian_sc_22m.yaml",
+      "historical_single_block_training": true,
+      "status": "stopped_by_user",
+      "last_logged_optimizer_step_zero_based": 2619,
+      "latest_callback": {
+        "source": "core/outputs/text8_block_insertion_gaussian_sc_22m/task_callback/step_00002000.json",
+        "sha256": "8b0b34acaf81b8f3f02a8c119e320ab3be32200250488588cb663b62ee3fcd3e",
+        "samples": 8,
+        "valid_word_rate": 0.5223463687150838,
+        "valid_word_rate_min_length_5": 0.07482993197278912,
+        "length_mean": 259.875,
+        "length_range": [
+          257,
+          268
+        ],
+        "block_length_mean": 32.484375,
+        "block_length_range": [
+          31,
+          38
+        ],
+        "truncated_samples": 0,
+        "unique_sequences": 8
+      }
+    },
+    {
+      "experiment": "text8_parallel_block_insertion_gaussian_sc_22m",
+      "config": "configs/experiment/text8_parallel_block_insertion_gaussian_sc_22m.yaml",
+      "historical_single_block_training": false,
+      "status": "complete",
+      "last_logged_optimizer_step_zero_based": 4999,
+      "latest_callback": {
+        "source": "core/outputs/text8_parallel_block_insertion_gaussian_sc_22m/task_callback/step_00005000.json",
+        "sha256": "32e08a54b6ab4c75fd7ffaa0212f0a1ac608a3f74de06a5aa7f1abe2e1f8cc01",
+        "samples": 8,
+        "valid_word_rate": 0.7280701754385965,
+        "valid_word_rate_min_length_5": 0.31746031746031744,
+        "length_mean": 260.25,
+        "length_range": [
+          257,
+          263
+        ],
+        "block_length_mean": 32.53125,
+        "block_length_range": [
+          31,
+          39
+        ],
+        "truncated_samples": 0,
+        "unique_sequences": 8
+      }
+    }
+  ],
+  "parallel_block_callback_history": [
+    {
+      "source": "core/outputs/text8_parallel_block_insertion_gaussian_sc_22m/task_callback/step_00001000.json",
+      "sha256": "de2fc6505acc8cd9703c6bd9ba74a58a24ded27d579ed31ddf835401747799ef",
+      "samples": 8,
+      "valid_word_rate": 0.5173410404624278,
+      "valid_word_rate_min_length_5": 0.06206896551724138,
+      "length_mean": 258.875,
+      "length_range": [
+        257,
+        261
+      ],
+      "block_length_mean": 32.359375,
+      "block_length_range": [
+        31,
+        37
+      ],
+      "truncated_samples": 0,
+      "unique_sequences": 8
+    },
+    {
+      "source": "core/outputs/text8_parallel_block_insertion_gaussian_sc_22m/task_callback/step_00002000.json",
+      "sha256": "ee8915fed36081f1be7e54ded0f4e061734c01d7ffd75f9f2148e74c571e6dfc",
+      "samples": 8,
+      "valid_word_rate": 0.7208672086720868,
+      "valid_word_rate_min_length_5": 0.22033898305084745,
+      "length_mean": 259.75,
+      "length_range": [
+        257,
+        266
+      ],
+      "block_length_mean": 32.46875,
+      "block_length_range": [
+        30,
+        40
+      ],
+      "truncated_samples": 0,
+      "unique_sequences": 8
+    },
+    {
+      "source": "core/outputs/text8_parallel_block_insertion_gaussian_sc_22m/task_callback/step_00003000.json",
+      "sha256": "1ba3edab26cabbf1de9e320b20d77585a1bebf2eda5e22554c97bd10154115fe",
+      "samples": 8,
+      "valid_word_rate": 0.7645502645502645,
+      "valid_word_rate_min_length_5": 0.3,
+      "length_mean": 260.75,
+      "length_range": [
+        257,
+        267
+      ],
+      "block_length_mean": 32.59375,
+      "block_length_range": [
+        32,
+        38
+      ],
+      "truncated_samples": 0,
+      "unique_sequences": 8
+    },
+    {
+      "source": "core/outputs/text8_parallel_block_insertion_gaussian_sc_22m/task_callback/step_00004000.json",
+      "sha256": "46c1c2b79a282f6cf6eca69dc739c363abb32bda379839d193e932d3ac3ee344",
+      "samples": 8,
+      "valid_word_rate": 0.778393351800554,
+      "valid_word_rate_min_length_5": 0.432,
+      "length_mean": 259.375,
+      "length_range": [
+        257,
+        264
+      ],
+      "block_length_mean": 32.421875,
+      "block_length_range": [
+        31,
+        39
+      ],
+      "truncated_samples": 0,
+      "unique_sequences": 8
+    },
+    {
+      "source": "core/outputs/text8_parallel_block_insertion_gaussian_sc_22m/task_callback/step_00005000.json",
+      "sha256": "32e08a54b6ab4c75fd7ffaa0212f0a1ac608a3f74de06a5aa7f1abe2e1f8cc01",
+      "samples": 8,
+      "valid_word_rate": 0.7280701754385965,
+      "valid_word_rate_min_length_5": 0.31746031746031744,
+      "length_mean": 260.25,
+      "length_range": [
+        257,
+        263
+      ],
+      "block_length_mean": 32.53125,
+      "block_length_range": [
+        31,
+        39
+      ],
+      "truncated_samples": 0,
+      "unique_sequences": 8
+    }
+  ]
+}

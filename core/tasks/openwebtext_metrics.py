@@ -25,11 +25,15 @@ class OpenWebTextAggregate:
 
 
 class OpenWebTextMetrics:
+    supports_variable_length = True
+
     def __init__(self, tokenizer, scorer, length):
         self.tokenizer, self.scorer, self.length = tokenizer, scorer, length
         self.records = []
 
-    def update(self, samples, examples, indices):
+    def update(self, samples, examples, indices, *, lengths=None):
+        if lengths is not None:
+            samples = [sample[:n] for sample, n in zip(samples, lengths)]
         texts = self.tokenizer.batch_decode(samples)
         scores = self.scorer.score(texts, self.length)
         for index, sample, text, score in zip(indices, samples, texts, scores):

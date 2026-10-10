@@ -26,6 +26,9 @@ class TrainingModule(L.LightningModule):
             {"config": OmegaConf.to_container(self.config, resolve=True)}
         )
         self.algorithm = instantiate(self.config.algorithm)
+        structural = self.config.get("variable_length")
+        if structural is not None:
+            self.algorithm = instantiate(structural, algorithm=self.algorithm)
         block = self.config.get("block_diffusion", {})
         if block.get("enabled", False):
             from core.modifiers.block_diffusion import BlockDiffusion
@@ -36,6 +39,7 @@ class TrainingModule(L.LightningModule):
                 clean_loss=block.get("clean_loss", "none"),
                 clean_loss_weight=block.get("clean_loss_weight", 1.0),
                 cache_clean_prefix=block.get("cache_clean_prefix", True),
+                max_length=block.get("max_length"),
             )
         feedback = self.config.get("token_feedback", {})
         if feedback.get("enabled", False):
@@ -83,6 +87,11 @@ class TrainingModule(L.LightningModule):
             batch["input_ids"],
             batch["loss_mask"],
             corruption_mask=batch.get("corruption_mask"),
+            **(
+                {"valid_mask": batch.get("attention_mask")}
+                if getattr(self.algorithm, "supports_variable_length", False)
+                else {}
+            ),
             step=self.global_step,
             training=True,
             global_batch_size=self.config.loader.global_batch_size,
@@ -94,7 +103,14 @@ class TrainingModule(L.LightningModule):
         # Accumulate detached, token-weighted metrics across microbatches.
         # Logging only the last microbatch aliases the stratified time ranges.
         count = result["num_tokens"].detach().float()
-        for key in ("loss", "main_loss", "token_feedback_loss"):
+        for key in (
+            "loss",
+            "main_loss",
+            "token_feedback_loss",
+            "content_loss",
+            "insertion_loss",
+            "insertion_content_loss",
+        ):
             if key in result:
                 value = result[key].detach().float() * count
                 previous_sum, previous_count = self._train_metric_totals.get(
@@ -143,6 +159,11 @@ class TrainingModule(L.LightningModule):
             batch["input_ids"],
             batch["loss_mask"],
             corruption_mask=batch.get("corruption_mask"),
+            **(
+                {"valid_mask": batch.get("attention_mask")}
+                if getattr(self.algorithm, "supports_variable_length", False)
+                else {}
+            ),
         )
         self._valid_sum += result["loss_sum"]
         self._valid_count += result["num_tokens"]

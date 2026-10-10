@@ -44,6 +44,10 @@ class TokenFeedback(nn.Module):
         super().__init__()
         if loss_weight < 0:
             raise ValueError("token feedback loss weight must be nonnegative")
+        if getattr(algorithm, "supports_variable_length", False):
+            raise TypeError(
+                "token feedback auxiliary loss requires compacted target alignment for variable-length sequences"
+            )
         self.algorithm = algorithm
         model = _backbone(algorithm.model)
         blocks = getattr(model, "blocks", None)

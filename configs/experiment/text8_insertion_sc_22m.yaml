@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+- insertion_continuous
+- text8_22m_common
+- override /task: text8
+- _self_
+self_conditioning:
+  enabled: true
+  source: posterior_mean
+  probability: 0.9
+  evaluation_probability: 1.0
+parameterization:
+  temperature: 0.7
+variable_length:
+  gap_predictor:
+    _target_: core.parameterizations.posterior.PosteriorParameterization
+    temperature: 0.7
+sampler:
+  max_length: 512
+  overflow: truncate

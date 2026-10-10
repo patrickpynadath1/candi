@@ -1,0 +1,7 @@
+_target_: core.samplers.insertion.InsertionSampler
+steps: 180
+epsilon: 0.001
+max_length: 512
+overflow: error
+final_denoise: sample
+pad_token_id: 0

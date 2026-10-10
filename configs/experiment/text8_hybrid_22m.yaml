@@ -1,0 +1,8 @@
+# @package _global_
+defaults:
+- insertion_hybrid
+- text8_22m_common
+- override /task: text8
+- override /sampler: hybrid
+- override /variable_length: null
+- _self_

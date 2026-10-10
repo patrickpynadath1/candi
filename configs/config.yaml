@@ -15,6 +15,7 @@ defaults:
 - sampler: entropy_bounded
 - lr_scheduler: constant_warmup
 - strategy: null
+- variable_length: null
 - _self_
 self_conditioning:
   enabled: false
@@ -27,6 +28,8 @@ block_diffusion:
   clean_loss: none
   clean_loss_weight: 1.0
   cache_clean_prefix: true
+  # Per-active-block capacity for variable-length sampling. Null uses block_size.
+  max_length: null
 token_feedback:
   enabled: false
   depth: 3

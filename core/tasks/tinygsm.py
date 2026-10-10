@@ -77,7 +77,7 @@ class TinyGSMTask(Task):
 
     def collate_training(self, examples):
         batch = default_collate(examples)
-        loss_mask = batch.pop("attention_mask").bool()
+        loss_mask = batch["attention_mask"].bool()
         batch.update(
             loss_mask=loss_mask,
             corruption_mask=loss_mask.clone(),
