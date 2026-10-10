@@ -16,6 +16,7 @@ class BlockDiffusion(nn.Module):
         clean_loss_weight=1.0,
         cache_clean_prefix=True,
         max_length=None,
+        x0_causal=True,
     ):
         super().__init__()
         if clean_loss not in {"none", "autoregressive"}:
@@ -28,6 +29,8 @@ class BlockDiffusion(nn.Module):
                 "routing and optimizer parameter groups; use MDLM or GaussianDiffusion"
             )
         variable_length = getattr(algorithm, "supports_variable_length", False)
+        if not x0_causal and (variable_length or clean_loss != "none"):
+            raise ValueError("block-causal clean attention requires fixed lengths and clean_loss=none")
         if max_length is not None and (
             not isinstance(max_length, int)
             or isinstance(max_length, bool)
@@ -43,7 +46,8 @@ class BlockDiffusion(nn.Module):
             getattr(algorithm, "representation", None), "encode", None
         )
         wrapped_model = BlockDiffusionModel(
-            algorithm.model, block_size, clean_encoder=clean_encoder
+            algorithm.model, block_size, clean_encoder=clean_encoder,
+            x0_causal=x0_causal,
         )
         # VariableLengthDiffusion exposes its assembly model through a read-only
         # property. Install the visibility wrapper on that owning assembly.

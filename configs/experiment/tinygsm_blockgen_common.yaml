@@ -1,0 +1,71 @@
+# @package _global_
+# Fixed-block TinyGSM recipe from jdeschena/blockgen @ 6f52b0d.
+# Shared by tinygsm_blockgen_masked and tinygsm_blockgen_uniform.
+defaults:
+- tinygsm
+- override /lr_scheduler: constant_warmup
+- _self_
+seed: 1
+data:
+  # Upstream uses literal backslash+n, not a newline. Keep eval identical.
+  separator: '\n'
+  wrap: false
+  streaming: false
+  train_on_prompt: false
+  train_on_pad: true
+  filter_too_long: true
+  val_ratio: 0.01
+  val_seed: 42
+task:
+  length: 512
+model:
+  hidden_size: 768
+  cond_dim: 128
+  n_blocks: 12
+  n_heads: 12
+  dropout: 0.1
+  adaLN: true
+  tie_word_embeddings: false
+self_conditioning:
+  enabled: false
+block_diffusion:
+  enabled: true
+  block_size: 16
+  x0_causal: false
+  clean_loss: none
+  cache_clean_prefix: true
+loader:
+  global_batch_size: 512
+  eval_batch_size: 64
+  num_workers: 16
+training:
+  ema: 0.9999
+  warmup_steps: 2500
+optimizer:
+  lr: 0.0003
+  beta1: 0.9
+  beta2: 0.999
+  epsilon: 1.0e-8
+  weight_decay: 0.0
+trainer:
+  devices: 8
+  num_nodes: 1
+  accumulate_grad_batches: 1
+  precision: bf16-mixed
+  max_steps: 250000
+  gradient_clip_val: 1.0
+  val_check_interval: 10000
+  limit_val_batches: 500
+  log_every_n_steps: 100
+checkpoint:
+  every_n_steps: 10000
+callback:
+  # Upstream training scripts disable generation; evaluate checkpoints separately.
+  every_n_steps: 0
+evaluation:
+  use_ema: true
+noise_schedule:
+  epsilon: 0.001
+time_sampler:
+  epsilon: 0.001
+  antithetic: true

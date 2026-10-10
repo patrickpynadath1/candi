@@ -13,7 +13,7 @@ from .layout import make_layout
 
 
 class BlockDiffusionModel(nn.Module):
-    def __init__(self, model, block_size, clean_encoder=None):
+    def __init__(self, model, block_size, clean_encoder=None, x0_causal=True):
         super().__init__()
         if not isinstance(model, (DiT, ContinuousDiT, HybridModel)):
             raise TypeError(
@@ -21,6 +21,7 @@ class BlockDiffusionModel(nn.Module):
             )
         self.model = model
         self.block_size = block_size
+        self.x0_causal = x0_causal
         self.clean_encoder = clean_encoder
         self._clean = ContextVar("block_diffusion_clean", default=None)
         self.last_clean_logits = None
@@ -96,6 +97,7 @@ class BlockDiffusionModel(nn.Module):
             batch_size=len(inputs[0]),
             offset=offset,
             clean_length=clean_length,
+            x0_causal=self.x0_causal,
         )
         if (
             cache is not None
