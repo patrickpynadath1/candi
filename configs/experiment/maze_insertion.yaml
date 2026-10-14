@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+- maze
+- override /variable_length: insertion
+- override /sampler: insertion
+- _self_
+task:
+  variable_length: true
+sampler:
+  steps: 127
+  max_length: ${task.length}
+  overflow: truncate
+  final_denoise: greedy

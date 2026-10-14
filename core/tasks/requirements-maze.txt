@@ -1,0 +1,5 @@
+# Used only to generate a new maze cache; existing caches load without it.
+maze-dataset==1.4.2
+# Newer muutils removes a symbol imported by this generator release.
+muutils==0.8.3
+zanj==0.5.0

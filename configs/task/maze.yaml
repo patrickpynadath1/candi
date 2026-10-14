@@ -1,0 +1,10 @@
+defaults:
+- /data@_global_.data: maze
+- /token_space@_global_.token_space: append_mask
+- _self_
+_target_: core.tasks.maze.MazeTask
+data: ${data}
+vocab_size: 132
+length: 256
+variable_length: false
+eval_repeats: 1

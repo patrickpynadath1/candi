@@ -1,0 +1,12 @@
+defaults:
+- /data@_global_.data: nqueens
+- /token_space@_global_.token_space: append_mask
+- _self_
+_target_: core.tasks.nqueens.NQueensTask
+data: ${data}
+vocab_size: 9
+length: 16
+evaluation_mode: conditional
+samples_per_prompt: 1
+
+variable_length: false

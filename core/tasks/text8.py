@@ -18,6 +18,8 @@ from .text8_metrics import Text8Metrics
 
 class Text8Task(Task):
     name = "text8"
+    # Packed windows contain internal EOS separators; generate the whole window.
+    generation_eos_token_id = None
 
     def __init__(
         self,
@@ -28,6 +30,7 @@ class Text8Task(Task):
         evaluation_split="validation",
         num_eval_samples=128,
         evaluation_seed=23,
+        variable_length=False,
     ):
         if vocab_size != 35 or length <= 2:
             raise ValueError("Text8Task requires vocab_size=35 and length > 2")
@@ -35,6 +38,7 @@ class Text8Task(Task):
             raise ValueError("evaluation_split must be validation or test")
         if num_eval_samples <= 0:
             raise ValueError("num_eval_samples must be positive")
+        self.variable_length = variable_length
         self.num_eval_samples, self.evaluation_seed = num_eval_samples, evaluation_seed
         lengths = tuple(min_word_lengths)
         if any(

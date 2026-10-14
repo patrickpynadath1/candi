@@ -1,0 +1,6 @@
+# @package _global_
+defaults:
+- maze
+- _self_
+data:
+  num_waypoints: 2

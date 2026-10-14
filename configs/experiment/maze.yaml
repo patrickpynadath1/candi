@@ -1,0 +1,36 @@
+# @package _global_
+defaults:
+- override /algorithm: hybrid_diffusion
+- override /model: single_view
+- override /sampler: hybrid
+- override /parameterization: unconstrained_posterior
+- override /objective: cross_entropy
+- override /task: maze
+- override /hybrid_view@model.views.content: masked
+model:
+  backbone:
+    hidden_size: 256
+    cond_dim: 64
+    n_blocks: 4
+    n_heads: 4
+    dropout: 0.1
+loader:
+  global_batch_size: 128
+  eval_batch_size: 16
+  num_workers: 2
+training:
+  warmup_steps: 200
+trainer:
+  max_steps: 5000
+  val_check_interval: 4000
+  num_sanity_val_steps: 0
+  enable_progress_bar: false
+checkpoint:
+  every_n_steps: 1000
+  save_top_k: 1
+callback:
+  every_n_steps: 1000
+  subset_size: 64
+sampler:
+  steps: 127
+  final_denoise: greedy

@@ -115,6 +115,25 @@ def solution_grid(tokens):
 def sudoku_metrics(generated, ground_truth, puzzle=None):
     generated = torch.as_tensor(generated)
     ground_truth = torch.as_tensor(ground_truth)
+    if generated.shape != ground_truth.shape:
+        # A generated board must have exactly the required number of positions.
+        return {
+            "exact": False,
+            "cell_accuracy": 0.0,
+            "valid_rows": 0.0,
+            "valid_columns": 0.0,
+            "valid_boxes": 0.0,
+            "valid_grid": False,
+            **(
+                {
+                    "digit_accuracy": 0.0,
+                    "clue_consistency": False,
+                    "valid_solution": False,
+                }
+                if puzzle is not None
+                else {}
+            ),
+        }
     exact = bool(torch.equal(generated, ground_truth))
     cell_accuracy = float((generated == ground_truth).float().mean())
     grid = solution_grid(generated)

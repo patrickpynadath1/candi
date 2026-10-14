@@ -38,13 +38,17 @@ class SudokuAggregate:
 
 
 class SudokuMetrics:
+    supports_variable_length = True
+
     def __init__(self, tokenizer: SudokuTokenizer):
         self.tokenizer = tokenizer
         self.records: list[SudokuRecord] = []
 
-    def update(self, samples, examples, indices) -> None:
+    def update(self, samples, examples, indices, *, lengths=None) -> None:
         start = self.tokenizer.prompt_len
-        for sample, example, index in zip(samples, examples, indices):
+        for row, (sample, example, index) in enumerate(zip(samples, examples, indices)):
+            if lengths is not None:
+                sample = sample[: lengths[row]]
             prediction = sample[start:].cpu()
             target = example["input_ids"][start:].cpu()
             puzzle = example["input_ids"][1 : start - 1].cpu()

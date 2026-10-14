@@ -38,7 +38,9 @@ def evaluate(
                 getattr(task, "tokenizer", None), "bos_token_id", None
             ),
             eos_token_id=getattr(
-                getattr(task, "tokenizer", None), "eos_token_id", None
+                task,
+                "generation_eos_token_id",
+                getattr(getattr(task, "tokenizer", None), "eos_token_id", None),
             ),
             pad_token_id=getattr(
                 getattr(task, "tokenizer", None), "pad_token_id", None

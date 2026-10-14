@@ -1,0 +1,8 @@
+size: 8
+cache_dir: ${hydra:runtime.cwd}/core/data_cache
+num_train: 1024
+num_valid: 128
+data_seed: 42
+min_clues: 2
+max_clues: 4
+validation_solution_fraction: 0.2

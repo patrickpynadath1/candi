@@ -1,0 +1,13 @@
+defaults:
+- /data@_global_.data: tinystories
+- /token_space@_global_.token_space: tinystories
+- _self_
+_target_: core.tasks.tinystories.TinyStoriesTask
+data: ${data}
+vocab_size: 260
+length: 1024
+prompt_bytes: 64
+num_eval_samples: 128
+evaluation_seed: 23
+variable_length: false
+calculate_bleu: false

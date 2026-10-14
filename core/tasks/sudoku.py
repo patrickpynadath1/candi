@@ -11,8 +11,11 @@ from .sudoku_metrics import SudokuMetrics
 class SudokuTask(Task):
     name = "sudoku"
     primary_metric = PrimaryMetric("accuracy", "max")
+    # Row separators are not end-of-sequence tokens.
+    generation_eos_token_id = None
 
-    def __init__(self, data, vocab_size=12, length=180):
+    def __init__(self, data, vocab_size=12, length=180, variable_length=False):
+        self.variable_length = variable_length
         self.tokenizer = SudokuTokenizer()
         if vocab_size != len(self.tokenizer) or length != self.tokenizer.total_seq_len:
             raise ValueError("SudokuTask requires vocab_size=12 and length=180")

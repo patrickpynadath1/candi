@@ -1,0 +1,8 @@
+# @package _global_
+defaults:
+- nqueens
+data:
+  size: 10
+task:
+  vocab_size: 11
+  length: 20

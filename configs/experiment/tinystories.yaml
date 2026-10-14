@@ -1,0 +1,21 @@
+# @package _global_
+defaults:
+- override /task: tinystories
+- override /sampler: ancestral
+model:
+  hidden_size: 256
+  cond_dim: 128
+  n_blocks: 6
+  n_heads: 8
+  dropout: 0.1
+  adaLN: true
+loader:
+  global_batch_size: 64
+  eval_batch_size: 16
+trainer:
+  max_steps: 10000
+  val_check_interval: 1000
+checkpoint:
+  every_n_steps: 1000
+sampler:
+  steps: 128

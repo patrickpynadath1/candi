@@ -13,3 +13,5 @@ min_word_lengths:
 evaluation_split: validation
 num_eval_samples: 128
 evaluation_seed: 23
+
+variable_length: false

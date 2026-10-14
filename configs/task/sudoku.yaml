@@ -6,3 +6,5 @@ _target_: core.tasks.sudoku.SudokuTask
 data: ${data}
 vocab_size: 12
 length: 180
+
+variable_length: false

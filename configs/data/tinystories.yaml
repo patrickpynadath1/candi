@@ -1,0 +1,8 @@
+cache_dir: ${hydra:runtime.cwd}/core/data_cache/tinystories
+dataset_name: roneneldan/TinyStories
+revision: f54c09fd23315a6f9c86f9dc80f725de7d8f9c64
+download: false
+train_path: null
+validation_path: null
+max_train_examples: 100000
+max_validation_examples: 2000

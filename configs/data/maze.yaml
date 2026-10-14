@@ -1,0 +1,12 @@
+cache_dir: ${hydra:runtime.cwd}/core/data_cache
+# Grid of cells connected by passages; walls live between adjacent cells.
+grid_size: 10
+num_waypoints: 0
+families: [tree, cyclic]
+cycle_probability: 0.15
+min_path_edges: 4
+max_path_edges: 128
+num_train: 4000
+num_valid: 256
+num_test: 256
+data_seed: 42
