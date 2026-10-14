@@ -1,6 +1,7 @@
 """Uniform diffusion with normalized plug-in estimates of clean token weights."""
 
 from .discrete import DiscreteDiffusion
+import torch
 from core.parameterizations.plug_in import PlugInParameterization
 from core.processes.uniform import UniformProcess
 from core.objectives.uniform import UniformDiffusionObjective
@@ -9,7 +10,7 @@ from core.modifiers.self_conditioning.sources import posterior_mean
 
 
 class UniformDiffusion(DiscreteDiffusion):
-    def __init__(self, *args, prediction=None, **kwargs):
+    def __init__(self, *args, prediction=None, time_conditioning=True, **kwargs):
         super().__init__(
             *args,
             prediction=prediction
@@ -17,6 +18,7 @@ class UniformDiffusion(DiscreteDiffusion):
             else PredictionCoordinator(),
             **kwargs,
         )
+        self.time_conditioning = time_conditioning
         self.prediction.validate(
             self.model, self.predictor, training_pathway="training_plugin"
         )
@@ -41,7 +43,7 @@ class UniformDiffusion(DiscreteDiffusion):
         return self.prediction.predict(
             self.model,
             self.predictor,
-            (state, -keep.log()),
+            (state, -keep.log() if self.time_conditioning else torch.zeros_like(keep)),
             state,
             pathway,
             mean=self.prediction_mean,

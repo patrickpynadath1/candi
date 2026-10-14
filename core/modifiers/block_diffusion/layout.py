@@ -12,7 +12,7 @@ class BlockLayout:
 
 
 def make_layout(length, block_size, device, *, batch_size=1, offset=0,
-                clean_length=None):
+                clean_length=None, x0_causal=True):
     if not isinstance(block_size, int) or isinstance(block_size, bool) or block_size < 1:
         raise ValueError("block_size must be a positive integer")
     clean_length = length if clean_length is None else clean_length
@@ -21,7 +21,10 @@ def make_layout(length, block_size, device, *, batch_size=1, offset=0,
     blocks = positions.div(block_size, rounding_mode="floor")
     clean_blocks = clean_positions.div(block_size, rounding_mode="floor")
     clean_q, clean_k = clean_positions[:, None], clean_positions[None, :]
-    clean_to_clean = clean_k <= clean_q
+    clean_to_clean = (
+        clean_k <= clean_q if x0_causal
+        else clean_blocks[None, :] <= clean_blocks[:, None]
+    )
     noisy_to_clean = clean_blocks[None, :] < blocks[:, None]
     noisy_to_noisy = blocks[None, :] == blocks[:, None]
     visible = torch.cat(

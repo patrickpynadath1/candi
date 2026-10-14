@@ -1,0 +1,23 @@
+# @package _global_
+# python main.py +experiment=tinygsm_blockgen_masked
+# On one GPU: trainer.devices=1 trainer.accumulate_grad_batches=8
+# Batch remains 512 globally / 64 per GPU per microstep.
+# CANDI keeps posterior normalization in FP32. Validation reports CE,
+# whereas upstream switches masked validation to the ELBO.
+defaults:
+- tinygsm_blockgen_common
+- override /algorithm: mdlm
+- override /model: dit
+- override /parameterization: posterior
+- override /process: absorbing
+- override /objective: cross_entropy
+- override /noise_schedule: log_linear
+- override /time_sampler: antithetic
+- override /sampler: ancestral
+- _self_
+algorithm:
+  time_conditioning: false
+parameterization:
+  temperature: 0.1
+sampler:
+  steps: 16

@@ -4,6 +4,8 @@ from .adaptive import validate_adaptive_feedback, observe_training_loss
 
 import torch
 from .posterior import PosteriorDiffusion
+from core.objectives.cross_entropy import CrossEntropy
+from core.objectives.weighting import ObjectiveContext
 
 
 class MDLM(PosteriorDiffusion):
@@ -52,7 +54,13 @@ class MDLM(PosteriorDiffusion):
         prediction = self.training_prediction(
             noisy, keep
         )  # Shaping cannot enter this path.
-        per_token = self.objective(prediction, tokens, keep, derivative)
+        if isinstance(self.objective, CrossEntropy):
+            per_token = self.objective(
+                prediction, tokens,
+                context=ObjectiveContext(time=times, alpha=keep, sigma=-keep.log()),
+            )
+        else:
+            per_token = self.objective(prediction, tokens, keep, derivative)
         weights = loss_mask.to(per_token)
         count = weights.sum()
         if count <= 0:
