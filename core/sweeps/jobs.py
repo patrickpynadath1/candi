@@ -19,7 +19,18 @@ class InferenceJob:
             if not (
                 key.startswith("sampler.")
                 or key in {"seed", "loader.eval_batch_size", "trainer.precision"}
-                or key in {"evaluation.max_examples", "evaluation.use_ema"}
+                or key
+                in {
+                    "evaluation.max_examples",
+                    "evaluation.use_ema",
+                    "evaluation.policy",
+                    "evaluator.evaluation_name",
+                    "task.evaluation_mode",
+                    "task.samples_per_prompt",
+                    "task.eval_repeats",
+                    "task.calculate_bleu",
+                }
+                or key in {"wandb.name", "wandb.job_type"}
             ):
                 raise ValueError(
                     f"Inference cannot override training/model field {key!r}"

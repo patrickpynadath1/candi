@@ -202,3 +202,103 @@ def test_real_tune_inference_starts_before_training_finishes(tmp_path, monkeypat
         assert ray.get(events.get.remote()) == history
     finally:
         ray.shutdown()
+
+
+def test_live_submissions_restore_duplicates_and_close(tmp_path):
+    from core.sweeps.submissions import SubmissionQueue
+
+    queue = SubmissionQueue.create(tmp_path / "submissions.sqlite")
+    search = TrainingInferenceSearch(submission_path=queue.path)
+    assert search.suggest("idle") is None
+    assert queue.submit(jobs()[:1]) == 1
+    assert queue.submit(jobs()[:1]) == 0
+    first = search.suggest("first")
+    assert first["name"] == "fast"
+    changed = jobs()[0]
+    changed.config["seed"] = 987
+    with pytest.raises(ValueError, match="Conflicting"):
+        queue.submit([jobs()[1], changed])
+    assert len(queue.read_after(0)[0]) == 1  # Entire conflicting batch rolled back.
+    search.on_trial_complete("first", error=True)
+    assert search.suggest("idle") is None  # Completed work does not close submissions.
+    checkpoint = tmp_path / "search.json"
+    search.save(checkpoint)
+    assert queue.submit(jobs()[1:]) == 1
+    restored = TrainingInferenceSearch()
+    restored.restore(checkpoint)
+    queue.close()
+    assert restored.suggest("second")["name"] == "slow"
+    assert restored.suggest("waiting") is None
+    restored.on_trial_complete("second", error=True)
+    assert restored.suggest("done") == restored.FINISHED
+    with pytest.raises(ValueError, match="closed"):
+        queue.submit(jobs())
+
+
+def test_real_tune_accepts_submission_after_idle(tmp_path, monkeypatch):
+    import threading
+    import ray
+    from ray import tune
+    from core.sweeps.submissions import SubmissionQueue
+
+    monkeypatch.setenv("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
+    queue = SubmissionQueue.create(tmp_path / "live.sqlite")
+    idle = tmp_path / "idle"
+    submitted = threading.Event()
+    failures = []
+
+    class ObservedSearch(TrainingInferenceSearch):
+        def suggest(self, trial_id):
+            result = super().suggest(trial_id)
+            if result is None and self.completed:
+                idle.touch()
+            return result
+
+    def producer():
+        try:
+            import time
+
+            deadline = time.monotonic() + 60
+            while not idle.exists():
+                if time.monotonic() > deadline:
+                    raise AssertionError("Tune never reached idle with an open queue")
+                time.sleep(0.1)
+            queue.submit([TrainingJob(name="later", config=tiny())])
+            queue.close()
+            submitted.set()
+        except BaseException as exc:
+            failures.append(exc)
+            queue.close()
+
+    def worker(job):
+        tune.report({"accepted": job["name"]})
+
+    queue.submit([TrainingJob(name="first", config=tiny())])
+    ray.init(
+        num_cpus=1,
+        num_gpus=0,
+        include_dashboard=False,
+        object_store_memory=100 * 1024**2,
+    )
+    thread = threading.Thread(target=producer, daemon=True)
+    thread.start()
+    try:
+        result = tune.Tuner(
+            tune.with_resources(worker, {"cpu": 1}),
+            tune_config=tune.TuneConfig(
+                search_alg=ObservedSearch(submission_path=queue.path),
+                num_samples=-1,
+                max_concurrent_trials=1,
+            ),
+            run_config=tune.RunConfig(
+                storage_path=str(tmp_path), name="live", verbose=0
+            ),
+        ).fit()
+        thread.join(timeout=5)
+        assert not failures, failures
+        assert submitted.is_set()
+        assert result.num_errors == 0
+        assert {r.metrics["accepted"] for r in result} == {"first", "later"}
+    finally:
+        queue.close()
+        ray.shutdown()

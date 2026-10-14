@@ -92,7 +92,8 @@ def run(config):
             module, config.evaluation.checkpoint, legacy=config.evaluation.legacy
         )
         module.to(config.evaluation.device)
-        task.prepare_evaluation(task.primary_metric.dataset)
+        evaluation_name = config.evaluator.get("evaluation_name") or task.primary_metric.dataset
+        task.prepare_evaluation(evaluation_name)
         evaluate = instantiate(config.evaluator)
         result = evaluate(
             module,
@@ -106,15 +107,44 @@ def run(config):
         result["primary_metric"] = {
             "name": task.primary_metric.name,
             "mode": task.primary_metric.mode,
-            "dataset": task.primary_metric.dataset,
+            "dataset": evaluation_name,
         }
         result["checkpoint_step"] = step
+        if config.get("benchmark") is not None:
+            result["benchmark"] = OmegaConf.to_container(config.benchmark, resolve=True)
         result["seed"] = config.seed
         result["parameterization"] = OmegaConf.to_container(
             config.parameterization, resolve=True
         )
         result["sampler"] = OmegaConf.to_container(config.sampler, resolve=True)
         (output / "results.json").write_text(json.dumps(result, indent=2))
+        if config.wandb is not None:
+            import wandb
+            from core.evaluation.reporting import scalar_metrics
+
+            policy = config.evaluation.get("policy")
+            namespace = f"{task.name}/{policy}" if policy else task.name
+            options = dict(config.wandb)
+            options["job_type"] = "evaluate"
+            with wandb.init(
+                dir=str(output),
+                config=OmegaConf.to_container(config, resolve=True),
+                **options,
+            ) as tracking_run:
+                tracking_run.log(
+                    {
+                        **{
+                            f"{namespace}/{key}": value
+                            for key, value in scalar_metrics(result)
+                        },
+                        "trainer/global_step": step,
+                    }
+                )
+                artifact = wandb.Artifact(
+                    f"{task.name}-{policy or 'final'}-evaluation", type="evaluation"
+                )
+                artifact.add_file(str(output / "results.json"))
+                tracking_run.log_artifact(artifact)
         print(json.dumps({k: v for k, v in result.items() if k != "records"}, indent=2))
     else:
         raise ValueError("mode must be train, evaluate or sample")

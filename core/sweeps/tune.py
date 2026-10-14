@@ -60,7 +60,10 @@ def _metrics(output):
             for row in csv.DictReader(handle):
                 for key, value in row.items():
                     if value:
-                        result[key] = float(value)
+                        if value in {"True", "False"}:
+                            result[key] = value == "True"
+                        else:
+                            result[key] = float(value)
     return result
 
 
@@ -69,7 +72,7 @@ def run_trial(spec):
 
     ``spec`` is {experiment, overrides} or {config: plain_config_dict}. Wrap
     either form in {trial: ...} to grid-search a list of complete specifications.
-    Reports final metrics only; retries restart unless checkpoint.resume is set.
+    Reports final metrics only; retries resume the latest local training checkpoint.
     """
     from ray import tune
 
@@ -80,6 +83,9 @@ def run_trial(spec):
         spec = spec["trial"]
     output = Path(context.get_trial_dir()).resolve() / "run"
     config = _prepare(spec, output, context.get_trial_resources().required_resources)
+    latest = output / "checkpoints" / "last.ckpt"
+    if config.mode == "train" and latest.is_file():
+        config.checkpoint.resume = str(latest)
     if config.trainer.accelerator == "cpu":
         # Ray can retain the driver's visibility on a CPU-only local cluster.
         # Auxiliary evaluators must not pick up an unreserved GPU either.

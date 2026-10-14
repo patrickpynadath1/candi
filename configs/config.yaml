@@ -74,6 +74,7 @@ checkpoint:
   resume: null
   every_n_steps: 5000
 evaluation:
+  policy: null
   checkpoint: null
   legacy: false
   use_ema: true

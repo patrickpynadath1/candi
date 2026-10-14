@@ -41,13 +41,30 @@ class _QueuedJob:
         )
 
 
+def _training_job(source):
+    source = copy.deepcopy(source)
+    config = _configuration(source.to_trial_spec())
+    if config.mode != "train":
+        raise ValueError("A training job must have mode=train")
+    return _QueuedJob(
+        stage="train",
+        name=source.name,
+        trial={"config": OmegaConf.to_container(config, resolve=False)},
+        inference=tuple(
+            InferenceJob(choice.sampler, choice.overrides)
+            for choice in source.inference
+        ),
+        checkpoint=source.checkpoint,
+    )
+
+
 def _inference_config(saved: Path, choice: InferenceJob, checkpoint: str):
     config = OmegaConf.load(saved / "config.yaml")
     if choice.sampler is not None:
         sampler = compose(overrides={"sampler": choice.sampler}).sampler
         config.sampler = OmegaConf.to_container(sampler, resolve=False)
     for key, value in choice.overrides.items():
-        OmegaConf.update(config, key, value, merge=False)
+        OmegaConf.update(config, key, value, merge=False, force_add=True)
     config.mode = "evaluate"
     config.evaluation.checkpoint = str(saved / "checkpoints" / checkpoint)
     config.evaluation.legacy = False
@@ -65,45 +82,53 @@ class TrainingInferenceSearch(Searcher):
     Checkpoint storage must be a local/shared filesystem visible to all workers.
     """
 
-    def __init__(self, jobs: Iterable[TrainingJob]):
+    def __init__(self, jobs: Iterable[TrainingJob] = (), *, submission_path=None):
         super().__init__()
         self.training: deque[_QueuedJob] = deque()
         self.inference: deque[_QueuedJob] = deque()
         self.issued: dict[str, _QueuedJob] = {}
         self.completed: dict[str, Literal["failed", "succeeded"]] = {}
         self.expanded: set[str] = set()
-        names: set[str] = set()
+        self.submission_path = (
+            str(Path(submission_path).resolve()) if submission_path else None
+        )
+        self.submission_cursor = 0
+        self.names: set[str] = set()
         for source in jobs:
-            source = copy.deepcopy(source)
-            if source.name in names:
-                raise ValueError(f"Duplicate job name: {source.name!r}")
-            names.add(source.name)
-            config = _configuration(source.to_trial_spec())
-            if config.mode != "train":
-                raise ValueError("A training job must have mode=train")
-            self.training.append(
-                _QueuedJob(
-                    stage="train",
-                    name=source.name,
-                    trial={"config": OmegaConf.to_container(config, resolve=False)},
-                    inference=tuple(
-                        InferenceJob(choice.sampler, choice.overrides)
-                        for choice in source.inference
-                    ),
-                    checkpoint=source.checkpoint,
-                )
-            )
+            job = _training_job(source)
+            if job.name in self.names:
+                raise ValueError(f"Duplicate job name: {job.name!r}")
+            self.names.add(job.name)
+            self.training.append(job)
+
+    def _poll_submissions(self):
+        if not self.submission_path:
+            return False
+        from core.sweeps.submissions import SubmissionQueue
+
+        rows, opened = SubmissionQueue(self.submission_path).read_after(
+            self.submission_cursor
+        )
+        for sequence, payload in rows:
+            job = _QueuedJob.from_dict(payload)
+            if job.name in self.names:
+                raise ValueError(f"Duplicate job name: {job.name!r}")
+            self.training.append(job)
+            self.names.add(job.name)
+            self.submission_cursor = sequence
+        return opened
 
     def suggest(self, trial_id):
         if trial_id in self.issued:
             return asdict(self.issued[trial_id])
+        opened = self._poll_submissions()
         queue = self.inference if self.inference else self.training
         if queue:
             job = queue.popleft()
             self.issued[trial_id] = job
             return asdict(job)
         # Empty while training is running is a pause, not end of the sweep.
-        if self.issued.keys() - self.completed.keys():
+        if opened or self.issued.keys() - self.completed.keys():
             return None
         return self.FINISHED
 
@@ -143,6 +168,8 @@ class TrainingInferenceSearch(Searcher):
             json.dumps(
                 {
                     "version": 1,
+                    "submission_path": self.submission_path,
+                    "submission_cursor": self.submission_cursor,
                     "training": [asdict(job) for job in self.training],
                     "inference": [asdict(job) for job in self.inference],
                     "issued": {
@@ -165,3 +192,12 @@ class TrainingInferenceSearch(Searcher):
         }
         self.completed = state["completed"]
         self.expanded = set(state["expanded"])
+
+        self.submission_path = state.get(
+            "submission_path", getattr(self, "submission_path", None)
+        )
+        self.submission_cursor = state.get("submission_cursor", 0)
+        self.names = {job.name for job in self.training}
+        self.names.update(
+            job.name for job in self.issued.values() if job.stage == "train"
+        )

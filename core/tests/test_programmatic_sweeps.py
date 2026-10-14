@@ -141,3 +141,43 @@ def test_real_ray_training_failure_and_restore(tmp_path, monkeypatch):
         assert checkpoint.stat().st_mtime_ns == before
     finally:
         ray.shutdown()
+
+
+def test_retry_uses_own_latest_checkpoint(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from ray import tune
+    from core.training import runner
+
+    output = tmp_path / "run"
+    checkpoint = output / "checkpoints/last.ckpt"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.touch()
+    context = SimpleNamespace(
+        get_trial_dir=lambda: str(tmp_path),
+        get_trial_resources=lambda: SimpleNamespace(required_resources={"CPU": 1}),
+    )
+    monkeypatch.setattr(tune, "get_context", lambda: context)
+    config = tiny()
+    config["checkpoint"]["resume"] = "/old/source/last.ckpt"
+
+    def inspect(config):
+        assert config.checkpoint.resume == str(checkpoint)
+        raise RuntimeError("checkpoint verified")
+
+    monkeypatch.setattr(runner, "run", inspect)
+    with pytest.raises(RuntimeError, match="checkpoint verified"):
+        run_trial({"config": config})
+
+
+def test_csv_metrics_preserve_booleans_and_numeric_values(tmp_path):
+    directory = tmp_path / "metrics/version_0"
+    directory.mkdir(parents=True)
+    (directory / "metrics.csv").write_text(
+        "step,train/loss,head,sc\n9,1.2,True,False\n10,0.8,,\n"
+    )
+    assert _metrics(tmp_path) == {
+        "step": 10.0,
+        "train/loss": 0.8,
+        "head": True,
+        "sc": False,
+    }
