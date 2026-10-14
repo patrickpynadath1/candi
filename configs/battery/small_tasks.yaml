@@ -1,0 +1,55 @@
+name: small_tasks
+seeds: [1, 2, 3, 4, 5]
+# Budgets and data live here; method choices live in algorithm_definition/.
+settings:
+  trainer.max_steps: 10000
+  trainer.accumulate_grad_batches: 1
+  trainer.val_check_interval: 1000
+  trainer.num_sanity_val_steps: 0
+  trainer.enable_progress_bar: false
+  training.warmup_steps: 200
+  loader.global_batch_size: 64
+  loader.eval_batch_size: 16
+  loader.num_workers: 2
+  checkpoint.every_n_steps: 1000
+  checkpoint.save_top_k: 1
+  callback.every_n_steps: 1000
+  callback.subset_size: 64
+  evaluation.max_examples: 128
+  evaluation.use_ema: true
+tasks:
+- name: sudoku_hard
+  task: sudoku
+  settings:
+    data.cache_dir: ${oc.env:HOME}/.cache/duo/data_cache
+    data.num_train: 48000
+    data.num_valid: 2000
+- name: nqueens
+  task: nqueens
+  settings:
+    data.cache_dir: ${oc.env:HOME}/.cache/duo/data_cache
+  evaluations:
+  - name: conditional
+    overrides: {}
+  - name: unconditional
+    overrides:
+      task.evaluation_mode: unconditional
+      task.samples_per_prompt: 4
+- name: text8
+  task: text8
+  settings:
+    data.cache_dir: ${oc.env:HOME}/.cache/duo/data_cache/text8
+    data.download: false
+- name: tinystories
+  task: tinystories
+  settings:
+    data.cache_dir: ${oc.env:HOME}/.cache/duo/data_cache/tinystories
+    data.download: false
+- name: maze
+  task: maze
+  settings:
+    data.cache_dir: ${oc.env:HOME}/.cache/duo/data_cache
+  evaluations:
+  - name: test
+    overrides:
+      evaluator.evaluation_name: test

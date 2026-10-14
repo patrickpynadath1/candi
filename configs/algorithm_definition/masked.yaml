@@ -1,0 +1,31 @@
+# A method definition. No task, dataset, vocabulary, or sequence length here.
+name: masked
+components:
+  algorithm: hybrid_diffusion
+  model: single_view
+  parameterization: unconstrained_posterior
+  objective: cross_entropy
+  sampler: hybrid
+  hybrid_view@model.views.content: masked
+settings:
+  model.backbone.hidden_size: 256
+  model.backbone.cond_dim: 64
+  model.backbone.n_blocks: 4
+  model.backbone.n_heads: 4
+  model.backbone.dropout: 0.1
+  self_conditioning.enabled: false
+  sampler.steps: 127
+  sampler.final_denoise: greedy
+policies:
+- name: native_128
+  overrides:
+    sampler.steps: 127
+    sampler.greedy_clean_estimate: false
+- name: native_128_greedy
+  overrides:
+    sampler.steps: 127
+    sampler.greedy_clean_estimate: true
+- name: eb_greedy
+  sampler: parallel_entropy_bounded
+  overrides:
+    sampler.steps: 127

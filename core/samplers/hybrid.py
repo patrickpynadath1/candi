@@ -14,6 +14,7 @@ class HybridSampler:
         final_denoise="greedy",
         final_transition_noise=False,
         synchronize_committed=False,
+        greedy_clean_estimate=False,
     ):
         if steps < 1 or not 0 <= epsilon < 1:
             raise ValueError("positive steps and epsilon in [0, 1) required")
@@ -23,6 +24,7 @@ class HybridSampler:
         self.final_denoise = final_denoise
         self.final_transition_noise = bool(final_transition_noise)
         self.synchronize_committed = bool(synchronize_committed)
+        self.greedy_clean_estimate = bool(greedy_clean_estimate)
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
@@ -50,6 +52,10 @@ class HybridSampler:
                 algo.sampling_prediction(states, source, source_time).float().exp()
             )
             nfe += 1
+            if self.greedy_clean_estimate:
+                posterior = torch.nn.functional.one_hot(
+                    posterior.argmax(-1), posterior.shape[-1]
+                ).to(posterior)
             updated = []
             for view, state, point_t, point_s in zip(
                 algo.views, states, source, destination

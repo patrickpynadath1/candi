@@ -1,0 +1,6 @@
+_target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
+steps: 127
+epsilon: 1.0e-05
+entropy_bound: 0.1
+freeze: true
+greedy_clean_estimate: true

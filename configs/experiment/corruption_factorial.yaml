@@ -1,0 +1,32 @@
+# @package _global_
+# Common training assembly: one noisy view, one posterior, one CE objective.
+defaults:
+- override /algorithm: hybrid_diffusion
+- override /model: single_view
+- override /sampler: hybrid
+- override /parameterization: unconstrained_posterior
+- override /objective: cross_entropy
+- override /time_sampler: antithetic
+
+model:
+  time_conditioning: identity
+self_conditioning:
+  source: hidden
+  probability: 0.9
+  evaluation_probability: 1.0
+trainer:
+  max_steps: 10000
+  val_check_interval: 1000
+  # Use one precision across families (including the simplex recipe).
+  precision: bf16-mixed
+  enable_progress_bar: false
+checkpoint:
+  every_n_steps: 1000
+  save_top_k: 1
+# Periodic generation uses isolated RNG and EMA weights.
+callback:
+  every_n_steps: 1000
+  subset_size: 128
+sampler:
+  steps: 127
+  final_denoise: greedy
