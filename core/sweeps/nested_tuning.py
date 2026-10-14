@@ -358,15 +358,15 @@ def execute(stage, payload, output):
     return ray.get(remote.remote(payload, str(output)))
 
 
-def run_study(spec, root, concurrency=4):
+def run_case(spec, root, concurrency=4):
     if concurrency < 1:
         raise ValueError("Concurrency must be positive")
     path = Path(root).resolve() / spec["name"] / ".driver.lock"
     with lock(path, blocking=False):
-        return _run_study(spec, root, concurrency)
+        return _run_case(spec, root, concurrency)
 
 
-def _run_study(spec, root, concurrency):
+def _run_case(spec, root, concurrency):
     validate(spec)
     spec = copy.deepcopy(spec)
     root = Path(root).resolve() / spec["name"]
@@ -378,7 +378,7 @@ def _run_study(spec, root, concurrency):
     protocol = {"spec": spec, "config": config}
     path = root / "protocol.json"
     if path.exists() and json.loads(path.read_text()) != protocol:
-        raise ValueError("Protocol changed; use a new study name")
+        raise ValueError("Protocol changed; use a new case name")
     save(path, protocol)
     pinned_config = root / "config.yaml"
     OmegaConf.save(OmegaConf.create(config), pinned_config)
@@ -467,22 +467,33 @@ def _run_study(spec, root, concurrency):
     return winner
 
 
+# Preserve existing callers and saved launcher commands.
+run_study = run_case
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--address", default="auto")
-    parser.add_argument("--study-concurrency", type=int, default=1)
+    parser.add_argument(
+        "--case-concurrency",
+        "--study-concurrency",
+        dest="case_concurrency",
+        type=int,
+        default=1,
+        help="Independent experiment cases to execute concurrently",
+    )
     args = parser.parse_args()
-    if args.concurrency < 1 or args.study_concurrency < 1:
+    if args.concurrency < 1 or args.case_concurrency < 1:
         parser.error("Concurrency must be positive")
     import ray
 
     ray.init(address=args.address)
-    with ThreadPoolExecutor(max_workers=args.study_concurrency) as pool:
+    with ThreadPoolExecutor(max_workers=args.case_concurrency) as pool:
         futures = [
-            pool.submit(run_study, spec, args.output, args.concurrency)
+            pool.submit(run_case, spec, args.output, args.concurrency)
             for spec in json.loads(args.manifest.read_text())
         ]
         for future in futures:

@@ -1,4 +1,4 @@
-"""Build fresh training + tuning studies using an existing evaluation protocol."""
+"""Build fresh training + tuning cases using an existing evaluation protocol."""
 
 import argparse
 import copy
@@ -26,7 +26,7 @@ def build(previous, output, project, *, adaptive_continuous=False):
         f"{j.config['benchmark']['task_id']}-{j.config['benchmark']['algorithm_name']}": j.config
         for j in jobs
     }
-    studies = []
+    cases = []
     for original in previous:
         spec = copy.deepcopy(original)
         config = OmegaConf.create(configs[spec["name"]])
@@ -46,8 +46,8 @@ def build(previous, output, project, *, adaptive_continuous=False):
         spec["training"] = {"space": {}, "trials": 1}
         spec["wandb"] = OmegaConf.to_container(config.wandb, resolve=True)
         validate(spec)
-        studies.append(spec)
-    return studies
+        cases.append(spec)
+    return cases
 
 
 if __name__ == "__main__":
@@ -59,11 +59,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.output.exists():
         parser.error("Use a fresh output directory")
-    studies = build(
+    cases = build(
         json.loads(args.previous_manifest.read_text()),
         args.output,
         args.project,
         adaptive_continuous=args.adaptive_continuous,
     )
-    (args.output / "manifest.json").write_text(json.dumps(studies, indent=2))
-    print(f"Prepared {len(studies)} fresh training + tuning studies in {args.output}")
+    (args.output / "manifest.json").write_text(json.dumps(cases, indent=2))
+    print(f"Prepared {len(cases)} fresh training + tuning cases in {args.output}")

@@ -77,7 +77,7 @@ def test_same_nested_path_only_winner_sees_test_and_resume_is_noop(
         return {"score": lr + payload["parameters"]["algorithm.predictor.temperature"]}
 
     monkeypatch.setattr(tuning, "execute", execute)
-    winner = tuning.run_study(settings, tmp_path / "runs", concurrency=1)
+    winner = tuning.run_case(settings, tmp_path / "runs", concurrency=1)
     assert winner["score"] == 1.2
     root = tmp_path / "runs/example"
     assert (root / "training/selected.json").exists()  # Also for inference-only.
@@ -89,11 +89,11 @@ def test_same_nested_path_only_winner_sees_test_and_resume_is_noop(
     ]
     assert len(test_calls) == 1
     count = len(calls)
-    tuning.run_study(settings, tmp_path / "runs", concurrency=1)
+    tuning.run_case(settings, tmp_path / "runs", concurrency=1)
     assert len(calls) == count
     settings["evaluation"]["test_indices"] = [8, 9]
     with pytest.raises(ValueError, match="Protocol changed"):
-        tuning.run_study(settings, tmp_path / "runs")
+        tuning.run_case(settings, tmp_path / "runs")
 
 
 def test_failed_inner_search_does_not_touch_test_or_retrain_on_resume(
@@ -119,9 +119,9 @@ def test_failed_inner_search_does_not_touch_test_or_retrain_on_resume(
 
     monkeypatch.setattr(tuning, "execute", execute)
     with pytest.raises(RuntimeError, match="transient"):
-        tuning.run_study(settings, tmp_path / "runs", 1)
+        tuning.run_case(settings, tmp_path / "runs", 1)
     assert not (tmp_path / "runs/example/final/result.json").exists()
-    tuning.run_study(settings, tmp_path / "runs", 1)
+    tuning.run_case(settings, tmp_path / "runs", 1)
     assert calls.count("train") == 1
 
 
@@ -240,7 +240,7 @@ def test_fixed_checkpoint_workers_use_pinned_config(tmp_path, monkeypatch):
         return {"score": 1.0}
 
     monkeypatch.setattr(tuning, "execute", execute)
-    tuning.run_study(settings, tmp_path / "runs", 1)
+    tuning.run_case(settings, tmp_path / "runs", 1)
     assert len(paths) == 3
 
 
@@ -283,3 +283,25 @@ def test_sqlite_trial_lifecycle_is_serial_while_evaluations_are_parallel(
     assert all(t.state == optuna.trial.TrialState.COMPLETE for t in study.trials)
     tuning.search(tmp_path, settings, "maximize", objective, 4)
     assert len(calls) == 8
+
+
+def test_previous_case_entrypoint_remains_compatible():
+    assert tuning.run_study is tuning.run_case
+
+
+@pytest.mark.parametrize("flag", ["--case-concurrency", "--study-concurrency"])
+def test_case_concurrency_cli_accepts_both_names(tmp_path, monkeypatch, flag):
+    import sys
+    import ray
+
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text("[]")
+    connections = []
+    monkeypatch.setattr(ray, "init", lambda **kwargs: connections.append(kwargs))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["nested_tuning", str(manifest), "--output", str(tmp_path), flag, "2"],
+    )
+    tuning.main()
+    assert connections == [{"address": "auto"}]
