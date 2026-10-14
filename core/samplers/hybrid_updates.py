@@ -134,3 +134,22 @@ class BlurringPosteriorUpdate:
             destination.coefficients,
             noise=noise,
         )
+
+
+class GIDDUpdate:
+    """GIDD marginal reverse update, including revisable non-mask tokens."""
+
+    def __call__(
+        self,
+        process,
+        representation,
+        state,
+        probabilities,
+        source,
+        destination,
+        *,
+        noise=None,
+    ):
+        return process.reverse(
+            state, probabilities, source.coefficients, destination.coefficients
+        )

@@ -68,6 +68,7 @@ block-local generation, adaptive-time feedback, and the current Text8 evidence.
 ## Method recipes
 
 - [Discrete diffusion](methods/discrete-diffusion.md): MDLM, uniform, SEDD, DUO, D3PM.
+- [GIDD mask/uniform corruption](methods/gidd.md): a single-view mixture with a CE baseline.
 - [Gaussian diffusion](methods/gaussian-diffusion.md): one-hot/embedding recipes.
 - [Spherical flow matching](methods/spherical-flow-matching.md)
 - [Simplex diffusion](methods/simplex-diffusion.md)

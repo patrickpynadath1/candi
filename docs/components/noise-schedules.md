@@ -20,6 +20,10 @@ Gaussian schedules return [GaussianPath](../../core/noise_schedules/gaussian_pat
 sampling: sigma alone only describes special paths. Optional `training_time`
 implements method-specific time adjustment; callers must apply it once.
 
+For discrete mask/uniform interpolation, `GIDDSchedule` returns `GIDDPath` with
+`alpha`, `mask`, and `uniform` masses of shape `[B]`. See the
+[GIDD recipe](../methods/gidd.md) for its parameters and compatible update.
+
 ## Fixed Gaussian choices
 
 | `noise_schedule` | Calibration and options |

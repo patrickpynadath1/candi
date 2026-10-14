@@ -1,0 +1,3 @@
+_target_: core.noise_schedules.gidd.GIDDSchedule
+p_uniform: 0.2
+gamma: 1.0
