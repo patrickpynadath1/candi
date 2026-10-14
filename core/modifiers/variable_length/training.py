@@ -12,9 +12,11 @@ from core.algorithms.adaptive import observe_training_loss
 from core.modifiers.hybrid.views import point
 from core.noise_schedules.insertion import PowerInsertionSchedule
 from core.objectives.insertion import InsertionObjective
+from core.objectives.weighting import ObjectiveContext
 from core.parameterizations.posterior import PosteriorParameterization
 from core.processes.deletion import DeletionProcess
-from .birth import ForwardInsertion
+from .birth import ForwardInsertion, UniformInsertion
+from core.processes.uniform_posterior import PosteriorUniformProcess
 from .model import GapHead, SequencePrediction, forward_features
 from core.sequence_edits import valid_positions
 
@@ -31,6 +33,7 @@ class VariableLengthDiffusion(nn.Module):
         process=None,
         objective=None,
         gap_predictor=None,
+        predict_gap_tokens=True,
         training_epsilon=1e-4,
         time_sampling_include_aux=False,
     ):
@@ -48,17 +51,28 @@ class VariableLengthDiffusion(nn.Module):
                 "use an unconstrained token posterior; observations are enforced per view"
             )
         self.algorithm = algorithm
+        defaults = [
+            UniformInsertion()
+            if isinstance(view.process, PosteriorUniformProcess)
+            else ForwardInsertion()
+            for view in algorithm.views
+        ]
         if insertion is None:
-            insertion = [ForwardInsertion() for _ in algorithm.views]
+            insertion = defaults
         if isinstance(insertion, Mapping):
             insertion = [
-                insertion.get(view.name, ForwardInsertion()) for view in algorithm.views
+                insertion.get(view.name, default)
+                for view, default in zip(algorithm.views, defaults)
             ]
         if len(insertion) != len(algorithm.views):
             raise ValueError("one insertion law is required per diffusion view")
         self.insertion = nn.ModuleList(insertion)
         for law, view in zip(self.insertion, self.views):
             law.validate(view)
+            if isinstance(view.process, PosteriorUniformProcess) and not isinstance(
+                law, UniformInsertion
+            ):
+                raise TypeError("uniform views require noise-born UniformInsertion")
             # An absorbing view needs the explicit coupled birth law, not the
             # generic independent forward kernel (which can reveal at birth).
             if callable(getattr(view.process, "observed_tokens", None)) and isinstance(
@@ -66,10 +80,20 @@ class VariableLengthDiffusion(nn.Module):
             ):
                 raise TypeError("absorbing views require MaskInsertion")
         hidden = self.model.backbone.blocks[0].attn_qkv.in_features
-        self.gap_head = GapHead(hidden, vocab_size)
+        if not predict_gap_tokens and any(
+            getattr(law, "requires_clean_posterior", True) for law in self.insertion
+        ):
+            raise ValueError(
+                "Gap-token prediction is required by the configured insertion law"
+            )
+        self.gap_head = GapHead(hidden, vocab_size, predict_content=predict_gap_tokens)
         self.schedule = schedule or PowerInsertionSchedule()
         self.process = process or DeletionProcess()
-        self.objective = objective or InsertionObjective()
+        self.objective = objective or InsertionObjective(
+            content_weight=1.0 if predict_gap_tokens else 0.0
+        )
+        if not predict_gap_tokens and self.objective.content_weight != 0:
+            raise ValueError("Disabling gap-token prediction requires content_weight=0")
         self.gap_predictor = gap_predictor or PosteriorParameterization()
         self.training_epsilon = training_epsilon
         self.time_sampling_include_aux = time_sampling_include_aux
@@ -140,8 +164,12 @@ class VariableLengthDiffusion(nn.Module):
                 token_log_probs = torch.where(
                     (committed & valid)[..., None], fixed, token_log_probs
                 )
-        gap_log_probs = getattr(self.gap_predictor, pathway)(
-            gap_logits, torch.zeros_like(counts, dtype=torch.long)
+        gap_log_probs = (
+            getattr(self.gap_predictor, pathway)(
+                gap_logits, torch.zeros_like(counts, dtype=torch.long)
+            )
+            if gap_logits is not None
+            else None
         )
         next_feedback = None
         if policy.enabled:
@@ -222,7 +250,15 @@ class VariableLengthDiffusion(nn.Module):
         # `training` controls feedback observations; both train and validation
         # always use the unshaped training posterior.
         prediction = self.predict(states, points, times, edit.valid, training=True)
-        per_token = self.algorithm.objective(prediction.tokens, compact)
+        per_token = self.algorithm.objective(
+            prediction.tokens,
+            compact,
+            **(
+                {"context": ObjectiveContext(time=times)}
+                if getattr(self.algorithm.objective, "requires_context", False)
+                else {}
+            ),
+        )
         token_sum = torch.where(compact_loss.bool(), per_token * compact_loss, 0).sum()
         # Gaps containing removed targets, and gaps adjacent to editable tokens,
         # are eligible. Fully protected interiors never learn to insert.

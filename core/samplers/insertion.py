@@ -104,6 +104,7 @@ class InsertionSampler:
         allowed = allowed & valid_positions(lengths + 1, width + 1)
         states = tuple(view.representation.clean_state(anchors) for view in algo.views)
         # Use valid clean padding states, including simplex/spherical domains.
+        birth_times = torch.ones_like(anchors, dtype=torch.float32)
         feedback = None
         truncated = torch.zeros(len(lengths), dtype=torch.bool, device=anchors.device)
         inserted_total = torch.zeros_like(lengths)
@@ -122,14 +123,23 @@ class InsertionSampler:
                 else tuple(
                     clamp(
                         view,
-                        view.update(
-                            view.process, view.representation, state, posterior, pt, ps
+                        (
+                            law.update(view, state, posterior, pt, ps, birth_times)
+                            if hasattr(law, "update")
+                            else view.update(
+                                view.process,
+                                view.representation,
+                                state,
+                                posterior,
+                                pt,
+                                ps,
+                            )
                         ),
                         anchors,
                         fixed,
                     )
-                    for view, state, pt, ps in zip(
-                        algo.views, states, points_t, points_s
+                    for view, law, state, pt, ps in zip(
+                        algo.views, algo.insertion, states, points_t, points_s
                     )
                 )
             )
@@ -146,7 +156,14 @@ class InsertionSampler:
             edit = SequenceEdit.insertion(lengths, counts)
             # Every birth gets its own random draw, including repeated births in
             # the same gap. q_s uses the DESTINATION global time, never birth age.
-            birth_posterior = gather_positions(prediction.gap_tokens.exp(), edit.gap)
+            birth_posterior = (
+                gather_positions(prediction.gap_tokens.exp(), edit.gap)
+                if prediction.gap_tokens is not None
+                else posterior.new_full(
+                    (*edit.gap.shape, algo.gap_head.vocab_size),
+                    1 / algo.gap_head.vocab_size,
+                )
+            )
             new_states = []
             for view, law, old, ps in zip(
                 algo.views, algo.insertion, updated, points_s
@@ -169,6 +186,9 @@ class InsertionSampler:
                 )
                 new_states.append(torch.where(selector, moved, padding))
             states = tuple(new_states)
+            birth_times = torch.where(
+                edit.inserted, s[:, None], edit.apply(birth_times, padding=1.0)
+            )
             anchors, fixed = edit.apply(anchors), edit.apply(fixed)
             feedback = (
                 None if prediction.feedback is None else edit.apply(prediction.feedback)

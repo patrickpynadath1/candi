@@ -14,6 +14,8 @@ from core.modifiers.hybrid.views import point
 class ForwardInsertion(nn.Module):
     """Estimate x0, then apply the view's forward kernel at its CURRENT point."""
 
+    requires_clean_posterior = True
+
     def __init__(self, estimate="sample"):
         super().__init__()
         if estimate not in {"sample", "mean"}:
@@ -57,6 +59,8 @@ class MaskInsertion(nn.Module):
     absorbing view, including its configured global-to-local time map.
     """
 
+    requires_clean_posterior = False
+
     def validate(self, view):
         if not hasattr(view.process, "mask_index") or not callable(
             getattr(view.process, "observed_tokens", None)
@@ -88,3 +92,49 @@ class MaskInsertion(nn.Module):
             tokens.shape, device=tokens.device
         ) < masked_probability.clamp(0, 1)
         return torch.where(editable & masked, view.process.mask_index, tokens)
+
+
+class UniformInsertion(nn.Module):
+    """Uniform noise at birth, then a birth-relative uniform replacement bridge.
+
+    A position born at b has clean keep rate (alpha(t)-alpha(b))/(1-alpha(b)).
+    It starts at zero signal at t=b and reaches the clean endpoint at t=0.
+    Training and reverse transitions use this same conditional path.
+    """
+
+    requires_clean_posterior = False
+
+    def validate(self, view):
+        from core.processes.uniform_posterior import PosteriorUniformProcess
+
+        if not isinstance(view.process, PosteriorUniformProcess):
+            raise TypeError("UniformInsertion requires PosteriorUniformProcess")
+        if hasattr(view.schedule, "for_layout"):
+            raise TypeError("UniformInsertion requires a token-local schedule")
+
+    def initialize(self, view, posterior, local_point):
+        self.validate(view)
+        return view.process.prior(posterior.shape[:2], posterior.device)
+
+    def _keep(self, view, local_point, birth_times):
+        born = (
+            point(view, birth_times.flatten()).coefficients[0].reshape_as(birth_times)
+        )
+        current = local_point.coefficients[0][:, None]
+        return ((current - born) / (1 - born).clamp_min(1e-7)).clamp(0, 1)
+
+    def corrupt_training(self, view, tokens, local_point, birth_times, editable):
+        keep = self._keep(view, local_point, birth_times)
+        return view.process.corrupt(
+            tokens.reshape(-1, 1), keep.flatten(), editable.reshape(-1, 1)
+        ).reshape_as(tokens)
+
+    def update(self, view, state, posterior, source, destination, birth_times):
+        # The process consumes one keep rate per row. Flatten positions to use
+        # its exact posterior bridge with each position's own birth time.
+        return view.process.reverse(
+            state.reshape(-1, 1),
+            posterior.reshape(-1, 1, posterior.shape[-1]),
+            self._keep(view, source, birth_times).flatten(),
+            self._keep(view, destination, birth_times).flatten(),
+        ).reshape_as(state)

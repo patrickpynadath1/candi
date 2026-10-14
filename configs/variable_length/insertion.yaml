@@ -1,5 +1,7 @@
 _target_: core.modifiers.variable_length.training.VariableLengthDiffusion
 vocab_size: ${task.vocab_size}
+# Disable only with content_weight=0 and a birth law that needs no clean posterior.
+predict_gap_tokens: true
 schedule:
   _target_: core.noise_schedules.insertion.PowerInsertionSchedule
   power: 1.0
@@ -10,11 +12,14 @@ objective:
   count_weight: 1.0
   content_weight: 1.0
 # Policies are keyed by DiffusionView.name, independent of view ordering.
-# Unlisted views use a sampled clean token and their forward kernel.
+# Uniform views default to uniform noise; other unlisted views use a sampled
+# clean token and their forward kernel.
 insertion:
   GaussianProcess:
     _target_: core.modifiers.variable_length.birth.ForwardInsertion
     estimate: mean
+  PosteriorUniformProcess:
+    _target_: core.modifiers.variable_length.birth.UniformInsertion
   AbsorbingProcess:
     _target_: core.modifiers.variable_length.birth.MaskInsertion
 training_epsilon: 0.0001

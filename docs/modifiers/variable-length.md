@@ -92,8 +92,9 @@ kernel and content update. Named insertion policies are selected by
 ## Initialization at the current noise level
 
 At a sampler step from global noise time `t` to `s < t`, existing positions first
-advance using each view's ordinary update. The gap head's clean-content posterior
-then initializes new positions at **s**, through the destination view point:
+advance using each view's update (or the insertion law's birth-relative update).
+For continuous views, the gap head's clean-content posterior initializes new
+positions at **s**, through the destination view point:
 
 ```
 clean_estimate = representation.posterior_mean(gap_posterior)
@@ -108,7 +109,7 @@ without being forward-corrupted again.
 
 `ForwardInsertion(estimate="sample")` instead samples a clean token from the gap
 posterior, encodes it, and applies the forward kernel. This is the generic default
-for unlisted views and works with spherical, simplex and uniform processes. It
+for unlisted continuous views and works with spherical and simplex processes. It
 avoids treating an unconstrained posterior mean as a valid point on every
 representation's manifold. The Gaussian preset explicitly selects the mean rule.
 
@@ -128,11 +129,14 @@ insertion.
 | Masked / absorbing | Create `[MASK]`; subsequent unmasking follows the coupled survival law above. |
 | Simplex / Dirichlet | Sample a clean token, then apply the Dirichlet forward kernel at `s`. |
 | Spherical | Sample a clean token, encode its unit-sphere state, then apply spherical corruption at `s`. |
-| Uniform discrete | Sample a clean token, then apply uniform corruption at `s`. |
+| Uniform discrete | Draw uniform token noise, independent of the gap posterior. |
 
-A newborn uses the current global noise level, **not elapsed time since its
-birth**. With multiple views, each view first maps that global time through its
-own time map and schedule. For block generation, this clock is restarted for each
+Continuous births use the current global noise level. Uniform births always
+start as uniform noise. `UniformInsertion` conditions training corruption and
+reverse bridges on each token's birth time `b`, with effective keep rate
+`(keep(t) - keep(b)) / (1 - keep(b))`. This is zero at birth and one at the clean
+endpoint. The sampler carries birth times through sequence edits. With multiple
+views, each view maps global times through its own time map and schedule. For block generation, this clock is restarted for each
 active block; completed blocks remain clean throughout.
 
 ## Training path and objectives
@@ -153,8 +157,13 @@ The objective combines the inner token objective with:
 - A weighted clean-content cross entropy over the deleted tokens assigned to
   each gap, computed without a dense target histogram.
 
-The gap content head learns a distribution over missing tokens in the gap. Several
-births in a gap use the same distribution. Their clean estimates are not an
+The gap content head learns a distribution over missing tokens in the gap.
+Continuous births in a gap use the same predicted distribution; masked and uniform
+births ignore it. For these discrete views it is auxiliary training supervision.
+Set `variable_length.predict_gap_tokens=false` and
+`variable_length.objective.content_weight=0` to remove the content head and loss
+while retaining gap-count prediction. A birth law requiring a clean posterior
+rejects this setting. Several continuous births in a gap use the same distribution. Their clean estimates are not an
 ordered joint prediction. Losses are normalized by the original loss-mask count,
 so random deletion does not change the batch denominator. Training and validation
 use training posteriors, independently of inference temperature/top-k settings.

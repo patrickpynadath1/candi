@@ -30,10 +30,15 @@ class InsertionObjective(nn.Module):
         count = (torch.where(gap_mask, count, 0) * rate[:, None]).sum(-1)
         # Sparse equivalent of a per-gap bag-of-deleted-tokens target. Multiple
         # births in a gap use this same distribution; their order is approximate.
-        gap = sample.gap_for_token.clamp_max(gap_log_probs.shape[1] - 1)
-        rows = torch.arange(len(clean_tokens), device=clean_tokens.device)[:, None]
-        content = -gap_log_probs[rows, gap, clean_tokens]
-        content = (torch.where(sample.deleted, content, 0) * rate[:, None]).sum(-1)
+        if gap_log_probs is None:
+            if self.content_weight != 0:
+                raise ValueError("Gap-token supervision requires gap predictions")
+            content = torch.zeros_like(count)
+        else:
+            gap = sample.gap_for_token.clamp_max(gap_log_probs.shape[1] - 1)
+            rows = torch.arange(len(clean_tokens), device=clean_tokens.device)[:, None]
+            content = -gap_log_probs[rows, gap, clean_tokens]
+            content = (torch.where(sample.deleted, content, 0) * rate[:, None]).sum(-1)
         if reduction == "sum":
             count, content = count.sum(), content.sum()
         return self.count_weight * count + self.content_weight * content, count, content

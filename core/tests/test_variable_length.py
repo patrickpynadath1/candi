@@ -680,3 +680,152 @@ def test_parallel_block_features_and_gradients_match_isolated_contexts(continuou
         assert (parameter.grad is None) == (other.grad is None), name
         if parameter.grad is not None:
             torch.testing.assert_close(parameter.grad, other.grad, atol=2e-4, rtol=2e-4)
+
+
+def masked_assembly(*, head, feedback):
+    from core.modifiers.hybrid.model import HybridModel
+    from core.models.dit import DiT
+    from core.modifiers.self_conditioning.prediction import PredictionCoordinator
+
+    inner = make_algorithm()
+    inner.model = HybridModel(
+        DiT(5, 16, 8, 1, 4, dropout=0),
+        [inner.views[0]],
+        self_conditioning=feedback,
+        self_conditioning_source="hidden",
+    )
+    inner.prediction = PredictionCoordinator(
+        enabled=feedback,
+        source="hidden",
+        probability=1,
+    )
+    return VariableLengthDiffusion(
+        inner,
+        5,
+        [MaskInsertion()],
+        predict_gap_tokens=head,
+    )
+
+
+@pytest.mark.parametrize("head", [False, True])
+@pytest.mark.parametrize("feedback", [False, True])
+def test_optional_gap_head_backward_and_sampling(head, feedback):
+    algo = masked_assembly(head=head, feedback=feedback)
+
+    # Delete all targets so only gap supervision can train content planning.
+    class DeleteAll(PowerInsertionSchedule):
+        def birth_times(self, shape, device):
+            return torch.zeros(shape, device=device)
+
+    algo.schedule = DeleteAll()
+    tokens = torch.tensor([[1, 2, 3], [2, 3, 4]])
+    editable = torch.tensor([[False, True, True], [False, True, True]])
+    result = algo.loss(tokens, editable, editable, training=True)
+    result["loss"].backward()
+    assert torch.isfinite(result["loss"])
+    assert (algo.gap_head.content is not None) == head
+    assert algo.gap_head.count.weight.grad is not None
+    if head:
+        assert algo.gap_head.content.weight.grad.abs().sum() > 0
+        assert result["insertion_content_loss"] > 0
+    else:
+        assert result["insertion_content_loss"] == 0
+        assert not any(
+            "gap_head.content" in name for name, _ in algo.named_parameters()
+        )
+    output, meta = algo.generate(
+        InsertionSampler(steps=3, max_length=12, overflow="truncate"),
+        tokens,
+        ~editable,
+    )
+    assert torch.equal(output[:, 0], tokens[:, 0])
+    assert meta["nfe"] == 4
+
+
+def test_required_gap_head_cannot_be_disabled_for_forward_births():
+    continuous = assembly(continuous=True)
+    with pytest.raises(ValueError, match="required"):
+        VariableLengthDiffusion(
+            continuous.algorithm,
+            5,
+            [ForwardInsertion("mean")],
+            predict_gap_tokens=False,
+        )
+
+
+def test_uniform_births_ignore_gap_predictions_and_use_matching_bridge():
+    from core.modifiers.variable_length.birth import UniformInsertion
+    from core.modifiers.hybrid.views import DiffusionView
+    from core.processes.uniform_posterior import PosteriorUniformProcess
+    from core.noise_schedules.log_linear import LogLinear
+    from core.representations.noisy_inputs import TokenRepresentation
+    from core.samplers.hybrid_updates import DiscretePosteriorUpdate
+
+    view = DiffusionView(
+        PosteriorUniformProcess(5),
+        LogLinear(0),
+        TokenRepresentation(5, 16),
+        DiscretePosteriorUpdate(),
+    )
+    law = UniformInsertion()
+    posterior = torch.nn.functional.one_hot(
+        torch.zeros(1, 20000, dtype=torch.long), 5
+    ).float()
+    t = point(view, torch.tensor([0.8]))
+    torch.manual_seed(31)
+    first = law.initialize(view, posterior, t)
+    torch.manual_seed(31)
+    second = law.initialize(view, posterior.roll(1, -1), t)
+    assert torch.equal(first, second)
+    assert (first == 0).float().mean() == pytest.approx(0.2, abs=0.012)
+    born = torch.full_like(first, 0.8, dtype=torch.float32)
+    clean = torch.zeros_like(first)
+    editable = torch.ones_like(first, dtype=torch.bool)
+    at_birth = law.corrupt_training(view, clean, t, born, editable)
+    assert (at_birth == 0).float().mean() == pytest.approx(0.2, abs=0.012)
+    halfway = point(view, torch.tensor([0.4]))
+    state = law.corrupt_training(view, clean, halfway, born, editable)
+    assert (state == 0).float().mean() == pytest.approx(0.6, abs=0.012)
+    reversed_state = law.update(view, first, posterior, t, halfway, born)
+    assert (reversed_state == 0).float().mean() == pytest.approx(0.6, abs=0.012)
+    final = law.update(
+        view, reversed_state, posterior, halfway, point(view, torch.tensor([0.0])), born
+    )
+    assert torch.equal(final, clean)
+
+
+@pytest.mark.parametrize("head", [False, True])
+@pytest.mark.parametrize("feedback", [False, True])
+def test_uniform_optional_head_trains_and_samples(head, feedback):
+    from core.modifiers.variable_length.birth import UniformInsertion
+    from core.modifiers.hybrid.views import DiffusionView
+    from core.processes.uniform_posterior import PosteriorUniformProcess
+    from core.noise_schedules.log_linear import LogLinear
+    from core.representations.noisy_inputs import TokenRepresentation
+    from core.samplers.hybrid_updates import DiscretePosteriorUpdate
+
+    masked = masked_assembly(head=head, feedback=feedback)
+    masked.algorithm.model.views = torch.nn.ModuleList(
+        [
+            DiffusionView(
+                PosteriorUniformProcess(5),
+                LogLinear(0),
+                TokenRepresentation(5, 16),
+                DiscretePosteriorUpdate(),
+            )
+        ]
+    )
+    algo = VariableLengthDiffusion(masked.algorithm, 5, predict_gap_tokens=head)
+    assert isinstance(algo.insertion[0], UniformInsertion)
+    tokens = torch.tensor([[1, 2, 3, 4], [2, 3, 4, 1]])
+    editable = torch.ones_like(tokens, dtype=torch.bool)
+    editable[:, 0] = False
+    result = algo.loss(tokens, editable, editable, training=True)
+    result["loss"].backward()
+    assert torch.isfinite(result["loss"])
+    assert (algo.gap_head.content is not None) == head
+    samples, meta = algo.generate(
+        InsertionSampler(steps=3, max_length=16, overflow="truncate"), tokens, ~editable
+    )
+    assert torch.equal(samples[:, 0], tokens[:, 0])
+    assert meta["nfe"] == 4

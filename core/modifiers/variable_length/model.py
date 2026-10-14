@@ -11,13 +11,13 @@ from core.models.prediction import ModelPrediction
 class SequencePrediction:
     tokens: torch.Tensor
     expected_counts: torch.Tensor
-    gap_tokens: torch.Tensor
+    gap_tokens: torch.Tensor | None
     feedback: torch.Tensor | None
     nfe: int = 1
 
 
 class GapHead(nn.Module):
-    def __init__(self, hidden_size, vocab_size):
+    def __init__(self, hidden_size, vocab_size, *, predict_content=True):
         super().__init__()
         self.left_boundary = nn.Parameter(torch.randn(hidden_size) / hidden_size**0.5)
         self.right_boundary = nn.Parameter(torch.randn(hidden_size) / hidden_size**0.5)
@@ -25,7 +25,7 @@ class GapHead(nn.Module):
             nn.Linear(2 * hidden_size, hidden_size), nn.SiLU()
         )
         self.count = nn.Linear(hidden_size, 1)
-        self.content = nn.Linear(hidden_size, vocab_size)
+        self.content = nn.Linear(hidden_size, vocab_size) if predict_content else None
         self.vocab_size = int(vocab_size)
 
     def forward(self, hidden, valid):
@@ -39,9 +39,8 @@ class GapHead(nn.Module):
             right_valid[..., None], right, self.right_boundary.to(right)
         )
         gaps = self.projection(torch.cat([hidden, right], -1))
-        return F.softplus(self.count(gaps).squeeze(-1).float()) + 1e-6, self.content(
-            gaps
-        )
+        content = self.content(gaps) if self.content is not None else None
+        return F.softplus(self.count(gaps).squeeze(-1).float()) + 1e-6, content
 
 
 def forward_features(model, head, states, points, time, valid, conditioning=None):
