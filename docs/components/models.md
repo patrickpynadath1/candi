@@ -1,5 +1,7 @@
 # Models
 
+Recipe context: [denoising task](../concepts/denoising-task.md).
+
 Models own neural architecture and learned parameters. They consume prepared
 states and conditioning coordinates and return raw vocabulary logits. Posterior
 constraints, softcapping, temperature, and token filtering belong to

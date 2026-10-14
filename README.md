@@ -1,9 +1,27 @@
 # CANDI v2.1
 
-Composable diffusion models for discrete data. Implementations and tests live in
-`core/`, Hydra configs in `configs/`, and documentation in [`docs/`](docs/index.md).
-The root `main.py` runs training/evaluation; `frontier.py` evaluates pretrained
-sampling grids. No removed legacy source checkout is required.
+A framework for testing what makes diffusion language models work. Compose recipes
+from an **information path**, a **denoising task**, and **inference settings**, then
+compare them across tasks with explicit training budgets and validation-based
+hyperparameter selection.
+
+The aim is controlled, affordable research into component interactions—not
+large-scale pretraining or introducing a single preferred diffusion algorithm.
+Compatible components can be exchanged without rewriting an entire method;
+mathematical constraints remain explicit.
+
+| Recipe part | Components |
+| --- | --- |
+| [Information path](docs/concepts/information-path.md) | Representation, corruption process, noise schedule |
+| [Denoising task](docs/concepts/denoising-task.md) | Backbone, output parameterization, objective, training time sampler |
+| [Inference settings](docs/concepts/inference-settings.md) | Initialization, inference time/noise grid, update rule, terminal decoding |
+
+Self-conditioning, multiple views, block diffusion, and insertion/deletion are
+modifiers that can affect several parts. See the [recipe overview](docs/concepts/recipe.md).
+Tasks define data, conditioning, and metrics independently of corruption.
+
+Implementations and tests live in `core/`, Hydra configs in `configs/`, and
+[documentation](docs/index.md) explains both the research model and code contracts.
 
 ## Quick start
 
@@ -29,6 +47,27 @@ uv run python main.py mode=evaluate evaluation.checkpoint=/path/to/last.ckpt
 # Pretrained Sudoku frontier grid
 uv run python frontier.py evaluation.checkpoint=/path/to/last.ckpt
 ```
+
+## Experiments
+
+An experiment expands recipes, tasks, and training seeds into **cases**. Each case
+uses an outer Optuna study for training choices and inner studies for inference
+settings. Both selection stages use validation; only the selected winner reaches
+final evaluation. An existing checkpoint is the one-candidate special case of
+this same workflow. Ray schedules the training/evaluation workers and W&B records
+runs.
+
+Install and launch from the same locked environment:
+
+```bash
+uv sync --locked --extra tuning --extra scoring --extra tracking
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m core.sweeps.nested_tuning --help
+```
+
+See [experiment terminology](docs/guides/experiments.md),
+[task suites](docs/guides/task-batteries.md), and
+[nested tuning](docs/guides/nested-tuning.md) for configuration and execution.
 
 ## Documentation
 

@@ -1,5 +1,7 @@
 # Predictors
 
+Recipe context: [denoising task](../concepts/denoising-task.md).
+
 A predictor defines the mathematical meaning of raw network output. Normalized
 arrays are not automatically interchangeable: a clean-token posterior and a
 uniform plug-in estimate have different roles in reverse transitions.

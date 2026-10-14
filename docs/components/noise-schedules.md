@@ -1,5 +1,7 @@
 # Noise schedules
 
+Recipe context: [information path](../concepts/information-path.md).
+
 Schedules map global time to corruption coefficients; they do not draw training
 times or corrupt states. In the usual convention, zero is clean and increasing
 time means more noise. Sampling proceeds toward smaller times. Endpoint choices

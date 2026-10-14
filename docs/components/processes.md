@@ -1,5 +1,7 @@
 # Processes
 
+Recipe context: [information path](../concepts/information-path.md).
+
 Processes own forward corruption, priors, and reverse-transition or vector-field
 mathematics. They receive prepared states, coefficients, predictions, and masks;
 they do not call the model, schedule, or objective. Samplers decide when and how

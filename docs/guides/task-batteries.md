@@ -1,6 +1,10 @@
-# Running an algorithm on a task battery
+# Running a recipe on a task suite
 
-`examples/task_battery.py` composes an algorithm with tasks and seeds, then passes
+The established filenames use `battery` and `algorithm_definition`; these refer to
+a **task suite** and a **recipe definition**. See [experiment terminology](experiments.md)
+for cases, studies, trials, and runs.
+
+`examples/task_battery.py` composes a recipe with tasks and seeds, then passes
 ordinary `TrainingJob` and `InferenceJob` objects to the existing Ray queue.
 Ray owns scheduling, GPU allocation, trial storage, and restoration.
 
@@ -27,9 +31,9 @@ CUDA_VISIBLE_DEVICES=0,1 uv run --extra mazes --extra tracking \
 ```
 
 Each run's existing `config.yaml` and checkpoint hyperparameters contain the
-algorithm definition and its configuration ID. Periodic and final results carry
+recipe definition and its configuration ID. Periodic and final results carry
 that ID, task name, and training seed under `benchmark`. W&B receives the same
-configuration when enabled. The ID hashes the declared algorithm configuration;
+configuration when enabled. The ID hashes the declared recipe configuration;
 it is not a code version. The normal resolved run config records the actual
 component settings. Git remains responsible for source versioning.
 
@@ -44,9 +48,9 @@ downloads disabled by default; configure prepared data before launching. See the
 [task suite](evaluation-suite.md) and [story judge](story-judging.md) for setup.
 Judging remains a separate optional pass over TinyStories results.
 
-Insertion/deletion requires a task supporting variable-length generation. All five battery tasks expose that interface. Sudoku and N-Queens count answers
-with the wrong generated length as invalid; Text8 scores only generated positions. The example battery has standard Sudoku evaluation, not a
-clue-removal variant. No full battery run is launched by tests or previews.
+Insertion/deletion requires a task supporting variable-length generation. All five suite tasks expose that interface. Sudoku and N-Queens count answers
+with the wrong generated length as invalid; Text8 scores only generated positions. The example task suite has standard Sudoku evaluation, not a
+clue-removal variant. No full suite run is launched by tests or previews.
 
 `examples/full_battery_comparison.py` runs seven approximately 20M-parameter
 methods across all five tasks with one seed and 10,000 steps: masked and uniform,
@@ -56,19 +60,26 @@ evaluations to Ray. GPU visibility is selected with `CUDA_VISIBLE_DEVICES`.
 Insertion uses its own sampled/greedy endpoint policies and reports truncation at
 the task capacity. Fixed-length diffusion uses native, native greedy, and EB.
 
-`examples/self_conditioning_battery.py` applies the original Sudoku corruption
-recipes to all five tasks: blurring, adaptive Gaussian, default spherical, simplex,
-masked and uniform, each with hidden self-conditioning off/on. It uses one seed,
-approximately 20M parameters, 10,000 steps, and BF16 mixed precision across families. The
-60 training jobs generate 216 final evaluations, including clue-free N-Queens.
-All three inference policies also run every 1,000 optimizer steps.
-Blurring uses `terminal_mean=0.01` consistently across the battery so that
-1024-token sequences satisfy its terminal leakage bound; the original Sudoku-only
-recipe used 0.03. Gaussian and spherical vocabulary references resolve per task.
+`examples/self_conditioning_battery.py` expands six corruption recipes with hidden
+self-conditioning off/on. Its default task suite is Sudoku hard, Text8, and
+TinyStories: 36 training cases with one seed, about 20M parameters, 10,000 steps,
+and BF16. Its fixed inference policies produce 108 final evaluation jobs. Adding
+`--include-insertion` gives 60 training cases and 156 fixed-policy evaluations.
+N-Queens and mazes are available through `--tasks`.
+
+`--adaptive-continuous` enables the shared CDCD view clock for Gaussian, blurring,
+spherical, and simplex; without it, only the Gaussian preset is loss-adaptive.
+Blurring uses `terminal_mean=0.01` for long sequences. Vocabulary references resolve
+per task. Periodic generation runs every 1,000 optimizer steps.
+
+For validation-based sampler selection, use the [nested pipeline](nested-tuning.md)
+instead: it reports one selected final result per case, not one per sampler. Its
+manifest is the expanded experiment configuration; it does not use this launcher's
+live submission queue.
 
 ## Adding jobs to a running sweep
 
-The self-conditioning battery keeps a durable submission queue open after its
+The self-conditioning sweep keeps a durable submission queue open after its
 initial jobs finish. Ray still schedules every training and evaluation worker;
 the submission file only holds job definitions. It is stored at
 `~/.cache/duo/batteries/submissions/<experiment-name>.sqlite` on the local disk.
@@ -132,22 +143,23 @@ python examples/insertion_head_sweep.py --submit
 
 Existing fixed-length masked/uniform runs provide separate no-insertion baselines.
 
-## Current three-task run
+## Historical three-task fixed-policy experiment
 
-The replacement run excludes mazes and N-Queens and starts from scratch in W&B
+The October 12 experiment excluded mazes and N-Queens and starts from scratch in W&B
 project `self-cond-three-tasks-20261012`. It includes the 12 corruption/SC
 configurations and eight insertion/head/SC configurations on each of Sudoku hard,
 Text8 and TinyStories: 60 training runs and 156 final evaluations, seed 1 only.
 The existing 10,000-step, BF16, roughly 20M-parameter budgets are retained.
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1,2,5 python examples/self_conditioning_battery.py \
+CUDA_VISIBLE_DEVICES=0,1,2,5 uv run --locked --extra scoring --extra tracking \
+  python examples/self_conditioning_battery.py \
   --run --name three-tasks-20m-bf16-20261012 \
   --tasks sudoku_hard text8 tinystories \
   --wandb-project self-cond-three-tasks-20261012 --include-insertion
 ```
 
-The live queue is
+Its saved submission queue is
 `~/.cache/duo/batteries/submissions/three-tasks-20m-bf16-20261012.sqlite`.
 Previous results remain in their original directories and projects.
 

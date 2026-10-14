@@ -1,5 +1,10 @@
 # Architecture and ownership
 
+Start with the [three-part recipe](recipe.md) for the research-facing model:
+information path, denoising task, and inference settings. This page maps those
+choices onto Python ownership and execution. The algorithm coordinates components;
+it is not a fourth part of the recipe.
+
 The algorithm coordinates training and model-to-prediction conversion. The sampler
 coordinates generation. Components own the mathematics needed by both, so an
 algorithm does not need to contain a reverse-time loop or every sampling variant.

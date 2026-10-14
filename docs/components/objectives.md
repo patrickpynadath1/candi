@@ -1,5 +1,7 @@
 # Objectives
 
+Recipe context: [denoising task](../concepts/denoising-task.md).
+
 Objectives own loss mathematics. They receive predictions, targets, and explicit
 coefficient/context tensors rather than reaching into a model or schedule. Most
 return `[batch,length]` losses; algorithms apply masks and reduction. Learned

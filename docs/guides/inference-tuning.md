@@ -7,23 +7,25 @@ for the full configuration and training-search extension.
 Build a manifest from completed sweep artifacts:
 
 ```bash
-python examples/tune_three_tasks.py \
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m examples.tune_three_tasks \
   --all-methods \
   --results /tmp/three-task-results-so-far.csv \
   --output /tmp/tuning-manifest.json
-python -m core.sweeps.nested_tuning /tmp/tuning-manifest.json \
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m core.sweeps.nested_tuning /tmp/tuning-manifest.json \
   --output /home/patrick/.cache/duo/nested-tuning/three-tasks \
   --concurrency 4
 ```
 
 Start or connect a Ray cluster before launching. Install dependencies with
-`uv sync --extra tuning --extra scoring --extra tracking`. These commands launch
-new work; the previous sweeps were stopped at the user's request.
+`uv sync --locked --extra tuning --extra scoring --extra tracking`. Start Ray
+through `uv run` with those same extras so workers use the same environment.
 
 Without `--all-methods`, the builder includes masked/uniform with SC off/on on
 Sudoku, Text8 and TinyStories (12 checkpoints). With it, all 60 checkpoints from
 the original and insertion sweeps are included, each as one outer candidate.
-The full manifest contains 60 outer studies and 156 sampler searches.
+The full manifest contains 60 experiment cases and 156 sampler searches.
 
 - Original methods: ancestral temperature 0.5–1.5 (16 candidates); top-1 ancestral
   final decoding greedy/sample (2 candidates); greedy EB entropy bound 0.02–0.5

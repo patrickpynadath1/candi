@@ -1,5 +1,7 @@
 # Time sampling
 
+Recipe context: [denoising task](../concepts/denoising-task.md).
+
 Training-time sampling chooses which global times to train on. A noise schedule
 then maps those times to corruption coefficients. Inference discretization belongs
 to samplers; changing a training distribution does not automatically change the
