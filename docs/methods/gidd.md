@@ -20,6 +20,11 @@ paper's ELBO or reweighted GIDD+ loss**. The paper's additional self-correction
 sampler is not included. Insertion and EB combinations have not been validated
 for this process.
 
+The two divergence terms are available separately as `objective=forward_kl` and
+`objective=observed_token_is`, or together as `objective=forward_kl_is`. These
+presets omit the ELBO weighting; see [loss composition](../components/objectives.md#forward-distribution-terms)
+for independent coefficients and the forward-marginal interface.
+
 Although the implementation uses the shared hybrid-view interface, this preset
 has one noisy view. Mixing masking and replacement noise in that view is
 different from presenting multiple noisy views to the backbone.

@@ -11,11 +11,14 @@ from core.models.layers import TimestepEmbedder
 
 @dataclass(frozen=True)
 class ObjectiveContext:
-    """Per-example coordinates supplied by the algorithm, without implicit detach."""
+    """Coordinates and optional noisy views, supplied without implicit detach."""
 
     time: torch.Tensor
     alpha: torch.Tensor | None = None
     sigma: torch.Tensor | None = None
+    processes: tuple = ()
+    coefficients: tuple = ()
+    states: tuple = ()
 
 
 def _positive_finite(value, name):

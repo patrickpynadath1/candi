@@ -16,6 +16,9 @@ track them.
 | `cross_entropy` | Clean-token negative log probability |
 | `cross_entropy_power` | CE times a configured power of a supplied coordinate |
 | `cross_entropy_learned` | `exp(-w)*CE+w`, with learned context-dependent scalar `w` |
+| `forward_kl` | KL between target and predicted forward marginals |
+| `observed_token_is` | Pointwise Itakura–Saito penalty at the observed noisy token |
+| `forward_kl_is` | Configurable sum of those two terms |
 | `uniform` | Uniform/DUO plug-in diffusion loss |
 | `score_entropy` | Absorbing score entropy, including reference constant |
 | `d3pm` | Absorbing discrete variational term plus clean reconstruction CE |
@@ -57,6 +60,37 @@ A legacy method's conditioning scalar may differ from the current Gaussian path'
 alpha. Matching a coordinate's name alone does not establish exact weighting parity.
 
 ## Specialized losses
+
+### Forward-distribution terms
+
+[ForwardDistributionObjective](../../core/objectives/forward_distribution.py)
+applies the selected view's forward marginal to the one-hot target and predicted
+clean-token probabilities. It computes these distributions once, then passes
+them to independent `ForwardKL` and/or `ObservedTokenIS` modules. The former is
+`KL(q || p)`; the latter is `r - log(r) - 1`, where `r=q(z_t)/p(z_t)`.
+There is no sampled or argmax prediction on this loss path.
+
+```bash
+uv run --locked python main.py +experiment=gidd_corruption objective=forward_kl
+uv run --locked python main.py +experiment=gidd_corruption objective=observed_token_is
+uv run --locked python main.py +experiment=gidd_corruption objective=forward_kl_is \
+  'objective.weights=[1.0,0.5]'
+```
+
+The combined preset lists the KL term first and the observed-token term second.
+`terms` is a list of modules; `weights` supplies nonnegative ablation coefficients.
+An optional `weighting` module can transform the combined token loss using the
+existing weighting interface. Equal coefficients alone do **not** implement the
+GIDD ELBO: its schedule-derived token weights are not included.
+
+The hybrid algorithm supplies `processes`, `coefficients`, and `states` tuples in
+`ObjectiveContext`. `view_index` selects one view explicitly (default zero), even
+when the prediction is conditioned on several views. The selected process must
+provide `marginal(clean_probabilities, coefficients)` and a discrete token state;
+GIDD is the currently tested implementation. Other process families are not
+automatically compatible. Algorithms retain ownership of loss masking/reduction.
+
+### Method-specific objectives
 
 [WeightedCrossEntropy](../../core/objectives/weighted_ce.py) excludes the exact
 clean endpoint because its denominator vanishes. Visible absorbing tokens have

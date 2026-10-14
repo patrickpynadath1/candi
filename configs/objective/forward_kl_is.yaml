@@ -1,0 +1,8 @@
+# GIDD's two divergence terms, without its schedule-derived ELBO weighting.
+_target_: core.objectives.forward_distribution.ForwardDistributionObjective
+view_index: 0
+terms:
+- _target_: core.objectives.forward_distribution.ForwardKL
+- _target_: core.objectives.forward_distribution.ObservedTokenIS
+weights: [1.0, 1.0]
+weighting: null

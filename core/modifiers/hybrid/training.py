@@ -131,7 +131,14 @@ class HybridDiffusion(PosteriorDiffusion):
             prediction,
             tokens,
             **(
-                {"context": ObjectiveContext(time=time)}
+                {
+                    "context": ObjectiveContext(
+                        time=time,
+                        processes=tuple(view.process for view in self.views),
+                        coefficients=tuple(local.coefficients for local in points),
+                        states=states,
+                    )
+                }
                 if getattr(self.objective, "requires_context", False)
                 else {}
             ),

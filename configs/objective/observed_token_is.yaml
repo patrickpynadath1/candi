@@ -1,0 +1,5 @@
+_target_: core.objectives.forward_distribution.ForwardDistributionObjective
+view_index: 0
+terms:
+- _target_: core.objectives.forward_distribution.ObservedTokenIS
+weighting: null
