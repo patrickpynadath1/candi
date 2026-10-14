@@ -137,6 +137,9 @@ class HybridDiffusion(PosteriorDiffusion):
                         processes=tuple(view.process for view in self.views),
                         coefficients=tuple(local.coefficients for local in points),
                         states=states,
+                        representations=tuple(
+                            view.representation for view in self.views
+                        ),
                     )
                 }
                 if getattr(self.objective, "requires_context", False)

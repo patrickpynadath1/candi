@@ -15,14 +15,15 @@ It follows the [official implementation](https://github.com/dvruette/gidd/tree/f
 - **Inference settings:** start all-mask, use GIDD's marginal plug-in reverse
   update, then use the shared sampler's terminal decoding.
 
-This is a corruption option with a CE baseline, **not a reproduction of the
-paper's ELBO or reweighted GIDD+ loss**. The paper's additional self-correction
+The default is a CE baseline. Select `objective=gidd_elbo` for the configured
+ELBO composition or `objective=gidd_clipped` for clipped weighting. The dynamic
+GIDD+ weighting is not implemented. The paper's additional self-correction
 sampler is not included. Insertion and EB combinations have not been validated
 for this process.
 
 The two divergence terms are available separately as `objective=forward_kl` and
 `objective=observed_token_is`, or together as `objective=forward_kl_is`. These
-presets omit the ELBO weighting; see [loss composition](../components/objectives.md#forward-distribution-terms)
+presets omit the ELBO weighting; see [loss composition](../components/objectives.md#configured-composition)
 for independent coefficients and the forward-marginal interface.
 
 Although the implementation uses the shared hybrid-view interface, this preset

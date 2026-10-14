@@ -19,6 +19,7 @@ class ObjectiveContext:
     processes: tuple = ()
     coefficients: tuple = ()
     states: tuple = ()
+    representations: tuple = ()
 
 
 def _positive_finite(value, name):

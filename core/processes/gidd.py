@@ -21,6 +21,10 @@ class GIDDProcess:
         uniform = path.uniform[:, None].expand(-1, self.vocab_size) / self.vocab_size
         return torch.cat((uniform, path.mask[:, None]), dim=-1)
 
+    def mixing_derivative(self, path):
+        uniform = path.duniform[:, None].expand(-1, self.vocab_size) / self.vocab_size
+        return torch.cat((uniform, path.dmask[:, None]), dim=-1)
+
     def marginal(self, clean_probabilities, path):
         if clean_probabilities.shape[-1] != self.vocab_size:
             raise ValueError(
@@ -30,6 +34,9 @@ class GIDDProcess:
             path.alpha[:, None, None] * F.pad(clean_probabilities.double(), (0, 1))
             + self.mixing(path)[:, None, :]
         )
+
+    def forward_distribution(self, clean, coefficients):
+        return torch.distributions.Categorical(probs=self.marginal(clean, coefficients))
 
     def corrupt_state(self, clean, coefficients, corruption_mask):
         probs = F.one_hot(clean, self.vocab_size)

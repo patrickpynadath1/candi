@@ -1,5 +1,16 @@
-_target_: core.objectives.forward_distribution.ForwardDistributionObjective
-view_index: 0
+_target_: core.objectives.composition.ComposedObjective
+preparation:
+  _target_: core.objectives.forward_distribution.ForwardDistributions
+  prediction:
+    _target_: core.objectives.forward_distribution.TokenProbabilities
+  view_index: 0
 terms:
-- _target_: core.objectives.forward_distribution.ObservedTokenIS
+- _target_: core.objectives.composition.Component
+  component:
+    _target_: core.objectives.forward_distribution.ObservedRatioPenalty
+  inputs:
+    target: target_distribution
+    predicted: predicted_distribution
+    observed: observed
+  coefficient: 1.0
 weighting: null

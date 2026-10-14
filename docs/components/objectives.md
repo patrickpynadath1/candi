@@ -61,34 +61,81 @@ alpha. Matching a coordinate's name alone does not establish exact weighting par
 
 ## Specialized losses
 
-### Forward-distribution terms
+### Configured composition
 
-[ForwardDistributionObjective](../../core/objectives/forward_distribution.py)
-applies the selected view's forward marginal to the one-hot target and predicted
-clean-token probabilities. It computes these distributions once, then passes
-them to independent `ForwardKL` and/or `ObservedTokenIS` modules. The former is
-`KL(q || p)`; the latter is `r - log(r) - 1`, where `r=q(z_t)/p(z_t)`.
-There is no sampled or argmax prediction on this loss path.
+`ComposedObjective` binds named inputs to standalone components through
+`Component`, then combines them with `SumTerms`. The same `SumTerms` is used for
+insertion losses. Input names and component argument signatures are checked at
+construction; incompatible distribution kernels fail when preparation runs.
+There is no ELBO class or method-name branch.
 
-```bash
-uv run --locked python main.py +experiment=gidd_corruption objective=forward_kl
-uv run --locked python main.py +experiment=gidd_corruption objective=observed_token_is
-uv run --locked python main.py +experiment=gidd_corruption objective=forward_kl_is \
-  'objective.weights=[1.0,0.5]'
+`ForwardDistributions` prepares target and predicted distribution objects once.
+`TokenProbabilities` supplies categorical clean distributions;
+`CleanVector` supplies clean vectors and predicted mean vectors. The latter does
+not marginalize a Gaussian mixture over possible tokens. GIDD and Gaussian
+processes currently expose `forward_distribution`; other families must implement
+that contract before using these recipes.
+
+`ForwardKL(target, predicted)` calls PyTorch's analytic `kl_divergence`.
+Unsupported distribution pairs raise rather than silently using a Monte Carlo
+estimate. `ObservedRatioPenalty(target, predicted, observed)` computes
+`expm1(log_ratio)-log_ratio` from the two log probabilities/densities. Gaussian
+vector dimensions form one event, leaving a loss per token. Gaussian kernels
+require strictly positive variance.
+
+```yaml
+# Excerpt: each component declares its actual arguments via configuration.
+terms:
+- _target_: core.objectives.composition.Component
+  component:
+    _target_: core.objectives.forward_distribution.ForwardKL
+  inputs:
+    target: target_distribution
+    predicted: predicted_distribution
+  coefficient: 1.0
 ```
 
-The combined preset lists the KL term first and the observed-token term second.
-`terms` is a list of modules; `weights` supplies nonnegative ablation coefficients.
-An optional `weighting` module can transform the combined token loss using the
-existing weighting interface. Equal coefficients alone do **not** implement the
-GIDD ELBO: its schedule-derived token weights are not included.
+Available recipes:
 
-The hybrid algorithm supplies `processes`, `coefficients`, and `states` tuples in
-`ObjectiveContext`. `view_index` selects one view explicitly (default zero), even
-when the prediction is conditioned on several views. The selected process must
-provide `marginal(clean_probabilities, coefficients)` and a discrete token state;
-GIDD is the currently tested implementation. Other process families are not
-automatically compatible. Algorithms retain ownership of loss masking/reduction.
+- `composed_ce`: ordinary CE through the same composition, without preparation.
+- `forward_kl`, `observed_token_is`, `forward_kl_is`: unweighted categorical terms.
+- `gaussian_forward_kl`: Gaussian KL using predicted clean mean vectors.
+- `gidd_elbo`: KL + observed-ratio penalty + interpolating discrete weight.
+- `gidd_clipped`: the same composition with a clipped weight (maximum 1).
+
+For `q_t=alpha_t*x+b_t`, `InterpolatingDiscreteWeight` computes
+`(b'_t - alpha'_t/alpha_t*b_t)[observed] / q_t(observed|x)`.
+It consumes the actual path coefficients and process mixing derivatives, with
+no schedule reconstructed inside the loss. It requires interior times.
+`ClippedWeight` wraps this weight independently of the loss terms.
+The ELBO interpretation assumes the matching GIDD kernel and time integration;
+changing training time sampling or time warping requires the corresponding
+importance/Jacobian correction. The dynamic GIDD+ weighting is not included.
+Using these divergence terms with another kernel does not establish an ELBO.
+
+```bash
+uv run --locked python main.py +experiment=gidd_corruption objective=gidd_elbo
+uv run --locked python main.py +experiment=gidd_corruption objective=forward_kl_is \
+  objective.terms.1.coefficient=0.5
+```
+
+The hybrid algorithm supplies processes, representations, coefficients and states
+in the context. `view_index` selects the forward kernel. Only preparation reads
+this context; individual terms receive their configured explicit arguments.
+Algorithms retain ownership of the task mask and final reduction.
+
+### Insertion terms
+
+`GapCountLoss` computes the Poisson count loss without the target-only constant.
+`GapTokenLoss` computes clean-token CE at the gap assigned to each deleted token.
+Both accept explicit arguments and return per-example losses after applying their
+respective gap/token masks and insertion rate. `InsertionObjective` only adapts
+aligned insertion inputs and preserves the existing reporting/reduction API;
+it combines configured components using the shared `SumTerms`.
+
+`variable_length/insertion.yaml` specifies both components, their input bindings,
+and coefficients. The existing `count_weight` and `content_weight` config fields
+feed those coefficients so saved experiments and head-off ablations still work.
 
 ### Method-specific objectives
 

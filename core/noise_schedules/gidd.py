@@ -11,6 +11,9 @@ class GIDDPath:
     alpha: torch.Tensor
     mask: torch.Tensor
     uniform: torch.Tensor
+    dalpha: torch.Tensor
+    dmask: torch.Tensor
+    duniform: torch.Tensor
 
 
 class GIDDSchedule:
@@ -33,4 +36,17 @@ class GIDDSchedule:
             raise ValueError("GIDD time must be finite and in [0, 1]")
         time = time.double()
         c = self.B * (time * (1 - time)).pow(self.gamma / 2)
-        return GIDDPath((1 - time) / (1 + c), time / (1 + c), c / (1 + c))
+        # Derivatives are only used for interior-time loss weights. Keep endpoint
+        # construction finite; weighting rejects endpoint alpha/probability zeros.
+        interior = time.clamp(1e-12, 1 - 1e-12)
+        ci = self.B * (interior * (1 - interior)).pow(self.gamma / 2)
+        dc = self.gamma / 2 * (1 - 2 * interior) / (interior * (1 - interior)) * ci
+        denominator = 1 + c
+        return GIDDPath(
+            (1 - time) / denominator,
+            time / denominator,
+            c / denominator,
+            -1 / denominator - (1 - time) * dc / denominator.square(),
+            1 / denominator - time * dc / denominator.square(),
+            dc / denominator.square(),
+        )

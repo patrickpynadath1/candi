@@ -4,6 +4,15 @@ import torch
 
 
 class GaussianProcess:
+    def forward_distribution(self, clean, coefficients):
+        if torch.any(coefficients.sigma <= 0):
+            raise ValueError("Gaussian density requires positive sigma")
+        mean = coefficients.alpha[:, None, None] * clean
+        scale = coefficients.sigma[:, None, None].expand_as(mean)
+        return torch.distributions.Independent(
+            torch.distributions.Normal(mean, scale), 1
+        )
+
     def corrupt_state(self, clean, coefficients, corruption_mask):
         return self.corrupt(
             clean, coefficients.alpha, coefficients.sigma, corruption_mask
