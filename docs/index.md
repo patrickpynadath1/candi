@@ -17,8 +17,12 @@ and `frontier.py`. This documentation describes the current implementation.
 
 - [Training](guides/training.md)
 - [Sampling and evaluation](guides/sampling-and-evaluation.md)
+- [Small-task evaluation suite](guides/evaluation-suite.md)
+- [Algorithm definitions and task batteries](guides/task-batteries.md)
+- [TinyStories judging](guides/story-judging.md)
 - [Programmatic sweeps](guides/programmatic-sweeps.md)
 - [Base algorithm sweep](guides/base-algorithm-sweep.md)
+- [Corruption × self-conditioning sweep](guides/corruption-self-conditioning.md)
 - [Frontier sweeps](guides/frontier-sweeps.md)
 - [Checkpointing](guides/checkpointing.md)
 - [Distributed training](guides/distributed-training.md)
@@ -59,7 +63,8 @@ block-local generation, adaptive-time feedback, and the current Text8 evidence.
 
 See [task conventions](tasks/overview.md), then
 [Sudoku](tasks/sudoku.md), [Text8](tasks/text8.md),
-[OpenWebText](tasks/openwebtext.md), or [TinyGSM](tasks/tinygsm.md).
+[N-Queens](tasks/nqueens.md), [TinyStories](tasks/tinystories.md),
+[Mazes](tasks/maze.md), [OpenWebText](tasks/openwebtext.md), or [TinyGSM](tasks/tinygsm.md).
 
 ## Extend and assess
 
