@@ -7,6 +7,7 @@ The driver owns both studies and holds no GPUs while waiting for child work.
 
 import argparse
 import copy
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 import fcntl
 import hashlib
@@ -149,8 +150,7 @@ def search(directory, settings, direction, objective, concurrency):
         for point in settings.get("initial_points", []):
             study.enqueue_trial(point)
 
-    def candidate(trial):
-        parameters = suggest(trial, settings["space"])
+    def candidate(trial, parameters):
         # Retry a completed stage without repeating training or generation.
         key = hashlib.sha256(
             json.dumps(parameters, sort_keys=True).encode()
@@ -182,7 +182,7 @@ def search(directory, settings, direction, objective, concurrency):
         ):
             continue
         retry = optuna.trial.FixedTrial(old.params)
-        score = candidate(retry)
+        score = candidate(retry, suggest(retry, settings["space"]))
         recovered = optuna.trial.create_trial(
             params=old.params,
             distributions=old.distributions,
@@ -193,8 +193,32 @@ def search(directory, settings, direction, objective, concurrency):
         completed.append(recovered)
 
     remaining = settings["trials"] - len(completed)
-    if remaining > 0:
-        study.optimize(candidate, n_trials=remaining, n_jobs=concurrency)
+    # SQLite cannot safely claim queued trials from multiple optimizer threads.
+    # The driver owns trial allocation and completion; only evaluations run in parallel.
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        pending = {}
+        failure = None
+        while remaining > 0 or pending:
+            while failure is None and remaining > 0 and len(pending) < concurrency:
+                trial = study.ask()
+                parameters = suggest(trial, settings["space"])
+                pending[pool.submit(candidate, trial, parameters)] = trial
+                remaining -= 1
+            if not pending:
+                break
+            done, _ = wait(pending, return_when=FIRST_COMPLETED)
+            for future in done:
+                trial = pending.pop(future)
+                try:
+                    score = future.result()
+                except Exception as exc:
+                    study.tell(trial, state=optuna.trial.TrialState.FAIL)
+                    failure = failure or exc
+                else:
+                    study.tell(trial, score)
+            # Save results from already-running evaluations before surfacing an error.
+            if failure is not None and not pending:
+                raise failure
     best = study.best_trial
     result = json.loads(Path(best.user_attrs["result_path"]).read_text())
     save(directory / "selected.json", {**result, "parameters": best.params})

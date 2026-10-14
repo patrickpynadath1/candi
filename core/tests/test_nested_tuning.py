@@ -242,3 +242,44 @@ def test_fixed_checkpoint_workers_use_pinned_config(tmp_path, monkeypatch):
     monkeypatch.setattr(tuning, "execute", execute)
     tuning.run_study(settings, tmp_path / "runs", 1)
     assert len(paths) == 3
+
+
+def test_sqlite_trial_lifecycle_is_serial_while_evaluations_are_parallel(
+    tmp_path, monkeypatch
+):
+    import threading
+    import optuna
+
+    driver = threading.get_ident()
+    barrier = threading.Barrier(4)
+    calls = []
+    for method in ("ask", "tell"):
+        original = getattr(optuna.study.Study, method)
+
+        def checked(self, *args, _original=original, **kwargs):
+            assert threading.get_ident() == driver
+            return _original(self, *args, **kwargs)
+
+        monkeypatch.setattr(optuna.study.Study, method, checked)
+
+    def objective(parameters, output):
+        assert threading.get_ident() != driver
+        barrier.wait(timeout=10)
+        calls.append(parameters["x"])
+        return {"score": float(parameters["x"])}
+
+    settings = {
+        "space": {"x": list(range(8))},
+        "initial_points": [{"x": x} for x in range(8)],
+        "trials": 8,
+    }
+    winner = tuning.search(tmp_path, settings, "maximize", objective, 4)
+    assert winner["score"] == 7
+    assert sorted(calls) == list(range(8))
+    study = optuna.load_study(
+        study_name="search", storage=f"sqlite:///{tmp_path / 'optuna.sqlite'}"
+    )
+    assert len(study.trials) == 8
+    assert all(t.state == optuna.trial.TrialState.COMPLETE for t in study.trials)
+    tuning.search(tmp_path, settings, "maximize", objective, 4)
+    assert len(calls) == 8
