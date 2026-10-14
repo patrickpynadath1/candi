@@ -10,8 +10,6 @@ from torch import nn
 class ModelPrediction:
     logits: torch.Tensor
     hidden: torch.Tensor
-    clean_logits: torch.Tensor | None = None
-    clean_hidden: torch.Tensor | None = None
     auxiliary_logits: torch.Tensor | None = None
 
 

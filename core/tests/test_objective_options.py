@@ -10,7 +10,6 @@ from torch import nn
 from core.objectives.cross_entropy import CrossEntropy
 from core.objectives.weighting import (
     LearnedLossWeighting,
-    LossCoordinate,
     ObjectiveContext,
     PowerLossWeighting,
 )
@@ -62,9 +61,10 @@ def test_power_weighting_and_context_contract():
     assert objective.requires_context
     with pytest.raises(ValueError, match="requires ObjectiveContext"):
         objective(torch.zeros(2, 3, 1), torch.zeros(2, 3, dtype=torch.long))
-    with pytest.raises(ValueError, match="matching shape"):
+    with pytest.raises(ValueError, match="shape"):
         weighting(
-            loss, ObjectiveContext(torch.zeros(2, 1), torch.ones(2), torch.ones(2))
+            loss,
+            ObjectiveContext(torch.zeros(2), torch.ones(2), torch.ones(2, 1)),
         )
     with pytest.raises(ValueError, match="batch"):
         weighting(torch.ones(3, 2), context())
@@ -104,16 +104,42 @@ def test_learned_weighting_neutral_initialization_formula_and_registration():
     )
 
 
-@pytest.mark.parametrize("name", sorted(LossCoordinate.names))
+@pytest.mark.parametrize(
+    "name", ["time", "alpha", "sigma", "effective_noise", "snr", "log_snr"]
+)
 def test_conditioning_endpoint_values_are_finite(name):
     endpoints = ObjectiveContext(
         torch.tensor([0.0, 1]), torch.tensor([1.0, 0]), torch.tensor([0.0, 1])
     )
-    assert torch.isfinite(LossCoordinate(name)(endpoints)).all()
     result = LearnedLossWeighting(name, cond_dim=8, hidden_dim=12)(
         torch.ones(2, 3), endpoints
     )
     torch.testing.assert_close(result, torch.ones(2, 3))
+
+
+def test_time_weighting_only_accesses_time():
+    context = ObjectiveContext(time=torch.tensor([0.2, 0.7]))
+    loss = torch.ones(2, 3)
+    torch.testing.assert_close(
+        PowerLossWeighting("time", exponent=2)(loss, context),
+        loss * context.time.square()[:, None],
+    )
+    torch.testing.assert_close(
+        LearnedLossWeighting("time", cond_dim=8, hidden_dim=12)(loss, context), loss
+    )
+
+
+def test_weighting_only_validates_accessed_coordinates():
+    loss = torch.ones(2, 3)
+    context = ObjectiveContext(time=torch.zeros(2, 1), alpha=torch.tensor([0.8, 0.3]))
+    torch.testing.assert_close(
+        PowerLossWeighting("alpha", exponent=1)(loss, context),
+        loss * context.alpha[:, None],
+    )
+    with pytest.raises(ValueError, match="context.sigma"):
+        PowerLossWeighting("sigma")(loss, context)
+    with pytest.raises(ValueError, match="context.alpha and context.sigma"):
+        LearnedLossWeighting("snr", cond_dim=8, hidden_dim=12)(loss, context)
 
 
 def test_coordinate_gradients_are_not_detached():

@@ -179,6 +179,8 @@ class PredictionCoordinator:
 
 def _select_batch(value, selected):
     """Select a batch through nested immutable model-input structures."""
+    if callable(getattr(value, "select_batch", None)):
+        return value.select_batch(selected)
     if torch.is_tensor(value):
         return value[selected]
     if isinstance(value, tuple):

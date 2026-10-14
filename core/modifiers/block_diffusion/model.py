@@ -60,23 +60,6 @@ class BlockDiffusionModel(nn.Module):
         finally:
             self._clean.reset(token)
 
-    def _split_output(self, output, length):
-        clean_hidden, noisy_hidden = (
-            output.hidden[:, :length],
-            output.hidden[:, length:],
-        )
-        clean_logits, noisy_logits = (
-            output.logits[:, :length],
-            output.logits[:, length:],
-        )
-        self.last_clean_logits = clean_logits
-        auxiliary = output.auxiliary_logits
-        if auxiliary is not None:
-            auxiliary = auxiliary[:, length:]
-        return ModelPrediction(
-            noisy_logits, noisy_hidden, clean_logits, clean_hidden, auxiliary
-        )
-
     def forward(self, *inputs, self_condition=None, return_features=False):
         current = self._clean.get()
         if current is None:
@@ -130,16 +113,13 @@ class BlockDiffusionModel(nn.Module):
             output.logits[:, :clean_length],
             output.logits[:, clean_length:],
         )
-        clean_hidden, noisy_hidden = (
-            output.hidden[:, :clean_length],
-            output.hidden[:, clean_length:],
-        )
+        noisy_hidden = output.hidden[:, clean_length:]
         self.last_clean_logits = clean_logits
         auxiliary = output.auxiliary_logits
         if auxiliary is not None:
             auxiliary = auxiliary[:, clean_length:]
         result = ModelPrediction(
-            noisy_logits, noisy_hidden, clean_logits, clean_hidden, auxiliary
+            noisy_logits, noisy_hidden, auxiliary_logits=auxiliary
         )
         return result if return_features else result.logits
 

@@ -96,12 +96,3 @@ class BlurringDiffusion(PosteriorDiffusion):
             "loss_sum": total.detach(),
             "num_tokens": count.detach(),
         }
-
-    @torch.no_grad()
-    def generate(self, sampler, prompt_tokens, prompt_mask):
-        was_training = self.training
-        self.eval()
-        try:
-            return sampler.sample(self, prompt_tokens, prompt_mask)
-        finally:
-            self.train(was_training)

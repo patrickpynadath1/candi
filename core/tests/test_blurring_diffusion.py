@@ -201,3 +201,40 @@ def test_algorithm_backward_block_training_and_sampler_nfe(source):
     assert samples.shape == tokens.shape
     assert torch.equal(samples[:, :2], tokens[:, :2])
     assert metadata["nfe"] == 9
+
+
+def test_self_conditioning_selects_spans_not_batch_dimension():
+    from core.modifiers.self_conditioning.prediction import _select_batch
+    from core.modifiers.hybrid.views import ViewPoint
+    from core.noise_schedules.blurring import BlurringSchedule
+    from core.sequences import SequenceLayout
+
+    # Unequal span counts and lengths: neither group dimension equals batch size.
+    mask = torch.tensor(
+        [[1, 1, 0, 1, 1, 1], [0, 1, 0, 0, 0, 0], [1, 1, 0, 1, 1, 0]], dtype=torch.bool
+    )
+    time = torch.tensor([0.2, 0.4, 0.6])
+    schedule = BlurringSchedule(terminal_mean=0.01)
+    path = schedule.for_layout(time, mask, 8, SequenceLayout.contiguous(3, 6, "cpu"))
+    for selected in [
+        torch.tensor([True, False, True]),
+        torch.tensor([False, True, False]),
+        torch.zeros(3, dtype=torch.bool),
+    ]:
+        result = _select_batch(ViewPoint(time, path), selected)
+        expected = schedule.for_layout(
+            time[selected],
+            mask[selected],
+            8,
+            SequenceLayout.contiguous(int(selected.sum()), 6, "cpu"),
+        )
+        assert [(g.length, g.spans) for g in result.coefficients.groups] == [
+            (g.length, g.spans) for g in expected.groups
+        ]
+        for actual, target in zip(result.coefficients.groups, expected.groups):
+            torch.testing.assert_close(
+                actual.coefficients.attenuation, target.coefficients.attenuation
+            )
+            torch.testing.assert_close(
+                actual.coefficients.sigma, target.coefficients.sigma
+            )

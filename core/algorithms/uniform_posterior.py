@@ -88,12 +88,3 @@ class PosteriorUniformDiffusion(PosteriorDiffusion):
             training=training,
         )
         return reduce_token_loss(per_token, loss_mask)
-
-    @torch.no_grad()
-    def generate(self, sampler, prompt_tokens, prompt_mask):
-        was_training = self.training
-        self.eval()
-        try:
-            return sampler.sample(self, prompt_tokens, prompt_mask)
-        finally:
-            self.train(was_training)

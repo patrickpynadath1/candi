@@ -1,5 +1,6 @@
 """Shared posterior prediction endpoints, separate from training objectives."""
 
+import torch
 from torch import nn
 from core.modifiers.self_conditioning.prediction import PredictionCoordinator
 from core.modifiers.self_conditioning.sources import posterior_mean
@@ -47,3 +48,12 @@ class PosteriorDiffusion(nn.Module):
 
     def greedy_prediction(self, *state, trajectory=None):
         return self._prediction("greedy_posterior", *state, trajectory=trajectory)
+
+    @torch.no_grad()
+    def generate(self, sampler, prompt_tokens, prompt_mask):
+        was_training = self.training
+        self.eval()
+        try:
+            return sampler.sample(self, prompt_tokens, prompt_mask)
+        finally:
+            self.train(was_training)

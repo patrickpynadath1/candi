@@ -1,6 +1,6 @@
 """Length-local separable heat-kernel schedule for blurring diffusion."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import math
 import torch
 
@@ -23,6 +23,28 @@ class BlurSpanGroup:
 @dataclass(frozen=True)
 class BlurLayoutPath:
     groups: tuple
+
+    def select_batch(self, selected):
+        # Coefficients are indexed by spans, not examples. Select those spans
+        # and remap their row IDs into the compact self-conditioning batch.
+        rows = selected.nonzero(as_tuple=False).flatten().tolist()
+        remap = {old: new for new, old in enumerate(rows)}
+        groups = []
+        for group in self.groups:
+            indices = [i for i, (row, _, _) in enumerate(group.spans) if row in remap]
+            if not indices:
+                continue
+            spans = tuple(
+                (remap[group.spans[i][0]], *group.spans[i][1:]) for i in indices
+            )
+            coefficients = BlurCoefficients(
+                **{
+                    field.name: getattr(group.coefficients, field.name)[indices]
+                    for field in fields(group.coefficients)
+                }
+            )
+            groups.append(BlurSpanGroup(group.length, spans, coefficients))
+        return BlurLayoutPath(tuple(groups))
 
 
 class BlurringSchedule:

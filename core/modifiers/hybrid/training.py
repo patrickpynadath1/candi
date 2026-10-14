@@ -5,6 +5,7 @@ from .views import point, clamp
 
 from core.algorithms.posterior import PosteriorDiffusion
 from core.algorithms.adaptive import validate_adaptive_feedback, observe_training_loss
+from core.objectives.weighting import ObjectiveContext
 
 
 class HybridDiffusion(PosteriorDiffusion):
@@ -96,19 +97,6 @@ class HybridDiffusion(PosteriorDiffusion):
                 result = torch.where(committed[..., None], fixed, result)
         return result
 
-    def training_prediction(self, states, points, global_time):
-        return self._prediction("training_posterior", states, points, global_time)
-
-    def sampling_prediction(self, states, points, global_time, trajectory=None):
-        return self._prediction(
-            "sampling_posterior", states, points, global_time, trajectory
-        )
-
-    def greedy_prediction(self, states, points, global_time, trajectory=None):
-        return self._prediction(
-            "greedy_posterior", states, points, global_time, trajectory
-        )
-
     def loss(
         self,
         tokens,
@@ -138,7 +126,15 @@ class HybridDiffusion(PosteriorDiffusion):
         if self.synchronize_committed:
             states = self._synchronize_committed(states)
         prediction = self.training_prediction(states, points, time)
-        per_token = self.objective(prediction, tokens)
+        per_token = self.objective(
+            prediction,
+            tokens,
+            **(
+                {"context": ObjectiveContext(time=time)}
+                if getattr(self.objective, "requires_context", False)
+                else {}
+            ),
+        )
         weights = loss_mask.to(per_token)
         count = weights.sum()
         if count <= 0:
@@ -175,12 +171,3 @@ class HybridDiffusion(PosteriorDiffusion):
                     for other, value in zip(self.views, states)
                 )
         return states
-
-    @torch.no_grad()
-    def generate(self, sampler, prompt_tokens, prompt_mask):
-        was_training = self.training
-        self.eval()
-        try:
-            return sampler.sample(self, prompt_tokens, prompt_mask)
-        finally:
-            self.train(was_training)

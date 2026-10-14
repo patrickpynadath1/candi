@@ -196,11 +196,7 @@ class HybridModel(nn.Module):
             return ModelPrediction(
                 output.logits[..., : self.output_vocab_size],
                 output.hidden,
-                None
-                if output.clean_logits is None
-                else output.clean_logits[..., : self.output_vocab_size],
-                output.clean_hidden,
-                None
+                auxiliary_logits=None
                 if output.auxiliary_logits is None
                 else output.auxiliary_logits[..., : self.output_vocab_size],
             )
