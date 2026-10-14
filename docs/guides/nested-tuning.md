@@ -138,3 +138,36 @@ The old standalone inference execution engine has been removed. All new searches
 use this unified entry point, including inference-only studies. Historical sweep
 results are preserved, but old Ray Tune execution state is not resumed by this
 engine. Use a new output directory for a new run.
+
+To retrain the three-task sweep with the same validation/final partitions and
+sampler searches, including insertion variants:
+
+```bash
+uv sync --locked --extra tuning --extra scoring --extra tracking
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m examples.retrain_three_tasks \
+  --previous-manifest /path/to/previous/manifest.json \
+  --output /path/to/new-study \
+  --project adaptive-three-tasks \
+  --adaptive-continuous
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m core.sweeps.nested_tuning /path/to/new-study/manifest.json \
+  --output /path/to/new-study --address auto \
+  --study-concurrency 4 --concurrency 1
+```
+
+Start Ray through the same `uv run` command and extras. `--study-concurrency`
+allows independent training/tuning studies to progress together; `--concurrency`
+is the number of inference candidates per study. Ray reserves a GPU only for an
+actual training or evaluation worker, never for the outer study coordinator.
+
+`--adaptive-continuous` applies `configs/time_map/cdcd.yaml` to Gaussian,
+blurring, simplex, and spherical views. It learns base-path progress from masked
+per-example training cross-entropy, after 1,000 warmup updates, and refits every
+50 updates once the 12,800-observation buffer is full. Gaussian's existing
+adaptive wrapper is replaced by this equivalent view-clock placement, so it is
+not warped twice. Discrete and insertion schedules remain as configured.
+The learned clock is a registered module saved with the model and reused during
+inference; validation and generation do not update it. Each study trains once
+from scratch, then tunes inference, then evaluates only the validation-selected
+winner. Existing checkpoints and study directories are not overwritten.

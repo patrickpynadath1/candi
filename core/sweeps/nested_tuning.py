@@ -473,14 +473,20 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--address", default="auto")
+    parser.add_argument("--study-concurrency", type=int, default=1)
     args = parser.parse_args()
-    if args.concurrency < 1:
+    if args.concurrency < 1 or args.study_concurrency < 1:
         parser.error("Concurrency must be positive")
     import ray
 
     ray.init(address=args.address)
-    for spec in json.loads(args.manifest.read_text()):
-        run_study(spec, args.output, args.concurrency)
+    with ThreadPoolExecutor(max_workers=args.study_concurrency) as pool:
+        futures = [
+            pool.submit(run_study, spec, args.output, args.concurrency)
+            for spec in json.loads(args.manifest.read_text())
+        ]
+        for future in futures:
+            future.result()
 
 
 if __name__ == "__main__":
