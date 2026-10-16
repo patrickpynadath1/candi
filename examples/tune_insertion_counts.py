@@ -25,22 +25,25 @@ def build_cases(source, project, trials=24):
         case["wandb"].update(
             project=project, group=project, job_type="inference-tuning"
         )
-        case["evaluation"].setdefault("overrides", {})["wandb.project"] = project
-        case["evaluation"]["overrides"]["wandb.group"] = project
-        case["evaluation"]["overrides"]["wandb.job_type"] = "inference-tuning"
         winner = result["selection"]
         policy = copy.deepcopy(winner["policy"])
         case["inference"] = [policy]
         # Keep the selected token temperature and decoding policy fixed.
-        case["evaluation"]["overrides"].update(winner["inference_parameters"])
         policy["sampler"]["count_scale"] = 1.0
         policy["space"] = {
             "sampler.count_scale": dict(type="float", low=0.25, high=4.0, log=True)
         }
+        policy["space"].update(
+            {key: [value] for key, value in winner["inference_parameters"].items()}
+        )
         policy["trials"] = trials
         policy["initial_points"] = [
-            {"sampler.count_scale": scale} for scale in [1.0, 0.5, 2.0]
+            {**winner["inference_parameters"], "sampler.count_scale": scale}
+            for scale in [1.0, 0.5, 2.0]
         ]
+        from core.sweeps.nested_tuning import validate
+
+        validate(case)
         cases.append(case)
     return cases
 
