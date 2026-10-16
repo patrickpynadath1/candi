@@ -829,3 +829,27 @@ def test_uniform_optional_head_trains_and_samples(head, feedback):
     )
     assert torch.equal(samples[:, 0], tokens[:, 0])
     assert meta["nfe"] == 4
+
+
+@pytest.mark.parametrize("scale", [-1, float("nan"), float("inf")])
+def test_insertion_count_scale_validation(scale):
+    with pytest.raises(ValueError, match="count_scale"):
+        InsertionSampler(count_scale=scale)
+
+
+def test_insertion_count_scale_changes_poisson_rate(monkeypatch):
+    algo = assembly()
+    prompt = torch.tensor([[1, 2]])
+    fixed = torch.ones_like(prompt, dtype=torch.bool)
+    rates = []
+
+    def record(rate):
+        rates.append(rate.clone())
+        return torch.zeros_like(rate)
+
+    monkeypatch.setattr(torch, "poisson", record)
+    for scale in [1.0, 2.0]:
+        torch.manual_seed(17)
+        algo.generate(InsertionSampler(steps=1, count_scale=scale), prompt, fixed)
+    torch.testing.assert_close(rates[1], 2 * rates[0])
+    assert rates[0].sum() > 0

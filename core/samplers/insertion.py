@@ -1,5 +1,6 @@
 """Joint content updates and Poisson insertion on a shared dynamic sequence."""
 
+import math
 import torch
 from core.modifiers.hybrid.views import clamp
 from core.sequence_edits import SequenceEdit, gather_positions, valid_positions
@@ -16,6 +17,7 @@ class InsertionSampler:
         overflow="error",
         final_denoise="sample",
         pad_token_id=0,
+        count_scale=1.0,
     ):
         if not isinstance(steps, int) or steps < 1 or not 0 < epsilon < 1:
             raise ValueError("positive steps and epsilon in (0, 1) required")
@@ -26,6 +28,9 @@ class InsertionSampler:
             "greedy",
         }:
             raise ValueError("unknown insertion overflow or final denoise policy")
+        if not math.isfinite(count_scale) or count_scale < 0:
+            raise ValueError("count_scale must be finite and nonnegative")
+        self.count_scale = float(count_scale)
         self.steps, self.epsilon, self.max_length = steps, epsilon, max_length
         self.overflow, self.final_denoise, self.pad_token_id = (
             overflow,
@@ -144,7 +149,8 @@ class InsertionSampler:
                 )
             )
             intensity = (
-                prediction.expected_counts
+                self.count_scale
+                * prediction.expected_counts
                 * algo.schedule.integrated_rate(t, s)[:, None]
             )
             if not torch.isfinite(intensity).all():
