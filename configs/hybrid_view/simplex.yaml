@@ -2,6 +2,7 @@ _target_: core.modifiers.hybrid.views.DiffusionView
 process:
   _target_: core.processes.dirichlet.DirichletProcess
   vocab_size: ${task.vocab_size}
+  precision: float32
 schedule:
   _target_: core.noise_schedules.simplex.SimplexSchedule
   kind: constant_linear

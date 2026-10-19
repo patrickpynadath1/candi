@@ -175,6 +175,7 @@ class HybridModel(nn.Module):
         return_features=False,
         attention_mask=None,
         position_ids=None,
+        hidden_only=False,
     ):
         hidden, condition = self.prepare_fused(
             states, points, global_time, self_condition=self_condition
@@ -186,6 +187,7 @@ class HybridModel(nn.Module):
                 return_features=return_features,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
+                hidden_only=hidden_only,
             )
         )
 
@@ -194,7 +196,7 @@ class HybridModel(nn.Module):
             return output
         if isinstance(output, ModelPrediction):
             return ModelPrediction(
-                output.logits[..., : self.output_vocab_size],
+                None if output.logits is None else output.logits[..., : self.output_vocab_size],
                 output.hidden,
                 auxiliary_logits=None
                 if output.auxiliary_logits is None

@@ -1,0 +1,27 @@
+# @package _global_
+defaults:
+- tinygsm_sc_common
+- override /algorithm: simplex_diffusion
+- override /model: simplex_dit
+- override /parameterization: gaussian_posterior
+- override /process: dirichlet
+- override /noise_schedule: simplex
+- override /time_sampler: loss_derivative
+- override /objective: cross_entropy
+- override /sampler: simplex
+- override /token_space@token_space: data_only
+- _self_
+model:
+  hidden_size: 768
+  cond_dim: 128
+  n_blocks: 12
+  n_heads: 12
+  dropout: 0.1
+  adaLN: true
+  tie_word_embeddings: false
+parameterization:
+  temperature: 0.1
+time_sampler:
+  adaptive: true
+sampler:
+  steps: 16

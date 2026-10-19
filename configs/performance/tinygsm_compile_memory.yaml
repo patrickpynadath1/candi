@@ -1,0 +1,19 @@
+# Lower activation memory at the cost of backward recomputation.
+training:
+  performance:
+    hidden_only_bootstrap: true
+    activation_checkpointing: true
+    compile:
+      enabled: true
+      backend: inductor
+      mode: default
+      dynamic: true
+      fullgraph: false
+      objective: true
+optimizer:
+  fused: true
+loader:
+  num_workers: 4
+  eval_batch_size: 16
+trainer:
+  limit_val_batches: 2000

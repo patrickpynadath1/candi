@@ -60,7 +60,7 @@ class DiT(TextDiT):
 
     def forward(
         self, tokens, conditioning, *, self_condition=None, return_features=False,
-        attention_mask=None, position_ids=None
+        attention_mask=None, position_ids=None, hidden_only=False
     ):
         with torch.autocast(tokens.device.type, enabled=False):
             embedded = self.input_adapter(tokens, self.vocab_embed)
@@ -71,18 +71,20 @@ class DiT(TextDiT):
             return_features=return_features,
             attention_mask=attention_mask,
             position_ids=position_ids,
+            hidden_only=hidden_only,
         )
 
     def forward_with_embeddings(
         self, hidden, conditioning, *, self_condition=None, return_features=False,
-        attention_mask=None, position_ids=None
+        attention_mask=None, position_ids=None, hidden_only=False
     ):
         hidden, condition = self.prepare_hidden(
             hidden, conditioning, self_condition=self_condition
         )
         return self.forward_hidden(
             hidden, condition, return_features=return_features,
-            attention_mask=attention_mask, position_ids=position_ids
+            attention_mask=attention_mask, position_ids=position_ids,
+            hidden_only=hidden_only,
         )
 
     def prepare_hidden(self, hidden, conditioning, *, self_condition=None):

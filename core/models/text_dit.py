@@ -63,6 +63,7 @@ class TextDiT(nn.Module):
         return_features=False,
         attention_mask=None,
         position_ids=None,
+        hidden_only=False,
     ):
         # RoPE frequencies must be constructed in FP32 even under autocast.
         with torch.autocast(hidden.device.type, enabled=False):
@@ -91,7 +92,9 @@ class TextDiT(nn.Module):
             if isinstance(hidden, BlockExecutionOutput):
                 auxiliary_logits = hidden.auxiliary_logits
                 hidden = hidden.hidden
-            logits = self.project_hidden(hidden, condition)
+            if hidden_only and not return_features:
+                raise ValueError("hidden_only requires return_features")
+            logits = None if hidden_only else self.project_hidden(hidden, condition)
         if return_features:
             return ModelPrediction(logits, hidden, auxiliary_logits=auxiliary_logits)
         return logits

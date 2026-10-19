@@ -21,12 +21,13 @@ class SimplexDiT(DiT):
             return self.input_adapter(log_state, self.vocab_embed)
 
     def forward(self, log_state, time, *, self_condition=None, return_features=False,
-                attention_mask=None, position_ids=None):
+                attention_mask=None, position_ids=None, hidden_only=False):
         return self.forward_with_embeddings(
             self.embed_state(log_state),
             time.float(),
             self_condition=self_condition,
             return_features=return_features,
+            hidden_only=hidden_only,
             attention_mask=attention_mask,
             position_ids=position_ids,
         )

@@ -139,7 +139,7 @@ class CANDIRepresentation(nn.Module):
 
 class SimplexRepresentation(TokenRepresentation):
     def clean_state(self, tokens):
-        return F.one_hot(tokens, len(self.embedding)).double().log()
+        return F.one_hot(tokens, len(self.embedding)).float().log()
 
     def to_model_embedding(self, state, point):
         del point

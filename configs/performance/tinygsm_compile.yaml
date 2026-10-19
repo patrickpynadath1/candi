@@ -1,0 +1,21 @@
+# Pass to scripts/tinygsm_ray_queue.py --config-overrides.
+# This is an override document, not a Hydra experiment preset.
+training:
+  performance:
+    hidden_only_bootstrap: true
+    activation_checkpointing: false
+    compile:
+      enabled: true
+      backend: inductor
+      mode: default
+      dynamic: true
+      fullgraph: false
+      objective: true
+optimizer:
+  fused: true
+loader:
+  num_workers: 4
+  eval_batch_size: 16
+trainer:
+  # Preserve the previous cap of 500 batches x 64 examples per rank.
+  limit_val_batches: 2000

@@ -150,6 +150,8 @@ class PredictionCoordinator:
                         bootstrap = model(
                             *(_select_batch(value, selected) for value in inputs),
                             return_features=True,
+                            **({"hidden_only": True} if self.source == "hidden"
+                               and getattr(model, "hidden_only_bootstrap", False) else {}),
                         )
                     feedback = self.feedback(
                         bootstrap,
