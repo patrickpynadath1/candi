@@ -23,8 +23,16 @@ class TokenInput(nn.Module):
 
 
 class SimplexExpectationInput(nn.Module):
+    def __init__(self, precision="legacy", chunk_size=0):
+        super().__init__()
+        self.precision, self.chunk_size = precision, chunk_size
+
     def forward(self, state, embedding):
-        return state.exp().to(embedding.embedding.dtype) @ embedding.embedding
+        from .simplex_projection import simplex_projection
+
+        return simplex_projection(
+            state, embedding.embedding, self.precision, self.chunk_size
+        )
 
 
 class SimplexArgmaxInput(nn.Module):

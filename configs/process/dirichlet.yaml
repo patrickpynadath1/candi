@@ -1,3 +1,6 @@
 _target_: core.processes.dirichlet.DirichletProcess
 vocab_size: ${token_space.model_vocab_size}
 reference: null
+precision: fp64
+sampler_backend: torch
+chunk_size: 0

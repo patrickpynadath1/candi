@@ -34,6 +34,9 @@ views:
     _target_: core.processes.dirichlet.DirichletProcess
     vocab_size: ${task.vocab_size}
     reference: null
+    precision: fp64
+    sampler_backend: torch
+    chunk_size: 0
   schedule:
     _target_: core.noise_schedules.simplex.SimplexSchedule
     kind: constant_linear
@@ -43,6 +46,9 @@ views:
     epsilon: 1.0
   representation:
     _target_: core.representations.noisy_inputs.SimplexRepresentation
+    state_precision: ${..process.precision}
+    projection_precision: legacy
+    projection_chunk_size: 0
     vocab_size: ${task.vocab_size}
     hidden_size: ${model.backbone.hidden_size}
     scale: 0.5
