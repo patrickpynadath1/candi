@@ -15,6 +15,18 @@ not require FlashAttention or a sibling source checkout. For optional W&B loggin
 uv sync --locked --extra tracking
 ```
 
+For nested training/inference tuning, including BLEU and W&B, use the same extras
+for installation, the Ray launcher, and the driver:
+
+```bash
+uv sync --locked --extra tuning --extra scoring --extra tracking
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m core.sweeps.nested_tuning --help
+```
+
+Do not depend on temporary `PYTHONPATH` package directories. See
+[experiment terminology](guides/experiments.md) and [nested tuning](guides/nested-tuning.md).
+
 Dataset files, pretrained checkpoints, and external reference scoring models are
 provided separately. See the individual [task pages](tasks/overview.md) for data
 sources and offline options.

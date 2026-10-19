@@ -1,5 +1,10 @@
 # Configuration
 
+A [recipe](recipe.md) combines an information path, denoising task, and inference
+settings. Hydra component groups below are its implementation, while an
+[experiment configuration](../guides/experiments.md) adds tasks, budgets, seeds,
+and hyperparameter search spaces.
+
 Hydra composes YAML from root [`configs/`](../../configs/). The default training
 configuration is [`config.yaml`](../../configs/config.yaml); the frontier entrypoint
 uses [`frontier.yaml`](../../configs/frontier.yaml). Run commands from the repository

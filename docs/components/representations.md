@@ -1,5 +1,7 @@
 # Representations
 
+Recipe context: [information path](../concepts/information-path.md).
+
 A representation maps discrete tokens to continuous states and interprets a
 clean-token posterior in that space. It owns the token embedding table when one
 exists; the model's input projections are separate learned layers.

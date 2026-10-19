@@ -1,5 +1,7 @@
 # Samplers
 
+Recipe context: [inference settings](../concepts/inference-settings.md).
+
 Samplers orchestrate generation: initialization, time grids, model requests,
 process updates, stopping, decoding, prompt preservation, and trajectory state.
 They consume parameterized predictions, not raw logits. Temperature and filtering

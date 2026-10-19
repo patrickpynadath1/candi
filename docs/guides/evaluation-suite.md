@@ -1,7 +1,7 @@
 # Small-task evaluation suite
 
-Use [algorithm definitions and task batteries](task-batteries.md) to run the suite
-with one shared method definition and linked result provenance.
+Use [recipe definitions and task suites](task-batteries.md) to run the suite
+with one shared recipe definition and linked result provenance.
 
 | Task | What it measures | Presets / documentation |
 | --- | --- | --- |

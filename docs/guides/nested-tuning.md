@@ -1,6 +1,7 @@
-# Training and inference hyperparameter selection
+# Nested training and inference tuning
 
-`python -m core.sweeps.nested_tuning` runs one workflow:
+Each [experiment case](experiments.md) runs one workflow through
+`python -m core.sweeps.nested_tuning`:
 
 1. An outer Optuna candidate obtains a checkpoint.
 2. Every configured sampler receives an inference search on validation examples.
@@ -14,12 +15,13 @@ acquisition differs; there is no separate inference-only selection/evaluation pa
 
 The driver holds no GPU reservation. Ray workers run training and generation;
 a training worker exits before the inner search starts. Outer candidates execute
-sequentially and inner evaluations use the requested concurrency.
+sequentially within a case; separate cases and inner evaluations have their own
+concurrency settings.
 
 ## Configuration
 
-A manifest is a JSON list of study specifications. The three-task builder now
-emits this format directly. Here is a minimal inference-only study:
+A manifest is a JSON list of experiment-case specifications. The three-task builder now
+emits this format directly. Here is a minimal inference-only case:
 
 ```python
 spec = {
@@ -88,7 +90,8 @@ integer distributions (`type: int`, inclusive `low`/`high`, optional `step` or
 policies use the same validation metric and examples. Each has its own budget.
 
 ```bash
-python -m core.sweeps.nested_tuning nested-manifest.json \
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m core.sweeps.nested_tuning nested-manifest.json \
   --output /home/patrick/.cache/duo/nested-tuning \
   --concurrency 4
 ```
@@ -116,9 +119,9 @@ Parallel Optuna proposals can depend on completion order despite fixed seeds.
 Matching search budgets and checking winners across training seeds remain
 experimental-design decisions.
 
-## Persistence and current running jobs
+## Persistence and resumption
 
-Each study saves a local configuration snapshot and full protocol. Workers use
+Each case saves a local configuration snapshot and full protocol. Workers use
 that snapshot, including when the checkpoint already exists. Each search
 has an Optuna SQLite database, candidate artifacts and `selected.json`. Training
 candidates save `trained.json`, the training checkpoint/config, and an unwrapped
@@ -127,7 +130,7 @@ candidates save `trained.json`, the training checkpoint/config, and an unwrapped
 
 Rerunning the same manifest resumes interrupted candidates and reuses completed
 training/evaluation stages. A failed validation trial stops selection until it is
-successfully retried. Changing a protocol or source config requires a new study
+successfully retried. Changing a protocol or source config requires a new case
 name. File locks prevent concurrent drivers or duplicate candidates from writing
 the same artifacts simultaneously. Checkpoints and output directories must be on
 storage visible to every Ray worker. W&B logging uses the source config's tracking
@@ -135,6 +138,39 @@ settings through the existing training/evaluation runner. A top-level `wandb`
 configuration can override the source config tracking settings.
 
 The old standalone inference execution engine has been removed. All new searches
-use this unified entry point, including inference-only studies. Historical sweep
+use this unified entry point, including inference-only cases. Historical sweep
 results are preserved, but old Ray Tune execution state is not resumed by this
 engine. Use a new output directory for a new run.
+
+To retrain the three-task sweep with the same validation/final partitions and
+sampler searches, including insertion variants:
+
+```bash
+uv sync --locked --extra tuning --extra scoring --extra tracking
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m examples.retrain_three_tasks \
+  --previous-manifest /path/to/previous/manifest.json \
+  --output /path/to/new-experiment \
+  --project adaptive-three-tasks \
+  --adaptive-continuous
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m core.sweeps.nested_tuning /path/to/new-experiment/manifest.json \
+  --output /path/to/new-experiment --address auto \
+  --case-concurrency 4 --concurrency 1
+```
+
+Start Ray through the same `uv run` command and extras. `--case-concurrency`
+allows independent experiment cases to progress together; `--concurrency`
+is the number of inference candidates per case. Ray reserves a GPU only for an
+actual training or evaluation worker, never for the case coordinator.
+
+`--adaptive-continuous` applies `configs/time_map/cdcd.yaml` to Gaussian,
+blurring, simplex, and spherical views. It learns base-path progress from masked
+per-example training cross-entropy, after 1,000 warmup updates, and refits every
+50 updates once the 12,800-observation buffer is full. Gaussian's existing
+adaptive wrapper is replaced by this equivalent view-clock placement, so it is
+not warped twice. Discrete and insertion schedules remain as configured.
+The learned clock is a registered module saved with the model and reused during
+inference; validation and generation do not update it. Each case trains once
+from scratch, then tunes inference, then evaluates only the validation-selected
+winner. Existing checkpoints and case directories are not overwritten.

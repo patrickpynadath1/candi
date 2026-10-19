@@ -1,0 +1,52 @@
+"""Mask/uniform interpolation from GIDD, Section 4 (arXiv:2503.04482)."""
+
+from dataclasses import dataclass
+import math
+
+import torch
+
+
+@dataclass(frozen=True)
+class GIDDPath:
+    alpha: torch.Tensor
+    mask: torch.Tensor
+    uniform: torch.Tensor
+    dalpha: torch.Tensor
+    dmask: torch.Tensor
+    duniform: torch.Tensor
+
+
+class GIDDSchedule:
+    """Uniform mixing peaks at p_uniform at t=1/2; both endpoints are exact.
+
+    Restrict gamma to (0, 2] so every forward conditional mixing mass is
+    nonnegative. p_uniform=0 gives the exact linear absorbing path.
+    """
+
+    def __init__(self, p_uniform=0.2, gamma=1.0):
+        if not math.isfinite(p_uniform) or not 0 <= p_uniform < 1:
+            raise ValueError("p_uniform must be finite and in [0, 1)")
+        if not math.isfinite(gamma) or not 0 < gamma <= 2:
+            raise ValueError("gamma must be finite and in (0, 2]")
+        self.p_uniform, self.gamma = p_uniform, gamma
+        self.B = 2**gamma * p_uniform / (1 - p_uniform)
+
+    def __call__(self, time):
+        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
+            raise ValueError("GIDD time must be finite and in [0, 1]")
+        time = time.double()
+        c = self.B * (time * (1 - time)).pow(self.gamma / 2)
+        # Derivatives are only used for interior-time loss weights. Keep endpoint
+        # construction finite; weighting rejects endpoint alpha/probability zeros.
+        interior = time.clamp(1e-12, 1 - 1e-12)
+        ci = self.B * (interior * (1 - interior)).pow(self.gamma / 2)
+        dc = self.gamma / 2 * (1 - 2 * interior) / (interior * (1 - interior)) * ci
+        denominator = 1 + c
+        return GIDDPath(
+            (1 - time) / denominator,
+            time / denominator,
+            c / denominator,
+            -1 / denominator - (1 - time) * dc / denominator.square(),
+            1 / denominator - time * dc / denominator.square(),
+            dc / denominator.square(),
+        )

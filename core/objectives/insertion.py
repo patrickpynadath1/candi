@@ -1,16 +1,91 @@
-"""Losses for missing counts and clean content in insertion gaps."""
+"""Standalone insertion terms and an adapter for aligned gap supervision."""
 
-import math
 import torch
 from torch import nn
 
+from core.objectives.composition import Component, SumTerms
+
+
+class GapCountLoss(nn.Module):
+    def forward(self, expected, counts, mask, rate):
+        # Poisson NLL without the target-only log-factorial constant.
+        loss = expected - counts * expected.log()
+        return (torch.where(mask, loss, 0) * rate[:, None]).sum(-1)
+
+
+class GapTokenLoss(nn.Module):
+    def forward(self, log_probs, targets, gap_indices, deleted, rate):
+        if log_probs is None:
+            return torch.zeros_like(rate)
+        gap = gap_indices.clamp_max(log_probs.shape[1] - 1)
+        rows = torch.arange(len(targets), device=targets.device)[:, None]
+        loss = -log_probs[rows, gap, targets]
+        return (torch.where(deleted, loss, 0) * rate[:, None]).sum(-1)
+
 
 class InsertionObjective(nn.Module):
-    def __init__(self, count_weight=1.0, content_weight=1.0):
+    """Align insertion inputs and preserve the existing reporting/reduction API.
+
+    All loss mathematics lives in the configured components. Legacy weight
+    arguments remain supported for saved experiment configs.
+    """
+
+    def __init__(self, count_weight=1.0, content_weight=1.0, count=None, content=None):
         super().__init__()
-        if any(not math.isfinite(w) or w < 0 for w in (count_weight, content_weight)):
-            raise ValueError("insertion loss weights must be finite and nonnegative")
-        self.count_weight, self.content_weight = count_weight, content_weight
+        self.combination = SumTerms(
+            [
+                count
+                if count is not None
+                else Component(
+                    GapCountLoss(),
+                    dict(
+                        expected="expected", counts="counts", mask="mask", rate="rate"
+                    ),
+                    count_weight,
+                ),
+                content
+                if content is not None
+                else Component(
+                    GapTokenLoss(),
+                    dict(
+                        log_probs="log_probs",
+                        targets="targets",
+                        gap_indices="gap_indices",
+                        deleted="deleted",
+                        rate="rate",
+                    ),
+                    content_weight,
+                ),
+            ]
+        )
+        available = {
+            "expected",
+            "counts",
+            "mask",
+            "rate",
+            "log_probs",
+            "targets",
+            "gap_indices",
+            "deleted",
+        }
+        for term in self.combination.terms:
+            term.validate(available)
+
+    @property
+    def count_weight(self):
+        return self.combination.terms[0].coefficient
+
+    @count_weight.setter
+    def count_weight(self, value):
+        self.combination.terms[0].coefficient = value
+
+    @property
+    def content_weight(self):
+        return self.combination.terms[1].coefficient
+
+    @content_weight.setter
+    def content_weight(self, value):
+        self.combination.terms[1].coefficient = value
 
     def forward(
         self,
@@ -25,20 +100,20 @@ class InsertionObjective(nn.Module):
     ):
         if reduction not in {"sum", "none"}:
             raise ValueError("insertion reduction must be sum or none")
-        # Poisson/Bregman loss; omitted target-only constant does not affect grads.
-        count = expected - sample.gap_counts * expected.log()
-        count = (torch.where(gap_mask, count, 0) * rate[:, None]).sum(-1)
-        # Sparse equivalent of a per-gap bag-of-deleted-tokens target. Multiple
-        # births in a gap use this same distribution; their order is approximate.
-        if gap_log_probs is None:
-            if self.content_weight != 0:
-                raise ValueError("Gap-token supervision requires gap predictions")
-            content = torch.zeros_like(count)
-        else:
-            gap = sample.gap_for_token.clamp_max(gap_log_probs.shape[1] - 1)
-            rows = torch.arange(len(clean_tokens), device=clean_tokens.device)[:, None]
-            content = -gap_log_probs[rows, gap, clean_tokens]
-            content = (torch.where(sample.deleted, content, 0) * rate[:, None]).sum(-1)
+        if gap_log_probs is None and self.content_weight != 0:
+            raise ValueError("Gap-token supervision requires gap predictions")
+        total, (count, content) = self.combination(
+            dict(
+                expected=expected,
+                counts=sample.gap_counts,
+                mask=gap_mask,
+                rate=rate,
+                log_probs=gap_log_probs,
+                targets=clean_tokens,
+                gap_indices=sample.gap_for_token,
+                deleted=sample.deleted,
+            )
+        )
         if reduction == "sum":
-            count, content = count.sum(), content.sum()
-        return self.count_weight * count + self.content_weight * content, count, content
+            return total.sum(), count.sum(), content.sum()
+        return total, count, content

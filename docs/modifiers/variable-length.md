@@ -385,3 +385,20 @@ This changes only training-time sampler feedback, not the optimization objective
 per-view adaptive noise-schedule feedback, or the generation timestep grid.
 Enabling it requires a new run or an explicit resumed-run configuration change;
 it does not retroactively change a running process.
+
+### Insertion-count calibration
+
+`InsertionSampler.count_scale` multiplies each gap's Poisson intensity before
+sampling counts. Its default is 1; values below/above 1 decrease/increase birth
+rates. It does not change the relative gap preferences at a given step or the
+birth-state law. Protected gaps remain excluded and the length limit still applies.
+
+`examples/tune_insertion_counts.py SOURCE OUTPUT --project PROJECT` creates a
+fixed-checkpoint manifest from completed insertion cases. It searches count scale
+in `[0.25, 4]` on a log scale, holding each case's previously selected token
+settings and final decoding fixed. The original validation/final partitions and
+NFE budget are retained. Submit this manifest with the normal nested-tuning CLI.
+
+For mask and uniform births, the gap-token posterior is not used to initialize
+new positions: births are masks or uniform noise. Consequently, gap-token
+inference temperature is not searched for those laws.

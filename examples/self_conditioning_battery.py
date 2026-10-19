@@ -17,7 +17,9 @@ from examples.corruption_self_conditioning_sweep import (
 )
 
 
-def build_jobs(group, *, tasks=None, project="self-cond-sweep"):
+def build_jobs(
+    group, *, tasks=None, project="self-cond-sweep", adaptive_continuous=False
+):
     battery = OmegaConf.to_container(
         OmegaConf.load(ROOT / "configs/battery/small_tasks.yaml")
     )
@@ -47,6 +49,17 @@ def build_jobs(group, *, tasks=None, project="self-cond-sweep"):
     args = original_parser().parse_args([])
     for variant in variants(args):
         base = base_config(variant, args)
+        if adaptive_continuous and variant.family in {
+            "gaussian",
+            "simplex",
+            "spherical",
+            "blurring",
+        }:
+            view = base.model.views.content
+            if variant.family == "gaussian":
+                # Move the existing Gaussian clock to the shared view interface.
+                view.schedule = view.schedule.base
+            view.time_map = OmegaConf.load(ROOT / "configs/time_map/cdcd.yaml")
         for enabled in (False, True):
             name = variant.name + ("-sc-on" if enabled else "-sc-off")
             algorithm = OmegaConf.to_container(
@@ -137,13 +150,19 @@ def main():
     )
     parser.add_argument("--wandb-project", default="self-cond-three-tasks-20261012")
     parser.add_argument("--include-insertion", action="store_true")
+    parser.add_argument("--adaptive-continuous", action="store_true")
     args = parser.parse_args()
     if args.restore and args.resume_from:
         parser.error("Use --restore or --resume-from, not both")
     jobs = (
         []
         if args.restore
-        else build_jobs(args.name, tasks=args.tasks, project=args.wandb_project)
+        else build_jobs(
+            args.name,
+            tasks=args.tasks,
+            project=args.wandb_project,
+            adaptive_continuous=args.adaptive_continuous,
+        )
     )
     if args.include_insertion and not args.restore:
         from examples.insertion_head_sweep import build_jobs as insertion_jobs

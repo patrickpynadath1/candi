@@ -29,3 +29,25 @@ class LinearTimeMap:
         if not torch.isfinite(result).all() or torch.any((result < 0) | (result > 1)):
             raise ValueError("mapped local time must be finite and in [0, 1]")
         return result
+
+
+class AdaptiveTimeMap(torch.nn.Module):
+    """Learn a monotone base-path clock from detached training-loss feedback."""
+
+    def __init__(self, clock):
+        super().__init__()
+        self.clock = clock
+
+    @property
+    def loss_signal(self):
+        return self.clock.loss_signal
+
+    def forward(self, time):
+        keep, _ = self.clock(time)
+        return (1 - keep).clamp(0, 1)
+
+    def observe(self, time, loss, step, *, training=False):
+        self.clock.observe(time, loss, step, training=training and self.training)
+
+    def snapshot(self):
+        return self.clock.snapshot()

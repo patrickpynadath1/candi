@@ -31,6 +31,7 @@ class HybridDiffusion(PosteriorDiffusion):
             )
         for view in model.views:
             validate_adaptive_feedback(view.schedule, predictor)
+            validate_adaptive_feedback(view.time_map, predictor)
             if getattr(view.process, "prediction_kind", "posterior") != "posterior":
                 raise TypeError(
                     "hybrid views must consume clean-token posteriors; "
@@ -159,7 +160,17 @@ class HybridDiffusion(PosteriorDiffusion):
             prediction,
             tokens,
             **(
-                {"context": ObjectiveContext(time=time)}
+                {
+                    "context": ObjectiveContext(
+                        time=time,
+                        processes=tuple(view.process for view in self.views),
+                        coefficients=tuple(local.coefficients for local in points),
+                        states=states,
+                        representations=tuple(
+                            view.representation for view in self.views
+                        ),
+                    )
+                }
                 if getattr(self.objective, "requires_context", False)
                 else {}
             ),
@@ -173,6 +184,16 @@ class HybridDiffusion(PosteriorDiffusion):
             if observe_time is not None:
                 observe_time(feedback_time, per_token, loss_mask, step)
             for view, point in zip(self.views, points):
+                observe_training_loss(
+                    view.time_map,
+                    time,
+                    prediction,
+                    tokens,
+                    per_token,
+                    loss_mask,
+                    step=step,
+                    training=True,
+                )
                 observe_training_loss(
                     view.schedule,
                     point.time,

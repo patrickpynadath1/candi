@@ -11,6 +11,27 @@ objective:
   _target_: core.objectives.insertion.InsertionObjective
   count_weight: 1.0
   content_weight: 1.0
+  count:
+    _target_: core.objectives.composition.Component
+    component:
+      _target_: core.objectives.insertion.GapCountLoss
+    coefficient: ${variable_length.objective.count_weight}
+    inputs:
+      expected: expected
+      counts: counts
+      mask: mask
+      rate: rate
+  content:
+    _target_: core.objectives.composition.Component
+    component:
+      _target_: core.objectives.insertion.GapTokenLoss
+    coefficient: ${variable_length.objective.content_weight}
+    inputs:
+      log_probs: log_probs
+      targets: targets
+      gap_indices: gap_indices
+      deleted: deleted
+      rate: rate
 # Policies are keyed by DiffusionView.name, independent of view ordering.
 # Uniform views default to uniform noise; other unlisted views use a sampled
 # clean token and their forward kernel.

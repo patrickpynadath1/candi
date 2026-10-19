@@ -1,0 +1,7 @@
+# @package _global_
+# GIDD's information path and reverse rule with ordinary posterior CE.
+# This is not the paper's GIDD ELBO or its reweighted GIDD+ objective.
+defaults:
+- corruption_factorial
+- override /hybrid_view@model.views.content: gidd
+- _self_

@@ -1,5 +1,7 @@
 # Noise schedules
 
+Recipe context: [information path](../concepts/information-path.md).
+
 Schedules map global time to corruption coefficients; they do not draw training
 times or corrupt states. In the usual convention, zero is clean and increasing
 time means more noise. Sampling proceeds toward smaller times. Endpoint choices
@@ -17,6 +19,10 @@ Gaussian schedules return [GaussianPath](../../core/noise_schedules/gaussian_pat
 `z_t=alpha_t*clean+sigma_t*noise`. Derivatives are essential for general continuous
 sampling: sigma alone only describes special paths. Optional `training_time`
 implements method-specific time adjustment; callers must apply it once.
+
+For discrete mask/uniform interpolation, `GIDDSchedule` returns `GIDDPath` with
+`alpha`, `mask`, and `uniform` masses of shape `[B]`. See the
+[GIDD recipe](../methods/gidd.md) for its parameters and compatible update.
 
 ## Fixed Gaussian choices
 

@@ -1,9 +1,24 @@
 # CANDI documentation
 
-CANDI composes models, prediction parameterizations, corruption processes,
-schedules, objectives, and samplers for discrete data. Source lives in `core/`,
-Hydra configurations in root `configs/`, and executable entrypoints in `main.py`
-and `frontier.py`. This documentation describes the current implementation.
+CANDI supports controlled experiments on diffusion language model recipes. Its
+purpose is to make component choices and their interactions explicit, not to
+prescribe one diffusion algorithm or provide a large-scale pretraining stack.
+
+## The recipe
+
+Read the [recipe overview](concepts/recipe.md), then its three parts:
+
+1. [Information path](concepts/information-path.md): representation, corruption
+   process, and noise schedule.
+2. [Denoising task](concepts/denoising-task.md): backbone, output parameterization,
+   objective, and training time sampler.
+3. [Inference settings](concepts/inference-settings.md): initialization, inference
+   time/noise grid, update rule, and terminal decoding.
+
+[Modifiers](concepts/recipe.md#modifiers-across-the-three-parts) explain how
+self-conditioning, multiple views, insertion/deletion, and block diffusion affect
+these choices. Compatible component composition is the goal; arbitrary combinations
+are not guaranteed to be mathematically valid.
 
 ## Start here
 
@@ -15,10 +30,17 @@ and `frontier.py`. This documentation describes the current implementation.
 
 ## Run experiments
 
+Start with [experiments, cases, studies, and runs](guides/experiments.md).
+A manifest lists cases; each case can contain nested Optuna studies. Both training
+and inference choices are selected on validation before final evaluation.
+
+- [Nested training and inference tuning](guides/nested-tuning.md)
+- [Inference-only tuning as a fixed-checkpoint case](guides/inference-tuning.md)
+
 - [Training](guides/training.md)
 - [Sampling and evaluation](guides/sampling-and-evaluation.md)
 - [Small-task evaluation suite](guides/evaluation-suite.md)
-- [Algorithm definitions and task batteries](guides/task-batteries.md)
+- [Recipe definitions and task suites](guides/task-batteries.md)
 - [TinyStories judging](guides/story-judging.md)
 - [Programmatic sweeps](guides/programmatic-sweeps.md)
 - [Base algorithm sweep](guides/base-algorithm-sweep.md)
@@ -29,17 +51,12 @@ and `frontier.py`. This documentation describes the current implementation.
 
 ## Component reference
 
-| Component | Responsibility |
+| Recipe part | Component references |
 | --- | --- |
-| [Algorithms](components/algorithms.md) | Connect training and prediction operations. |
-| [Models](components/models.md) | Neural architecture and conditioning. |
-| [Representations](components/representations.md) | Map tokens to/from continuous states. |
-| [Predictors](components/predictors.md) | Give model outputs mathematical meaning and apply inference shaping. |
-| [Processes](components/processes.md) | Forward corruption and reverse-transition mathematics. |
-| [Noise schedules](components/noise-schedules.md) | Map time to corruption coefficients. |
-| [Time sampling](components/time-sampling.md) | Draw training times and, where supported, construct inference grids. |
-| [Objectives](components/objectives.md) | Compute mathematical training losses. |
-| [Samplers](components/samplers.md) | Own generation state and update loops. |
+| Information path | [Representations](components/representations.md), [processes](components/processes.md), [noise schedules](components/noise-schedules.md) |
+| Denoising task | [Backbones/models](components/models.md), [output parameterizations](components/predictors.md), [objectives](components/objectives.md), [training time sampling](components/time-sampling.md) |
+| Inference settings | [Samplers](components/samplers.md), with compatible process updates and predictor shaping |
+| Coordination | [Algorithms](components/algorithms.md) connect the components; [architecture](concepts/architecture.md) describes execution ownership |
 
 Architectural/sequence modifiers have dedicated references:
 [self-conditioning](modifiers/self-conditioning.md),
@@ -51,6 +68,7 @@ block-local generation, adaptive-time feedback, and the current Text8 evidence.
 ## Method recipes
 
 - [Discrete diffusion](methods/discrete-diffusion.md): MDLM, uniform, SEDD, DUO, D3PM.
+- [GIDD mask/uniform corruption](methods/gidd.md): a single-view mixture with a CE baseline.
 - [Gaussian diffusion](methods/gaussian-diffusion.md): one-hot/embedding recipes.
 - [Spherical flow matching](methods/spherical-flow-matching.md)
 - [Simplex diffusion](methods/simplex-diffusion.md)

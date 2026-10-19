@@ -7,6 +7,7 @@ The driver owns both studies and holds no GPUs while waiting for child work.
 
 import argparse
 import copy
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 import fcntl
 import hashlib
@@ -149,8 +150,7 @@ def search(directory, settings, direction, objective, concurrency):
         for point in settings.get("initial_points", []):
             study.enqueue_trial(point)
 
-    def candidate(trial):
-        parameters = suggest(trial, settings["space"])
+    def candidate(trial, parameters):
         # Retry a completed stage without repeating training or generation.
         key = hashlib.sha256(
             json.dumps(parameters, sort_keys=True).encode()
@@ -182,7 +182,7 @@ def search(directory, settings, direction, objective, concurrency):
         ):
             continue
         retry = optuna.trial.FixedTrial(old.params)
-        score = candidate(retry)
+        score = candidate(retry, suggest(retry, settings["space"]))
         recovered = optuna.trial.create_trial(
             params=old.params,
             distributions=old.distributions,
@@ -193,8 +193,32 @@ def search(directory, settings, direction, objective, concurrency):
         completed.append(recovered)
 
     remaining = settings["trials"] - len(completed)
-    if remaining > 0:
-        study.optimize(candidate, n_trials=remaining, n_jobs=concurrency)
+    # SQLite cannot safely claim queued trials from multiple optimizer threads.
+    # The driver owns trial allocation and completion; only evaluations run in parallel.
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        pending = {}
+        failure = None
+        while remaining > 0 or pending:
+            while failure is None and remaining > 0 and len(pending) < concurrency:
+                trial = study.ask()
+                parameters = suggest(trial, settings["space"])
+                pending[pool.submit(candidate, trial, parameters)] = trial
+                remaining -= 1
+            if not pending:
+                break
+            done, _ = wait(pending, return_when=FIRST_COMPLETED)
+            for future in done:
+                trial = pending.pop(future)
+                try:
+                    score = future.result()
+                except Exception as exc:
+                    study.tell(trial, state=optuna.trial.TrialState.FAIL)
+                    failure = failure or exc
+                else:
+                    study.tell(trial, score)
+            # Save results from already-running evaluations before surfacing an error.
+            if failure is not None and not pending:
+                raise failure
     best = study.best_trial
     result = json.loads(Path(best.user_attrs["result_path"]).read_text())
     save(directory / "selected.json", {**result, "parameters": best.params})
@@ -334,15 +358,15 @@ def execute(stage, payload, output):
     return ray.get(remote.remote(payload, str(output)))
 
 
-def run_study(spec, root, concurrency=4):
+def run_case(spec, root, concurrency=4):
     if concurrency < 1:
         raise ValueError("Concurrency must be positive")
     path = Path(root).resolve() / spec["name"] / ".driver.lock"
     with lock(path, blocking=False):
-        return _run_study(spec, root, concurrency)
+        return _run_case(spec, root, concurrency)
 
 
-def _run_study(spec, root, concurrency):
+def _run_case(spec, root, concurrency):
     validate(spec)
     spec = copy.deepcopy(spec)
     root = Path(root).resolve() / spec["name"]
@@ -354,7 +378,7 @@ def _run_study(spec, root, concurrency):
     protocol = {"spec": spec, "config": config}
     path = root / "protocol.json"
     if path.exists() and json.loads(path.read_text()) != protocol:
-        raise ValueError("Protocol changed; use a new study name")
+        raise ValueError("Protocol changed; use a new case name")
     save(path, protocol)
     pinned_config = root / "config.yaml"
     OmegaConf.save(OmegaConf.create(config), pinned_config)
@@ -443,20 +467,37 @@ def _run_study(spec, root, concurrency):
     return winner
 
 
+# Preserve existing callers and saved launcher commands.
+run_study = run_case
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--address", default="auto")
+    parser.add_argument(
+        "--case-concurrency",
+        "--study-concurrency",
+        dest="case_concurrency",
+        type=int,
+        default=1,
+        help="Independent experiment cases to execute concurrently",
+    )
     args = parser.parse_args()
-    if args.concurrency < 1:
+    if args.concurrency < 1 or args.case_concurrency < 1:
         parser.error("Concurrency must be positive")
     import ray
 
     ray.init(address=args.address)
-    for spec in json.loads(args.manifest.read_text()):
-        run_study(spec, args.output, args.concurrency)
+    with ThreadPoolExecutor(max_workers=args.case_concurrency) as pool:
+        futures = [
+            pool.submit(run_case, spec, args.output, args.concurrency)
+            for spec in json.loads(args.manifest.read_text())
+        ]
+        for future in futures:
+            future.result()
 
 
 if __name__ == "__main__":
