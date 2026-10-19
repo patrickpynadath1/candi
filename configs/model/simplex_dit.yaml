@@ -10,3 +10,6 @@ tie_word_embeddings: false
 input_mode: expectation
 self_conditioning: ${self_conditioning.enabled}
 self_conditioning_source: ${self_conditioning.source}
+
+projection_precision: legacy
+projection_chunk_size: 0

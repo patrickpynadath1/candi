@@ -1,0 +1,62 @@
+{
+  "baseline": "bb666ad12226b5e3fa2398bae327be995c424276",
+  "source_sha256": {
+    "configs/hybrid_view/simplex.yaml": "c74ba0225b981e37329c8fcdb66a367c519d8e692f144bb52720f7c38f051c63",
+    "configs/model/hybrid_uniform_simplex.yaml": "7c6a877fd4204f65d465e4e94ab836d28cc0bafb6595d8698698fc34db275e09",
+    "configs/model/simplex_dit.yaml": "69e2e0656c58da064d2c63f6fa009097ed6d032c0360d4bb221200f5a61bbcec",
+    "configs/process/dirichlet.yaml": "fdf520bbc9261961dcaf799ee98fbbcc4399a4aefcaa0b084e8777a0f04b39a9",
+    "core/models/components.py": "81e524ff636612ab01e0bb1543a2c3102b86fd30ef6428cc75245b52701d03f3",
+    "core/models/simplex.py": "fcff20e0f8269a344a1f7503f1fae4225a54fee2f63cbe521fe5ff768850961d",
+    "core/processes/dirichlet.py": "6f4d926b1c1c63fb76c6429b47b428400f91ac1aa49362da77a5a4934381d4aa",
+    "core/processes/simplex_math.py": "9c2c4e8906f5e7befa1eed1c8c2952c87b6a34853f48196b49fecd434a604552",
+    "core/representations/noisy_inputs.py": "85228fc2e3f19c5859c033e3b2b8700454176637acd43a18c7501b62c0fbddd3",
+    "core/models/simplex_projection.py": "eed974ccac602f78cc51023aee0d3ec3c39b919abdb1b8d7600cd7541e16bda9",
+    "core/processes/simplex_triton.py": "8d8125a2f0d0768f8cc44be1f51346e3dd39975c3da3472a37d2729d9c2df350",
+    "core/tests/test_simplex_precision.py": "913c8ef033ca6f6a75d20fa7999a2c7315f43a53d84f829f2ce1d25a64d94f13",
+    "scripts/benchmark_simplex_precision.py": "e75653a57f66b299b00abb4b326b2bdde6f05b4bc55a9bf9c9b5705b18c2928b",
+    "scripts/validate_simplex_precision.py": "a7a7f195000719e6aa8bc3c2cf34348a2e05af75e3656af72c48d2fb4cd9fa1f"
+  },
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+    "OMP_NUM_THREADS": "4",
+    "PYTHONPATH": "."
+  },
+  "gpu_tests_command": [
+    "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+    "-m",
+    "pytest",
+    "core/tests/test_simplex_precision.py",
+    "core/tests/test_simplex.py",
+    "core/tests/test_adaptive_view_clock.py",
+    "core/tests/test_hybrid_diffusion.py",
+    "core/tests/test_hybrid_composition.py",
+    "-q",
+    "--junitxml=results/simplex_precision/tests.xml"
+  ],
+  "cpu_tests_command": [
+    "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+    "-m",
+    "pytest",
+    "core/tests/test_simplex_precision.py",
+    "-q",
+    "--junitxml=results/simplex_precision/cpu-tests.xml"
+  ],
+  "cpu_environment_override": {
+    "CUDA_VISIBLE_DEVICES": ""
+  },
+  "numerical_command": [
+    "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+    "scripts/validate_simplex_precision.py"
+  ],
+  "benchmark_command": [
+    "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+    "scripts/benchmark_simplex_precision.py"
+  ],
+  "results": {
+    "gpu_tests_passed": 114,
+    "cpu_tests_passed": 29,
+    "cpu_tests_skipped": 2,
+    "benchmark_successes": 75,
+    "benchmark_ooms": 3
+  }
+}

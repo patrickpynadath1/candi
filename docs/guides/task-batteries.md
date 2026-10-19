@@ -371,10 +371,15 @@ so corruption, prior and reverse log states stay in the selected precision.
 Hybrid clean states use float32, avoiding promotion of the large noisy state.
 Existing serialized configs need an explicit precision override when resumed.
 
-Run `python -m scripts.benchmark_simplex_precision --device cuda --output result.json`
+Run `python -m scripts.benchmark_simplex_state_precision --device cuda --output result.json`
 on a reserved GPU to compare FP32/FP64 forward corruption and churn=1 reverse
 sampling at batch16, sequence512, vocabulary49153. This is a corruption benchmark,
 not end-to-end training throughput. A small CPU smoke benchmark was run; no GPU
 benchmark was launched while the Gaussian hybrids own the allocation.
 All simplex jobs are stopped for now, leaving masked/uniform Gaussian hybrids
 running concurrently. Their precision/settings were not changed by this patch.
+
+The optional fused FP32 sampler, BF16 projection, and row chunking are described
+in [the simplex optimization benchmark](../benchmarks/simplex-precision.md).
+They remain opt-in; both precision naming conventions are accepted. The original
+forward/reverse benchmark is retained as `scripts.benchmark_simplex_state_precision`.
