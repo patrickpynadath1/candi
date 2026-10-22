@@ -71,6 +71,7 @@ block-local generation, adaptive-time feedback, and the current Text8 evidence.
 - [GIDD mask/uniform corruption](methods/gidd.md): a single-view mixture with a CE baseline.
 - [Gaussian diffusion](methods/gaussian-diffusion.md): one-hot/embedding recipes.
 - [Spherical flow matching](methods/spherical-flow-matching.md)
+- [Rank-linear schedules](methods/rank-linear-schedules.md): simplex and spherical calibration.
 - [Simplex diffusion](methods/simplex-diffusion.md)
 - [Blurring diffusion](methods/blurring-diffusion.md)
 - [RePlaid](methods/replaid.md)

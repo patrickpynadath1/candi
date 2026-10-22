@@ -1,0 +1,5 @@
+_target_: core.noise_schedules.spherical_rank.SphericalRankSchedule
+dimension: ${..representation.state_dim}
+rank_min: 0.01
+rank_max: 0.49
+endpoint_width: 0.01

@@ -1,0 +1,12 @@
+_target_: core.noise_schedules.simplex_rank.SimplexRankSchedule
+vocab_size: ${task.vocab_size}
+rank_min: 0.01
+rank_max: 0.49
+endpoint_width: 0.01
+base:
+  _target_: core.noise_schedules.simplex.SimplexSchedule
+  kind: constant_linear
+  nu0: 0.4
+  nu1: 0.75
+  pivot: 0.8
+  epsilon: 1.0
