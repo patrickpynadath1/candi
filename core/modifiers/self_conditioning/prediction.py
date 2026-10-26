@@ -32,6 +32,7 @@ class PredictionCoordinator:
         probability=0.9,
         evaluation_probability=1.0,
         selection="bernoulli",
+        gradient_mode="detached",
     ):
         if source not in SOURCES:
             raise ValueError(
@@ -44,6 +45,9 @@ class PredictionCoordinator:
         if selection not in {"bernoulli", "fixed_count"}:
             raise ValueError("selection must be bernoulli or fixed_count")
         self.selection = selection
+        if gradient_mode not in {"detached", "both", "producer", "mixed"}:
+            raise ValueError("unknown self-conditioning gradient mode")
+        self.gradient_mode = gradient_mode
 
     def select(self, batch, device, training):
         probability = self.probability if training else self.evaluation_probability
@@ -89,20 +93,26 @@ class PredictionCoordinator:
         mean,
         logits_transform,
         training_pathway="training_posterior",
+        detach=True,
     ):
         if not isinstance(output, ModelPrediction):
             raise TypeError(
                 "self-conditioning requires logits and hidden model outputs"
             )
-        with torch.no_grad():
+        with torch.no_grad() if detach else nullcontext():
             if self.source == "hidden":
-                return final_hidden(output.hidden).detach()
+                return (
+                    final_hidden(output.hidden).detach()
+                    if detach
+                    else final_hidden(output.hidden)
+                )
             probabilities = predictor.probabilities(
                 getattr(predictor, training_pathway)(
                     logits_transform(output.logits), observed
                 )
             )
-            return mean(probabilities).detach()
+            value = mean(probabilities)
+            return value.detach() if detach else value
 
     def predict(
         self,
@@ -123,6 +133,12 @@ class PredictionCoordinator:
         if not self.enabled:
             return parameterize(logits_transform(model(*inputs)), observed)
         conditioning = None
+        mode = (
+            self.gradient_mode
+            if model.training and torch.is_grad_enabled() and trajectory is None
+            else "detached"
+        )
+        producer = None
         probability = (
             self.probability if model.training else self.evaluation_probability
         )
@@ -134,7 +150,7 @@ class PredictionCoordinator:
                 selected = self.select(batch, observed.device, model.training)
             if selected.any():
                 with (
-                    torch.no_grad(),
+                    torch.no_grad() if mode == "detached" else nullcontext(),
                     torch.autocast(
                         observed.device.type,
                         enabled=torch.is_autocast_enabled(observed.device.type),
@@ -158,10 +174,41 @@ class PredictionCoordinator:
                         mean,
                         bootstrap_logits_transform or logits_transform,
                         training_pathway,
+                        detach=mode == "detached",
                     )
                     feedback = bootstrap_feedback_transform(feedback)
                     conditioning = feedback.new_zeros((batch, *feedback.shape[1:]))
                     conditioning[selected] = feedback
+        if mode in {"producer", "mixed"} and conditioning is not None:
+            producer = selected.clone()
+            if mode == "mixed":
+                indices = selected.nonzero().flatten()
+                producer.zero_()
+                indices = indices[torch.randperm(len(indices), device=indices.device)]
+                producer[indices[: len(indices) // 2]] = True
+            shape = (len(producer),) + (1,) * (conditioning.ndim - 1)
+            conditioning = torch.where(
+                producer.reshape(shape), conditioning, conditioning.detach()
+            )
+            # Detached parameter values freeze the consumer while preserving its
+            # Jacobian with respect to the producer's conditioning tensor.
+            with torch.autocast(
+                observed.device.type,
+                enabled=torch.is_autocast_enabled(observed.device.type),
+                cache_enabled=False,
+            ):
+                frozen = torch.func.functional_call(
+                    model,
+                    _detached_parameters(model),
+                    inputs,
+                    dict(self_condition=conditioning, return_features=True),
+                    tie_weights=False,
+                )
+                output = model(
+                    *inputs, self_condition=conditioning.detach(), return_features=True
+                )
+            logits = torch.where(producer[:, None, None], frozen.logits, output.logits)
+            return parameterize(logits_transform(logits), observed)
         output = model(*inputs, self_condition=conditioning, return_features=True)
         if trajectory is not None:
             trajectory.update(
@@ -196,3 +243,25 @@ def _select_batch(value, selected):
             },
         )
     return value
+
+
+def _detached_parameters(model):
+    """Swap each physical parameter slot once, preserving tied parameter values.
+
+    A shared submodule can have several paths (e.g. a view representation also
+    exposed through the backbone). Expanding all aliases in functional_call can
+    restore a detached value over the original Parameter on PyTorch 2.5.
+    named_modules visits each module once; local parameter names retain distinct
+    slots even when their values are tied across modules.
+    """
+    values = {}
+    parameters = {}
+    for module_name, module in model.named_modules():
+        for name, parameter in module.named_parameters(
+            recurse=False, remove_duplicate=False
+        ):
+            if id(parameter) not in values:
+                values[id(parameter)] = parameter.detach()
+            key = f"{module_name}.{name}" if module_name else name
+            parameters[key] = values[id(parameter)]
+    return parameters

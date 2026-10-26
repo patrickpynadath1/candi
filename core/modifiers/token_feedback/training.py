@@ -39,7 +39,7 @@ class RepresentationFeedback(nn.Module):
 
 class TokenFeedback(nn.Module):
     def __init__(
-        self, algorithm, *, depth, loss_weight=1.0, gate="scalar", detach=False
+        self, algorithm, *, depth, loss_weight=1.0, detach=False
     ):
         super().__init__()
         if loss_weight < 0:
@@ -78,7 +78,7 @@ class TokenFeedback(nn.Module):
             raise ValueError(f"token feedback depth must be in [0, {len(blocks) - 1}]")
         hidden_size = table.shape[1]
         model.block_execution = TokenFeedbackBlocks(
-            blocks[depth], depth, hidden_size, gate=gate, detach=detach
+            blocks[depth], depth, hidden_size, detach=detach
         )
         self._feedback_ref = weakref.ref(model.block_execution)
         self.loss_weight = float(loss_weight)

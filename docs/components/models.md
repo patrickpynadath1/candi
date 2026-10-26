@@ -149,6 +149,6 @@ attached logits and trains the extractor and shared output head. The default is
 `false`, which lets both losses train the intermediate prediction.
 
 This detaches the predicted probabilities, not the entire feedback branch: the
-embedding table and feedback gate still receive main-loss gradients, and the
+embedding table and feedback projection still receive main-loss gradients, and the
 backbone and shared output head still train through their normal final-output
 paths. Changing this flag does not change forward values or inference behavior.

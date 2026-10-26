@@ -50,7 +50,6 @@ class TrainingModule(L.LightningModule):
                 self.algorithm,
                 depth=feedback.depth,
                 loss_weight=feedback.get("loss_weight", 1.0),
-                gate=feedback.get("gate", "scalar"),
                 detach=feedback.get("detach", False),
             )
         if self.config.get("self_conditioning", {}).get("enabled", False):

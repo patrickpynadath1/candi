@@ -17,10 +17,18 @@ class ConditioningProjection(nn.Module):
     def __init__(self, input_dim, hidden_size, initialization="zero"):
         super().__init__()
         self.projection = nn.Linear(input_dim, hidden_size, bias=False)
-        if initialization not in {"zero", "default"}:
-            raise ValueError("conditioning initialization must be zero or default")
+        if initialization not in {"zero", "default", "identity"}:
+            raise ValueError(
+                "conditioning initialization must be zero, default, or identity"
+            )
         if initialization == "zero":
             nn.init.zeros_(self.projection.weight)
+        elif initialization == "identity":
+            if input_dim != hidden_size:
+                raise ValueError(
+                    "identity conditioning requires equal input and hidden dimensions"
+                )
+            nn.init.eye_(self.projection.weight)
 
     def forward(self, hidden, conditioning):
         if conditioning is None:

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from hydra.utils import instantiate
 import lightning as L
+import logging
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from omegaconf import OmegaConf
@@ -14,6 +15,9 @@ from core.training.strategies import build_strategy
 
 
 def run(config):
+    # Default also applies to queued configs created before compilation existed.
+    if "compile" not in config:
+        config.compile = True
     L.seed_everything(config.seed, workers=True)
     output = Path(config.output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -25,6 +29,16 @@ def run(config):
     task = instantiate(config.task)
     data = instantiate(config.datamodule, task=task)
     module = TrainingModule(config)
+    if config.compile:
+        from core.models.layers import DDiTBlock
+
+        blocks = [block for block in module.modules() if isinstance(block, DDiTBlock)]
+        for block in blocks:
+            # In-place compilation preserves parameter names and checkpoint keys.
+            block.compile(dynamic=False)
+        logging.getLogger(__name__).info(
+            "torch.compile enabled for %d transformer blocks", len(blocks)
+        )
     if config.mode == "train":
         callbacks = [
             ModelCheckpoint(
@@ -92,7 +106,9 @@ def run(config):
             module, config.evaluation.checkpoint, legacy=config.evaluation.legacy
         )
         module.to(config.evaluation.device)
-        evaluation_name = config.evaluator.get("evaluation_name") or task.primary_metric.dataset
+        evaluation_name = (
+            config.evaluator.get("evaluation_name") or task.primary_metric.dataset
+        )
         task.prepare_evaluation(evaluation_name)
         evaluate = instantiate(config.evaluator)
         result = evaluate(

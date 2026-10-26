@@ -39,7 +39,7 @@ def algorithm(*overrides):
 
 
 @pytest.mark.parametrize("return_features", [False, True])
-def test_zero_gate_preserves_disabled_model_and_one_backbone_pass(return_features):
+def test_zero_projection_preserves_disabled_model_and_one_backbone_pass(return_features):
     baseline = model().eval()
     enabled = copy.deepcopy(baseline)
     enabled.block_execution = __import__(
@@ -68,7 +68,7 @@ def test_zero_gate_preserves_disabled_model_and_one_backbone_pass(return_feature
         assert actual.auxiliary_logits.shape == (2, 7, 11)
 
 
-def test_gate_gradient_then_feedback_changes_output():
+def test_projection_gradient_then_feedback_changes_output():
     net = model().eval()
     from core.modifiers.token_feedback.model import TokenFeedbackBlocks
 
@@ -77,9 +77,9 @@ def test_gate_gradient_then_feedback_changes_output():
     tokens, time = torch.randint(0, 11, (2, 7)), torch.rand(2)
     baseline = net(tokens, time).detach()
     net(tokens, time).square().mean().backward()
-    assert net.block_execution.gate.grad.abs() > 0
+    assert net.block_execution.conditioning.projection.weight.grad.abs().sum() > 0
     with torch.no_grad():
-        net.block_execution.gate.fill_(0.5)
+        net.block_execution.conditioning.projection.weight.copy_(0.5 * torch.eye(16))
     assert not torch.equal(net(tokens, time), baseline)
 
 
@@ -99,7 +99,7 @@ def test_auxiliary_ce_uses_loss_mask_and_trains_extractor_after_head_bootstrap()
     torch.testing.assert_close(result["token_feedback_loss"], expected)
     result["loss"].backward()
     assert result["token_feedback_loss"].isfinite()
-    assert wrapped.feedback.gate.grad is not None
+    assert wrapped.feedback.conditioning.projection.weight.grad is not None
     assert wrapped.feedback.extractor.attn_qkv.weight.grad is not None
     # The shared head starts at zero, so extractor gradients bootstrap only
     # after the head has taken an update.
@@ -154,7 +154,7 @@ def test_detach_blocks_main_loss_through_auxiliary_logits_only(detach):
     # a missing gradient path.
     torch.nn.init.normal_(net.output_layer.linear.weight, std=0.1)
     with torch.no_grad():
-        net.block_execution.gate.fill_(0.5)
+        net.block_execution.conditioning.projection.weight.copy_(0.5 * torch.eye(16))
     tokens, time = torch.randint(0, 11, (2, 7)), torch.rand(2)
     output = net(tokens, time, return_features=True)
     main_gradient = torch.autograd.grad(
