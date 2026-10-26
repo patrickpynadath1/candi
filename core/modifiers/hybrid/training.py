@@ -20,6 +20,7 @@ class HybridDiffusion(PosteriorDiffusion):
         length=180,
         prediction=None,
         synchronize_committed=False,
+        adaptive_time_views=None,
     ):
         super().__init__(prediction)
         if not getattr(model, "supports_fused_streams", False):
@@ -41,24 +42,46 @@ class HybridDiffusion(PosteriorDiffusion):
         self.time_sampler, self.objective = time_sampler, objective
         self.length = length
         self.synchronize_committed = bool(synchronize_committed)
+        self.adaptive_time_views = tuple(adaptive_time_views or ())
+        if self.adaptive_time_views:
+            if any(
+                type(i) is not int or i < 0 or i >= len(model.views)
+                for i in self.adaptive_time_views
+            ):
+                raise ValueError("adaptive_time_views must contain valid view indices")
+            if not hasattr(time_sampler, "uniform") or not callable(time_sampler):
+                raise TypeError(
+                    "view-local adaptive time requires a sampler with uniform draws "
+                    "and a quantile map"
+                )
         self.validate_prediction()
 
     @property
     def views(self):
         return self.model.views
 
+    def _adaptive_time(self, time):
+        mapped = self.time_sampler(time)
+        # A flat CDF tail can make the generalized inverse send 1 to an
+        # interior time. Priors require the exact pure-noise endpoint, and
+        # the clean endpoint must remain exact too. Leave interior draws alone.
+        return torch.where((time == 0) | (time == 1), time, mapped)
+
     def points(
         self, global_time, *, training=False, corruption_mask=None, sequence_layout=None
     ):
+        adaptive_time = (
+            self._adaptive_time(global_time) if self.adaptive_time_views else global_time
+        )
         return tuple(
             point(
                 view,
-                global_time,
+                adaptive_time if index in self.adaptive_time_views else global_time,
                 training=training,
                 corruption_mask=corruption_mask,
                 sequence_layout=sequence_layout,
             )
-            for view in self.views
+            for index, view in enumerate(self.views)
         )
 
     def model_inputs(self, states, points, global_time):
@@ -111,7 +134,13 @@ class HybridDiffusion(PosteriorDiffusion):
     ):
         if corruption_mask is None:
             corruption_mask = loss_mask
-        time = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
+        # Keep the coordinator/discrete clock uniform. Only selected continuous
+        # views receive the learned quantile map, in training AND generation.
+        sampler = (
+            self.time_sampler.uniform if self.adaptive_time_views else self.time_sampler
+        )
+        time = sampler.sample(len(tokens), tokens.device, **time_context)
+        feedback_time = self._adaptive_time(time) if self.adaptive_time_views else time
         points = self.points(
             time,
             training=True,
@@ -153,7 +182,7 @@ class HybridDiffusion(PosteriorDiffusion):
         if training:
             observe_time = getattr(self.time_sampler, "observe", None)
             if observe_time is not None:
-                observe_time(time, per_token, loss_mask, step)
+                observe_time(feedback_time, per_token, loss_mask, step)
             for view, point in zip(self.views, points):
                 observe_training_loss(
                     view.time_map,

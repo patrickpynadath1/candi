@@ -9,6 +9,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from dataclasses import dataclass
+from contextlib import nullcontext
 
 
 @dataclass
@@ -23,8 +24,16 @@ class TokenInput(nn.Module):
 
 
 class SimplexExpectationInput(nn.Module):
+    def __init__(self, precision="legacy", chunk_size=0):
+        super().__init__()
+        self.precision, self.chunk_size = precision, chunk_size
+
     def forward(self, state, embedding):
-        return state.exp().to(embedding.embedding.dtype) @ embedding.embedding
+        from .simplex_projection import simplex_projection
+
+        return simplex_projection(
+            state, embedding.embedding, self.precision, self.chunk_size
+        )
 
 
 class SimplexArgmaxInput(nn.Module):
@@ -73,6 +82,10 @@ class TemperatureOutput(LayerOutput):
 
 
 class DiffusionBlocks(nn.Module):
+    def __init__(self, activation_checkpointing=False):
+        super().__init__()
+        self.activation_checkpointing = activation_checkpointing
+
     def forward(
         self,
         hidden,
@@ -86,7 +99,29 @@ class DiffusionBlocks(nn.Module):
     ):
         del project, feedback_embedding
         for block in blocks:
-            hidden = block(hidden, rotary, condition, attention_mask)
+            if self.activation_checkpointing and torch.is_grad_enabled():
+                from torch.utils.checkpoint import checkpoint, set_checkpoint_early_stop
+
+                # Legacy TorchScript residual helpers wrap checkpoint's internal
+                # early-stop exception. Recompute the complete block instead.
+                # Compiled execution inlines these helpers, so it can retain
+                # checkpoint's early-stop optimization without Python context.
+                context = (
+                    nullcontext()
+                    if torch.compiler.is_compiling()
+                    else set_checkpoint_early_stop(False)
+                )
+                with context:
+                    hidden = checkpoint(
+                        block,
+                        hidden,
+                        rotary,
+                        condition,
+                        attention_mask,
+                        use_reentrant=False,
+                    )
+            else:
+                hidden = block(hidden, rotary, condition, attention_mask)
         return hidden
 
 

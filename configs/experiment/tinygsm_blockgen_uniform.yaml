@@ -1,7 +1,7 @@
 # @package _global_
 # python main.py +experiment=tinygsm_blockgen_uniform
-# On one GPU: trainer.devices=1 trainer.accumulate_grad_batches=8
-# Batch remains 512 globally / 64 per GPU per microstep.
+# On one GPU: trainer.devices=1 trainer.accumulate_grad_batches=64
+# Batch remains 512 globally / 8 per GPU per microstep.
 # Uniform ELBO; no Gaussian curriculum or self-conditioning.
 defaults:
 - tinygsm_blockgen_common

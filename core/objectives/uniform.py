@@ -3,11 +3,12 @@
 import torch
 
 
-class UniformDiffusionObjective:
+class UniformDiffusionObjective(torch.nn.Module):
     def __init__(self, vocab_size):
+        super().__init__()
         self.vocab_size = vocab_size
 
-    def __call__(self, log_x_theta, xt, x0, alpha_t, dalpha_t, low_var=False):
+    def forward(self, log_x_theta, xt, x0, alpha_t, dalpha_t, low_var=False):
         assert alpha_t.ndim == 2
         assert x0.ndim == 2
         assert xt.ndim == 2

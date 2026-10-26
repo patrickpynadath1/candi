@@ -1,0 +1,13 @@
+# @package _global_
+defaults:
+- tinygsm_masked_gaussian_sc_adaptive
+- override /sampler: insertion
+- override /variable_length: insertion
+- _self_
+sampler:
+  steps: 16
+  max_length: 512
+  overflow: truncate
+  final_denoise: greedy
+variable_length:
+  time_sampling_include_aux: false

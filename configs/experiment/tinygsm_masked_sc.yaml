@@ -1,0 +1,26 @@
+# @package _global_
+defaults:
+- tinygsm_sc_common
+- override /algorithm: mdlm
+- override /model: dit
+- override /parameterization: posterior
+- override /process: absorbing
+- override /objective: cross_entropy
+- override /noise_schedule: log_linear
+- override /time_sampler: antithetic
+- override /sampler: ancestral
+- _self_
+algorithm:
+  time_conditioning: false
+parameterization:
+  temperature: 0.1
+sampler:
+  steps: 16
+model:
+  hidden_size: 768
+  cond_dim: 128
+  n_blocks: 12
+  n_heads: 12
+  dropout: 0.1
+  adaLN: true
+  tie_word_embeddings: false

@@ -49,7 +49,18 @@ loader:
 training:
   ema: 0.9999
   warmup_steps: 2500
+  performance:
+    hidden_only_bootstrap: false
+    activation_checkpointing: false
+    compile:
+      enabled: false
+      backend: inductor
+      mode: default
+      dynamic: true
+      fullgraph: false
+      objective: false
 optimizer:
+  fused: null
   lr: 0.0003
   beta1: 0.9
   beta2: 0.999

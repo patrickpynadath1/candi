@@ -69,6 +69,9 @@ class TrainingModule(L.LightningModule):
         self._train_metric_totals = {}
 
     def on_fit_start(self):
+        from .performance import configure_performance
+
+        configure_performance(self)
         if self.ema:
             self.ema.move_shadow_params_to_device(self.device)
 
@@ -226,7 +229,16 @@ class TrainingModule(L.LightningModule):
             betas=(c.beta1, c.beta2),
             eps=c.epsilon,
             weight_decay=c.weight_decay,
+            fused=c.get("fused", None),
         )
+        if c.get("fused", None) is not None:
+            from .performance import restore_optimizer_execution
+
+            from functools import partial
+
+            optimizer.register_load_state_dict_post_hook(
+                partial(restore_optimizer_execution, fused=c.fused)
+            )
         if self.config.get("lr_scheduler") is not None:
             scheduler = instantiate(self.config.lr_scheduler, optimizer=optimizer)
         else:
@@ -238,6 +250,30 @@ class TrainingModule(L.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {"scheduler": scheduler, "interval": "step"},
         }
+
+    def configure_gradient_clipping(
+        self, optimizer, gradient_clip_val=None, gradient_clip_algorithm=None
+    ):
+        # Lightning's AMP plugin rejects fused AdamW clipping even in BF16,
+        # where no GradScaler/unscaling exists. Clip these unscaled gradients
+        # directly; leave FP16 and other precision plugins to Lightning.
+        if (
+            self.config.optimizer.get("fused", False)
+            and self.config.trainer.precision == "bf16-mixed"
+        ):
+            if gradient_clip_val is None or gradient_clip_val <= 0:
+                return
+            parameters = [
+                p for group in optimizer.param_groups for p in group["params"]
+            ]
+            if gradient_clip_algorithm == "value":
+                torch.nn.utils.clip_grad_value_(parameters, gradient_clip_val)
+            else:
+                torch.nn.utils.clip_grad_norm_(parameters, gradient_clip_val)
+        else:
+            super().configure_gradient_clipping(
+                optimizer, gradient_clip_val, gradient_clip_algorithm
+            )
 
     def on_save_checkpoint(self, checkpoint):
         checkpoint["core_format_version"] = 1

@@ -138,13 +138,34 @@ class CANDIRepresentation(nn.Module):
 
 
 class SimplexRepresentation(TokenRepresentation):
+    def __init__(
+        self,
+        *args,
+        projection_precision="legacy",
+        projection_chunk_size=0,
+        state_precision="float32",
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        state_precision = {"float32": "fp32", "float64": "fp64"}.get(
+            state_precision, state_precision
+        )
+        if state_precision not in {"fp32", "fp64"}:
+            raise ValueError("state_precision must be fp32 or fp64")
+        self.state_dtype = torch.float32 if state_precision == "fp32" else torch.float64
+        self.projection_precision = projection_precision
+        self.projection_chunk_size = projection_chunk_size
+
     def clean_state(self, tokens):
-        return F.one_hot(tokens, len(self.embedding)).double().log()
+        return F.one_hot(tokens, len(self.embedding)).to(self.state_dtype).log()
 
     def to_model_embedding(self, state, point):
         del point
-        probabilities = state.exp().to(self.embedding)
-        return probabilities @ self._table() * self.scale
+        from core.models.simplex_projection import simplex_projection
+
+        return simplex_projection(
+            state, self._table(), self.projection_precision, self.projection_chunk_size
+        ) * self.scale
 
 
 class CleanEmbeddingTable(nn.Module):

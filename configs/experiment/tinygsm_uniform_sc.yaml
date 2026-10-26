@@ -1,0 +1,27 @@
+# @package _global_
+defaults:
+- tinygsm_sc_common
+- override /algorithm: uniform_diffusion
+- override /model: dit_conditioned
+- override /parameterization: plug_in
+- override /process: uniform
+- override /objective: uniform
+- override /noise_schedule: log_linear
+- override /time_sampler: antithetic
+- override /sampler: uniform_ancestral
+- override /token_space@token_space: data_only
+- _self_
+algorithm:
+  time_conditioning: false
+parameterization:
+  temperature: 0.1
+sampler:
+  steps: 16
+model:
+  hidden_size: 768
+  cond_dim: 128
+  n_blocks: 12
+  n_heads: 12
+  dropout: 0.1
+  adaLN: true
+  tie_word_embeddings: false

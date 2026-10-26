@@ -1,0 +1,3509 @@
+{
+  "command": [
+    "scripts/benchmark_simplex_precision.py"
+  ],
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+    "OMP_NUM_THREADS": "4"
+  },
+  "git_head": "bb666ad12226b5e3fa2398bae327be995c424276",
+  "warmup": 2,
+  "repeats": 3,
+  "cases": [
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        3.978881984949112,
+        3.3097881823778152,
+        3.7680938839912415
+      ],
+      "median_ms": 3.7680938839912415,
+      "peak_allocated": 49594880,
+      "peak_reserved": 58720256,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        6.163258105516434,
+        4.863785579800606,
+        5.316233262419701
+      ],
+      "median_ms": 5.316233262419701,
+      "peak_allocated": 67419648,
+      "peak_reserved": 79691776,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp64",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        5.839275196194649,
+        5.008608102798462,
+        5.259187892079353
+      ],
+      "median_ms": 5.259187892079353,
+      "peak_allocated": 72820224,
+      "peak_reserved": 94371840,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp64\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        4.077250137925148,
+        2.2337250411510468,
+        2.2904612123966217
+      ],
+      "median_ms": 2.2904612123966217,
+      "peak_allocated": 32797696,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        5.986709147691727,
+        4.2748115956783295,
+        4.224097356200218
+      ],
+      "median_ms": 4.2748115956783295,
+      "peak_allocated": 58353152,
+      "peak_reserved": 73400320,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        5.311219021677971,
+        4.224691540002823,
+        4.160827025771141
+      ],
+      "median_ms": 4.224691540002823,
+      "peak_allocated": 70840832,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.2692417949438095,
+        0.7122494280338287,
+        0.7113143801689148
+      ],
+      "median_ms": 0.7122494280338287,
+      "peak_allocated": 18929664,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        2.5670118629932404,
+        2.2464878857135773,
+        2.244412899017334
+      ],
+      "median_ms": 2.2464878857135773,
+      "peak_allocated": 58353152,
+      "peak_reserved": 73400320,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fused",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        3.3709555864334106,
+        2.325698733329773,
+        2.2844504565000534
+      ],
+      "median_ms": 2.325698733329773,
+      "peak_allocated": 70840832,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fused\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.340588554739952,
+        0.1740921288728714,
+        0.15286169946193695
+      ],
+      "median_ms": 0.1740921288728714,
+      "peak_allocated": 24660480,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.5133228152990341,
+        1.1018570512533188,
+        1.0726172477006912
+      ],
+      "median_ms": 1.1018570512533188,
+      "peak_allocated": 58353152,
+      "peak_reserved": 67108864,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.3952124863862991,
+        0.20794756710529327,
+        0.19407644867897034
+      ],
+      "median_ms": 0.20794756710529327,
+      "peak_allocated": 31379968,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.5135202556848526,
+        0.9963773190975189,
+        0.9535979479551315
+      ],
+      "median_ms": 0.9963773190975189,
+      "peak_allocated": 70840832,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        3.8629360496997833,
+        3.2030250877141953,
+        3.6592260003089905
+      ],
+      "median_ms": 3.6592260003089905,
+      "peak_allocated": 51693568,
+      "peak_reserved": 58720256,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        5.140300840139389,
+        4.599504172801971,
+        5.043543875217438
+      ],
+      "median_ms": 5.043543875217438,
+      "peak_allocated": 69518336,
+      "peak_reserved": 79691776,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp64",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        5.765384063124657,
+        4.770573228597641,
+        5.206681787967682
+      ],
+      "median_ms": 5.206681787967682,
+      "peak_allocated": 72820224,
+      "peak_reserved": 94371840,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp64\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        2.627940848469734,
+        2.232784405350685,
+        2.18794122338295
+      ],
+      "median_ms": 2.232784405350685,
+      "peak_allocated": 33847808,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        6.3993241637945175,
+        5.182275548577309,
+        4.076719284057617
+      ],
+      "median_ms": 5.182275548577309,
+      "peak_allocated": 58353152,
+      "peak_reserved": 73400320,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        5.225762724876404,
+        4.198985174298286,
+        4.027940332889557
+      ],
+      "median_ms": 4.198985174298286,
+      "peak_allocated": 71885824,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.067398115992546,
+        0.6740149110555649,
+        0.6478335708379745
+      ],
+      "median_ms": 0.6740149110555649,
+      "peak_allocated": 19946496,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        2.2995509207248688,
+        1.8533039838075638,
+        2.1909214556217194
+      ],
+      "median_ms": 2.1909214556217194,
+      "peak_allocated": 58353152,
+      "peak_reserved": 73400320,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fused",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        3.2251589000225067,
+        2.1314434707164764,
+        2.3054908961057663
+      ],
+      "median_ms": 2.3054908961057663,
+      "peak_allocated": 71885824,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fused\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.2911055237054825,
+        0.16926974058151245,
+        0.15508010983467102
+      ],
+      "median_ms": 0.16926974058151245,
+      "peak_allocated": 24660480,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.261407509446144,
+        0.7030162960290909,
+        0.6521008908748627
+      ],
+      "median_ms": 0.7030162960290909,
+      "peak_allocated": 58353152,
+      "peak_reserved": 67108864,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.4385245740413666,
+        0.21604076027870178,
+        0.19781291484832764
+      ],
+      "median_ms": 0.21604076027870178,
+      "peak_allocated": 31379968,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.6396008431911469,
+        1.2434683740139008,
+        1.1972375214099884
+      ],
+      "median_ms": 1.2434683740139008,
+      "peak_allocated": 70840832,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        3.9155688136816025,
+        3.2359249889850616,
+        3.732902929186821
+      ],
+      "median_ms": 3.732902929186821,
+      "peak_allocated": 51693568,
+      "peak_reserved": 58720256,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        5.802696570754051,
+        4.836440086364746,
+        5.186785012483597
+      ],
+      "median_ms": 5.186785012483597,
+      "peak_allocated": 69518336,
+      "peak_reserved": 79691776,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp64",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 2097664
+      },
+      "milliseconds": [
+        6.955599412322044,
+        5.85421547293663,
+        6.1690472066402435
+      ],
+      "median_ms": 6.1690472066402435,
+      "peak_allocated": 72820224,
+      "peak_reserved": 94371840,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp64\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        3.5551395267248154,
+        2.348572015762329,
+        2.332093194127083
+      ],
+      "median_ms": 2.348572015762329,
+      "peak_allocated": 33847808,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        6.6767241805791855,
+        5.272651091217995,
+        4.5915208756923676
+      ],
+      "median_ms": 5.272651091217995,
+      "peak_allocated": 58353152,
+      "peak_reserved": 73400320,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        6.0031842440366745,
+        5.077395588159561,
+        4.494776949286461
+      ],
+      "median_ms": 5.077395588159561,
+      "peak_allocated": 71885824,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.0688360780477524,
+        0.6353650242090225,
+        0.622384250164032
+      ],
+      "median_ms": 0.6353650242090225,
+      "peak_allocated": 19946496,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        2.3299865424633026,
+        1.7827395349740982,
+        1.8125902861356735
+      ],
+      "median_ms": 1.8125902861356735,
+      "peak_allocated": 58353152,
+      "peak_reserved": 73400320,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fused",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        3.0479878187179565,
+        2.31277197599411,
+        2.208879217505455
+      ],
+      "median_ms": 2.31277197599411,
+      "peak_allocated": 71885824,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fused\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.3230163604021072,
+        0.17288513481616974,
+        0.15166401863098145
+      ],
+      "median_ms": 0.17288513481616974,
+      "peak_allocated": 24660480,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.6590170562267303,
+        1.1219792068004608,
+        1.0707993060350418
+      ],
+      "median_ms": 1.1219792068004608,
+      "peak_allocated": 58353152,
+      "peak_reserved": 67108864,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.47932767868042,
+        0.2482254058122635,
+        0.22636540234088898
+      ],
+      "median_ms": 0.2482254058122635,
+      "peak_allocated": 31379968,
+      "peak_reserved": 37748736,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          32,
+          4097,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1048832
+      },
+      "milliseconds": [
+        1.442786306142807,
+        0.8688252419233322,
+        0.8374471217393875
+      ],
+      "median_ms": 0.8688252419233322,
+      "peak_allocated": 70840832,
+      "peak_reserved": 88080384,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [2, 32, 4097, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "oom",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "error": "CUDA out of memory. Tried to allocate 3.00 GiB. GPU 0 has a total capacity of 47.54 GiB of which 2.05 GiB is free. Including non-PyTorch memory, this process has 45.47 GiB memory in use. Of the allocated memory 43.64 GiB is allocated by PyTorch, and 1.53 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "peak_allocated": 46860178432,
+      "peak_reserved": 48526000128,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "oom",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "error": "CUDA out of memory. Tried to allocate 3.00 GiB. GPU 0 has a total capacity of 47.54 GiB of which 2.05 GiB is free. Including non-PyTorch memory, this process has 45.47 GiB memory in use. Of the allocated memory 43.64 GiB is allocated by PyTorch, and 1.53 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "peak_allocated": 46860178432,
+      "peak_reserved": 48526000128,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp64",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "oom",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "error": "CUDA out of memory. Tried to allocate 3.00 GiB. GPU 0 has a total capacity of 47.54 GiB of which 2.05 GiB is free. Including non-PyTorch memory, this process has 45.47 GiB memory in use. Of the allocated memory 43.64 GiB is allocated by PyTorch, and 1.53 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "peak_allocated": 46860178432,
+      "peak_reserved": 48526000128,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp64\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1176.5083577483892,
+        1126.8176585435867,
+        1126.6077160835266
+      ],
+      "median_ms": 1126.8176585435867,
+      "peak_allocated": 29545542656,
+      "peak_reserved": 30815551488,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1233.6033713072538,
+        1182.1739226579666,
+        1181.3184469938278
+      ],
+      "median_ms": 1182.1739226579666,
+      "peak_allocated": 29562582016,
+      "peak_reserved": 30815551488,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1267.293380573392,
+        1160.2430939674377,
+        1159.9864233285189
+      ],
+      "median_ms": 1160.2430939674377,
+      "peak_allocated": 29562582016,
+      "peak_reserved": 30792482816,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        115.98232761025429,
+        110.10263860225677,
+        106.35811649262905
+      ],
+      "median_ms": 110.10263860225677,
+      "peak_allocated": 8207636992,
+      "peak_reserved": 8237613056,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        171.3414080440998,
+        161.45231015980244,
+        160.7493069022894
+      ],
+      "median_ms": 161.45231015980244,
+      "peak_allocated": 8225462272,
+      "peak_reserved": 8237613056,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fused",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        151.126179844141,
+        142.19006523489952,
+        140.33913239836693
+      ],
+      "median_ms": 142.19006523489952,
+      "peak_allocated": 8224676352,
+      "peak_reserved": 9827254272,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fused\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        32.67582319676876,
+        31.042296439409256,
+        31.382551416754723
+      ],
+      "median_ms": 31.382551416754723,
+      "peak_allocated": 3431404032,
+      "peak_reserved": 4993318912,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        60.9616469591856,
+        58.90639126300812,
+        57.976534590125084
+      ],
+      "median_ms": 58.90639126300812,
+      "peak_allocated": 3741920768,
+      "peak_reserved": 4993318912,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        20.126568153500557,
+        17.45849847793579,
+        16.6840311139822
+      ],
+      "median_ms": 17.45849847793579,
+      "peak_allocated": 4299642880,
+      "peak_reserved": 4993318912,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 0,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        37.36583516001701,
+        34.282948821783066,
+        34.192318096756935
+      ],
+      "median_ms": 34.282948821783066,
+      "peak_allocated": 4534660608,
+      "peak_reserved": 4993318912,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 0, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "milliseconds": [
+        3798.497984185815,
+        3755.026202648878,
+        3755.7717002928257
+      ],
+      "median_ms": 3755.7717002928257,
+      "peak_allocated": 4310200832,
+      "peak_reserved": 4395630592,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "milliseconds": [
+        3935.379520058632,
+        3891.5137760341167,
+        3891.03739336133
+      ],
+      "median_ms": 3891.5137760341167,
+      "peak_allocated": 4327240192,
+      "peak_reserved": 4722786304,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp64",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "milliseconds": [
+        3931.699136272073,
+        3889.4682060927153,
+        3889.9885080754757
+      ],
+      "median_ms": 3889.9885080754757,
+      "peak_allocated": 4327240192,
+      "peak_reserved": 4857004032,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp64\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1062.7268645912409,
+        1030.290212482214,
+        1037.4266169965267
+      ],
+      "median_ms": 1037.4266169965267,
+      "peak_allocated": 2246363648,
+      "peak_reserved": 2306867200,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1179.3540716171265,
+        1143.0336516350508,
+        1151.6470480710268
+      ],
+      "median_ms": 1151.6470480710268,
+      "peak_allocated": 2263403008,
+      "peak_reserved": 2634022912,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1169.5515010505915,
+        1139.0765756368637,
+        1149.3939068168402
+      ],
+      "median_ms": 1149.3939068168402,
+      "peak_allocated": 2282470400,
+      "peak_reserved": 2795503616,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        136.7920320481062,
+        127.58955173194408,
+        127.40067951381207
+      ],
+      "median_ms": 127.58955173194408,
+      "peak_allocated": 1912908800,
+      "peak_reserved": 1952448512,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        248.58389049768448,
+        239.61764387786388,
+        239.56197872757912
+      ],
+      "median_ms": 239.61764387786388,
+      "peak_allocated": 2131668992,
+      "peak_reserved": 2279604224,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fused",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        244.34388428926468,
+        236.47848702967167,
+        236.36515252292156
+      ],
+      "median_ms": 236.47848702967167,
+      "peak_allocated": 2282470400,
+      "peak_reserved": 2441084928,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fused\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        40.884727612137794,
+        39.981137961149216,
+        39.934705942869186
+      ],
+      "median_ms": 39.981137961149216,
+      "peak_allocated": 1845925376,
+      "peak_reserved": 3380609024,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        115.43780751526356,
+        115.1797603815794,
+        115.03078043460846
+      ],
+      "median_ms": 115.1797603815794,
+      "peak_allocated": 2131668992,
+      "peak_reserved": 3380609024,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        22.587871178984642,
+        21.548626944422722,
+        21.495552733540535
+      ],
+      "median_ms": 21.548626944422722,
+      "peak_allocated": 1921424384,
+      "peak_reserved": 3380609024,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 128,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        108.67595672607422,
+        108.71567577123642,
+        108.77613537013531
+      ],
+      "median_ms": 108.71567577123642,
+      "peak_allocated": 2282470400,
+      "peak_reserved": 3380609024,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 128, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "milliseconds": [
+        3874.0295451134443,
+        4080.7033460587263,
+        3903.2515399158
+      ],
+      "median_ms": 3903.2515399158,
+      "peak_allocated": 7122546176,
+      "peak_reserved": 7325351936,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp64",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "milliseconds": [
+        3968.5804434120655,
+        4166.967725381255,
+        3990.247769281268
+      ],
+      "median_ms": 3990.247769281268,
+      "peak_allocated": 7139585536,
+      "peak_reserved": 7352614912,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp64\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp64",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 3221291008
+      },
+      "milliseconds": [
+        3954.660063609481,
+        4152.383640408516,
+        3975.7634960114956
+      ],
+      "median_ms": 3975.7634960114956,
+      "peak_allocated": 7139585536,
+      "peak_reserved": 7352614912,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp64\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1082.1312721818686,
+        1053.6659080535173,
+        1027.9929917305708
+      ],
+      "median_ms": 1053.6659080535173,
+      "peak_allocated": 3699723776,
+      "peak_reserved": 3802136576,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1154.8947095870972,
+        1127.0534433424473,
+        1103.3683326095343
+      ],
+      "median_ms": 1127.0534433424473,
+      "peak_allocated": 3716763136,
+      "peak_reserved": 4135583744,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        1139.7400926798582,
+        1111.9376085698605,
+        1093.5090966522694
+      ],
+      "median_ms": 1111.9376085698605,
+      "peak_allocated": 3716763136,
+      "peak_reserved": 4129292288,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "corruption"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        126.37361884117126,
+        115.57836458086967,
+        115.57353660464287
+      ],
+      "median_ms": 115.57836458086967,
+      "peak_allocated": 2365912064,
+      "peak_reserved": 2466250752,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"corruption\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fused",
+        "projection": "fp32",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        197.77915254235268,
+        189.0469640493393,
+        189.37544338405132
+      ],
+      "median_ms": 189.37544338405132,
+      "peak_allocated": 2382951424,
+      "peak_reserved": 2799697920,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fused\", \"projection\": \"fp32\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fused",
+        "projection": "bf16",
+        "operation": "combined"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        181.2572218477726,
+        173.94018173217773,
+        173.9487573504448
+      ],
+      "median_ms": 173.9487573504448,
+      "peak_allocated": 2382951424,
+      "peak_reserved": 2793406464,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fused\", \"projection\": \"bf16\", \"operation\": \"combined\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        37.74912841618061,
+        37.49597258865833,
+        37.56924159824848
+      ],
+      "median_ms": 37.56924159824848,
+      "peak_allocated": 1996923392,
+      "peak_reserved": 3380609024,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "fp32",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        77.21257582306862,
+        76.55912823975086,
+        76.13079994916916
+      ],
+      "median_ms": 76.55912823975086,
+      "peak_allocated": 2208839168,
+      "peak_reserved": 3380609024,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"fp32\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_forward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        25.96086636185646,
+        24.835502728819847,
+        24.831432849168777
+      ],
+      "median_ms": 24.835502728819847,
+      "peak_allocated": 2072422400,
+      "peak_reserved": 3380609024,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_forward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    },
+    {
+      "case": {
+        "shape": [
+          16,
+          512,
+          49153,
+          768
+        ],
+        "chunk": 512,
+        "sampler": "fp32",
+        "projection": "bf16",
+        "operation": "projection_backward"
+      },
+      "status": "ok",
+      "metadata": {
+        "torch": "2.5.1+cu121",
+        "triton": "3.1.0",
+        "cuda": "12.1",
+        "python": "3.10.9",
+        "gpu": "NVIDIA RTX A6000",
+        "visible_device": "GPU-707ec8ba-9bbb-f97c-7b07-6abe6335ec64",
+        "total_memory": 51041271808,
+        "tf32": false,
+        "bf16_reduced_precision_reduction": false,
+        "state_storage_bytes": 1610645504
+      },
+      "milliseconds": [
+        59.7061924636364,
+        59.71126817166805,
+        58.481499552726746
+      ],
+      "median_ms": 59.7061924636364,
+      "peak_allocated": 2358559232,
+      "peak_reserved": 3380609024,
+      "command": [
+        "/home/patrick/.codex/worktrees/22a3/duo/.venv/bin/python",
+        "/home/patrick/.codex/worktrees/e1f4/duo/scripts/benchmark_simplex_precision.py",
+        "--worker",
+        "{\"shape\": [16, 512, 49153, 768], \"chunk\": 512, \"sampler\": \"fp32\", \"projection\": \"bf16\", \"operation\": \"projection_backward\"}",
+        "--repeats",
+        "3",
+        "--warmup",
+        "2"
+      ]
+    }
+  ]
+}

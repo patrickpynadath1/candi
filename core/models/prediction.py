@@ -8,7 +8,7 @@ from torch import nn
 
 @dataclass
 class ModelPrediction:
-    logits: torch.Tensor
+    logits: torch.Tensor | None
     hidden: torch.Tensor
     auxiliary_logits: torch.Tensor | None = None
 

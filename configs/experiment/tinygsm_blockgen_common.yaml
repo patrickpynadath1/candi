@@ -50,7 +50,8 @@ optimizer:
 trainer:
   devices: 8
   num_nodes: 1
-  accumulate_grad_batches: 1
+  # 8 sequences per GPU per microstep; effective global batch remains 512.
+  accumulate_grad_batches: 8
   precision: bf16-mixed
   max_steps: 250000
   gradient_clip_val: 1.0

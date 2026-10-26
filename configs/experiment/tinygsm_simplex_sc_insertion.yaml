@@ -1,0 +1,32 @@
+# @package _global_
+defaults:
+- tinygsm_sc_common
+- override /algorithm: hybrid_diffusion
+- override /model: single_view
+- override /parameterization: unconstrained_posterior
+- override /objective: cross_entropy
+- override /sampler: insertion
+- override /variable_length: insertion
+- override /hybrid_view@model.views.content: simplex
+- override /time_sampler: loss_derivative
+- _self_
+model:
+  backbone:
+    hidden_size: 768
+    cond_dim: 128
+    n_blocks: 12
+    n_heads: 12
+    dropout: 0.1
+    adaLN: true
+    tie_word_embeddings: false
+parameterization:
+  temperature: 0.1
+time_sampler:
+  adaptive: true
+sampler:
+  steps: 16
+  max_length: 512
+  overflow: truncate
+  final_denoise: greedy
+variable_length:
+  time_sampling_include_aux: false
