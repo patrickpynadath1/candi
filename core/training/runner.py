@@ -29,7 +29,11 @@ def run(config):
     task = instantiate(config.task)
     data = instantiate(config.datamodule, task=task)
     module = TrainingModule(config)
-    if config.compile:
+    # Explicit backbone compilation already covers its transformer blocks.
+    backbone_compiled = OmegaConf.select(
+        config, "training.performance.compile.enabled", default=False
+    )
+    if config.compile and not backbone_compiled:
         from core.models.layers import DDiTBlock
 
         blocks = [block for block in module.modules() if isinstance(block, DDiTBlock)]

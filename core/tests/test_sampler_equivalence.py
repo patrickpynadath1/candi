@@ -39,6 +39,10 @@ def build_algorithm(family, discrete, sc):
             OmegaConf.load(f"configs/hybrid_view/{discrete}.yaml"),
             force_add=True,
         )
+    if family == "simplex":
+        # These historical snapshots used FP64 states. Production presets now
+        # default to FP32, which has separate precision/gradient coverage.
+        cfg.model.views.content.process.precision = "float64"
     return instantiate(cfg.algorithm).eval()
 
 
