@@ -184,4 +184,4 @@ class MapSampler:
         state, nfe = iterate_maps(
             algo.model, state, times, self.step, clean, prompt_mask
         )
-        return state.argmax(-1), dict(nfe=nfe)
+        return state.argmax(-1), dict(nfe=nfe, nfe_per_sample=[nfe] * len(state))

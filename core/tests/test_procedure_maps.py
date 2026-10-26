@@ -201,6 +201,25 @@ def test_map_training_module_update_and_generation(endpoint):
     tokens, info = module.algorithm.generate(MapSampler(policy, steps=4), prompts, mask)
     assert tokens.shape == prompts.shape and tokens[0, 0] == 0
     assert info["nfe"] == 4
+    assert info["nfe_per_sample"] == [4]
+
+    from core.evaluation.generation import evaluate
+    from core.tests.test_entrypoint import TinyTask
+
+    sampler_config = dict(
+        _target_="core.training.procedures.map_training.MapSampler",
+        steps=4,
+        step=dict(_target_="core.training.procedures.maps." + (
+            "EndpointRefinementStep" if endpoint else "LearnedMapStep")),
+    )
+    # Exercise evaluator aggregation and record serialization across batches,
+    # including the short final batch that requires one NFE entry per sample.
+    result = evaluate(module, TinyTask(vocab_size=5, length=8), sampler_config,
+                      batch_size=2, max_examples=3, use_ema=False, precision="32-true")
+    assert result["num_total"] == 3
+    assert result["mean_nfe"] == result["min_nfe"] == result["max_nfe"] == 4
+    assert len(result["records"]) == 3
+    assert [record["nfe"] for record in result["records"]] == [4, 4, 4]
 
 
 def test_semigroup_preserves_conditioning_for_second_prediction():

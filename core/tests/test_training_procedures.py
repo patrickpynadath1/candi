@@ -208,3 +208,45 @@ def test_promotion_state_survives_checkpoint():
     torch.testing.assert_close(
         restored.phases[0].targets.step_size, torch.tensor(1 / 64)
     )
+
+
+def test_manual_procedure_entrypoint_clips_without_trainer_conflict(tmp_path):
+    from core.training.runner import run
+
+    cfg = compose(
+        "corruption_factorial",
+        overrides={
+            "hybrid_view@model.views.content": "masked",
+            "model.backbone.hidden_size": 32,
+            "model.backbone.n_heads": 4,
+            "model.backbone.n_blocks": 1,
+            "model.backbone.cond_dim": 16,
+            "model.backbone.dropout": 0.0,
+            "self_conditioning.enabled": False,
+            "trainer.accumulate_grad_batches": 1,
+            "trainer.gradient_clip_val": 0.0,
+            "trainer.accelerator": "cpu",
+            "trainer.devices": 1,
+            "trainer.precision": "32-true",
+            "trainer.max_steps": 2,
+            "trainer.val_check_interval": 1,
+            "trainer.num_sanity_val_steps": 0,
+            "trainer.limit_val_batches": 1,
+            "training.warmup_steps": 0,
+            "loader.global_batch_size": 2,
+            "loader.eval_batch_size": 2,
+            "loader.num_workers": 0,
+            "checkpoint.every_n_steps": 2,
+            "checkpoint.save_top_k": 0,
+            "compile": False,
+        },
+    )
+    cfg.procedure = OmegaConf.load("configs/procedure/dmmd.yaml")
+    cfg.wandb = None
+    cfg.callback = None
+    cfg.output_dir = str(tmp_path)
+    cfg.task = dict(
+        _target_="core.tests.test_entrypoint.TinyTask", vocab_size=12, length=8
+    )
+    run(cfg)
+    assert (tmp_path / "checkpoints/last.ckpt").is_file()

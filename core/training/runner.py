@@ -77,6 +77,11 @@ def run(config):
             )
             loggers.append(tracking)
         trainer_options = OmegaConf.to_container(config.trainer, resolve=True)
+        if not module.automatic_optimization:
+            # Manual phases clip explicitly. Lightning distinguishes an absent
+            # trainer clip setting from 0.0 and rejects combining the latter
+            # with clip_gradients(positive_value).
+            trainer_options.pop("gradient_clip_val", None)
         trainer_options["strategy"] = build_strategy(config, module.algorithm)
         trainer = L.Trainer(
             default_root_dir=str(output),
