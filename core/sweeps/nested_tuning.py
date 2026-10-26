@@ -311,6 +311,7 @@ def _train_worker(payload, output):
 
 def _evaluate_worker(payload, output):
     from core.training.runner import run
+    from hydra.utils import instantiate
 
     evaluation, policy = payload["evaluation"], payload["policy"]
     config = OmegaConf.load(payload["checkpoint"]["config"])
@@ -319,7 +320,12 @@ def _evaluate_worker(payload, output):
     config.sampler = OmegaConf.create(policy["sampler"])
     for key, value in payload["parameters"].items():
         OmegaConf.update(config, key, value, merge=False, force_add=True)
-    config.sampler[policy["budget_parameter"]] = evaluation["nfe"] - 1
+    # Resolve after trial overrides: correction count can itself be tuned.
+    sampler = instantiate(config.sampler)
+    allocate = getattr(sampler, "steps_for_nfe", None)
+    config.sampler[policy["budget_parameter"]] = (
+        allocate(evaluation["nfe"]) if allocate is not None else evaluation["nfe"] - 1
+    )
     config.mode = "evaluate"
     config.evaluation.checkpoint = payload["checkpoint"]["checkpoint"]
     config.evaluation.legacy = False
