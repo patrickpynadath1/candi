@@ -45,7 +45,7 @@ def test_released_gaussian_commitment_is_forward_corrupted(monkeypatch):
     monkeypatch.setattr(view.process,'corrupt_state',corrupt)
     selections=[torch.tensor([[False,True,False]]),
                 torch.tensor([[False,False,True]])]
-    monkeypatch.setattr(eb,'select_prefix',Mock(side_effect=selections))
+    monkeypatch.setattr('core.samplers.policies.select_prefix',Mock(side_effect=selections))
     tokens=torch.tensor([[1,2,3]])
     sample,info=algo.generate(eb.ParallelEntropyBoundedSampler(freeze=False,steps=2),
                               tokens,torch.tensor([[True,False,False]]))

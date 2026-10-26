@@ -119,3 +119,111 @@ specialized loops. Their APIs and behavior are unchanged. Likewise, specialized
 DDPM/blur/hybrid updates currently use local update callables rather than the
 discrete rule protocol; sharing execution does not assert mathematical
 interchangeability between those processes.
+
+### Forward resampling
+
+`sampler=forward_resampling` uses one update rule for all fixed-length recipes
+built with the single-view/parallel-view algorithm interface. At each time step
+it samples a clean token sequence from the model's predicted posterior and draws
+fresh noise from each view's forward kernel at the destination time. Hybrid
+views share the sampled token sequence; their corruption draws are separate.
+Prompt tokens are clamped after every update, and existing self-conditioning
+is carried between model calls.
+
+```yaml
+sampler:
+  _target_: core.samplers.forward_resampling.ForwardResamplingSampler
+  steps: 127                 # 127 updates + one terminal prediction = 128 NFE
+  epsilon: 1.0e-5
+  greedy_clean_estimate: false  # true uses argmax instead of sampling x0
+  final_denoise: greedy       # greedy or sample
+```
+
+Sampling temperature comes from the recipe's existing sampling posterior
+configuration. `greedy_clean_estimate` affects token selection only: the forward
+corruption still draws random noise. Final decoding is configured independently.
+
+This is fresh forward resampling, not a reverse posterior bridge or a velocity
+integration step. Previously generated non-prompt positions may be corrupted
+again, including remasking. No per-process reverse update is used. Variable-length
+insertion/deletion algorithms require a separate edit policy and are rejected.
+Legacy standalone algorithm interfaces must first use the existing single-view
+representation; the sampler does not add separate per-method execution branches.
+
+### One loop, independent sampling choices
+
+`ComposedSampler` is the shared execution engine for fixed-length single-view
+and parallel-view recipes. Native reverse sampling, forward resampling, and
+parallel EB now run this same loop. Existing sampler names and constructor
+arguments remain compatible presets; they contain no separate sampling loops.
+Historical CANDI's specialized clock, legacy standalone algorithm interfaces,
+variable-length edits, autoregressive decoding, and multistage ODE solvers are
+outside this shared view-based loop.
+
+The components are:
+
+| Choice | Options | Responsibility |
+| --- | --- | --- |
+| `tokens` | `TokenSelection(mode=posterior/sample/greedy)` | Keep the full posterior or propose a shared clean token sequence. |
+| `positions` | `AllPositions`, `RandomPositions(count=...)`, `EntropyPositions(bound=...)` | Select active positions to update or accept. |
+| `transition` | `ReverseTransition`, `ForwardCorruption` | Evolve noisy states using a view's reverse rule or forward kernel. |
+| `commitment` | `none`, `freeze`, `revise` | Retain no accepted tokens, accumulate permanent commitments, or replace commitments each step. |
+| Terminal decoding | `final_denoise=greedy/sample` | Select final tokens independently of intermediate token proposals. |
+
+Without commitments, selected positions receive the transition and unselected
+positions retain their previous state. With commitments, the transition evolves
+uncommitted states and selected positions are clamped to their proposed clean
+tokens. `freeze` removes accepted positions from subsequent selection; `revise`
+allows them to be released. Completed examples stop changing. Prompts always
+remain clamped. A terminal prediction handles unfinished examples, while the
+legacy strict masked-EB preset retains its error-on-exhaustion behavior.
+
+`ReverseTransition` preserves the method's existing reverse update by default.
+`clean_estimate=true` replaces its full posterior with a one-hot token estimate;
+otherwise token proposals affect commitments only. Noise suppression, keeping
+absorbing states masked until acceptance, and forward-corrupting released
+continuous commitments are explicit transition options. This distinction
+preserves EB's behavior even when clean token selection is greedy.
+
+For example, `sampler=composed` selects forward resampling:
+
+```yaml
+sampler:
+  _target_: core.samplers.composed.ComposedSampler
+  steps: 127
+  tokens:
+    _target_: core.samplers.policies.TokenSelection
+    mode: sample
+  positions:
+    _target_: core.samplers.policies.AllPositions
+  transition:
+    _target_: core.samplers.policies.ForwardCorruption
+  commitment: none
+  final_denoise: greedy
+```
+
+`sampler=random_commitment` uses EB-style reverse updates but accepts one
+uniformly sampled active position per example per step. Change
+`sampler.positions.count` to accept more, `sampler.tokens.mode` to switch between
+sampling and greedy, or `sampler.commitment` to change persistence. Random
+selection has an explicit count, not an entropy bound; it does not claim the
+entropy guarantee of EB. Revisable absorbing EB updates remain unsupported,
+matching the existing validation.
+
+Per-process reverse updates, priors, corruption schedules, and representations
+stay with their existing components. One sampled clean sequence is shared across
+views. Self-conditioning still uses one trajectory state per sampling call.
+`steps=127` means 128 NFE for native/forward sampling, while commitment policies
+may finish earlier. Metadata preserves per-example NFE and completion status.
+
+Regression snapshots in `core/tests/fixtures/sampler_behavior.json` capture the
+pre-refactor seeded outputs, noisy-state traces, RNG states, and metadata across
+204 pure/hybrid/conditioning cases under the locked environment.
+
+### vMF probability flow and correction
+
+The alternative [vMF spherical path](../methods/vmf-spherical-flows.md) uses a
+posterior-weighted tangent Euler update in the shared sampler. Optional
+`SphericalLangevinCorrector` steps run fresh predictions after each predictor
+and contribute to reported NFE. Select `sampler=vmf_predictor_corrector` for the
+predictor-corrector preset; the ordinary `hybrid` sampler uses only the predictor.
