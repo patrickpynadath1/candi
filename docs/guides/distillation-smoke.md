@@ -91,3 +91,31 @@ both stages. Each successful training run adds its inference jobs. The live
 submission queue stays open for further jobs; close it through `SubmissionQueue`
 when finished to let the driver exit and write its final dataframe. Per-job
 checkpoints, CSV metrics, generation records and logs are available before then.
+
+## First effectiveness comparison
+
+`examples/distillation_effectiveness.py` submits to an existing live queue using
+`--queue PATH --plan PATH --submit`. Defaults are 3,000 student updates, batch size
+16, one seed, and 256 validation examples. It keeps the approved smoke W&B project
+and uses group `fewstep-3000`.
+
+Alpha, SDTT, dMMD, IDLM and DMD each run on all three tasks. Each masked/Gaussian
+base also has an unchanged baseline and an ordinary continued-training control.
+The unchanged baseline uses zero optimizer updates and saves the imported EMA
+weights for evaluation through the same pipeline. All candidates use matched
+samplers at 4 and 16 NFE; unchanged bases additionally use 128 NFE. Baselines are
+queued first. There are 21 optimization runs, six baseline snapshots, and 60 final
+evaluations. The saved plan records source checkpoints and fully resolved configs.
+
+SDTT promotes its teacher every 500 updates, increasing the target rollout stride
+from 1/128 through 1/4 over six training stages. Alternating methods perform 3,000
+student and 3,000 auxiliary updates, so their Lightning step count is 6,000.
+Controls match student updates and data batch size, not total FLOPs. Fixed final
+checkpoints are evaluated; no inference tuning or test-set selection is performed.
+
+Compare each method with its own unchanged base and continued-training control
+at the same NFE. Sudoku accuracy, text8 lexical metrics, and TinyStories reference
+BLEU are task-specific evidence; one seed and 256 examples are an initial quality
+screen, not a robust ranking. The linear flow-map and Beckmann presets are excluded
+because their fresh initialization and different information path do not test
+few-step improvement of the existing base checkpoints.
