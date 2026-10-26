@@ -1,0 +1,5 @@
+# Discrete Flow Maps, PSD with linear interpolation (not ESD/LSD).
+# Same mean-denoiser/semigroup components as FMLM direct training.
+defaults:
+  - flow_map
+  - _self_

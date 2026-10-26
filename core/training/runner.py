@@ -57,7 +57,7 @@ def run(config):
             ),
             ModelCheckpoint(
                 dirpath=output / "checkpoints",
-                monitor="val/nll",
+                monitor=getattr(module.algorithm, "validation_metric", "val/nll"),
                 mode="min",
                 save_top_k=1,
                 filename="best",
