@@ -13,7 +13,7 @@
 
 set -euo pipefail
 # Submit from the repository root, or set CANDI_ROOT.
-repo_root=${CANDI_ROOT:-${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}}
+repo_root=${CANDI_ROOT:-${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}}
 cd "$repo_root"
 python_bin=${CANDI_PYTHON:-${UV_PROJECT_ENVIRONMENT:-$HOME/candi-1/.venv}/bin/python}
 [[ -x "$python_bin" ]] || { echo "Missing Python environment: $python_bin" >&2; exit 1; }

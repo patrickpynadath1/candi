@@ -3,10 +3,10 @@
 Submit from the repository root:
 
 ```bash
-sbatch job_tinygsm_replaid.sh
-sbatch job_tinygsm_replaid_hybrid.sh
-sbatch job_openwebtext_replaid.sh
-sbatch job_openwebtext_replaid_hybrid.sh
+sbatch scripts/jobs/job_tinygsm_replaid.sh
+sbatch scripts/jobs/job_tinygsm_replaid_hybrid.sh
+sbatch scripts/jobs/job_openwebtext_replaid.sh
+sbatch scripts/jobs/job_openwebtext_replaid_hybrid.sh
 ```
 
 These run `replaid` and the new full-ELBO `replaid_hybrid`, using
@@ -33,4 +33,4 @@ preemption; it does not automatically extend a job past its wall-time limit.
 Override Hydra settings by appending arguments to sbatch. `DATA_CACHE_DIR`,
 `SCRATCH_DIR`, `RUN_DIR`, and `UV_PROJECT_ENVIRONMENT` override storage or the
 environment. Configuration can be inspected without a GPU using
-`bash job_tinygsm_replaid.sh --cfg job --resolve`.
+`bash scripts/jobs/job_tinygsm_replaid.sh --cfg job --resolve`.

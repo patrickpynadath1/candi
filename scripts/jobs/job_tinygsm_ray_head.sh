@@ -19,7 +19,7 @@ hold_allocation() {
 }
 trap hold_allocation EXIT
 trap 'trap - EXIT; ray stop --force >/dev/null 2>&1 || true; exit 0' TERM INT
-repo_root=${CANDI_ROOT:-${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}}
+repo_root=${CANDI_ROOT:-${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}}
 cd "$repo_root"
 export CANDI_PYTHON=${CANDI_PYTHON:-$HOME/candi-1/.venv/bin/python}
 export PATH="$(dirname "$CANDI_PYTHON"):$PATH"
