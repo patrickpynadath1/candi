@@ -119,3 +119,43 @@ BLEU are task-specific evidence; one seed and 256 examples are an initial qualit
 screen, not a robust ranking. The linear flow-map and Beckmann presets are excluded
 because their fresh initialization and different information path do not test
 few-step improvement of the existing base checkpoints.
+
+## Inherited affine-path map adapters
+
+`AffineMap` wraps a pretrained single-view Gaussian algorithm. It retains the
+base representation (including embedding codebooks), input projection,
+preconditioning, posterior parameterization, and learned noise schedule. The
+flow-map destination adapter starts at zero, preserving base predictions exactly.
+The generic checkpoint importer loads base EMA into `initialization_target` and
+initializes a new EMA over the complete adapted student. Teachers are frozen
+copies of that initialized student. No adaptive schedule fitting is performed
+during these distillation procedures.
+
+For an affine path, write a deterministic jump as
+`z_s = A_ts z_t + B_ts mean(p)`, where
+`A_ts = sigma(s)/sigma(t)` and
+`B_ts = alpha(s) - A_ts alpha(t)`.
+Composing two jumps gives the PSD target
+`p_target = w p_first + (1-w) p_second`, with
+`w = A_us B_tu / B_ts`. These are inherited-schedule coefficients, not the linear
+one-hot interpolation's time ratios. Teacher predictions produce the target;
+the student learns destination-conditioned jumps alongside diagonal CE.
+
+`beckmann_inherited` is explicitly a **time-conditioned characteristic extension**,
+not the autonomous Beckmann paper implementation. The endpoint remains a function
+of state and source time to preserve the pretrained denoiser. Its target is the
+stopped-gradient endpoint plus its total directional derivative along the frozen
+teacher's probability-flow field, including the time derivative. Clean-boundary
+CE anchors the endpoint. Field coefficients use finite differences of the full
+inherited schedule, including clock warps. This JVP path is uncompiled. Sampling
+first predicts the endpoint from the prior, then refines in clean representation
+space at time zero. Its 4/16-NFE baselines must use this same refinement policy.
+
+`examples/inherited_map_comparison.py` accepts an explicit JSON mapping of task
+names to base `config` and `checkpoint` paths. It prepares both distilled and
+zero-update adapted baselines at 4/16 NFE and submits to the existing live queue.
+The unchanged adapted baselines distinguish changes in inference policy from
+improvements due to training. It does not silently convert one-hot checkpoints
+into embedding-corruption checkpoints. The older pure Gaussian checkpoints used
+in the first effectiveness sweep have one-hot state representations; their input
+projections alone do not make their corruption an embedding-space process.

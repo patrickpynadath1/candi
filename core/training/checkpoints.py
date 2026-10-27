@@ -14,7 +14,21 @@ def initialize_student(module, path):
         for key, value in checkpoint["state_dict"].items()
         if key.startswith("algorithm.")
     }
-    module.algorithm.load_state_dict(state, strict=True)
+    target = getattr(module.algorithm, "initialization_target", module.algorithm)
+    target.load_state_dict(state, strict=True)
+    if target is not module.algorithm:
+        # Adapters add parameters; import base EMA into the base only, then
+        # initialize the full student EMA from the adapted parameters.
+        if module.ema:
+            from .ema import ExponentialMovingAverage
+
+            imported = ExponentialMovingAverage(target.parameters(), module.ema.decay)
+            imported.load_state_dict(checkpoint["ema"])
+            imported.copy_to(target.parameters())
+            module.ema = ExponentialMovingAverage(
+                module.algorithm.parameters(), module.ema.decay
+            )
+        return
     if module.ema:
         if "ema" not in checkpoint:
             raise ValueError("EMA initialization requires saved student EMA")

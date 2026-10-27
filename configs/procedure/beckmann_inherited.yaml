@@ -1,0 +1,17 @@
+# Time-conditioned characteristic extension; not the autonomous paper variant.
+_target_: core.training.procedures.composition.Procedure
+teacher: true
+phases:
+- _target_: core.training.procedures.composition.Phase
+  states:
+    _target_: core.training.procedures.affine_maps.AffineStates
+  prediction:
+    _target_: core.training.procedures.affine_maps.AffinePredictions
+  targets:
+    _target_: core.training.procedures.affine_maps.CharacteristicTarget
+  objective:
+    _target_: core.training.procedures.map_training.MapLoss
+    consistency:
+      _target_: core.training.procedures.losses.MeanSquaredError
+  reduction:
+    _target_: core.training.procedures.losses.MaskedMean
