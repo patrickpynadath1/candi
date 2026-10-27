@@ -88,7 +88,7 @@ def policies(gaussian):
     return [dict(**p, budget_parameter="steps") for p in out]
 
 
-def build(root):
+def build(root, *, prefix="fewstep-3000-", expected=27, exclude=()):
     cases = []
     partitions = {}
     seen = set()
@@ -104,8 +104,9 @@ def build(root):
             continue
         job = json.loads(params.read_text())
         if (
-            job["stage"] != "train"
-            or not job["name"].startswith("fewstep-3000-")
+            job["name"] in exclude
+            or job["stage"] != "train"
+            or not job["name"].startswith(prefix)
             or "-inherited-" in job["name"]
         ):
             continue
@@ -183,8 +184,10 @@ def build(root):
                 validate(case)
                 cases.append(case)
         seen.add(job["name"])
-    if len(seen) != 27:
-        raise ValueError(f"Expected 27 completed checkpoints; found {len(seen)}")
+    if expected is not None and len(seen) != expected:
+        raise ValueError(
+            f"Expected {expected} completed checkpoints; found {len(seen)}"
+        )
     return cases
 
 
@@ -192,8 +195,59 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--runs", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--prefix", default="fewstep-3000-")
+    p.add_argument("--expected", type=int, default=27)
+    p.add_argument("--exclude", action="append", default=[])
+    p.add_argument(
+        "--wait",
+        action="store_true",
+        help="Wait for requested checkpoints before building",
+    )
+    p.add_argument(
+        "--run-address", help="Run the existing nested tuner on this Ray address"
+    )
     args = p.parse_args()
-    cases = build(args.runs)
+    if args.expected < 1:
+        p.error("expected must be positive")
+    if args.wait:
+        import time
+
+        while True:
+            cases = build(
+                args.runs, prefix=args.prefix, expected=None, exclude=args.exclude
+            )
+            ready = len({case["training"]["checkpoint"] for case in cases})
+            if ready == args.expected:
+                break
+            if ready > args.expected:
+                raise ValueError("More checkpoints matched than expected")
+            print(f"Waiting for checkpoints: {ready}/{args.expected}", flush=True)
+            time.sleep(30)
+    else:
+        cases = build(
+            args.runs, prefix=args.prefix, expected=args.expected, exclude=args.exclude
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(cases, indent=2) + "\n")
     print(f"{len(cases)} independent checkpoint/NFE/sampler cases")
+
+    if args.run_address:
+        import subprocess
+
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "core.sweeps.nested_tuning",
+                str(args.output),
+                "--output",
+                str(args.output.parent),
+                "--address",
+                args.run_address,
+                "--case-concurrency",
+                "4",
+                "--concurrency",
+                "1",
+            ],
+            check=True,
+        )

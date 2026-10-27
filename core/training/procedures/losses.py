@@ -31,7 +31,17 @@ class SequenceAlpha(nn.Module):
         logp = prediction.float().gather(-1, target[..., None]).squeeze(-1)
         count = mask.sum(-1)
         mean = torch.where(mask.bool(), logp, 0).sum(-1) / count.clamp_min(1)
-        value = -mean if self.k == 0 else -torch.expm1(self.k * mean) / self.k
+        if self.k == 0:
+            value = -mean
+        else:
+            exponent = self.k * mean
+            # expm1 is accurate near zero, but its backward uses expm1(x)+1:
+            # that rounds to zero for strongly negative FP32 inputs. Use exp
+            # in that region to retain the analytically nonzero gradient.
+            value = (
+                torch.where(exponent > -1, -torch.expm1(exponent), 1 - exponent.exp())
+                / self.k
+            )
         return torch.where(count > 0, value, 0)
 
 

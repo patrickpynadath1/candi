@@ -250,3 +250,49 @@ def test_manual_procedure_entrypoint_clips_without_trainer_conflict(tmp_path):
     )
     run(cfg)
     assert (tmp_path / "checkpoints/last.ckpt").is_file()
+
+
+@pytest.mark.parametrize("view", ["uniform", "gaussian"])
+@pytest.mark.parametrize("k", [4, 8, 16])
+def test_sequence_alpha_with_nonmasked_ce_path(view, k):
+    cfg = compose(
+        "corruption_factorial",
+        overrides={
+            "hybrid_view@model.views.content": view,
+            "model.backbone.hidden_size": 32,
+            "model.backbone.n_heads": 4,
+            "model.backbone.n_blocks": 1,
+            "model.backbone.cond_dim": 16,
+            "model.backbone.dropout": 0.0,
+            "self_conditioning.enabled": False,
+        },
+    )
+    student = instantiate(cfg.algorithm)
+    procedure_config = OmegaConf.load(
+        Path(__file__).parents[2] / "configs/procedure/alpha.yaml"
+    )
+    procedure_config.phases[0].states.only_corrupted = False
+    procedure_config.phases[0].objective.k = k
+    procedure = instantiate(procedure_config, student=student)
+    batch = dict(
+        input_ids=torch.tensor([[0, 1, 2, 3], [1, 2, 3, 4]]),
+        loss_mask=torch.ones(2, 4, dtype=torch.bool),
+    )
+    result = procedure(student, batch, 0)
+    assert torch.isfinite(result["loss"])
+    result["loss"].backward()
+    gradients = [p.grad for p in student.parameters() if p.grad is not None]
+    assert gradients and all(torch.isfinite(g).all() for g in gradients)
+    assert any(g.abs().sum() > 0 for g in gradients)
+
+
+@pytest.mark.parametrize("k", [4.0, 8.0, 16.0])
+def test_alpha_saturated_gradient_matches_analytic(k):
+    logp = torch.tensor([[[-3.0, -4.0]]], requires_grad=True)
+    loss = SequenceAlpha(k)(
+        logp, torch.zeros(1, 1, dtype=torch.long), torch.ones(1, 1, dtype=torch.bool)
+    ).sum()
+    loss.backward()
+    expected = -torch.exp(torch.tensor(-3.0 * k))
+    torch.testing.assert_close(logp.grad[0, 0, 0], expected, atol=0, rtol=1e-6)
+    assert logp.grad[0, 0, 0] != 0

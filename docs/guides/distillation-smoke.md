@@ -182,3 +182,27 @@ These are held-out validation partitions, not an independent official test set.
 The score is Sudoku accuracy, text8 mean unique-valid words of length at least
 five, or TinyStories corpus BLEU. This creates 180 cases and retains a separate
 `selected.json`, Optuna database, and `final/result.json` for each policy/budget.
+
+## Alpha strength follow-up
+
+`examples/alpha_sweep.py` submits k=4,8,16 on each masked task base, retaining the
+3,000-update/batch-16/one-seed protocol. These are k values; effective sequence
+alpha is k divided by the selected token count. The original k=.5 runs remain
+separate comparisons. No additional k=0 control is included in this follow-up.
+
+The SequenceAlpha numerical component consumes clean-token log probabilities,
+target IDs and a supervised mask; it contains no corruption-specific branch.
+For nonmasked CE paths, configure CorruptData.only_corrupted=false. Uniform and
+embedding-Gaussian forward/backward tests cover all three new strengths. This
+establishes numerical compatibility, not a theoretical equivalence for arbitrary
+weighted CE, ELBO or auxiliary-objective compositions.
+
+The implementation uses expm1 near zero and exp for strongly negative exponents:
+FP32 expm1 backward can otherwise round its expm1(x)+1 derivative to zero long
+before exp(x) underflows. An analytical saturated-gradient test guards this.
+
+The tuning manifest builder accepts --prefix/--expected and --exclude to select
+completed follow-ups. --wait --run-address ADDRESS waits for those checkpoints,
+then invokes the existing nested Optuna tuner. The Alpha follow-up uses the same
+validation partitions and per-sampler 4/16-NFE searches. Its superseded original
+k4 Sudoku run is explicitly excluded in the saved launch configuration.
