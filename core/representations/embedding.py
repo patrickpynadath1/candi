@@ -13,7 +13,7 @@ class EmbeddingRepresentation(nn.Module):
         vocab_size,
         dimension=128,
         unit_normalized=True,
-        trainable=False,
+        trainable=True,
         project_after_update=False,
     ):
         super().__init__()

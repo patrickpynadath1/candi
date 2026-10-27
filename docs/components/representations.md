@@ -23,7 +23,8 @@ The boundary is deliberately tokenwise:
 | `centered_embedding` | Learned centered embedding geometry used by blurring, with post-update projection |
 
 [EmbeddingRepresentation](../../core/representations/embedding.py) supports
-`dimension`, `unit_normalized`, `trainable`, and `project_after_update`. A fixed
+`dimension`, `unit_normalized`, `trainable`, and `project_after_update`. Embeddings
+are learnable by default; set `trainable: false` explicitly for a fixed codebook. A fixed
 table is a registered buffer; a trainable table is a parameter. Unit normalization
 is enforced whenever its codebook is used. Post-update projection requires both
 trainability and unit normalization. Dot-product decoding is also nearest-neighbor

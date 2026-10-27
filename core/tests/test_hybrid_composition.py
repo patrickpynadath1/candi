@@ -193,3 +193,28 @@ def test_saved_hybrid_config_upgrade_has_no_old_import_targets():
     assert view["representation"]["_target_"].endswith("CANDIRepresentation")
     assert "branches" in old["model"]  # Saved input isn't modified.
     assert "core.hybrid." not in str(upgraded)
+
+
+@pytest.mark.parametrize("discrete", ["masked", "uniform"])
+def test_gaussian_hybrid_default_updates_embedding_codebook(discrete):
+    torch.manual_seed(42)
+    algo, _ = compose_hybrid("gaussian", discrete)
+    table = algo.views[0].representation.state_representation.table
+    assert isinstance(table, torch.nn.Parameter)
+    optimizer = torch.optim.SGD(algo.parameters(), lr=0.1)
+    tokens = torch.randint(0, 12, (2, 6))
+    # The zero-initialized output head needs one update before input gradients flow.
+    algo.loss(tokens, torch.ones_like(tokens, dtype=torch.bool), training=True)[
+        "loss"
+    ].backward()
+    optimizer.step()
+    optimizer.zero_grad(set_to_none=True)
+    before = table.detach().clone()
+    algo.loss(tokens, torch.ones_like(tokens, dtype=torch.bool), training=True)[
+        "loss"
+    ].backward()
+    assert table.grad is not None
+    assert torch.isfinite(table.grad).all()
+    assert table.grad.abs().sum() > 0
+    optimizer.step()
+    assert not torch.equal(before, table.detach())
