@@ -102,7 +102,12 @@ def build(root, *, prefix="fewstep-3000-", expected=27, exclude=()):
             or (directory / "error.txt").exists()
         ):
             continue
-        job = json.loads(params.read_text())
+        try:
+            job = json.loads(params.read_text())
+        except json.JSONDecodeError:
+            if expected is None:  # Ray may be rewriting metadata while polling.
+                continue
+            raise
         if (
             job["name"] in exclude
             or job["stage"] != "train"
@@ -110,7 +115,12 @@ def build(root, *, prefix="fewstep-3000-", expected=27, exclude=()):
             or "-inherited-" in job["name"]
         ):
             continue
-        last = json.loads(result.read_text().splitlines()[-1])
+        try:
+            last = json.loads(result.read_text().splitlines()[-1])
+        except (json.JSONDecodeError, IndexError):
+            if expected is None:
+                continue
+            raise
         saved = directory / last["checkpoint_dir_name"]
         checkpoint = saved / "checkpoints/last.ckpt"
         config_path = saved / "config.yaml"
