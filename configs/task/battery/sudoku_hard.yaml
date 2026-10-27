@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+- /token_space@token_space: append_mask
+- _self_
+task:
+  _target_: core.tasks.sudoku.SudokuTask
+  data: ${data}
+  vocab_size: 12
+  length: 180
+  variable_length: false
+data:
+  difficulty: hard
+  cache_dir: ${oc.env:HOME}/.cache/duo/data_cache
+  num_train: 48000
+  num_valid: 2000
+  data_seed: 42
+  sudoku_num_workers: 1
+preparation:
+  task_name: sudoku_hard
+  reference_case: sudoku_hard-gaussian-rank-linear-cdcd-sc-off_20m

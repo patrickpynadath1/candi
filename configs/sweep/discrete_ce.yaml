@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+- /experiment: corruption_factorial
+- common
+- /content_view: masked
+- /sc: 'off'
+- override /task: battery/sudoku_hard
+- _self_
+model:
+  backbone:
+    n_blocks: 8
+    hidden_size: 512
+    cond_dim: 128
+    n_heads: 8
+    dropout: 0.1
+preparation:
+  family: discrete_ce
+  recipe_name: ${preparation.content_name}-native-cross_entropy-sc-${preparation.sc_name}
+hydra:
+  sweeper:
+    params:
+      sc: off,on
+      content_view: masked,uniform

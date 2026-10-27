@@ -2,11 +2,87 @@
 
 [Ray Tune](https://docs.ray.io/en/latest/tune/index.html) owns the sweep API,
 trial scheduling, GPU allocation, results and experiment restoration. Hydra
-composes the existing presets. The only repository helpers are
+composes the existing presets. The main execution helpers are
 [`compose`](../../core/sweeps/configuration.py) and
 [`run_trial`](../../core/sweeps/tune.py), an adapter to the existing
 training/evaluation runner. There are no custom Trial, Sweep or executor classes.
 Ray Tune is installed by `uv sync` with the other project dependencies.
+
+## Prepare native Hydra sweeps for the queue
+
+Hydra's built-in `BasicSweeper` owns Cartesian expansion and its defaults list
+composes each recipe. The [sweep configs](../../configs/sweep/) define ordinary
+`hydra.sweeper.params`; there is no separate grid configuration language.
+For example, [hybrids.yaml](../../configs/sweep/hybrids.yaml) sweeps:
+
+```yaml
+hydra:
+  sweeper:
+    params:
+      gaussian_state: one_hot,embedding
+      discrete_view: masked,uniform
+      path_schedule: adaptive,rank_linear
+      sc: off,on
+```
+
+The shared [common.yaml](../../configs/sweep/common.yaml) adds the three tasks,
+seed, training budget, and inference search spaces. Native config groups select
+components through Hydra defaults; their small preparation labels preserve
+readable run names. The experiment consists of seven valid grids:
+
+| Sweep config | Training cases |
+| --- | ---: |
+| `gaussian` | 6 |
+| `hybrids` | 48 |
+| `continuous` | 24 |
+| `discrete_ce` | 12 |
+| `uniform_plugin` | 6 |
+| `gidd` | 12 |
+| `replaid` | 6 |
+
+Prepare one grid using Hydra's standard CLI:
+
+```bash
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m core.sweeps.prepare --multirun +sweep=hybrids
+```
+
+To prepare all seven grids and collect them into the existing queue formats:
+
+```bash
+for sweep in gaussian hybrids continuous discrete_ce uniform_plugin gidd replaid; do
+  uv run --locked --extra tuning --extra scoring --extra tracking \
+    python -m core.sweeps.prepare --multirun +sweep="$sweep" || exit 1
+done
+uv run --locked --extra tuning --extra scoring --extra tracking \
+  python -m core.sweeps.prepare collect \
+  /home/patrick/.cache/duo/plans/local-diffusion-20k-20261027-hydra
+```
+
+Collect only after every grid succeeds; it validates exported cases but cannot
+know which grids you intended to include. To use a different destination, pass
+`preparation.output=/path/to/new-plan` to each multirun and that same directory to
+`collect`. CLI overrides can narrow or extend the sweep, for example
+`task=battery/text8 seed=1,2 sc=on`.
+
+[`prepare.py`](../../core/sweeps/prepare.py) only exports the already-composed
+configuration and its tuning specification. Although Hydra prints “Launching
+jobs,” these are preparation calls: they do not train, initialize Ray, or log to
+W&B. Existing case/config files are refused rather than overwritten.
+
+Each case produces `configs/<name>.yaml` and a record under `cases/<name>/`.
+`collect` produces `training-jobs.yaml` for the durable Ray queue and
+`manifest.json` for nested tuning. Hydra saves its configs and overrides under
+`hydra/<family>/`. Submission, GPU scheduling, and nested Optuna selection remain
+with the existing runners. The GPU IDs and concurrency in `preparation.local`
+record launch assumptions; preparation does not allocate devices.
+
+Evaluation indices are inherited from the explicit reference manifest to keep
+validation/test partitions unchanged. A standalone plan can instead supply the
+complete `preparation.evaluation` and omit the reference. Each inference policy
+inherits the composed sampler unless it supplies `sampler`; `sampler_overrides`
+changes sampler fields. Callback NFE allocation and algorithm identifiers are
+recorded at export. Recipe identity excludes the preparation metadata.
 
 For a ready-made catalogue covering Gaussian schedules, simplex, spherical flow,
 uniform, MDLM, RePlaid and blurring, see the

@@ -1,0 +1,138 @@
+# @package _global_
+mode: train
+trainer:
+  max_steps: 20000
+  accumulate_grad_batches: 4
+  precision: bf16-mixed
+  val_check_interval: 4000
+  num_sanity_val_steps: 0
+  enable_progress_bar: false
+loader:
+  global_batch_size: 256
+  eval_batch_size: 8
+  num_workers: 2
+training:
+  warmup_steps: 2500
+  ema: 0.9999
+  performance:
+    compile:
+      enabled: true
+      backend: inductor
+      dynamic: true
+lr_scheduler:
+  _target_: core.training.schedules.constant_warmup
+  warmup_steps: 2500
+optimizer:
+  lr: 0.0003
+checkpoint:
+  resume: null
+  every_n_steps: 20000
+  save_top_k: 1
+evaluation:
+  checkpoint: null
+  max_examples: 128
+callback:
+  every_n_steps: 1000
+  subset_size: 64
+  batch_size: ${loader.eval_batch_size}
+  sampler_config: ${sampler}
+  output_dir: ${output_dir}/task_callback
+self_conditioning:
+  source: posterior_mean
+  probability: 0.9
+  evaluation_probability: 1.0
+preparation:
+  name: local-diffusion-20k-20261027
+  output: /home/patrick/.cache/duo/plans/local-diffusion-20k-20261027-hydra
+  reference_manifest: /home/patrick/.cache/duo/nested-tuning/adaptive-three-tasks-20261014/manifest.json
+  recipe_fields:
+  - model
+  - representation
+  - algorithm
+  - parameterization
+  - objective
+  - noise_schedule
+  - time_sampler
+  - prediction
+  - self_conditioning
+  - optimizer
+  local:
+    gpu_ids:
+    - 0
+    - 1
+    - 2
+    - 5
+    concurrent_jobs: 4
+    resources_per_job:
+      cpu: 4
+      gpu: 1
+  wandb:
+    entity: rz-text-dlp
+    project: local-diffusion-20k-20261027
+  training:
+    space: {}
+    trials: 1
+  evaluation:
+    nfe: 128
+    seeds:
+    - 41
+    - 42
+    test_seeds:
+    - 1041
+    - 1042
+  inference:
+  - name: native
+    space:
+      algorithm.predictor.temperature:
+        type: float
+        low: 0.5
+        high: 1.5
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+    trials: 16
+    budget_parameter: steps
+  - name: native_greedy
+    space:
+      sampler.final_denoise:
+      - greedy
+      - sample
+    trials: 2
+    budget_parameter: steps
+    sampler_overrides:
+      greedy_clean_estimate: true
+  - name: eb_greedy
+    sampler:
+      _target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
+      steps: 127
+      freeze: true
+      greedy_clean_estimate: true
+      entropy_bound: 0.1
+    space:
+      algorithm.predictor.temperature:
+        type: float
+        low: 0.5
+        high: 1.5
+      sampler.entropy_bound:
+        type: float
+        low: 0.02
+        high: 0.5
+        log: true
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+      sampler.entropy_bound: 0.1
+    trials: 16
+    budget_parameter: steps
+  case_name: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}
+hydra:
+  sweep:
+    dir: ${preparation.output}/hydra/${preparation.family}
+    subdir: ${hydra.job.num}
+  sweeper:
+    params:
+      seed: '1'
+      ~training.performance.hidden_only_bootstrap: 'false'
+      ~training.performance.activation_checkpointing: 'false'
+      ~training.performance.compile.mode: default
+      ~training.performance.compile.fullgraph: 'false'
+      ~training.performance.compile.objective: 'false'
+      task: battery/sudoku_hard,battery/text8,battery/tinystories

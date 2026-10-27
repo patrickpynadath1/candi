@@ -1,0 +1,27 @@
+# @package _global_
+defaults:
+- /token_space@token_space: append_mask
+- _self_
+task:
+  _target_: core.tasks.text8.Text8Task
+  data: ${data}
+  vocab_size: 35
+  length: 256
+  min_word_lengths:
+  - 3
+  - 5
+  - 7
+  evaluation_split: validation
+  num_eval_samples: 128
+  evaluation_seed: 23
+  variable_length: false
+data:
+  cache_dir: /home/patrick/.cache/duo/worktrees/22a3/data_cache/text8
+  raw_dir: ${data.cache_dir}/raw
+  download: false
+  limit_train: null
+  limit_validation: null
+  limit_test: null
+preparation:
+  task_name: text8
+  reference_case: text8-gaussian-rank-linear-cdcd-sc-off_20m

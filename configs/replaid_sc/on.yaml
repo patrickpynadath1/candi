@@ -1,0 +1,7 @@
+# @package _global_
+self_conditioning:
+  enabled: true
+sampler:
+  self_conditioning_mode: bootstrap
+preparation:
+  sc_name: 'on'

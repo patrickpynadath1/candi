@@ -191,3 +191,14 @@ def test_generic_config_and_reference_replaid_policies():
     assert plaid.sampler.final_transition_noise
     assert plaid.sampler.self_conditioning_mode == "bootstrap"
     assert sudoku.sampler.prompt_mode == "clean"
+
+
+@pytest.mark.parametrize("mode,calls", [("previous", 1), ("bootstrap", 2)])
+def test_ddpm_budget_reserves_terminal_and_bootstrap_calls(mode, calls):
+    sampler = GaussianDDPMSampler(self_conditioning_mode=mode)
+    for budget in (4, 16, 128):
+        steps = sampler.steps_for_nfe(budget)
+        assert calls * (steps + 1) <= budget
+        assert calls * (steps + 2) > budget
+    with pytest.raises(ValueError):
+        sampler.steps_for_nfe(1)

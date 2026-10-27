@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+- /experiment: corruption_factorial
+- common
+- /gaussian_state: one_hot
+- /path_schedule: adaptive
+- /sc: 'on'
+- override /task: battery/sudoku_hard
+- _self_
+model:
+  backbone:
+    n_blocks: 8
+    hidden_size: 512
+    cond_dim: 128
+    n_heads: 8
+    dropout: 0.1
+preparation:
+  family: gaussian
+  recipe_name: gaussian-${preparation.representation_name}-adaptive-cross_entropy-sc-${preparation.sc_name}
+hydra:
+  sweeper:
+    params:
+      gaussian_state: one_hot,embedding

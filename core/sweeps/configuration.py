@@ -51,9 +51,12 @@ def compose(
         arguments.extend(overrides)
     with initialize_config_dir(version_base=None, config_dir=str(directory)):
         config = hydra_compose(config_name="config", overrides=arguments)
+    return capture_runtime_paths(config)
 
-    # Capture only Hydra's runtime paths. Keep task/model interpolations live and
-    # do not replace Hydra's global resolver (which would affect other callers).
+
+def capture_runtime_paths(config: DictConfig) -> DictConfig:
+    """Capture Hydra paths for deferred jobs, preserving recipe interpolations."""
+
     def capture(value):
         if isinstance(value, str):
             return value.replace("${hydra:runtime.cwd}", str(ROOT)).replace(

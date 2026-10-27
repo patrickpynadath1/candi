@@ -1,0 +1,5 @@
+# @package _global_
+defaults:
+- override /hybrid_view@model.views.content: simplex
+preparation:
+  content_name: simplex
