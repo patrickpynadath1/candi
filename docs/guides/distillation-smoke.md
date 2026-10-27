@@ -159,3 +159,26 @@ improvements due to training. It does not silently convert one-hot checkpoints
 into embedding-corruption checkpoints. The older pure Gaussian checkpoints used
 in the first effectiveness sweep have one-hot state representations; their input
 projections alone do not make their corruption an embedding-space process.
+
+## Sampler tuning after the fixed-setting comparison
+
+`examples/tune_distillation.py` builds manifests for `core.sweeps.nested_tuning`
+from the 27 completed original comparison checkpoints. Each checkpoint × NFE
+(4 or 16) × sampler is an independent case, so every sampler receives its own
+selected parameters and final evaluation. This is the existing nested search
+with one fixed checkpoint as its outer candidate, not a separate tuning engine.
+
+Policies are native posterior sampling, native greedy, and entropy-bounded greedy;
+Gaussian checkpoints additionally use forward-corruption sampling. Temperature
+is searched on [0.5, 1.5]; EB also searches its entropy bound on [0.02, 0.5]
+logarithmically. Native greedy compares greedy versus sampled terminal decoding.
+Forward corruption searches sampled versus greedy clean-token proposals. Budgets
+are 16 Optuna trials per searched policy, or two for native greedy.
+
+The shared task partitions exclude previously generated subsets of sizes 16,
+128, and 256. Selection uses 128 validation examples with generation seeds 41/42;
+final reporting uses 256 disjoint validation examples with seeds 1041/1042.
+These are held-out validation partitions, not an independent official test set.
+The score is Sudoku accuracy, text8 mean unique-valid words of length at least
+five, or TinyStories corpus BLEU. This creates 180 cases and retains a separate
+`selected.json`, Optuna database, and `final/result.json` for each policy/budget.
