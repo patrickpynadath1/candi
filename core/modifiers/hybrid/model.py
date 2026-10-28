@@ -10,35 +10,6 @@ from core.models.prediction import ModelPrediction, make_conditioning
 from core.representations.noisy_inputs import CleanEmbeddingTable
 
 
-class CANDIFusion(nn.Module):
-    """Legacy CANDI fusion: clean sites bypass noisy preconditioning."""
-
-    def __init__(self, mask_index, discrete_view=0):
-        super().__init__()
-        self.mask_index, self.discrete_view = int(mask_index), int(discrete_view)
-
-    def forward(self, states, points, embeddings, views):
-        del embeddings
-        tokens = states[self.discrete_view]
-        representation = views[self.discrete_view].representation
-        table = representation.embedding.float()
-        normalized = F.normalize(table, p=2, dim=-1)
-        clean = F.embedding(tokens.clamp_max(self.mask_index - 1), normalized[:-1])
-        mask = table[self.mask_index]
-        mask = mask / mask.norm().clamp_min(1e-12)
-        continuous = (states[1].float() @ normalized[: states[1].shape[-1]].float()).to(
-            states[1].dtype
-        )
-        sigma = points[1].coefficients.sigma.float()
-        c_in = 1 / (1 + sigma.square()).sqrt()
-        continuous_scale = views[1].representation.scale
-        noisy = (
-            representation.scale * mask.view(1, 1, -1)
-            + continuous_scale * continuous * c_in[:, None, None]
-        )
-        return torch.where(tokens.ne(self.mask_index)[..., None], clean, noisy)
-
-
 class HybridModel(nn.Module):
     """Fuses view inputs once, then performs exactly one network evaluation."""
 
@@ -196,7 +167,9 @@ class HybridModel(nn.Module):
             return output
         if isinstance(output, ModelPrediction):
             return ModelPrediction(
-                None if output.logits is None else output.logits[..., : self.output_vocab_size],
+                None
+                if output.logits is None
+                else output.logits[..., : self.output_vocab_size],
                 output.hidden,
                 auxiliary_logits=None
                 if output.auxiliary_logits is None

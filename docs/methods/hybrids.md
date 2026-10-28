@@ -32,6 +32,42 @@ uv run python main.py +experiment=hybrid \
 
 Available view presets: `masked`, `uniform`, `gaussian`, `simplex`, `spherical`, and `blurring`. These are composable component recipes, not claims of paper-equivalent training results. Change a view's schedule, representation, time map, or update directly in configuration. The default fusion sums model embeddings; each representation has a configurable scale. All views must agree on token vocabulary, sequence layout, and transformer hidden size.
 
+## Position-dependent fusion
+
+Representations own table normalization, scaling and noise preconditioning.
+Fusion combines those model-input embeddings; it does not change the corruption
+state or its clean encoding. The default remains an additive sum.
+
+Use `GatedFusion` to choose contributions according to the mask token in a
+reference discrete view. Each weight entry corresponds to one view in order;
+zero excludes it and one leaves it unchanged. For CADD-style input gating:
+
+```yaml
+model:
+  fusion:
+    _target_: core.modifiers.hybrid.fusion.GatedFusion
+    mask_index: ${token_space.mask_index}
+    discrete_view: 0
+    weights:
+      - {masked: 1, revealed: 1}  # discrete input everywhere
+      - {masked: 1, revealed: 0}  # continuous input only while masked
+```
+
+The example assumes view order `[discrete, continuous]`. For the default hybrid
+order `[gaussian, masked]`, set `discrete_view: 1` and reverse the weight entries.
+
+This specifies input gating only, not CADD's dropout, gradient routing or sampler.
+The reference view must contain discrete token IDs, and all embeddings must
+share a sequence layout and hidden size. The reference view can appear anywhere
+in the view list; additional views use the same mask with independent weights.
+
+CANDI uses the same component with discrete weights `{masked: 1, revealed: 2}`
+and continuous weights `{masked: 1, revealed: 0}`. Its representations have scale
+0.5, so the revealed discrete embedding has unit scale. The continuous input
+mapping owns shared-table normalization and sigma preconditioning. Existing
+CANDI checkpoint configurations are translated at load time; parameter names
+and shared embedding ownership do not change.
+
 ## Existing assemblies
 
 ```bash
