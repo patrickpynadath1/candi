@@ -4,34 +4,20 @@ import torch
 from . import legacy_pickle
 
 
-def initialize_student(module, path):
-    """Warm-start weights, not optimizer/procedure state; resume uses Lightning."""
+def initialize_weights(module, path):
+    """Warm-start weights, not optimizer state; resume uses Lightning."""
     checkpoint = torch.load(path, map_location="cpu", weights_only=False, mmap=True)
     if checkpoint.get("core_format_version") != 1:
-        raise ValueError("student initialization requires a core checkpoint")
+        raise ValueError("weight initialization requires a core checkpoint")
     state = {
         key.removeprefix("algorithm."): value
         for key, value in checkpoint["state_dict"].items()
         if key.startswith("algorithm.")
     }
-    target = getattr(module.algorithm, "initialization_target", module.algorithm)
-    target.load_state_dict(state, strict=True)
-    if target is not module.algorithm:
-        # Adapters add parameters; import base EMA into the base only, then
-        # initialize the full student EMA from the adapted parameters.
-        if module.ema:
-            from .ema import ExponentialMovingAverage
-
-            imported = ExponentialMovingAverage(target.parameters(), module.ema.decay)
-            imported.load_state_dict(checkpoint["ema"])
-            imported.copy_to(target.parameters())
-            module.ema = ExponentialMovingAverage(
-                module.algorithm.parameters(), module.ema.decay
-            )
-        return
+    module.algorithm.load_state_dict(state, strict=True)
     if module.ema:
         if "ema" not in checkpoint:
-            raise ValueError("EMA initialization requires saved student EMA")
+            raise ValueError("EMA initialization requires saved EMA")
         module.ema.load_state_dict(checkpoint["ema"])
         module.ema.copy_to(module.algorithm.parameters())
 

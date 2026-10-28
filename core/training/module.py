@@ -73,24 +73,9 @@ class TrainingModule(L.LightningModule):
             and self.config.mode == "train"
             and not self.config.checkpoint.resume
         ):
-            from .checkpoints import initialize_student
+            from .checkpoints import initialize_weights
 
-            initialize_student(self, initialization)
-        self.procedure = (
-            instantiate(self.config.procedure, student=self.algorithm)
-            if self.config.get("procedure") is not None
-            else None
-        )
-        if self.procedure is not None and self.procedure.auxiliary is not None:
-            self.automatic_optimization = False
-            if self.config.trainer.accumulate_grad_batches != 1:
-                raise ValueError(
-                    "alternating procedures currently require accumulate_grad_batches=1"
-                )
-            if self.config.trainer.gradient_clip_val:
-                raise ValueError(
-                    "use training.phase_gradient_clip for manual optimization"
-                )
+            initialize_weights(self, initialization)
 
     def on_fit_start(self):
         from .performance import configure_performance
@@ -110,28 +95,22 @@ class TrainingModule(L.LightningModule):
             self._pending_rng = None
 
     def training_step(self, batch, batch_idx):
-        if not self.automatic_optimization:
-            return self._procedure_step(batch)
-        result = (
-            self.procedure(self.algorithm, batch, self.global_step)
-            if self.procedure is not None
-            else self.algorithm.loss(
-                batch["input_ids"],
-                batch["loss_mask"],
-                corruption_mask=batch.get("corruption_mask"),
-                **(
-                    {"valid_mask": batch.get("attention_mask")}
-                    if getattr(self.algorithm, "supports_variable_length", False)
-                    else {}
-                ),
-                step=self.global_step,
-                training=True,
-                global_batch_size=self.config.loader.global_batch_size,
-                world_size=self.trainer.world_size,
-                rank=self.global_rank,
-                accumulation_steps=self.trainer.accumulate_grad_batches,
-                accumulation_index=batch_idx % self.trainer.accumulate_grad_batches,
-            )
+        result = self.algorithm.loss(
+            batch["input_ids"],
+            batch["loss_mask"],
+            corruption_mask=batch.get("corruption_mask"),
+            **(
+                {"valid_mask": batch.get("attention_mask")}
+                if getattr(self.algorithm, "supports_variable_length", False)
+                else {}
+            ),
+            step=self.global_step,
+            training=True,
+            global_batch_size=self.config.loader.global_batch_size,
+            world_size=self.trainer.world_size,
+            rank=self.global_rank,
+            accumulation_steps=self.trainer.accumulate_grad_batches,
+            accumulation_index=batch_idx % self.trainer.accumulate_grad_batches,
         )
         # Accumulate detached, token-weighted metrics across microbatches.
         # Logging only the last microbatch aliases the stratified time ranges.
@@ -154,31 +133,6 @@ class TrainingModule(L.LightningModule):
                     previous_count + count,
                 )
         return result["loss"]
-
-    def _procedure_step(self, batch):
-        optimizers = dict(zip(("student", "auxiliary"), self.optimizers()))
-        schedulers = dict(zip(("student", "auxiliary"), self.lr_schedulers()))
-        last_loss = None
-        for index, phase in enumerate(self.procedure.phases):
-            optimizer = optimizers[phase.role]
-            optimizer.zero_grad(set_to_none=True)
-            with self.procedure.active_role(self.algorithm, phase.role):
-                result = self.procedure(self.algorithm, batch, self.global_step, index)
-                self.manual_backward(result["loss"])
-                limit = self.config.training.get("phase_gradient_clip", 1.0)
-                if limit:
-                    self.clip_gradients(
-                        optimizer,
-                        gradient_clip_val=limit,
-                        gradient_clip_algorithm="norm",
-                    )
-                optimizer.step()
-                schedulers[phase.role].step()
-            self.log(f"train/{phase.role}_loss", result["loss"].detach(), on_step=True)
-            if phase.role == "student":
-                self._after_student_update()
-            last_loss = result["loss"].detach()
-        return last_loss
 
     def on_before_optimizer_step(self, optimizer):
         for name, (total, count) in self._train_metric_totals.items():
@@ -241,9 +195,6 @@ class TrainingModule(L.LightningModule):
 
     def optimizer_step(self, *args, **kwargs):
         super().optimizer_step(*args, **kwargs)
-        self._after_student_update()
-
-    def _after_student_update(self):
         if self.ema:
             self.ema.update(self.algorithm.parameters())
         # Match the reference lifecycle: EMA sees the optimizer's update,
@@ -308,20 +259,6 @@ class TrainingModule(L.LightningModule):
             from .schedules import constant_warmup
 
             scheduler = constant_warmup(optimizer, self.config.training.warmup_steps)
-        if not self.automatic_optimization:
-            auxiliary = torch.optim.AdamW(
-                self.procedure.auxiliary.parameters(),
-                lr=c.lr,
-                betas=(c.beta1, c.beta2),
-                eps=c.epsilon,
-                weight_decay=c.weight_decay,
-            )
-            auxiliary_scheduler = (
-                instantiate(self.config.lr_scheduler, optimizer=auxiliary)
-                if self.config.get("lr_scheduler") is not None
-                else constant_warmup(auxiliary, self.config.training.warmup_steps)
-            )
-            return [optimizer, auxiliary], [scheduler, auxiliary_scheduler]
         return {
             "optimizer": optimizer,
             "lr_scheduler": {"scheduler": scheduler, "interval": "step"},
