@@ -1,0 +1,6 @@
+# @package _global_
+# UDLM core: https://arxiv.org/abs/2412.10193
+# Plug-in uniform objective, not posterior CE. Paper guidance methods are absent.
+defaults:
+- uniform_diffusion
+- _self_

@@ -1,0 +1,10 @@
+# @package _global_
+# Block diffusion core: https://arxiv.org/abs/2503.09573
+# Clean-prefix blockwise denoising; block size is configurable. Paper-specific
+# variance reduction and optimized schedules are not reproduced.
+defaults:
+- mdlm
+- _self_
+block_diffusion:
+  enabled: true
+  block_size: 32

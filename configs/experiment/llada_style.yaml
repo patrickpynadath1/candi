@@ -1,0 +1,8 @@
+# @package _global_
+# LLaDA-style masked training: https://arxiv.org/abs/2502.09992
+# Local DiT and ancestral sampling, not the LLaDA architecture/decoding system.
+defaults:
+- mdlm
+- _self_
+model:
+  adaLN: false

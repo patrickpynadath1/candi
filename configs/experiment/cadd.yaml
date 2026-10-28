@@ -1,0 +1,18 @@
+# @package _global_
+# CADD-style adaptation: https://arxiv.org/abs/2510.01329
+# Mask-gated Gaussian + discrete inputs using the shared hybrid components.
+# TODO paper alignment: continuous-view dropout; embedding sharing and detachment;
+# reference noise schedule and reverse-sampling recipe. The two view embeddings
+# are currently independent and the continuous table is learned. This is not
+# a paper-faithful CADD reproduction merely because the fusion gate matches.
+defaults:
+- hybrid
+- _self_
+model:
+  fusion:
+    _target_: core.modifiers.hybrid.fusion.GatedFusion
+    discrete_view: 1
+    mask_index: ${task.vocab_size}
+    weights:
+    - {masked: 1, revealed: 0}  # first: Gaussian embedding view
+    - {masked: 1, revealed: 1}  # second: masked token view

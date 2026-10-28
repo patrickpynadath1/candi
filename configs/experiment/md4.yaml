@@ -1,0 +1,6 @@
+# @package _global_
+# Standard state-independent MD4: https://arxiv.org/abs/2406.04329
+# The masked weighted-CE construction is shared with MDLM. Not GenMD4.
+defaults:
+- mdlm
+- _self_

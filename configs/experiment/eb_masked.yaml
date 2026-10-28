@@ -1,0 +1,7 @@
+# @package _global_
+# Entropy-bounded unmasking: https://arxiv.org/abs/2505.24857
+# MDLM training with EB inference; not a new corruption or loss.
+defaults:
+- mdlm
+- override /sampler: entropy_bounded
+- _self_

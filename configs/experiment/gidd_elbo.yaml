@@ -1,0 +1,7 @@
+# @package _global_
+# GIDD: https://proceedings.mlr.press/v267/von-rutte25a.html
+# ELBO components and marginal reverse update; not dynamic GIDD+ weighting.
+defaults:
+- gidd_corruption
+- override /objective: gidd_elbo
+- _self_

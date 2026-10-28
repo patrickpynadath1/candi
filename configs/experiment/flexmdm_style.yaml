@@ -1,0 +1,8 @@
+# @package _global_
+# FlexMDM-inspired insertion: https://arxiv.org/abs/2509.01025
+# Our deletion corruption + insertion-count/gap-token objectives are an adaptation,
+# not the full paper variational loss. No reverse deletion/substitution edits.
+defaults:
+- insertion_continuous
+- override /hybrid_view@model.views.content: masked
+- _self_

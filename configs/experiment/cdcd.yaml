@@ -1,0 +1,10 @@
+# @package _global_
+# CDCD-style: https://arxiv.org/abs/2211.15089
+# Learned embeddings + Gaussian CE + adaptive schedule. Our bin/refit adaptation
+# is not the original time-warp implementation; shared backbone/budgets differ.
+defaults:
+- gaussian_base
+- override /representation: embedding
+- override /noise_schedule: cdcd_gaussian_adaptive
+- override /noise_schedule@noise_schedule.base: exponential_ve
+- _self_

@@ -67,6 +67,8 @@ block-local generation, adaptive-time feedback, and the current Text8 evidence.
 
 ## Method recipes
 
+- [Runnable paper presets](guides/paper-recipes.md): configuration names, adaptations and limits.
+
 - [Discrete diffusion](methods/discrete-diffusion.md): MDLM, uniform, SEDD, DUO, D3PM.
 - [GIDD mask/uniform corruption](methods/gidd.md): a single-view mixture with a CE baseline.
 - [Gaussian diffusion](methods/gaussian-diffusion.md): one-hot/embedding recipes.

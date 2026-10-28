@@ -1,0 +1,6 @@
+# @package _global_
+# Basic absorbing order-agnostic ARDM-style recipe: https://arxiv.org/abs/2110.02037
+# Not the paper's upscaling or adaptive-budget construction.
+defaults:
+- mdlm
+- _self_

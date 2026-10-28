@@ -1,0 +1,10 @@
+# @package _global_
+# Discrete Flow Matching: https://arxiv.org/abs/2407.15595
+# Base CTMC probability-velocity update; no divergence-free corrector.
+defaults:
+- corruption_factorial
+- override /hybrid_view@model.views.content: uniform
+- override /sampler: dfm
+- _self_
+sampler:
+  final_denoise: sample
