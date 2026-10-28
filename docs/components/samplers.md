@@ -20,6 +20,7 @@ A prompt mask fixes tokens regardless of whether they appear in a training loss.
 | `entropy_bounded` | Absorbing entropy-bounded commitments |
 | `analytic` | SEDD absorbing-score analytic transition |
 | `uniform_ancestral`, `uniform_entropy_bounded` | Uniform plug-in or posterior transition with matching predictor/process |
+| `dfm` | Sampled-endpoint CTMC updates for masked or posterior-uniform mixture paths |
 | `euler`, `heun`, `ode` | Gaussian posterior-derived velocity integration |
 | `gaussian_ddpm` | Stochastic Gaussian reverse posterior steps |
 | `spherical` | Posterior-derived spherical tangent flow |
@@ -31,6 +32,38 @@ A prompt mask fixes tokens regardless of whether they appear in a training loss.
 See [configs](../../configs/sampler/) and [implementations](../../core/samplers/).
 Choose a matching experiment first: an arbitrary sampler switch is not a proof of
 mathematical compatibility.
+
+## Discrete Flow Matching
+
+`sampler=dfm` configures `ComposedSampler` with ordinary token selection and a
+`DiscreteFlowTransition`; it adds no sampling loop or training objective.
+Use the shared single-view/parallel-view assembly with a masked or posterior-CE
+uniform process:
+
+```bash
+uv run python main.py +experiment=corruption_factorial \
+  hybrid_view@model.views.content=masked sampler=dfm \
+  sampler.steps=127 sampler.final_denoise=sample
+# Replace masked with uniform for the posterior-CE uniform path.
+```
+
+The model supplies a clean-token posterior. Each step samples a candidate token,
+then jumps toward it with probability `1 - exp(-h * rate)`, where
+`rate = -keep_derivative / (1 - keep)` and `h` is the decrease in the view's
+local noise time. This implements the basic sampled-endpoint mixture-path CTMC
+solver from the [official Flow Matching implementation](https://github.com/facebookresearch/flow_matching/blob/main/flow_matching/solver/discrete_solver.py),
+with no divergence-free correction. It is different from the uniform ancestral
+bridge. Revealed absorbing tokens remain fixed; uniform tokens can change again.
+Plug-in uniform predictions and continuous paths are rejected.
+
+Token selection, position selection, commitment and terminal decoding remain
+independent sampler choices. `sampler.tokens.mode=greedy` uses top-1 endpoints;
+`sampler.final_denoise=greedy` separately controls terminal decoding. These are
+ablations of the stochastic DFM recipe. Temperature stays in the predictor.
+The shared loop reserves a separate terminal prediction, so 127 transitions plus
+decoding cost 128 NFE. The reference solver instead decodes on its final iteration;
+compare by total NFE rather than by the number of transitions. Self-conditioning
+and prompt preservation use the existing shared-loop behavior.
 
 ## Continuous integration
 
