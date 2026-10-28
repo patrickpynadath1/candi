@@ -61,9 +61,13 @@ class SphericalFlowMatching(PosteriorDiffusion):
         *,
         step=0,
         training=False,
+        time_sampler=None,
+        objective=None,
         **time_context,
     ):
-        time = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
+        time_sampler = self.time_sampler if time_sampler is None else time_sampler
+        objective = self.objective if objective is None else objective
+        time = time_sampler.sample(len(tokens), tokens.device, **time_context)
         keep, _ = self.schedule(time)
         state = self.process.corrupt(
             self.representation.encode(tokens),
@@ -71,7 +75,7 @@ class SphericalFlowMatching(PosteriorDiffusion):
             loss_mask if corruption_mask is None else corruption_mask,
         )
         prediction = self.training_prediction(state, keep)
-        per_token = self.objective(prediction, tokens)
+        per_token = objective(prediction, tokens)
         observe_training_loss(
             self.schedule,
             time,

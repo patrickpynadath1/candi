@@ -33,7 +33,7 @@ class MDLM(PosteriorDiffusion):
         self.validate_prediction()
 
     def model_inputs(self, state, keep):
-        condition = -keep.log() if self.time_conditioning else torch.zeros_like(keep)
+        condition = -keep.clamp_min(torch.finfo(keep.dtype).tiny).log() if self.time_conditioning else torch.zeros_like(keep)
         return state, condition
 
     def loss(
@@ -44,23 +44,32 @@ class MDLM(PosteriorDiffusion):
         *,
         step=0,
         training=False,
+        time_sampler=None,
+        objective=None,
+        pure_noise=False,
         **time_context,
     ):
+        time_sampler = self.time_sampler if time_sampler is None else time_sampler
+        objective = self.objective if objective is None else objective
         if corruption_mask is None:
             corruption_mask = loss_mask
-        times = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
+        times = time_sampler.sample(len(tokens), tokens.device, **time_context)
         keep, derivative = self.schedule(times)
+        if pure_noise:
+            if not isinstance(objective, CrossEntropy):
+                raise ValueError("pure-noise discrete training requires a CE objective")
+            keep = torch.zeros_like(keep)
         noisy = self.process.corrupt(tokens, keep, corruption_mask)
         prediction = self.training_prediction(
             noisy, keep
         )  # Shaping cannot enter this path.
-        if isinstance(self.objective, CrossEntropy):
-            per_token = self.objective(
+        if isinstance(objective, CrossEntropy):
+            per_token = objective(
                 prediction, tokens,
-                context=ObjectiveContext(time=times, alpha=keep, sigma=-keep.log()),
+                context=ObjectiveContext(time=times, alpha=keep, sigma=-keep.clamp_min(torch.finfo(keep.dtype).tiny).log()),
             )
         else:
-            per_token = self.objective(prediction, tokens, keep, derivative)
+            per_token = objective(prediction, tokens, keep, derivative)
         weights = loss_mask.to(per_token)
         count = weights.sum()
         if count <= 0:

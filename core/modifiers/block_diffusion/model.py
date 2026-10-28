@@ -23,6 +23,7 @@ class BlockDiffusionModel(nn.Module):
         self.block_size = block_size
         self.x0_causal = x0_causal
         self.clean_encoder = clean_encoder
+        self._training_block_size = ContextVar("training_block_size", default=None)
         self._clean = ContextVar("block_diffusion_clean", default=None)
         self.last_clean_logits = None
         self._parallel_clean = ContextVar("parallel_block_clean", default=None)
@@ -32,6 +33,14 @@ class BlockDiffusionModel(nn.Module):
             return super().__getattr__(name)
         except AttributeError:
             return getattr(self.model, name)
+
+    @contextmanager
+    def block_size_context(self, size):
+        token = self._training_block_size.set(size)
+        try:
+            yield
+        finally:
+            self._training_block_size.reset(token)
 
     @contextmanager
     def parallel_clean_context(self, tokens, blocks):
@@ -75,7 +84,7 @@ class BlockDiffusionModel(nn.Module):
         clean_length = clean.shape[1]
         layout = make_layout(
             length,
-            self.block_size,
+            self._training_block_size.get() or self.block_size,
             noisy.device,
             batch_size=len(inputs[0]),
             offset=offset,

@@ -1,5 +1,7 @@
 """Algorithm modifier adding block conditioning and optional clean AR loss."""
 
+import inspect
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -17,6 +19,7 @@ class BlockDiffusion(nn.Module):
         cache_clean_prefix=True,
         max_length=None,
         x0_causal=True,
+        training=None,
     ):
         super().__init__()
         if clean_loss not in {"none", "autoregressive"}:
@@ -41,6 +44,15 @@ class BlockDiffusion(nn.Module):
             raise TypeError(
                 "clean autoregressive loss is not defined for variable active blocks"
             )
+        if training is not None and variable_length:
+            raise ValueError("block-size mixtures currently require fixed-length training")
+        if training is not None:
+            parameters = inspect.signature(algorithm.loss).parameters
+            for size in training.sizes:
+                unsupported = set(training.loss_options(size)) - set(parameters)
+                if unsupported:
+                    raise TypeError(f"algorithm does not support block loss overrides: {sorted(unsupported)}")
+        self.training_layout = training
         self.algorithm = algorithm
         clean_encoder = getattr(
             getattr(algorithm, "representation", None), "encode", None
@@ -69,13 +81,22 @@ class BlockDiffusion(nn.Module):
         return self.algorithm.model
 
     def loss(self, tokens, loss_mask, *args, **kwargs):
+        size = self.block_size
+        if self.training_layout is not None and kwargs.get("training", False):
+            size = self.training_layout.sample(**kwargs)
+            options = self.training_layout.loss_options(size)
+            kwargs = {**kwargs, **options}
+        with self.model.block_size_context(size):
+            return self._loss(tokens, loss_mask, size, *args, **kwargs)
+
+    def _loss(self, tokens, loss_mask, size, *args, **kwargs):
         if getattr(self.algorithm, "supports_variable_length", False):
             return self._variable_length_loss(tokens, loss_mask, *args, **kwargs)
         if getattr(self.algorithm, "supports_sequence_layout", False):
             if "sequence_layout" in kwargs:
                 raise ValueError("block diffusion owns sequence_layout construction")
             kwargs["sequence_layout"] = SequenceLayout.fixed_blocks(
-                len(tokens), tokens.shape[1], self.block_size, tokens.device
+                len(tokens), tokens.shape[1], size, tokens.device
             )
         self.model.last_clean_logits = None
         try:

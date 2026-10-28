@@ -69,14 +69,21 @@ class PosteriorUniformDiffusion(PosteriorDiffusion):
         *,
         step=0,
         training=False,
+        time_sampler=None,
+        objective=None,
+        pure_noise=False,
         **time_context,
     ):
         corruption_mask = loss_mask if corruption_mask is None else corruption_mask
-        times = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
+        time_sampler = self.time_sampler if time_sampler is None else time_sampler
+        objective = self.objective if objective is None else objective
+        times = time_sampler.sample(len(tokens), tokens.device, **time_context)
         keep, _ = self.schedule(times)
+        if pure_noise:
+            keep = torch.zeros_like(keep)
         state = self.process.corrupt(tokens, keep, corruption_mask)
         prediction = self.training_prediction(state, keep)
-        per_token = self.objective(prediction, tokens)
+        per_token = objective(prediction, tokens)
         observe_training_loss(
             self.schedule,
             times,

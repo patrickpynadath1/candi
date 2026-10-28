@@ -50,7 +50,7 @@ representation or schedule using the same Hydra groups as other experiments.
 
 | Experiment | Construction and limits |
 | --- | --- |
-| `blockgen_masked`, `blockgen_uniform` | [BlockGen fixed-block baselines](../methods/blockgen.md): CE masking or plug-in uniform ELBO; no block-size mixture or ARPC. |
+| `blockgen_masked`, `blockgen_uniform` | [BlockGen fixed-block baselines](../methods/blockgen.md): CE masking or plug-in uniform ELBO; no ARPC. |
 | `bd3lm` | [Block diffusion](https://arxiv.org/abs/2503.09573) with clean prefix, configurable `block_diffusion.block_size`, and ancestral sampling. No claim to the optimized paper schedules. |
 | `eb_masked` | [Entropy-bounded unmasking](https://arxiv.org/abs/2505.24857) on MDLM. This changes inference, not training. |
 | `flexmdm_style` | [FlexMDM-inspired](https://arxiv.org/abs/2509.01025) masked insertion. Uses our count/gap objectives, not the full paper variational objective. |
@@ -64,3 +64,5 @@ Set task-specific variable-length evaluation options when using insertion.
 No named config is provided for full SemiCat/DoubleCat, GenMD4, Edit Flows, DID,
 ReMDM or Dirichlet Flow Matching: the missing components need code. In particular,
 `semicat_gaussian` remains a Gaussian baseline, not full SemiCat.
+
+`blockgen_masked_mixture` and `blockgen_uniform_mixture` add stratified 1+16 block-size training, with pure-noise singleton CE. Mixture likelihood evaluation and ARPC remain unimplemented; see the [BlockGen guide](../methods/blockgen.md).

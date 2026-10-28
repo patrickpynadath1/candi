@@ -2,9 +2,9 @@
 # Fixed-block BlockGen baseline, not the multi-block-size mixture model.
 # Paper: https://arxiv.org/abs/2606.02241
 # Reference: jdeschena/blockgen @ 6f52b0da3aa961d7cd268fe2d7c20cd94b3f51ae
-# Single-size reference scripts require block-causal clean-stream attention.
-# Missing for full BlockGen: weighted/stratified block-size mixture training,
-# pure-noise singleton (AR) training, mixture likelihood evaluation, and ARPC/EIPC.
+# Use token-causal clean-stream attention for these BlockGen presets.
+# For mixture training use blockgen_masked_mixture / blockgen_uniform_mixture.
+# Mixture likelihood evaluation and ARPC/EIPC are not implemented.
 # Task, tokenizer, budget and batching remain independently configurable.
 defaults:
 - override /model: dit_conditioned
@@ -18,7 +18,7 @@ self_conditioning:
 block_diffusion:
   enabled: true
   block_size: 16
-  x0_causal: false
+  x0_causal: true
   clean_loss: none
   cache_clean_prefix: true
 noise_schedule:

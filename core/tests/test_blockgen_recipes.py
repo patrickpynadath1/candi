@@ -9,12 +9,13 @@ from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
 
 
-@pytest.mark.parametrize('recipe', ['blockgen_masked', 'blockgen_uniform'])
+@pytest.mark.parametrize('recipe', ['blockgen_masked', 'blockgen_uniform',
+                                    'blockgen_masked_mixture', 'blockgen_uniform_mixture'])
 @pytest.mark.parametrize('task', ['sudoku', 'text8', 'tinystories'])
 def test_blockgen_task_composition(recipe, task):
     cfg = compose(recipe, [f'task={task}'])
     OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    assert cfg.block_diffusion.enabled and not cfg.block_diffusion.x0_causal
+    assert cfg.block_diffusion.enabled and cfg.block_diffusion.x0_causal
     assert cfg.block_diffusion.clean_loss == 'none'
     assert cfg.model.adaLN and not cfg.algorithm.time_conditioning
     assert cfg.sampler.steps == 15

@@ -1,5 +1,8 @@
 """Shared token-diffusion training lifecycle, without sampling mathematics."""
 
+from core.objectives.cross_entropy import CrossEntropy
+from core.objectives.weighting import ObjectiveContext
+
 from .adaptive import validate_adaptive_feedback, observe_training_loss
 
 import torch
@@ -66,17 +69,32 @@ class DiscreteDiffusion(nn.Module):
         *,
         step=0,
         training=False,
+        time_sampler=None,
+        objective=None,
+        pure_noise=False,
         **time_context,
     ):
+        time_sampler = self.time_sampler if time_sampler is None else time_sampler
+        objective = self.objective if objective is None else objective
         if corruption_mask is None:
             corruption_mask = loss_mask
-        times = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
+        times = time_sampler.sample(len(tokens), tokens.device, **time_context)
         keep, derivative = self.schedule(times)
+        if pure_noise:
+            if not isinstance(objective, CrossEntropy):
+                raise ValueError("pure-noise discrete training requires a CE objective")
+            keep = torch.zeros_like(keep)
         state = self.process.corrupt(tokens, keep, corruption_mask)
         prediction = self.training_prediction(state, keep)
-        per_token = self.objective(
-            prediction, state, tokens, keep[:, None], derivative[:, None]
-        )
+        if isinstance(objective, CrossEntropy):
+            per_token = objective(
+                prediction, tokens,
+                context=ObjectiveContext(time=times, alpha=keep, sigma=-keep.clamp_min(1e-30).log()),
+            )
+        else:
+            per_token = objective(
+                prediction, state, tokens, keep[:, None], derivative[:, None]
+            )
         observe_training_loss(
             self.schedule,
             times,

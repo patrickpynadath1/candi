@@ -44,23 +44,27 @@ class SimplexDiffusion(PosteriorDiffusion):
         *,
         step=0,
         training=False,
+        time_sampler=None,
+        objective=None,
         **time_context,
     ):
+        time_sampler = self.time_sampler if time_sampler is None else time_sampler
+        objective = self.objective if objective is None else objective
         if corruption_mask is None:
             corruption_mask = loss_mask
-        time = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
+        time = time_sampler.sample(len(tokens), tokens.device, **time_context)
         state = self.process.corrupt(tokens, self.schedule(time), corruption_mask)
         if training:
             state = self.process.drop_condition(
                 state, corruption_mask, self.condition_dropout
             )
         prediction = self.training_prediction(state, time)
-        per_token = self.objective(prediction, tokens)
+        per_token = objective(prediction, tokens)
         weights = loss_mask.to(per_token)
         count = weights.sum()
         if count <= 0:
             raise ValueError("loss mask must include at least one target")
-        observe = getattr(self.time_sampler, "observe", None)
+        observe = getattr(time_sampler, "observe", None)
         if training and observe is not None:
             observe(time, per_token, loss_mask, step)
         total = (per_token * weights).sum()

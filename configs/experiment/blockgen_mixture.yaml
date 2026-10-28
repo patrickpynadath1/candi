@@ -1,0 +1,19 @@
+# @package _global_
+# Reusable block-size mixture; compose after a fixed-block recipe.
+# Singleton pure noise + CE; other sizes inherit the recipe's loss and times.
+block_diffusion:
+  x0_causal: true
+  training:
+    _target_: core.modifiers.block_diffusion.mixture.BlockSizeMixture
+    sizes: [1, 16]
+    probabilities: [0.05, 0.95]
+    sampling: stratified
+    seed: ${seed}
+    overrides:
+      1:
+        pure_noise: true
+        time_sampler:
+          _target_: core.time_sampling.fixed.FixedTimeSampler
+          time: 1.0
+        objective:
+          _target_: core.objectives.cross_entropy.CrossEntropy

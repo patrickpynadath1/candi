@@ -41,6 +41,7 @@ class TrainingModule(L.LightningModule):
                 cache_clean_prefix=block.get("cache_clean_prefix", True),
                 max_length=block.get("max_length"),
                 x0_causal=block.get("x0_causal", True),
+                training=instantiate(block.get("training")),
             )
         feedback = self.config.get("token_feedback", {})
         if feedback.get("enabled", False):
