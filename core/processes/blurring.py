@@ -35,6 +35,13 @@ class BlurringProcess:
         return self._basis_cache[key]
 
     def corrupt(self, clean, path, *, noise=None):
+        # Keep the diffusion state and DCT transforms out of model autocast.
+        if clean.dtype in (torch.float16, torch.bfloat16):
+            clean = clean.float()
+        with torch.autocast(clean.device.type, enabled=False):
+            return self._corrupt(clean, path, noise=noise.to(clean) if noise is not None else None)
+
+    def _corrupt(self, clean, path, *, noise=None):
         result = clean.clone()
         noise = torch.randn_like(clean) if noise is None else noise
         if noise.shape != clean.shape:
@@ -82,6 +89,13 @@ class BlurringProcess:
         return mean, variance
 
     def reverse(self, state, clean, current_path, target_path, *, noise=None):
+        if state.dtype in (torch.float16, torch.bfloat16):
+            state = state.float()
+        with torch.autocast(state.device.type, enabled=False):
+            return self._reverse(state, clean.to(state), current_path, target_path,
+                                 noise=noise.to(state) if noise is not None else None)
+
+    def _reverse(self, state, clean, current_path, target_path, *, noise=None):
         if tuple((g.length, g.spans) for g in current_path.groups) != tuple(
             (g.length, g.spans) for g in target_path.groups
         ):

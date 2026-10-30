@@ -80,6 +80,9 @@ class BlurringDiffusion(PosteriorDiffusion):
         count = weights.sum()
         if count <= 0:
             raise ValueError("loss mask must include at least one target")
+        observe = getattr(self.time_sampler, "observe", None)
+        if training and observe is not None:
+            observe(time, per_token, loss_mask, step)
         observe_training_loss(
             self.schedule,
             time,

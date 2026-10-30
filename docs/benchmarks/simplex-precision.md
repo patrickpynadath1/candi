@@ -60,6 +60,12 @@ Zero disables chunking. Projection chunking requires explicit `fp32` or `bf16`.
 * On tested PyTorch 2.5.1, `torch.compile` supports the sampler with graph breaks
   around validation and the explicit eager Triton boundary. Full-graph sampler
   capture is not supported. The projection is tested compiled including backward.
+  Multi-GPU training with the custom projection additionally requires
+  `training.performance.compile.optimize_ddp=false` on PyTorch 2.5.1: its DDP
+  graph partitioner rejects higher-order autograd operations. Keep
+  `training.performance.compile.enabled=true`; this workaround disables only
+  DDP graph partitioning, preserving Inductor compilation and distributed
+  gradient synchronization.
 * FP32 has finite dynamic range: extraordinarily small positive shapes whose
   log samples exceed FP32 range cannot be represented. Tests cover `1e-8` through
   `1000`; arbitrary subnormal concentrations are not guaranteed.
@@ -152,3 +158,14 @@ Maximum relative L2 errors across dense/sparse projection cases and tested chunk
 | bf16 | 0.00286214 | 0.00293595 | 0.0029097 |
 
 Fused Dirichlet normalization max absolute error: 2.08616e-07.
+
+## Four-GPU DDP validation (2026-10-20)
+
+With `compile.enabled=true` and `compile.optimize_ddp=false`, all three TinyGSM
+simplex variants passed production-shape smoke tests on four H100 GPUs: microbatch
+16 per rank, sequence length 512, accumulation 8, fused FP32 corruption, BF16
+projection, and 512-row chunks. Each completed two optimizer steps, validation,
+and checkpoint saving; plain simplex also restored the step-1250 checkpoint.
+The hybrid wrapper emitted Dynamo cache-limit warnings, so this verifies functional
+execution, not that every operation remains compiled or its steady-state speed.
+Results are saved in `/scratch/gautschi/ppynadat/cont_diff/candiv2.1/simplex-ddp-smoke-20261020/results.json`.

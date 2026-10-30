@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+- gaussian_base
+- tinygsm_training_common
+- override /representation: embedding
+- override /noise_schedule: embedding_sphere_rank
+- override /time_sampler: cdcd
+- _self_
+model:
+  hidden_size: 768
+  cond_dim: 128
+  n_blocks: 12
+  n_heads: 12
+  dropout: 0.1
+parameterization:
+  temperature: 0.1
+time_sampler:
+  adaptive: true
+sampler:
+  steps: 512

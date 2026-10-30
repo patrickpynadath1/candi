@@ -6,7 +6,7 @@ defaults:
 - override /parameterization: gaussian_posterior
 - override /process: dirichlet
 - override /noise_schedule: simplex
-- override /time_sampler: loss_derivative
+- override /time_sampler: cdcd
 - override /objective: cross_entropy
 - override /sampler: simplex
 - override /token_space@token_space: data_only

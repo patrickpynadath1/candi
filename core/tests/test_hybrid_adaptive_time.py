@@ -82,12 +82,19 @@ def test_simplex_hybrid_local_time_training_and_generation(kind, monkeypatch):
     cfg.sampler.steps = 2
     algo = TrainingModule(cfg).algorithm
     with torch.no_grad():
-        algo.time_sampler.cdf.copy_(algo.time_sampler.grid.square())
+        n = algo.time_sampler.bins
+        edges = torch.linspace(0, 1, n + 1)
+        widths = edges.square().diff()
+        logits = (widths * (1 + n * algo.time_sampler.min_bin_size) - algo.time_sampler.min_bin_size).log()
+        algo.time_sampler.ema_logits[1].copy_(logits)
+        algo.time_sampler.ready.fill_(True)
     time = torch.tensor([0.04, 0.25, 0.64])
+    eps = algo.time_sampler.uniform.epsilon
+    expected = eps + (1 - eps) * ((time - eps) / (1 - eps)).sqrt()
     for training in [True, False]:
         continuous, discrete = algo.points(time, training=training)
         torch.testing.assert_close(discrete.time, time)
-        torch.testing.assert_close(continuous.time, time.sqrt(), atol=1e-5, rtol=1e-5)
+        torch.testing.assert_close(continuous.time, expected, atol=2e-4, rtol=2e-4)
     monkeypatch.setattr(algo.time_sampler.uniform, 'sample', lambda *a, **kw: time)
     seen = []
     monkeypatch.setattr(algo.time_sampler, 'observe', lambda t, *a: seen.append(t.clone()))
@@ -98,7 +105,7 @@ def test_simplex_hybrid_local_time_training_and_generation(kind, monkeypatch):
     assert result['loss'].isfinite()
     result['loss'].backward()
     assert all(p.grad.isfinite().all() for p in algo.parameters() if p.grad is not None)
-    torch.testing.assert_close(seen[0], time.sqrt(), atol=1e-5, rtol=1e-5)
+    torch.testing.assert_close(seen[0], expected, atol=2e-4, rtol=2e-4)
     algo.eval()
     generated, _ = algo.generate(instantiate(cfg.sampler), tokens, ~target)
     assert torch.equal(generated[:, :2], tokens[:, :2])

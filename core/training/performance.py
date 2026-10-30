@@ -36,6 +36,16 @@ def configure_performance(module):
             block.activation_checkpointing = True
     compilation = settings.get("compile", {})
     if compilation.get("enabled", False):
+        if "optimize_ddp" in compilation:
+            from torch._dynamo import config as dynamo_config
+
+            # PyTorch 2.5's DDP graph partitioner cannot split custom autograd
+            # operations such as the chunked simplex projection. Disable only
+            # that partitioner when requested; Inductor and DDP stay enabled.
+            optimize_ddp = compilation["optimize_ddp"]
+            if not isinstance(optimize_ddp, bool):
+                raise ValueError("compile.optimize_ddp must be a boolean")
+            dynamo_config.optimize_ddp = optimize_ddp
         # Compile the backbone in place: replacing it with OptimizedModule would
         # introduce _orig_mod in checkpoints and optimizer parameter patterns.
         models = [

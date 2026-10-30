@@ -1,0 +1,16 @@
+# @package _global_
+defaults:
+- gaussian_base
+- tinygsm_training_common
+- tinygsm_embedding_sc_architecture
+- override /representation: centered_embedding
+- override /noise_schedule: embedding_sphere_rank
+- override /time_sampler: cdcd
+- override /sampler: gaussian_ddpm
+- _self_
+sampler:
+  epsilon: 0.0
+  prior_mode: standard_normal
+  prompt_mode: clean
+  self_conditioning_mode: previous
+  final_transition_noise: false

@@ -71,7 +71,7 @@ class EmbeddingSphereRankSchedule(nn.Module):
         if coupling not in {"linear", "geometric"}:
             raise ValueError("coupling must be linear or geometric")
         self.representation_requirements = RepresentationRequirements(
-            kinds=("embedding",), dimension=dimension, unit_normalized=True
+            kinds=("embedding", "centered_embedding"), dimension=dimension, unit_normalized=True
         )
         self.rank_min, self.rank_max = rank_min, rank_max
         self.endpoint_width, self.coupling = endpoint_width, coupling

@@ -1,0 +1,10 @@
+# @package _global_
+defaults:
+- blurring_diffusion
+- tinygsm_training_common
+- tinygsm_embedding_sc_architecture
+- override /time_sampler: cdcd
+- _self_
+# Bound terminal signal leakage for spans up to 512 tokens.
+noise_schedule:
+  terminal_mean: 0.02

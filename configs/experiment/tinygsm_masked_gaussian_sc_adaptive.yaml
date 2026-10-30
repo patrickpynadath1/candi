@@ -5,7 +5,7 @@ defaults:
 - override /model: hybrid
 - override /parameterization: unconstrained_posterior
 - override /objective: cross_entropy
-- override /time_sampler: loss_derivative
+- override /time_sampler: cdcd
 - override /sampler: hybrid
 - override /hybrid_view@model.views.second: masked
 - _self_

@@ -8,7 +8,7 @@ defaults:
 - override /sampler: insertion
 - override /variable_length: insertion
 - override /hybrid_view@model.views.content: simplex
-- override /time_sampler: loss_derivative
+- override /time_sampler: cdcd
 - _self_
 model:
   backbone:

@@ -238,3 +238,37 @@ def test_self_conditioning_selects_spans_not_batch_dimension():
             torch.testing.assert_close(
                 actual.coefficients.sigma, target.coefficients.sigma
             )
+
+
+@pytest.mark.parametrize('length', [1, 2, 31, 32, 128, 494, 495, 512])
+def test_tinygsm_schedule_terminal_leakage(length):
+    from core.sweeps.configuration import compose
+    from hydra.utils import instantiate
+    cfg = compose('tinygsm_blurring_sc_adaptive')
+    schedule = instantiate(cfg.noise_schedule)
+    schedule.validate_shape(length, cfg.representation.dimension)
+    endpoint = schedule.coefficients(torch.tensor([1.0], dtype=torch.float64), length, cfg.representation.dimension)
+    assert endpoint.attenuation.square().max().item() * length < 0.1
+
+
+def test_original_blur_endpoint_rejects_tinygsm_length():
+    with pytest.raises(ValueError, match='terminal local-span signal leakage'):
+        BlurringSchedule().validate_shape(512, 4)
+
+
+def test_blur_process_preserves_fp32_under_autocast():
+    schedule = BlurringSchedule(terminal_mean=0.02)
+    process = BlurringProcess()
+    clean = torch.randn(1, 512, 4, requires_grad=True)
+    active = torch.ones(1, 512, dtype=torch.bool)
+    layout = resolve_sequence_layout(active)
+    zero = schedule.for_layout(torch.zeros(1), active, 4, layout)
+    current = schedule.for_layout(torch.full((1,), 1/512), active, 4, layout)
+    expected = process.corrupt(clean, zero, noise=torch.zeros_like(clean))
+    with torch.autocast('cpu', dtype=torch.bfloat16):
+        actual = process.corrupt(clean, zero, noise=torch.zeros_like(clean))
+        reverse = process.reverse(clean, clean, current, zero, noise=torch.zeros_like(clean))
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+    torch.testing.assert_close(reverse, expected, rtol=0, atol=0)
+    actual.square().mean().backward()
+    assert clean.grad is not None and torch.isfinite(clean.grad).all()

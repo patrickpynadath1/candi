@@ -181,3 +181,23 @@ def test_resume_retains_explicit_fused_optimizer_execution():
         group["fused"] is True and group["foreach"] is None
         for group in fused.param_groups
     )
+
+
+def test_ddp_partition_workaround_keeps_model_compilation(monkeypatch):
+    from types import SimpleNamespace
+    from torch._dynamo import config as dynamo_config
+    from core.training.performance import configure_performance
+    from core.models.dit import DiT
+
+    monkeypatch.setattr(dynamo_config, 'optimize_ddp', True)
+    model = DiT(5, hidden_size=16, cond_dim=8, n_blocks=1, n_heads=2)
+    calls = []
+    monkeypatch.setattr(model, 'compile', lambda **kwargs: calls.append(kwargs))
+    module = SimpleNamespace(
+        algorithm=model,
+        config=SimpleNamespace(training={'performance': {'compile': {
+            'enabled': True, 'backend': 'inductor', 'optimize_ddp': False}}}),
+    )
+    configure_performance(module)
+    assert dynamo_config.optimize_ddp is False
+    assert len(calls) == 1 and calls[0]['backend'] == 'inductor'
