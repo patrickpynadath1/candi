@@ -52,6 +52,43 @@ also supports linear or geometric rank progression, but its sphere approximation
 is a separate schedule, not the exact one-hot formula applied to arbitrary tables.
 Geometry requirements are checked against the [representation](representations.md).
 
+## LangFlow Gumbel schedule
+
+`noise_schedule=gumbel` selects a VP Gaussian path whose log noise-to-signal
+variance ratio is a clipped Gumbel quantile:
+
+`gamma(t) = loc - scale * log(-log(t))`,
+`alpha² = sigmoid(-gamma)`, `sigma² = sigmoid(gamma)`.
+
+Uniform training times therefore induce Gumbel-distributed noise levels; a
+uniform inference grid visits their quantiles. Coefficient derivatives include
+the quantile derivative. The finite endpoint cutoffs follow the
+[released GumbelProposal](https://github.com/nealchen2003/LangFlow/blob/main/langflow/model.py)
+(including its upper-tail approximation); they are not exact clean/noise limits.
+
+```bash
+uv run python main.py +experiment=gaussian_base noise_schedule=gumbel
+# For the shared single-view/hybrid assembly:
+uv run python main.py +experiment=corruption_factorial \
+  hybrid_view@model.views.content=gaussian noise_schedule=gumbel \
+  'model.views.content.schedule=${noise_schedule}'
+```
+
+With `learnable=true`, the existing detached CE feedback fits
+`entropy * GumbelCDF(gamma)` to per-example CE by squared error, as described in
+[LangFlow §4.1](https://arxiv.org/html/2604.11748v1#S4.SS1).
+This implementation uses a separate SGD update per training observation,
+controlled by `learning_rate`; the paper's training optimizer is not released.
+The sampled gamma and CE targets are detached so fitting does not update the
+denoiser, and CE does not optimize the schedule. Location, log-scale and
+log-entropy are checkpointed buffers; distributed workers pool fitting gradients.
+Evaluation never updates them. Set `learnable=false` for a fixed schedule.
+
+Defaults initialize from the released checkpoint, not a task-independent optimum.
+The schedule works with either one-hot or embedding Gaussian representations.
+Selecting it alone does not reproduce LangFlow's embedding scaling, gamma
+conditioning, skip connection or complete training recipe.
+
 ## Rescaling and SNR
 
 [RescaledGaussianSchedule](../../core/noise_schedules/rescaled_gaussian.py) divides

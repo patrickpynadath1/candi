@@ -17,6 +17,7 @@ dependencies = [
     "torchdiffeq>=0.2.5",
     "transformers>=5.8.1",
     "ray[tune]>=2.49,<3",
+    "setuptools>=82.0.1",
 ]
 
 [project.optional-dependencies]

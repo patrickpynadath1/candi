@@ -1,0 +1,6 @@
+# @package _global_
+# BlockGen 1+16 training mixture. Mixture likelihood and ARPC are not implemented.
+defaults:
+- blockgen_masked
+- blockgen_mixture
+- _self_

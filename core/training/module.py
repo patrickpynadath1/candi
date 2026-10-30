@@ -41,6 +41,7 @@ class TrainingModule(L.LightningModule):
                 cache_clean_prefix=block.get("cache_clean_prefix", True),
                 max_length=block.get("max_length"),
                 x0_causal=block.get("x0_causal", True),
+                training=instantiate(block.get("training")),
             )
         feedback = self.config.get("token_feedback", {})
         if feedback.get("enabled", False):
@@ -50,7 +51,6 @@ class TrainingModule(L.LightningModule):
                 self.algorithm,
                 depth=feedback.depth,
                 loss_weight=feedback.get("loss_weight", 1.0),
-                gate=feedback.get("gate", "scalar"),
                 detach=feedback.get("detach", False),
             )
         if self.config.get("self_conditioning", {}).get("enabled", False):
@@ -68,6 +68,15 @@ class TrainingModule(L.LightningModule):
         )
         self._pending_rng = None
         self._train_metric_totals = {}
+        initialization = self.config.training.get("initialize_from")
+        if (
+            initialization
+            and self.config.mode == "train"
+            and not self.config.checkpoint.resume
+        ):
+            from .checkpoints import initialize_weights
+
+            initialize_weights(self, initialization)
 
     def on_fit_start(self):
         from .performance import configure_performance
@@ -106,7 +115,7 @@ class TrainingModule(L.LightningModule):
         )
         # Accumulate detached, token-weighted metrics across microbatches.
         # Logging only the last microbatch aliases the stratified time ranges.
-        count = result["num_tokens"].detach().float()
+        count = result.get("normalization_count", result["num_tokens"]).detach().float()
         for key in (
             "loss",
             "main_loss",
@@ -178,7 +187,11 @@ class TrainingModule(L.LightningModule):
             .reshape(-1, 2)
             .sum(0)
         )
-        self.log("val/nll", totals[0] / totals[1].clamp_min(1), sync_dist=False)
+        self.log(
+            getattr(self.algorithm, "validation_metric", "val/nll"),
+            totals[0] / totals[1].clamp_min(1),
+            sync_dist=False,
+        )
         self._validation_context.__exit__(None, None, None)
 
     def optimizer_step(self, *args, **kwargs):

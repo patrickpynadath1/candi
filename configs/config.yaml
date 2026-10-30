@@ -18,6 +18,7 @@ defaults:
 - variable_length: null
 - _self_
 self_conditioning:
+  gradient_mode: detached
   enabled: false
   source: posterior_mean
   probability: 0.9
@@ -34,9 +35,9 @@ token_feedback:
   enabled: false
   depth: 3
   loss_weight: 1.0
-  gate: scalar
   # Stop main-loss gradients through feedback probabilities; auxiliary CE stays attached.
   detach: false
+compile: true
 mode: train
 seed: 1
 output_dir: ${hydra:runtime.output_dir}

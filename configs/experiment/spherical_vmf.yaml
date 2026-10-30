@@ -1,0 +1,9 @@
+# @package _global_
+# vMF spherical flows: https://arxiv.org/abs/2605.05629
+# Core path and predictor-corrector. Tied spherical classifier and paper-specific
+# damping heuristics are not reproduced. This is distinct from geodesic S-FLM.
+defaults:
+- corruption_factorial
+- override /hybrid_view@model.views.content: vmf
+- override /sampler: vmf_predictor_corrector
+- _self_

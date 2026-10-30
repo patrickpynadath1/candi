@@ -23,6 +23,9 @@ class DiffusionView(nn.Module):
         self.update = update
         self.time_map = time_map or IdentityTimeMap()
         self.name = name or type(process).__name__
+        validate_process = getattr(schedule, "validate_process", None)
+        if validate_process is not None:
+            validate_process(process)
         requirements = getattr(schedule, "representation_requirements", None)
         if requirements is not None:
             requirements.validate(representation.spec, type(schedule).__name__)

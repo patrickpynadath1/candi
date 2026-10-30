@@ -1,0 +1,21 @@
+_target_: core.modifiers.hybrid.views.DiffusionView
+process:
+  _target_: core.processes.vmf.VMFProcess
+  dimension: 512
+  kappa_max: 250.0
+schedule:
+  _target_: core.noise_schedules.vmf.VMFSchedule
+  kappa_max: 250.0
+representation:
+  _target_: core.representations.noisy_inputs.ProjectedRepresentation
+  state_dim: 512
+  hidden_size: ${model.backbone.hidden_size}
+  precondition: false
+  state_representation:
+    _target_: core.representations.embedding.EmbeddingRepresentation
+    vocab_size: ${task.vocab_size}
+    dimension: 512
+    trainable: true
+    unit_normalized: true
+update:
+  _target_: core.samplers.hybrid_updates.VMFProbabilityFlowUpdate

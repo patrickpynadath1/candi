@@ -8,6 +8,7 @@ import torch
 from torch import nn
 
 from core.models.components import BlockExecutionOutput
+from core.models.prediction import ConditioningProjection
 
 
 class TokenFeedbackBlocks(nn.Module):
@@ -15,16 +16,12 @@ class TokenFeedbackBlocks(nn.Module):
 
     uses_intermediate_feedback = True
 
-    def __init__(self, template, depth, hidden_size, *, gate="scalar", detach=False):
+    def __init__(self, template, depth, hidden_size, *, detach=False):
         super().__init__()
-        if gate not in {"scalar", "channel"}:
-            raise ValueError("token feedback gate must be scalar or channel")
         self.extractor = deepcopy(template)
         self.depth = int(depth)
         self.detach = bool(detach)
-        self.norm = nn.LayerNorm(hidden_size, elementwise_affine=False)
-        shape = () if gate == "scalar" else (hidden_size,)
-        self.gate = nn.Parameter(torch.zeros(shape))
+        self.conditioning = ConditioningProjection(hidden_size, hidden_size)
         self._capture = ContextVar("token_feedback_capture", default=None)
 
     @contextmanager
@@ -70,8 +67,7 @@ class TokenFeedbackBlocks(nn.Module):
                 if self.detach:
                     weights = weights.detach()
                 feedback = weights @ feedback_embedding.float()
-                feedback = self.norm(feedback).to(hidden.dtype)
-                hidden = hidden + feedback * self.gate.to(hidden.dtype)
+                hidden = self.conditioning(hidden, feedback)
         capture = self._capture.get()
         if capture is not None and torch.is_grad_enabled():
             capture.append(auxiliary_logits)

@@ -174,3 +174,14 @@ The learned clock is a registered module saved with the model and reused during
 inference; validation and generation do not update it. Each case trains once
 from scratch, then tunes inference, then evaluates only the validation-selected
 winner. Existing checkpoints and case directories are not overwritten.
+
+### Sampler evaluation budgets
+
+NFE is an upper bound on reported model evaluations, including terminal decoding.
+The worker applies inference overrides before asking samplers that expose
+`steps_for_nfe(nfe)` to allocate their step budget. `ComposedSampler` accounts
+for its optional corrector evaluations; unused calls are left over when a whole
+predictor/corrector step cannot fit. Existing samplers without this method retain
+the one-call-per-step plus terminal-call convention. The worker also checks
+the actual reported NFE after evaluation. New samplers with a different call
+cost must implement this method.

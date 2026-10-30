@@ -1,0 +1,37 @@
+# @package _global_
+defaults:
+- /experiment: replaid
+- common
+- /replaid_sc: 'off'
+- override /task: battery/sudoku_hard
+- _self_
+model:
+  n_blocks: 8
+  hidden_size: 512
+  cond_dim: 128
+  n_heads: 8
+  dropout: 0.1
+preparation:
+  family: replaid
+  recipe_name: replaid-native-replaid-sc-${preparation.sc_name}
+  inference:
+  - name: native
+    space:
+      algorithm.predictor.temperature:
+        type: float
+        low: 0.5
+        high: 1.5
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+    trials: 16
+    budget_parameter: steps
+hydra:
+  sweeper:
+    params:
+      replaid_sc: off,on
+self_conditioning:
+  probability: 0.25
+algorithm:
+  corrupt_all: false
+sampler:
+  prompt_mode: clean

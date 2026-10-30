@@ -1,0 +1,5 @@
+# @package _global_
+defaults:
+- override /hybrid_view@model.views.content: gaussian_one_hot
+preparation:
+  representation_name: one_hot

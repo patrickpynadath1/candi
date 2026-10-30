@@ -1,0 +1,9 @@
+_target_: core.samplers.composed.ComposedSampler
+# Total NFE = steps * (1 + corrector.steps) + 1.
+steps: 63
+epsilon: 0.0
+final_denoise: greedy
+corrector:
+  _target_: core.samplers.correctors.SphericalLangevinCorrector
+  steps: 1
+  step_size: 0.001

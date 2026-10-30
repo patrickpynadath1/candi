@@ -47,7 +47,10 @@ views:
 self_conditioning: ${self_conditioning.enabled}
 self_conditioning_source: ${self_conditioning.source}
 fusion:
-  _target_: core.modifiers.hybrid.model.CANDIFusion
+  _target_: core.modifiers.hybrid.fusion.GatedFusion
   mask_index: ${token_space.mask_index}
+  weights:
+  - {masked: 1, revealed: 2}
+  - {masked: 1, revealed: 0}
 time_conditioning: negative_log_keep
 output_vocab_size: ${task.vocab_size}

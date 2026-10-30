@@ -153,3 +153,29 @@ class GIDDUpdate:
         return process.reverse(
             state, probabilities, source.coefficients, destination.coefficients
         )
+
+
+class VMFProbabilityFlowUpdate:
+    """Paper Algorithm 2 predictor: tangent Euler step and normalization."""
+
+    def __call__(
+        self,
+        process,
+        representation,
+        state,
+        probabilities,
+        source,
+        destination,
+        *,
+        noise=None,
+    ):
+        from core.processes.spherical import sphere_normalize
+
+        velocity = process.velocity(
+            state, representation.codebook(), probabilities, source.coefficients[0]
+        )
+        # Euler in local time: the derivative belongs to the source schedule.
+        delta = (destination.time - source.time) * source.coefficients[1]
+        while delta.ndim < state.ndim:
+            delta = delta.unsqueeze(-1)
+        return sphere_normalize(state.float() + delta * velocity).to(state.dtype)

@@ -37,6 +37,16 @@ class GaussianDDPMSampler:
         self.prior_mode = prior_mode
         self.steps, self.epsilon = steps, epsilon
 
+    def steps_for_nfe(self, nfe):
+        """Reserve terminal prediction and account for per-step SC bootstraps."""
+        if isinstance(nfe, bool) or int(nfe) != nfe:
+            raise ValueError("NFE budget must be an integer")
+        calls = 2 if self.self_conditioning_mode == "bootstrap" else 1
+        steps = int(nfe) // calls - 1
+        if steps < 1:
+            raise ValueError("NFE budget cannot fit a transition and final prediction")
+        return steps
+
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
         if not isinstance(algo.predictor, PosteriorParameterization):

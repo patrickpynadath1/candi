@@ -98,7 +98,7 @@ Trials resume their own `run/checkpoints/last.ckpt` on recovery. Restore interru
 Tune experiments with `resume_unfinished=True, resume_errored=True` and the same
 resource reservation and shared storage path.
 
-`job_tinygsm_ray_head.sh` reserves the TinyGSM reference resources for seven days
+`scripts/jobs/job_tinygsm_ray_head.sh` reserves the TinyGSM reference resources for seven days
 and starts a loopback Ray Jobs server on port 8265. It submits
 `scripts/tinygsm_ray_queue.py --root <persistent-directory>` to run the eight
 TinyGSM configurations sequentially, each using eight GPUs. The script accepts

@@ -43,7 +43,6 @@ def build_jobs(name):
                 "token_feedback.enabled": feedback,
                 "token_feedback.depth": depth,
                 "token_feedback.loss_weight": 1.0,
-                "token_feedback.gate": "scalar",
                 "token_feedback.detach": False,
             },
         )

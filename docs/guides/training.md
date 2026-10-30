@@ -122,9 +122,10 @@ An optional single-pass token-feedback branch can be enabled with
 `token_feedback.enabled=true`. After backbone block `token_feedback.depth`
 (zero based), one additional transformer block predicts auxiliary clean-token
 logits through the model's shared token output head. Their softmax expectation
-under the input token embedding table is normalized and added to the residual
-stream through a zero-initialized scalar gate. `token_feedback.gate=channel`
-uses one zero-initialized gate per hidden channel instead. The main objective is
+under the input token embedding table is added to the residual stream through
+the same zero-initialized, bias-free linear projection used by posterior-mean
+self-conditioning (`ConditioningProjection`). No LayerNorm is applied to this
+feedback. The main objective is
 unchanged and training adds masked clean-token cross entropy weighted by
 `token_feedback.loss_weight`. Prompt and padding positions remain excluded by
 the existing `loss_mask`.
@@ -137,3 +138,36 @@ a fixed configured depth for deterministic behavior across distributed ranks;
 random training depth is not supported. Models whose output is a score or
 velocity require an explicit token readout and are rejected rather than treated
 as token logits. Cached causal decoding is not currently supported.
+
+### Self-conditioning gradient routing
+
+`self_conditioning.gradient_mode` controls training-time bootstrap gradients:
+
+- `detached` (default): only the conditioned consumer pass receives gradients.
+- `both`: gradients flow through the bootstrap, expected embedding, and consumer.
+- `producer`: conditioned examples train the bootstrap through a consumer whose
+  parameter values are detached. Its input Jacobian remains differentiable.
+- `mixed`: randomly assign half the SC-selected examples in each microbatch to
+  `producer`, with the remainder using `detached` (an odd extra example uses
+  `detached`). Examples not selected for SC train normally.
+
+These modes retain the existing SC selection probability and do not change
+sampling. Producer/mixed execution evaluates frozen and trainable consumers;
+its training compute is greater than ordinary detached SC. Frozen here means
+no direct parameter gradients from that consumer call, not a separate model
+held fixed over the entire training run: both passes share current weights.
+
+A producer-only branch cannot learn through a zero-initialized SC projection.
+For hybrid/single-view models, `model.conditioning_initialization=identity`
+provides an initially active projection. Compare initialization as well as
+routing when interpreting results against zero-initialized baselines.
+
+### Compilation
+
+The shared runner enables `compile: true` by default, including for older queued
+configs that omit the field. Each transformer block uses in-place
+`Module.compile(dynamic=False)` with PyTorch's default Inductor backend. This
+preserves parameter identities and checkpoint keys, including for resumed
+training and EMA. It applies to training and generation; set `compile: false`
+for eager execution. Already-running workers retain their execution mode until
+their job ends; newly started Ray workers pick up the runner setting.

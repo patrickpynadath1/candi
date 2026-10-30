@@ -43,7 +43,7 @@ class UniformDiffusion(DiscreteDiffusion):
         return self.prediction.predict(
             self.model,
             self.predictor,
-            (state, -keep.log() if self.time_conditioning else torch.zeros_like(keep)),
+            (state, -keep.clamp_min(torch.finfo(keep.dtype).tiny).log() if self.time_conditioning else torch.zeros_like(keep)),
             state,
             pathway,
             mean=self.prediction_mean,

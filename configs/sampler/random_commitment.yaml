@@ -1,0 +1,18 @@
+# EB-style state updates with uniformly chosen positions instead of entropy order.
+_target_: core.samplers.composed.ComposedSampler
+steps: 180
+epsilon: 1.0e-5
+tokens:
+  _target_: core.samplers.policies.TokenSelection
+  mode: greedy
+positions:
+  _target_: core.samplers.policies.RandomPositions
+  count: 1
+transition:
+  _target_: core.samplers.policies.ReverseTransition
+  noise: zero
+  preserve_absorbing: true
+  renoise_released: true
+commitment: freeze
+final_denoise: greedy
+final_prediction: sampling

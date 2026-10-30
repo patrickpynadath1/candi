@@ -1,0 +1,13 @@
+# DFM mixture-path CTMC updates within the shared sampling loop.
+_target_: core.samplers.composed.ComposedSampler
+steps: 127
+epsilon: 1.0e-5
+tokens:
+  _target_: core.samplers.policies.TokenSelection
+  mode: sample
+positions:
+  _target_: core.samplers.policies.AllPositions
+transition:
+  _target_: core.samplers.discrete_flow.DiscreteFlowTransition
+commitment: none
+final_denoise: sample

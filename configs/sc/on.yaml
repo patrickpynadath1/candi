@@ -1,0 +1,5 @@
+# @package _global_
+self_conditioning:
+  enabled: true
+preparation:
+  sc_name: 'on'

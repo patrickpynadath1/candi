@@ -129,8 +129,10 @@ class CANDIRepresentation(nn.Module):
         return self.embedding[: self.state_dim]
 
     def to_model_embedding(self, state, point):
-        scale = (1 + point.coefficients.sigma.square()).rsqrt()
-        return (state.float() @ self._table()) * scale[:, None, None] * self.scale
+        table = F.normalize(self._table().float(), p=2, dim=-1)
+        continuous = (state.float() @ table).to(state.dtype)
+        scale = 1 / (1 + point.coefficients.sigma.float().square()).sqrt()
+        return self.scale * continuous * scale[:, None, None]
 
     def clean_embedding(self, probabilities):
         table = F.normalize(self._table(), p=2, dim=-1)
@@ -163,9 +165,15 @@ class SimplexRepresentation(TokenRepresentation):
         del point
         from core.models.simplex_projection import simplex_projection
 
-        return simplex_projection(
-            state, self._table(), self.projection_precision, self.projection_chunk_size
-        ) * self.scale
+        return (
+            simplex_projection(
+                state,
+                self._table(),
+                self.projection_precision,
+                self.projection_chunk_size,
+            )
+            * self.scale
+        )
 
 
 class CleanEmbeddingTable(nn.Module):

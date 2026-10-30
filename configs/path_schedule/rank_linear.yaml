@@ -1,0 +1,3 @@
+# @package _global_
+preparation:
+  schedule_name: rank_linear

@@ -13,5 +13,5 @@
 
 set -euo pipefail
 # Submit from the repository root (mkdir -p logs first), or set CANDI_ROOT.
-repo_root=${CANDI_ROOT:-${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}}
+repo_root=${CANDI_ROOT:-${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}}
 exec bash "${repo_root}/scripts/run_replaid_text.sh" tinygsm replaid_hybrid "$@"

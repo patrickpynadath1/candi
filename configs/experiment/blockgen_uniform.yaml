@@ -1,0 +1,14 @@
+# @package _global_
+# BlockGen-uniform single-block-size baseline, task independent.
+# The reference uses plug-in uniform ELBO, NOT our uniform posterior-CE recipe.
+# No Gaussian curriculum. See blockgen_common.yaml for mixture presets,
+# remaining limitations and per-block NFE accounting.
+defaults:
+- blockgen_common
+- override /algorithm: uniform_diffusion
+- override /parameterization: plug_in
+- override /process: uniform
+- override /objective: uniform
+- override /sampler: uniform_ancestral
+- override /token_space@token_space: data_only
+- _self_

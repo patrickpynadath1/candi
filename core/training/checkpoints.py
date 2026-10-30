@@ -4,6 +4,24 @@ import torch
 from . import legacy_pickle
 
 
+def initialize_weights(module, path):
+    """Warm-start weights, not optimizer state; resume uses Lightning."""
+    checkpoint = torch.load(path, map_location="cpu", weights_only=False, mmap=True)
+    if checkpoint.get("core_format_version") != 1:
+        raise ValueError("weight initialization requires a core checkpoint")
+    state = {
+        key.removeprefix("algorithm."): value
+        for key, value in checkpoint["state_dict"].items()
+        if key.startswith("algorithm.")
+    }
+    module.algorithm.load_state_dict(state, strict=True)
+    if module.ema:
+        if "ema" not in checkpoint:
+            raise ValueError("EMA initialization requires saved EMA")
+        module.ema.load_state_dict(checkpoint["ema"])
+        module.ema.copy_to(module.algorithm.parameters())
+
+
 def load_weights(module, path, *, legacy=False):
     # Checkpoints are user-supplied trusted training artifacts, not remote input.
     checkpoint = torch.load(

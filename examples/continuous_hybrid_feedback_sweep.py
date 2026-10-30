@@ -89,7 +89,6 @@ def build_job(group, family, feedback, mixture=None):
         "token_feedback.enabled": feedback == "token",
         "token_feedback.depth": 3,
         "token_feedback.loss_weight": 1.0,
-        "token_feedback.gate": "scalar",
         "token_feedback.detach": False,
     }
     for key, value in settings.items():

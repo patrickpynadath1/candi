@@ -1,0 +1,8 @@
+# @package _global_
+# RADD training recipe: https://arxiv.org/abs/2406.03736
+# Time-independent clean posterior. Unchanged-state prediction caching is absent.
+defaults:
+- mdlm
+- _self_
+model:
+  adaLN: false

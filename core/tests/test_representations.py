@@ -173,7 +173,7 @@ def test_embedding_rank_agrees_with_random_table_approximation():
 
 
 def test_representation_decoding_is_distinct_from_posterior_decoding():
-    representation = EmbeddingRepresentation(3, dimension=2)
+    representation = EmbeddingRepresentation(3, dimension=2, trainable=False)
     representation.table.copy_(torch.tensor([[1.0, 0.0], [0.8, 0.6], [-1.0, 0.0]]))
     p = torch.tensor([[[0.4, 0.35, 0.25]]])
     algo = SimpleNamespace(
@@ -195,3 +195,17 @@ def test_representation_decoding_is_distinct_from_posterior_decoding():
         EulerSampler(2, decoding="representation").sample(algo, tokens, mask)[0].item()
         == 1
     )
+
+
+def test_embedding_default_learns_and_fixed_codebook_is_opt_in():
+    representation = EmbeddingRepresentation(5, dimension=3)
+    before = representation.table.detach().clone()
+    optimizer = torch.optim.SGD(representation.parameters(), lr=0.1)
+    representation.encode(torch.tensor([0, 1])).sum().backward()
+    assert representation.table.grad is not None
+    assert torch.isfinite(representation.table.grad).all()
+    optimizer.step()
+    assert not torch.equal(before, representation.table.detach())
+    fixed = EmbeddingRepresentation(5, dimension=3, trainable=False)
+    assert not list(fixed.parameters())
+    assert not fixed.encode(torch.tensor([0, 1])).requires_grad

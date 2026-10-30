@@ -1,0 +1,14 @@
+# @package _global_
+# BlockGen-absorb single-block-size baseline, task independent.
+# Matches reference fixed-block CE training and observed-token preservation.
+# Our validation uses this same CE objective; upstream switches to ELBO.
+# For an ELBO-trained variant use objective=weighted_ce, but that changes training.
+# See blockgen_common.yaml for missing mixture/ARPC components and NFE accounting.
+defaults:
+- blockgen_common
+- override /algorithm: mdlm
+- override /parameterization: posterior
+- override /process: absorbing
+- override /objective: cross_entropy
+- override /sampler: ancestral
+- _self_

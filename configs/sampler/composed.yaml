@@ -1,0 +1,13 @@
+# Shared fixed-length sampler; all behavior is selected by these components.
+_target_: core.samplers.composed.ComposedSampler
+steps: 180
+epsilon: 1.0e-5
+tokens:
+  _target_: core.samplers.policies.TokenSelection
+  mode: sample
+positions:
+  _target_: core.samplers.policies.AllPositions
+transition:
+  _target_: core.samplers.policies.ForwardCorruption
+commitment: none
+final_denoise: greedy

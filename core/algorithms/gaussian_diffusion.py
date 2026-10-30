@@ -66,25 +66,29 @@ class GaussianDiffusion(PosteriorDiffusion):
         *,
         step=0,
         training=False,
+        time_sampler=None,
+        objective=None,
         **time_context,
     ):
+        time_sampler = self.time_sampler if time_sampler is None else time_sampler
+        objective = self.objective if objective is None else objective
         if corruption_mask is None:
             corruption_mask = loss_mask
         time = self.schedule.training_time(
-            self.time_sampler.sample(len(tokens), tokens.device, **time_context)
+            time_sampler.sample(len(tokens), tokens.device, **time_context)
         )
         path = self.schedule(time)
         clean = self.representation.encode(tokens)
         state = self.process.corrupt(clean, path.alpha, path.sigma, corruption_mask)
         prediction = self.training_prediction(state, time, path)
-        if getattr(self.objective, "requires_context", False):
-            per_token = self.objective(
+        if getattr(objective, "requires_context", False):
+            per_token = objective(
                 prediction,
                 tokens,
                 context=ObjectiveContext(time=time, alpha=path.alpha, sigma=path.sigma),
             )
         else:
-            per_token = self.objective(prediction, tokens)
+            per_token = objective(prediction, tokens)
         weights = loss_mask.to(per_token)
         count = weights.sum()
         if count <= 0:

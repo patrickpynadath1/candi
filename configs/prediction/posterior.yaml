@@ -3,3 +3,4 @@ enabled: ${self_conditioning.enabled}
 source: ${self_conditioning.source}
 probability: ${self_conditioning.probability}
 evaluation_probability: ${self_conditioning.evaluation_probability}
+gradient_mode: ${oc.select:self_conditioning.gradient_mode,detached}
