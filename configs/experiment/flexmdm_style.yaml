@@ -1,8 +1,27 @@
 # @package _global_
-# FlexMDM-inspired insertion: https://arxiv.org/abs/2509.01025
-# Our deletion corruption + insertion-count/gap-token objectives are an adaptation,
-# not the full paper variational loss. No reverse deletion/substitution edits.
+# FlexMDM-inspired masked insertion: https://arxiv.org/abs/2509.01025
+# Token CE and count loss have their own hazards. Gap-token auxiliary is an
+# independent optional ablation; the reference expected-count head does not need it.
+# Confidence sampling reuses our global entropy policy; no windowed decoding.
 defaults:
 - insertion_continuous
 - override /hybrid_view@model.views.content: masked
+- override /sampler: insertion_entropy_bounded
 - _self_
+
+model:
+  views:
+    content:
+      schedule:
+        epsilon: 0.0
+
+objective:
+  weighting:
+    _target_: core.objectives.weighting.KeepRateHazardWeighting
+    # Identity view time map: derivative is with respect to global training time.
+    schedule: ${model.views.content.schedule}
+
+variable_length:
+  predict_gap_tokens: false
+  objective:
+    content_weight: 0.0

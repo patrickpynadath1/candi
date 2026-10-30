@@ -161,3 +161,30 @@ class LearnedLossWeighting(nn.Module):
         if w.shape != loss.shape[:1]:
             raise ValueError("objective context batch must match token loss")
         return torch.exp(-w[:, None]) * loss + w[:, None]
+
+
+class KeepRateHazardWeighting(nn.Module):
+    """Weight a token loss by -alpha'(t)/(1-alpha(t)).
+
+    The configured schedule returns (keep probability, derivative) with respect
+    to GLOBAL training time. It may itself compose a time map, but its derivative
+    must include the chain rule. No corruption or insertion logic lives here.
+    """
+
+    requires_context = True
+
+    def __init__(self, schedule):
+        super().__init__()
+        self.schedule = schedule
+
+    def forward(self, loss, context):
+        if context is None:
+            raise ValueError("keep-rate hazard weighting requires ObjectiveContext")
+        keep, derivative = self.schedule(context.time)
+        if keep.shape != loss.shape[:1] or derivative.shape != keep.shape:
+            raise ValueError("keep-rate schedule must return one value per example")
+        if not torch.isfinite(keep).all() or not torch.isfinite(derivative).all():
+            raise ValueError("keep-rate schedule must be finite")
+        if ((keep < 0) | (keep >= 1) | (derivative > 0)).any():
+            raise ValueError("keep-rate hazard requires 0 <= keep < 1 and derivative <= 0")
+        return loss * (-derivative / (1 - keep))[:, None]

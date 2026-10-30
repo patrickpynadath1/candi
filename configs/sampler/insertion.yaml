@@ -5,3 +5,12 @@ max_length: 512
 overflow: error
 final_denoise: sample
 pad_token_id: 0
+# Finite conditional births. Use integrated_hazard only to replay old runs.
+count_integration: finite
+# Terminal greedy decoding is independent of trajectory token selection.
+tokens:
+  _target_: core.samplers.policies.TokenSelection
+  mode: posterior
+positions:
+  _target_: core.samplers.policies.AllPositions
+commitment: none

@@ -4,6 +4,7 @@ import math
 import torch
 from core.modifiers.hybrid.views import clamp
 from core.sequence_edits import SequenceEdit, gather_positions, valid_positions
+from .policies import AllPositions, TokenSelection, select_state
 
 
 class InsertionSampler:
@@ -18,6 +19,10 @@ class InsertionSampler:
         final_denoise="sample",
         pad_token_id=0,
         count_scale=1.0,
+        count_integration="finite",
+        tokens=None,
+        positions=None,
+        commitment="none",
     ):
         if not isinstance(steps, int) or steps < 1 or not 0 < epsilon < 1:
             raise ValueError("positive steps and epsilon in (0, 1) required")
@@ -30,6 +35,16 @@ class InsertionSampler:
             raise ValueError("unknown insertion overflow or final denoise policy")
         if not math.isfinite(count_scale) or count_scale < 0:
             raise ValueError("count_scale must be finite and nonnegative")
+        if count_integration not in {"finite", "integrated_hazard"}:
+            raise ValueError("count_integration must be finite or integrated_hazard")
+        if commitment not in {"none", "freeze"}:
+            raise ValueError("insertion commitment must be none or freeze")
+        self.tokens = tokens if tokens is not None else TokenSelection("posterior")
+        self.positions = positions if positions is not None else AllPositions()
+        if commitment != "none" and self.tokens.mode == "posterior":
+            raise ValueError("commitments require sample or greedy token selection")
+        self.commitment = commitment
+        self.count_integration = count_integration
         self.count_scale = float(count_scale)
         self.steps, self.epsilon, self.max_length = steps, epsilon, max_length
         self.overflow, self.final_denoise, self.pad_token_id = (
@@ -88,6 +103,8 @@ class InsertionSampler:
             raise ValueError("prompt exceeds max_length")
         anchors = compact.apply(prompt_tokens)
         fixed = compact.valid
+        committed = fixed.clone()
+        committed_tokens = anchors.clone()
         width = anchors.shape[1]
         if editable_gaps is None:
             # Existing placeholders specify editable spans, never target lengths.
@@ -122,6 +139,19 @@ class InsertionSampler:
             prediction = algo.predict(states, points_t, t, valid, feedback=feedback)
             nfe += prediction.nfe
             posterior = prediction.tokens.float().exp()
+            active = valid & ~committed if self.commitment == "freeze" else valid & ~fixed
+            selected = self.positions(posterior, active)
+            clean = (
+                self.tokens(prediction.tokens, posterior)
+                if posterior.shape[1] else anchors.clone()
+            )
+            if clean is not None:
+                posterior = torch.nn.functional.one_hot(
+                    clean, posterior.shape[-1]
+                ).to(posterior)
+            if self.commitment == "freeze":
+                committed_tokens = torch.where(selected, clean, committed_tokens)
+                committed = committed | selected
             updated = (
                 states
                 if states[0].shape[1] == 0
@@ -148,10 +178,25 @@ class InsertionSampler:
                     )
                 )
             )
+            # Reuse the same token/position policies as ComposedSampler. A frozen
+            # commitment is an explicit clean token, independent of birth counts.
+            updated = tuple(
+                clamp(view, select_state(selected, value, old), committed_tokens, committed)
+                if self.commitment == "freeze"
+                else clamp(view, select_state(selected, value, old), anchors, fixed)
+                for view, value, old in zip(algo.views, updated, states)
+            )
+            integrated = algo.schedule.integrated_rate(t, s)
+            # g predicts remaining tokens, not a constant intensity throughout
+            # the interval. The finite conditional birth fraction is 1-exp(-H).
+            fraction = (
+                -torch.expm1(-integrated)
+                if self.count_integration == "finite" else integrated
+            )
             intensity = (
                 self.count_scale
                 * prediction.expected_counts
-                * algo.schedule.integrated_rate(t, s)[:, None]
+                * fraction[:, None]
             )
             if not torch.isfinite(intensity).all():
                 raise RuntimeError("nonfinite insertion intensity")
@@ -196,6 +241,8 @@ class InsertionSampler:
                 edit.inserted, s[:, None], edit.apply(birth_times, padding=1.0)
             )
             anchors, fixed = edit.apply(anchors), edit.apply(fixed)
+            committed = edit.apply(committed)
+            committed_tokens = edit.apply(committed_tokens)
             feedback = (
                 None if prediction.feedback is None else edit.apply(prediction.feedback)
             )
@@ -228,6 +275,7 @@ class InsertionSampler:
             if self.final_denoise == "greedy" or prediction.tokens.shape[1] == 0
             else torch.distributions.Categorical(logits=prediction.tokens).sample()
         )
+        tokens = torch.where(committed, committed_tokens, tokens)
         tokens = torch.where(fixed, anchors, tokens)
         tokens = torch.where(valid, tokens, self.pad_token_id)
         return tokens, {

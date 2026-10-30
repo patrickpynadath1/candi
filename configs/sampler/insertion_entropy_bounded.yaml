@@ -1,0 +1,17 @@
+# Confidence-ranked clean commitments; counts are still independent Poisson draws.
+_target_: core.samplers.insertion.InsertionSampler
+steps: 180
+epsilon: 0.001
+max_length: 512
+overflow: error
+count_integration: finite
+count_scale: 1.0
+final_denoise: greedy
+pad_token_id: 0
+tokens:
+  _target_: core.samplers.policies.TokenSelection
+  mode: greedy
+positions:
+  _target_: core.samplers.policies.EntropyPositions
+  bound: 0.1
+commitment: freeze

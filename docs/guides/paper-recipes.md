@@ -53,7 +53,7 @@ representation or schedule using the same Hydra groups as other experiments.
 | `blockgen_masked`, `blockgen_uniform` | [BlockGen fixed-block baselines](../methods/blockgen.md): CE masking or plug-in uniform ELBO; no ARPC. |
 | `bd3lm` | [Block diffusion](https://arxiv.org/abs/2503.09573) with clean prefix, configurable `block_diffusion.block_size`, and ancestral sampling. No claim to the optimized paper schedules. |
 | `eb_masked` | [Entropy-bounded unmasking](https://arxiv.org/abs/2505.24857) on MDLM. This changes inference, not training. |
-| `flexmdm_style` | [FlexMDM-inspired](https://arxiv.org/abs/2509.01025) masked insertion. Uses our count/gap objectives, not the full paper variational objective. |
+| `flexmdm_style` | [FlexMDM-inspired](https://arxiv.org/abs/2509.01025) masked insertion. Hazard-weighted masked CE + expected-count loss; optional independent gap-token auxiliary. See [insertion policies](../methods/insertion.md) for sampling limits. |
 
 Self-conditioning is still an independent override, for example
 `self_conditioning.enabled=true self_conditioning.source=posterior_mean` on a
