@@ -121,6 +121,7 @@ def test_real_tune_inference_starts_before_training_finishes(tmp_path, monkeypat
     from ray import tune
 
     ray.init(
+        address="local",
         num_cpus=2,
         num_gpus=0,
         include_dashboard=False,
@@ -275,6 +276,7 @@ def test_real_tune_accepts_submission_after_idle(tmp_path, monkeypatch):
 
     queue.submit([TrainingJob(name="first", config=tiny())])
     ray.init(
+        address="local",
         num_cpus=1,
         num_gpus=0,
         include_dashboard=False,

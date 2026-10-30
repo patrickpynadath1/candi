@@ -181,6 +181,7 @@ def test_real_ray_training_failure_and_restore(tmp_path, monkeypatch):
     from ray import tune
 
     ray.init(
+        address="local",
         num_cpus=2,
         num_gpus=0,
         _node_ip_address="127.0.0.1",

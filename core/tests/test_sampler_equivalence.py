@@ -13,6 +13,19 @@ from omegaconf import OmegaConf
 FIXTURE = Path(__file__).with_name("fixtures") / "sampler_behavior.json"
 
 
+@pytest.fixture(autouse=True)
+def preserve_snapshot_denormals():
+    # CPU Inductor kernels can enable flush-to-zero for the calling thread.
+    # Historical byte-level snapshots include subnormal blur coefficients.
+    tiny = torch.tensor(torch.finfo(torch.float32).tiny)
+    was_flushing = bool((tiny / 2) == 0)
+    torch.set_flush_denormal(False)
+    try:
+        yield
+    finally:
+        torch.set_flush_denormal(was_flushing)
+
+
 def build_algorithm(family, discrete, sc):
     torch.manual_seed(123)
     with initialize_config_dir(

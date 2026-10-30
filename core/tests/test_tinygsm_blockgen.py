@@ -25,7 +25,8 @@ def recipe(kind, *overrides):
 def test_recipe_loss_backward_and_time_independence(kind):
     cfg = recipe(kind)
     assert cfg.loader.global_batch_size == 512
-    assert cfg.trainer.devices * cfg.trainer.accumulate_grad_batches == 8
+    partitions = cfg.trainer.devices * cfg.trainer.accumulate_grad_batches
+    assert cfg.loader.global_batch_size // partitions == 8
     assert cfg.data.train_on_pad and not cfg.data.train_on_prompt
     assert cfg.data.separator == "\\n"
     assert cfg.task.length == 512 and cfg.trainer.max_steps == 250000
