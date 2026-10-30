@@ -1,0 +1,71 @@
+# @package _global_
+# Small matched comparison: only token-loss weighting and inference change.
+defaults:
+- /experiment: text8_insertion_masked_sc_22m
+- common
+- /insertion_comparison: before
+- override /task: battery/text8
+- _self_
+seed: 1
+self_conditioning:
+  enabled: true
+  source: hidden
+parameterization:
+  temperature: 1.0
+variable_length:
+  predict_gap_tokens: true
+  gap_predictor:
+    temperature: 1.0
+  objective:
+    content_weight: 1.0
+model:
+  backbone:
+    n_blocks: 6
+    cond_dim: 128
+trainer:
+  max_steps: 2000
+  val_check_interval: 1000
+  limit_val_batches: 16
+training:
+  warmup_steps: 200
+lr_scheduler:
+  warmup_steps: 200
+checkpoint:
+  every_n_steps: 2000
+callback:
+  every_n_steps: 1000
+  subset_size: 32
+sampler:
+  max_length: 256
+  overflow: truncate
+  final_denoise: greedy
+preparation:
+  name: insertion-before-after-text8-20261028
+  output: /home/patrick/.cache/duo/plans/insertion-before-after-text8-20261028
+  family: insertion-comparison
+  recipe_fields:
+  - model
+  - algorithm
+  - variable_length
+  - objective
+  - self_conditioning
+  - sampler
+  - optimizer
+  local:
+    gpu_ids: [4, 6]
+    concurrent_jobs: 2
+  wandb:
+    project: insertion-before-after-text8-20261028
+  evaluation:
+    seeds: [41]
+    test_seeds: [1041]
+  inference:
+  - name: configured
+    space: {}
+    trials: 1
+    budget_parameter: steps
+hydra:
+  sweeper:
+    params:
+      task: battery/text8
+      insertion_comparison: before,after

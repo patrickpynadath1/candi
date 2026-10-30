@@ -1,0 +1,15 @@
+# @package _global_
+# Gaussian learned embeddings + masked, with/without expected-embedding SC.
+# Two feedback settings x three tasks = 6 cases; total with feedback.yaml is 42.
+defaults:
+- feedback
+- /discrete_view: masked
+- _self_
+preparation:
+  family: feedback_hybrid
+  path_name: gaussian_embedding_masked
+hydra:
+  sweeper:
+    params:
+      ablation_path: gaussian
+      feedback: none,expected_embedding

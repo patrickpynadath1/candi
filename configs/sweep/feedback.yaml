@@ -1,0 +1,22 @@
+# @package _global_
+# Three pure paths x four feedback/depth settings x three tasks = 36 cases.
+# Uses the S-FLM-sized backbone/training setup; each path keeps its own geometry.
+defaults:
+- /experiment: corruption_factorial
+- common
+- /ablation_path: gaussian
+- /feedback: none
+- override /task: battery/sudoku_hard
+- _self_
+preparation:
+  name: feedback-depth-20k-20261028
+  output: /home/patrick/.cache/duo/plans/feedback-depth-20k-20261028
+  family: feedback
+  recipe_name: ${preparation.path_name}-${preparation.feedback_name}
+  wandb:
+    project: feedback-depth-20k-20261028
+hydra:
+  sweeper:
+    params:
+      ablation_path: gaussian,masked,uniform
+      feedback: none,expected_embedding,hidden,double_depth

@@ -67,6 +67,7 @@ block-local generation, adaptive-time feedback, and the current Text8 evidence.
 
 ## Method recipes
 
+- [Feedback versus depth ablation](guides/feedback-depth-ablation.md): focused 14-method comparison.
 - [Runnable paper presets](guides/paper-recipes.md): configuration names, adaptations and limits.
 
 - [BlockGen fixed-block recipes](methods/blockgen.md): masked/uniform baselines and full-method limitations.

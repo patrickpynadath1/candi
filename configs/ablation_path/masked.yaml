@@ -1,0 +1,5 @@
+# @package _global_
+defaults:
+- /content_view: masked
+preparation:
+  path_name: masked

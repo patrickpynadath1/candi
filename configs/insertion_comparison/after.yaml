@@ -1,0 +1,16 @@
+# @package _global_
+objective:
+  weighting:
+    _target_: core.objectives.weighting.KeepRateHazardWeighting
+    schedule: ${model.views.content.schedule}
+sampler:
+  count_integration: finite
+  tokens:
+    _target_: core.samplers.policies.TokenSelection
+    mode: greedy
+  positions:
+    _target_: core.samplers.policies.EntropyPositions
+    bound: 0.1
+  commitment: freeze
+preparation:
+  recipe_name: masked-insertion-after

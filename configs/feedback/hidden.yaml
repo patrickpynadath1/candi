@@ -1,0 +1,9 @@
+# @package _global_
+self_conditioning:
+  enabled: true
+  source: hidden
+model:
+  backbone:
+    n_blocks: 8
+preparation:
+  feedback_name: hidden

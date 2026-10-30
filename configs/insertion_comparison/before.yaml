@@ -1,0 +1,10 @@
+# @package _global_
+objective:
+  weighting: null
+sampler:
+  count_integration: integrated_hazard
+  tokens: null
+  positions: null
+  commitment: none
+preparation:
+  recipe_name: masked-insertion-before
