@@ -1,5 +1,9 @@
 # Agent handoff: local development and remote Ray execution
 
+## Performance and schedule artifact index (2026-11-01)
+
+See [the performance and schedule handoff](docs/handoffs/performance-and-schedules.md) for campaign membership, final-score/checkpoint paths, per-sampler tuning records, schedule plots/CSVs, and intermediate-checkpoint caveats. Its adjacent CSV/JSON index records completed results and provenance at the stated snapshot time.
+
 ## Purpose and working rules
 
 CANDI v2.1 is a framework for controlled diffusion-language-model experiments,
