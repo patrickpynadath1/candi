@@ -1,0 +1,41 @@
+# @package _global_
+# Feature PCA only; positional DCT blur is deliberately not composed here.
+defaults:
+- corruption_factorial
+- override /hybrid_view@model.views.content: pca_blurring
+- override /task: sudoku
+- override /sampler: forward_resampling
+- override /time_sampler: cdcd
+- _self_
+algorithm:
+  adaptive_time_views: [0]
+time_sampler:
+  adaptive: true
+  epsilon: 0.001
+self_conditioning:
+  enabled: false
+trainer:
+  max_steps: 20000
+  precision: bf16-mixed
+  accumulate_grad_batches: 4
+loader:
+  global_batch_size: 256
+training:
+  warmup_steps: 2500
+  performance:
+    compile:
+      enabled: true
+sampler:
+  steps: 127
+  greedy_clean_estimate: false
+  final_denoise: greedy
+# Reuse the established cache; do not regenerate Sudoku data.
+data:
+  cache_dir: /home/patrick/.cache/duo/data_cache
+  num_train: 48000
+  num_valid: 2000
+  data_seed: 42
+optimizer:
+  lr: 0.0003
+lr_scheduler:
+  warmup_steps: 2500

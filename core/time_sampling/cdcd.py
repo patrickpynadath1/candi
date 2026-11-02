@@ -79,7 +79,12 @@ class CDCDTimeSampler(nn.Module):
     def inverse_cdf(self, probabilities):
         widths = self._widths(self.ema_logits)
         x = self._piecewise(probabilities.float().clamp(0, 1), widths[1], widths[0])[0]
-        return self.uniform.epsilon + (1 - self.uniform.epsilon) * x
+        # Normalized float32 bin widths can accumulate slightly past one.
+        # Bound the physical time after interpolation/rescaling; downstream
+        # schedules correctly reject even a one-ULP excursion outside [0, 1].
+        return (self.uniform.epsilon + (1 - self.uniform.epsilon) * x).clamp(
+            self.uniform.epsilon, 1.0
+        )
 
     @torch.no_grad()
     def forward(self, uniform_times):
