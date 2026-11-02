@@ -247,3 +247,23 @@ def test_collapsed_legacy_proposal_still_gets_low_noise_observations_with_cdcd()
     assert (new_times < 0.5).sum() >= 30
     # Coverage comes from positive learned bins, with no uniform mixture.
     assert new_times.min() >= 0.001 and new_times.max() <= 1
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+def test_inverse_cdf_stays_in_domain_after_float32_roundoff(device):
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA unavailable")
+    s = CDCDTimeSampler(adaptive=True, epsilon=0.001).to(device)
+    # Seed 9 produces 1.000000119 on CPU without the physical-time bound.
+    generator = torch.Generator().manual_seed(9)
+    s.ema_logits.copy_(3 * torch.randn(2, 100, generator=generator).to(device))
+    u = torch.cat((torch.linspace(0, 1, 1001), torch.linspace(0.99999, 1, 1001))).to(
+        device
+    )
+    t = s.inverse_cdf(u)
+    assert torch.isfinite(t).all()
+    assert (t >= s.uniform.epsilon).all()
+    assert (t <= 1).all()
+    s.ready.fill_(True)
+    drawn = s(s.uniform.epsilon + (1 - s.uniform.epsilon) * u)
+    assert ((drawn >= s.uniform.epsilon) & (drawn <= 1)).all()
