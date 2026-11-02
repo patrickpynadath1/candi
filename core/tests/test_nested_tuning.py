@@ -121,6 +121,12 @@ def test_failed_inner_search_does_not_touch_test_or_retrain_on_resume(
     with pytest.raises(RuntimeError, match="transient"):
         tuning.run_case(settings, tmp_path / "runs", 1)
     assert not (tmp_path / "runs/example/final/result.json").exists()
+    failures = list((tmp_path / "runs/example").rglob("failure.json"))
+    assert failures
+    assert all(
+        "transient evaluation failure" in json.loads(f.read_text())["traceback"]
+        for f in failures
+    )
     tuning.run_case(settings, tmp_path / "runs", 1)
     assert calls.count("train") == 1
 

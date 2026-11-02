@@ -203,3 +203,13 @@ resume normally. This recovery assumes the existing case's pinned protocol and
 config; changing training settings requires a new case. Tracking shutdown errors
 are logged but cannot turn a successfully saved final checkpoint into a training
 failure. Training errors themselves still propagate.
+
+### Diagnosing failed and recovered candidates
+
+An outer trial scores a trained checkpoint after inference tuning, so its `FAIL`
+state does not imply that training failed. Check `trained.json`, checkpoints and
+the inner inference study. During recovery, historical failed rows remain until
+the retry produces a completed trial. Each newly failed candidate preserves its
+parameters and full traceback in `candidates/<id>/failure.json`, including failures
+in the retry path. This file is historical evidence; `result.json` indicates a
+subsequent successful recovery.
