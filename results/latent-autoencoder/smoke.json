@@ -1,0 +1,50 @@
+[
+  {
+    "task": "text8",
+    "updates": [
+      {
+        "loss": 4.5553483963012695,
+        "latent_mse": 1.0,
+        "clean_decoding_loss": 3.5553481578826904,
+        "decoded_denoising_ce": 3.5553481578826904
+      },
+      {
+        "loss": 4.515789985656738,
+        "latent_mse": 0.9990538358688354,
+        "clean_decoding_loss": 3.5167362689971924,
+        "decoded_denoising_ce": 3.5469045639038086
+      }
+    ],
+    "nfe": 12,
+    "shape": [
+      1,
+      8
+    ],
+    "compiled": true,
+    "bf16": true
+  },
+  {
+    "task": "tinystories",
+    "updates": [
+      {
+        "loss": 6.5606818199157715,
+        "latent_mse": 0.9999998807907104,
+        "clean_decoding_loss": 5.5606818199157715,
+        "decoded_denoising_ce": 5.5606818199157715
+      },
+      {
+        "loss": 6.5060882568359375,
+        "latent_mse": 0.9923638105392456,
+        "clean_decoding_loss": 5.513724327087402,
+        "decoded_denoising_ce": 5.558882713317871
+      }
+    ],
+    "nfe": 12,
+    "shape": [
+      1,
+      8
+    ],
+    "compiled": true,
+    "bf16": true
+  }
+]

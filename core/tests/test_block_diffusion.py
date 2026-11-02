@@ -18,8 +18,12 @@ def configuration(*overrides):
         return compose(
             config_name="config",
             overrides=[
-                "model.hidden_size=32", "model.n_heads=4", "model.n_blocks=1",
-                "model.cond_dim=16", "model.dropout=0", "task.length=8",
+                "model.hidden_size=32",
+                "model.n_heads=4",
+                "model.n_blocks=1",
+                "model.cond_dim=16",
+                "model.dropout=0",
+                "task.length=8",
                 *overrides,
             ],
         )
@@ -36,8 +40,20 @@ def test_layout_has_no_clean_to_noisy_or_future_clean_leakage():
     assert not mask[:6, 6:].any()
     assert torch.equal(mask[:6, :6], torch.ones(6, 6, dtype=torch.bool).tril())
     # noisy block 1 sees clean block 0 and its own two noisy positions only
-    assert mask[8].tolist() == [True, True, False, False, False, False,
-                                False, False, True, True, False, False]
+    assert mask[8].tolist() == [
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+        False,
+        False,
+    ]
 
 
 def test_full_block_matches_unmodified_model_and_future_clean_cannot_leak():
@@ -68,8 +84,10 @@ def test_full_block_matches_unmodified_model_and_future_clean_cannot_leak():
 
 def test_shifted_clean_loss_respects_target_mask_and_backpropagates():
     algorithm = BlockDiffusion(
-        instantiate(configuration().algorithm), 2,
-        clean_loss="autoregressive", clean_loss_weight=0.5,
+        instantiate(configuration().algorithm),
+        2,
+        clean_loss="autoregressive",
+        clean_loss_weight=0.5,
     )
     open_output(algorithm.model.model)
     tokens = torch.randint(0, 12, (2, 8))
@@ -87,6 +105,7 @@ def test_shifted_clean_loss_respects_target_mask_and_backpropagates():
     assert algorithm.model.model.vocab_embed.embedding.grad is not None
 
 
+@torch.no_grad()
 def test_middle_block_visibility_and_prefix_kv_cache():
     torch.manual_seed(23)
     algorithm = BlockDiffusion(instantiate(configuration().algorithm), 2).eval()
@@ -114,9 +133,11 @@ def test_middle_block_visibility_and_prefix_kv_cache():
     with algorithm.model.clean_context(prefix, offset=4):
         uncached = algorithm.model(active, condition)
     calls = 0
+
     def count(*unused):
         nonlocal calls
         calls += 1
+
     handle = algorithm.model.model.blocks[0].attn_qkv.register_forward_hook(count)
     cache = {}
     with algorithm.model.clean_context(prefix, offset=4, cache=cache):
@@ -133,7 +154,9 @@ def test_block_sampler_preserves_prompts_tail_and_reports_per_sample_nfe():
     algorithm = BlockDiffusion(instantiate(configuration().algorithm), 3)
     sampler = BlockSampler(AncestralSampler(steps=1), 3)
     tokens = torch.randint(0, 12, (2, 8))
-    prompt = torch.tensor([[1, 0, 0, 0, 0, 0, 0, 1], [1, 1, 1, 0, 0, 0, 0, 0]], dtype=torch.bool)
+    prompt = torch.tensor(
+        [[1, 0, 0, 0, 0, 0, 0, 1], [1, 1, 1, 0, 0, 0, 0, 0]], dtype=torch.bool
+    )
     output, metadata = sampler.sample(algorithm, tokens, prompt)
     assert output.shape == tokens.shape
     assert torch.equal(output[prompt], tokens[prompt])
@@ -160,13 +183,27 @@ def test_gaussian_block_loss_and_cached_flag_have_same_generation_semantics():
     mask = torch.tensor([[1, 1, 1, 1, 0, 0, 0, 0]], dtype=torch.bool)
     torch.manual_seed(19)
     cached, _ = first.generate(
-        BlockSampler(__import__("core.samplers.euler", fromlist=["EulerSampler"]).EulerSampler(steps=1), 4, True),
-        tokens, mask,
+        BlockSampler(
+            __import__("core.samplers.euler", fromlist=["EulerSampler"]).EulerSampler(
+                steps=1
+            ),
+            4,
+            True,
+        ),
+        tokens,
+        mask,
     )
     torch.manual_seed(19)
     uncached, _ = second.generate(
-        BlockSampler(__import__("core.samplers.euler", fromlist=["EulerSampler"]).EulerSampler(steps=1), 4, False),
-        tokens, mask,
+        BlockSampler(
+            __import__("core.samplers.euler", fromlist=["EulerSampler"]).EulerSampler(
+                steps=1
+            ),
+            4,
+            False,
+        ),
+        tokens,
+        mask,
     )
     assert torch.equal(cached, uncached)
 

@@ -1,0 +1,15 @@
+# @package _global_
+model:
+  mlp_hidden_size: 1936
+  block_execution:
+    _target_: core.models.depth_mixing.execution.DepthMixingBlocks
+    dim: ${model.hidden_size}
+    n_blocks: ${model.n_blocks}
+    history: states
+    mixer:
+      _target_: core.models.depth_mixing.attention.DepthAttention
+      _partial_: true
+      key_dim: 8
+      gate_init: 0.0
+preparation:
+  architecture_name: depth_attention

@@ -1,0 +1,15 @@
+# @package _global_
+model:
+  mlp_hidden_size: 2032
+  block_execution:
+    _target_: core.models.depth_mixing.execution.DepthMixingBlocks
+    dim: ${model.hidden_size}
+    n_blocks: ${model.n_blocks}
+    history: contributions
+    mixer:
+      _target_: core.models.depth_mixing.dca.DCA
+      _partial_: true
+      # Written paper equation; nonzero init avoids a permanently dead ReLU.
+      gate_init_std: 0.001
+preparation:
+  architecture_name: dca

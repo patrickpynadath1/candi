@@ -1,0 +1,10 @@
+# @package _global_
+# Query-dependent depth mixtures of the encoder's actual attention K/V.
+# Same encoder/decoder defaults as e2d2; depth and corruption remain configurable.
+defaults:
+- e2d2
+- _self_
+encoder_decoder:
+  context_attention:
+    _target_: core.modifiers.encoder_decoder.attention.EncoderDepthAttention
+    query_chunk_size: 32

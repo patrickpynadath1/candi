@@ -9,13 +9,16 @@ from core.models.continuous_dit import ContinuousDiT
 from core.models.dit import DiT
 from core.modifiers.hybrid.model import HybridModel
 from core.models.prediction import ModelPrediction
+from core.models.kv_cache import append_key_value
 from .layout import make_layout
+from core.modifiers.encoder_decoder import EncoderDecoderModel
 
 
 class BlockDiffusionModel(nn.Module):
     def __init__(self, model, block_size, clean_encoder=None, x0_causal=True):
         super().__init__()
-        if not isinstance(model, (DiT, ContinuousDiT, HybridModel)):
+        input_model = model.model if isinstance(model, EncoderDecoderModel) else model
+        if not isinstance(input_model, (DiT, ContinuousDiT, HybridModel)):
             raise TypeError(
                 "block diffusion requires a model with fused-stream hidden interfaces"
             )
@@ -52,6 +55,35 @@ class BlockDiffusionModel(nn.Module):
 
     @contextmanager
     def clean_context(self, tokens, *, offset=0, cache=None):
+        if cache is not None:
+            if self.training or torch.is_grad_enabled():
+                cache = None
+            else:
+                size = self._training_block_size.get() or self.block_size
+                previous = cache.get("prefix_tokens")
+                if previous is not None:
+                    old_length = previous.shape[1]
+                    unchanged = (
+                        previous.device == tokens.device
+                        and previous.shape[0] == tokens.shape[0]
+                        and old_length <= tokens.shape[1]
+                        and torch.equal(previous, tokens[:, :old_length])
+                    )
+                    # Extending an incomplete block changes its bidirectional
+                    # clean states, so it cannot be treated as an immutable prefix.
+                    partial_extension = (
+                        not self.x0_causal
+                        and old_length % size
+                        and old_length != tokens.shape[1]
+                    )
+                    if (
+                        not unchanged
+                        or partial_extension
+                        or cache.get("block_size") != size
+                    ):
+                        cache.clear()
+                cache["prefix_tokens"] = tokens.detach().clone()
+                cache["block_size"] = size
         token = self._clean.set((tokens, offset, cache))
         try:
             yield
@@ -73,6 +105,10 @@ class BlockDiffusionModel(nn.Module):
     def forward(self, *inputs, self_condition=None, return_features=False):
         current = self._clean.get()
         if current is None:
+            if isinstance(self.model, EncoderDecoderModel):
+                raise ValueError(
+                    "encoder-decoder prediction requires a clean block context"
+                )
             return self.model(
                 *inputs, self_condition=self_condition, return_features=return_features
             )
@@ -91,6 +127,18 @@ class BlockDiffusionModel(nn.Module):
             clean_length=clean_length,
             x0_causal=self.x0_causal,
         )
+        if isinstance(self.model, EncoderDecoderModel):
+            clean_hidden, _, noisy_hidden, noisy_condition = self._stream_inputs(
+                inputs, clean, self_condition
+            )
+            result = self.model(
+                clean_hidden,
+                noisy_hidden,
+                noisy_condition,
+                layout,
+                cache=cache,
+            )
+            return result if return_features else result.logits
         if (
             cache is not None
             and not self.training
@@ -129,9 +177,7 @@ class BlockDiffusionModel(nn.Module):
         auxiliary = output.auxiliary_logits
         if auxiliary is not None:
             auxiliary = auxiliary[:, clean_length:]
-        result = ModelPrediction(
-            noisy_logits, noisy_hidden, auxiliary_logits=auxiliary
-        )
+        result = ModelPrediction(noisy_logits, noisy_hidden, auxiliary_logits=auxiliary)
         return result if return_features else result.logits
 
     def forward_sequence_features(
@@ -314,41 +360,45 @@ class BlockDiffusionModel(nn.Module):
         )
 
     def _stream_inputs(self, inputs, clean, self_condition):
-        if isinstance(self.model, HybridModel):
+        model = (
+            self.model.model
+            if isinstance(self.model, EncoderDecoderModel)
+            else self.model
+        )
+        if isinstance(model, HybridModel):
             states, points, global_time = inputs
-            noisy_hidden, noisy_condition = self.model.prepare_fused(
+            noisy_hidden, noisy_condition = model.prepare_fused(
                 states, points, global_time, self_condition=self_condition
             )
             probabilities = torch.nn.functional.one_hot(
                 clean,
-                self.model.output_vocab_size
-                or self.model.output_layer.linear.out_features,
+                model.output_vocab_size or model.output_layer.linear.out_features,
             ).float()
-            clean_hidden, clean_condition = self.model.clean_state_hidden(probabilities)
-        elif isinstance(self.model, ContinuousDiT):
+            clean_hidden, clean_condition = model.clean_state_hidden(probabilities)
+        elif isinstance(model, ContinuousDiT):
             state, time, sigma, alpha = inputs
-            noisy_hidden, noisy_condition = self.model.prepare_hidden(
+            noisy_hidden, noisy_condition = model.prepare_hidden(
                 state, time, sigma, alpha, self_condition=self_condition
             )
             clean_state = self.clean_encoder(clean) if self.clean_encoder else clean
-            clean_hidden, clean_condition = self.model.clean_state_hidden(clean_state)
+            clean_hidden, clean_condition = model.clean_state_hidden(clean_state)
         else:
             tokens, conditioning = inputs
             with torch.autocast(tokens.device.type, enabled=False):
                 noisy_emb = (
-                    self.model.embed_state(tokens)
-                    if hasattr(self.model, "embed_state") and tokens.ndim == 3
-                    else self.model.vocab_embed(tokens)
+                    model.embed_state(tokens)
+                    if hasattr(model, "embed_state") and tokens.ndim == 3
+                    else model.vocab_embed(tokens)
                 )
-                clean_hidden = self.model.vocab_embed(clean)
-            noisy_hidden, noisy_condition = self.model.prepare_hidden(
+                clean_hidden = model.vocab_embed(clean)
+            noisy_hidden, noisy_condition = model.prepare_hidden(
                 noisy_emb, conditioning, self_condition=self_condition
             )
             clean_condition = (
                 torch.nn.functional.silu(
-                    self.model.sigma_map(torch.zeros(len(clean), device=clean.device))
+                    model.sigma_map(torch.zeros(len(clean), device=clean.device))
                 )
-                if self.model.adaLN
+                if model.adaLN
                 else None
             )
         return clean_hidden, clean_condition, noisy_hidden, noisy_condition
@@ -356,35 +406,37 @@ class BlockDiffusionModel(nn.Module):
     def _cached_forward(
         self, inputs, clean, offset, cache, layout, self_condition, return_features
     ):
-        clean_hidden, clean_condition, noisy_hidden, noisy_condition = (
-            self._stream_inputs(inputs, clean, self_condition)
-        )
         clean_length = clean.shape[1]
-        if "layers" not in cache:
-            layers = []
-            if clean_length:
-                clean_ids = layout.position_ids[:, :clean_length]
-                with torch.autocast(clean.device.type, enabled=False):
-                    clean_rotary = self.model.rotary_emb(
-                        clean_hidden, position_ids=clean_ids
+        encoded_length = cache.get("clean_length", 0)
+        clean_hidden, clean_condition, noisy_hidden, noisy_condition = (
+            self._stream_inputs(inputs, clean[:, encoded_length:], self_condition)
+        )
+        layers = cache.setdefault("layers", [None] * len(self.model.blocks))
+        if clean_length > encoded_length:
+            clean_ids = layout.position_ids[:, encoded_length:clean_length]
+            with torch.autocast(clean.device.type, enabled=False):
+                clean_rotary = self.model.rotary_emb(
+                    clean_hidden, position_ids=clean_ids
+                )
+            causal = layout.attention_mask[
+                :, :, encoded_length:clean_length, :clean_length
+            ]
+            with torch.autocast(
+                clean.device.type,
+                enabled=torch.is_autocast_enabled(clean.device.type),
+                cache_enabled=False,
+            ):
+                for index, block in enumerate(self.model.blocks):
+                    clean_hidden, new_kv = block(
+                        clean_hidden,
+                        clean_rotary,
+                        clean_condition,
+                        causal,
+                        key_value_prefix=layers[index],
+                        return_key_value=True,
                     )
-                causal = layout.attention_mask[:, :, :clean_length, :clean_length]
-                with torch.autocast(
-                    clean.device.type,
-                    enabled=torch.is_autocast_enabled(clean.device.type),
-                    cache_enabled=False,
-                ):
-                    for block in self.model.blocks:
-                        clean_hidden, key_value = block(
-                            clean_hidden,
-                            clean_rotary,
-                            clean_condition,
-                            causal,
-                            return_key_value=True,
-                        )
-                        layers.append(key_value)
-            cache["layers"] = layers
-            cache["clean_hidden"] = clean_hidden
+                    layers[index] = append_key_value(layers[index], new_kv)
+            cache["clean_length"] = clean_length
         with torch.autocast(noisy_hidden.device.type, enabled=False):
             noisy_rotary = self.model.rotary_emb(
                 noisy_hidden, position_ids=layout.position_ids[:, clean_length:]

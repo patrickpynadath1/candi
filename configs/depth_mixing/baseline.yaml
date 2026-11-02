@@ -1,0 +1,6 @@
+# @package _global_
+model:
+  mlp_hidden_size: 2048
+  block_execution: null
+preparation:
+  architecture_name: baseline

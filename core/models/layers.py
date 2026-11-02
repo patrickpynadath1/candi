@@ -185,8 +185,12 @@ class DDiTBlock(nn.Module):
         cond_dim=None,
         mlp_ratio=4,
         dropout=0.1,
+        sublayer_factory=None,
+        mlp_hidden_size=None,
     ):
         super().__init__()
+        if sublayer_factory is not None and mlp_hidden_size is not None:
+            raise ValueError("mlp_hidden_size cannot be combined with sublayer_factory")
         self.n_heads = n_heads
         self.adaLN = adaLN
 
@@ -196,11 +200,14 @@ class DDiTBlock(nn.Module):
         self.dropout1 = nn.Dropout(dropout)
 
         self.norm2 = LayerNorm(dim)
-        self.mlp = nn.Sequential(
-            nn.Linear(dim, mlp_ratio * dim, bias=True),
-            nn.GELU(approximate="tanh"),
-            nn.Linear(mlp_ratio * dim, dim, bias=True),
+        from .sublayers import PositionwiseMLP
+
+        self.mlp = (
+            PositionwiseMLP(dim, mlp_ratio, hidden_size=mlp_hidden_size)
+            if sublayer_factory is None
+            else sublayer_factory(dim=dim, n_heads=n_heads)
         )
+        self.positionwise_sublayer = isinstance(self.mlp, PositionwiseMLP)
         self.dropout2 = nn.Dropout(dropout)
         self.dropout = dropout
 
@@ -215,70 +222,147 @@ class DDiTBlock(nn.Module):
         else:
             return bias_dropout_add_scale_fused_inference
 
-    def forward(self, x, rotary_cos_sin, c=None, attention_mask=None,
-                key_value_prefix=None, return_key_value=False):
+    def project_context_key_value(self, context, rotary_cos_sin):
+        """Project an external hidden context with this layer's K/V weights."""
+        context = self.norm1(context)
+        _, key_weight, value_weight = self.attn_qkv.weight.chunk(3, dim=0)
+        shape = (
+            *context.shape[:2],
+            self.n_heads,
+            self.attn_qkv.in_features // self.n_heads,
+        )
+        key = F.linear(context, key_weight).reshape(shape)
+        value = F.linear(context, value_weight).reshape(shape)
+        cos, sin = rotary_cos_sin
+        cos, sin = cos[:, :, 0].to(key.dtype), sin[:, :, 0].to(key.dtype)
+        return key * cos + rotate_half(key) * sin, value
 
+    def forward(
+        self,
+        x,
+        rotary_cos_sin,
+        c=None,
+        attention_mask=None,
+        key_value_prefix=None,
+        return_key_value=False,
+        context_attention=None,
+    ):
+        output, key_value, _ = self._forward(
+            x,
+            rotary_cos_sin,
+            c,
+            attention_mask,
+            key_value_prefix=key_value_prefix,
+            return_key_value=return_key_value,
+            context_attention=context_attention,
+        )
+        return (output, key_value) if return_key_value else output
+
+    def forward_streams(self, streams, rotary_cos_sin, c=None, attention_mask=None):
+        """Consume Q/K/V/residual sources; also expose the residual contribution.
+
+        Depth aggregation changes these inputs, not attention or the MLP.
+        Returning the contribution directly avoids subtracting large residuals
+        when a depth policy stores branch updates rather than whole states.
+        """
+        query, key, value, residual = streams.unbind(dim=2)
+        output, _, contribution = self._forward(
+            query,
+            rotary_cos_sin,
+            c,
+            attention_mask,
+            key_input=key,
+            value_input=value,
+            residual=residual,
+        )
+        return output, contribution
+
+    def _forward(
+        self,
+        x,
+        rotary_cos_sin,
+        c,
+        attention_mask,
+        *,
+        key_input=None,
+        value_input=None,
+        residual=None,
+        key_value_prefix=None,
+        return_key_value=False,
+        context_attention=None,
+    ):
         bias_dropout_scale_fn = self._get_bias_dropout_scale()
-
-        x_skip = x
-        x = self.norm1(x)
-
+        if not self.positionwise_sublayer and (
+            key_value_prefix is not None or return_key_value
+        ):
+            raise ValueError("second attention sublayers do not yet support KV caching")
+        x_skip = x if residual is None else residual
         if self.adaLN:
-            # self.adaLN_modulation(c): (128, 1536)
-            # self.adaLN_modulation(c)[:, None]: (128, 1, 1536)
-            # "" .chunk(6, dim=2) returns 6 tuples of shapes (128, 1, 256)
             modulation = self.adaLN_modulation(c)
             if modulation.ndim == 2:
                 modulation = modulation[:, None]
-            (
-                shift_msa,
-                scale_msa,
-                gate_msa,
-                shift_mlp,
-                scale_mlp,
-                gate_mlp,
-            ) = modulation.chunk(6, dim=-1)
-            x = modulate_fused(x, shift_msa, scale_msa)
-
-        qkv = einops.rearrange(
-            self.attn_qkv(x),
-            "b s (three h d) -> b s three h d",
-            three=3,
-            h=self.n_heads,
-        )
-        cos, sin = rotary_cos_sin
-        # Same split-half RoPE as the legacy FlashAttention torch helper;
-        # native tensor operations also permit CPU verification.
-        cos, sin = cos[:, :, 0].to(qkv.dtype), sin[:, :, 0].to(qkv.dtype)
-        q, k, v = qkv.unbind(dim=2)
-        q = q * cos + rotate_half(q) * sin
-        k = k * cos + rotate_half(k) * sin
-        current_key_value = (k, v)
-        if key_value_prefix is not None:
-            k = torch.cat([key_value_prefix[0], k], dim=1)
-            v = torch.cat([key_value_prefix[1], v], dim=1)
-        x = regular_attention_multi_headed(q, k, v, attention_mask=attention_mask)
-
-        if self.adaLN:
-            x = bias_dropout_scale_fn(
-                self.attn_out(x), None, gate_msa, x_skip, self.dropout
-            )
-            x = bias_dropout_scale_fn(
-                self.mlp(modulate_fused(self.norm2(x), shift_mlp, scale_mlp)),
-                None,
-                gate_mlp,
-                x,
-                self.dropout,
+            (shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp) = (
+                modulation.chunk(6, dim=-1)
             )
         else:
-            scale = torch.ones(1, device=x.device, dtype=x.dtype)
-            x = bias_dropout_scale_fn(
-                self.attn_out(x), None, scale, x_skip, self.dropout
+            gate_msa = gate_mlp = torch.ones(1, device=x.device, dtype=x.dtype)
+
+        def normalize_attention(source):
+            source = self.norm1(source)
+            return (
+                modulate_fused(source, shift_msa, scale_msa) if self.adaLN else source
             )
-            x = bias_dropout_scale_fn(
-                self.mlp(self.norm2(x)), None, scale, x, self.dropout
+
+        if key_input is None:
+            q, k, v = (
+                self.attn_qkv(normalize_attention(x))
+                .reshape(*x.shape[:2], 3, self.n_heads, -1)
+                .unbind(2)
             )
-        return (x, current_key_value) if return_key_value else x
+            cos, sin = rotary_cos_sin
+            cos, sin = cos[:, :, 0].to(q.dtype), sin[:, :, 0].to(q.dtype)
+            q = q * cos + rotate_half(q) * sin
+            k = k * cos + rotate_half(k) * sin
+        else:
+            # Same projections with distinct depth-mixed source streams.
+            weights = self.attn_qkv.weight.chunk(3, dim=0)
+            q, k, v = (
+                F.linear(normalize_attention(source), weight).reshape(
+                    *source.shape[:2], self.n_heads, -1
+                )
+                for source, weight in zip((x, key_input, value_input), weights)
+            )
+            cos, sin = rotary_cos_sin
+            cos, sin = cos[:, :, 0].to(q.dtype), sin[:, :, 0].to(q.dtype)
+            q = q * cos + rotate_half(q) * sin
+            k = k * cos + rotate_half(k) * sin
+        current_key_value = (k, v)
+        if key_value_prefix is not None and context_attention is not None:
+            attended = context_attention(q, k, v, key_value_prefix, attention_mask)
+        else:
+            if key_value_prefix is not None:
+                k = torch.cat([key_value_prefix[0], k], dim=1)
+                v = torch.cat([key_value_prefix[1], v], dim=1)
+            attended = regular_attention_multi_headed(
+                q, k, v, attention_mask=attention_mask
+            )
+        attention_update = bias_dropout_scale_fn(
+            self.attn_out(attended), None, gate_msa, None, self.dropout
+        )
+        hidden = x_skip + attention_update
+        mlp_input = self.norm2(hidden)
+        if self.adaLN:
+            mlp_input = modulate_fused(mlp_input, shift_mlp, scale_mlp)
+        mlp_update = bias_dropout_scale_fn(
+            self.mlp(
+                mlp_input, rotary_cos_sin=rotary_cos_sin, attention_mask=attention_mask
+            ),
+            None,
+            gate_mlp,
+            None,
+            self.dropout,
+        )
+        return hidden + mlp_update, current_key_value, attention_update + mlp_update
 
 
 class EmbeddingLayer(nn.Module):

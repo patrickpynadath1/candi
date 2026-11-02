@@ -1,0 +1,36 @@
+[
+  {
+    "config": "/data/remote_cache/patrick/duo/plans/context-memory-pilot-20261101/configs/text8-masked-context-linear-seed-1.yaml",
+    "batch_size": 8,
+    "length": 256,
+    "steps": 2,
+    "parameters": 25281316,
+    "peak_allocated_bytes": 546659840,
+    "peak_reserved_bytes": 658505728,
+    "starting_allocated_bytes": 328952832,
+    "seconds_per_step": 1.2625458976253867,
+    "loss": 3.265143394470215,
+    "device": "NVIDIA RTX A6000",
+    "precision": "bf16-mixed",
+    "compile": false,
+    "ema": false,
+    "synthetic_data": true
+  },
+  {
+    "config": "/data/remote_cache/patrick/duo/plans/context-memory-pilot-20261101/configs/tinystories-masked-context-linear-seed-1.yaml",
+    "batch_size": 8,
+    "length": 1024,
+    "steps": 2,
+    "parameters": 25511941,
+    "peak_allocated_bytes": 830094848,
+    "peak_reserved_bytes": 916455424,
+    "starting_allocated_bytes": 327057408,
+    "seconds_per_step": 5.203147701919079,
+    "loss": 5.5819807052612305,
+    "device": "NVIDIA RTX A6000",
+    "precision": "bf16-mixed",
+    "compile": false,
+    "ema": false,
+    "synthetic_data": true
+  }
+]

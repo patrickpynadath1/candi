@@ -1,0 +1,31 @@
+[
+  {
+    "config": "/tmp/linear-nested-group16.yaml",
+    "batch_size": 8,
+    "length": 1024,
+    "steps": 20,
+    "parameters": 25511941,
+    "peak_allocated_bytes": 972586496,
+    "peak_reserved_bytes": 1023410176,
+    "starting_allocated_bytes": 329023488,
+    "seconds_per_step": 0.15308481212705374,
+    "loss": 5.471240043640137,
+    "device": "NVIDIA RTX A6000",
+    "torch_version": "2.5.1+cu121",
+    "cuda_version": "12.1",
+    "precision": "bf16-mixed",
+    "compile": true,
+    "compile_target": "memory-layer",
+    "ema": false,
+    "synthetic_data": true,
+    "context_memory": {
+      "_target_": "core.models.context_memory.LinearMemory",
+      "_partial_": true
+    },
+    "memory_execution": "grouped",
+    "memory_group_size": 16,
+    "checkpoint_blocks": true,
+    "checkpoint_memory_layers": true,
+    "activation_checkpointing": false
+  }
+]

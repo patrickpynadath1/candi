@@ -7,17 +7,29 @@ from .utils import initialize_state
 class AbsorbingAncestralUpdate:
     prediction_feedback = True
 
-    def __init__(self, steps=180, epsilon=1e-5, final_denoise="greedy"):
+    def __init__(
+        self,
+        steps=180,
+        epsilon=1e-5,
+        final_denoise="greedy",
+        greedy_clean_estimate=False,
+    ):
         if steps <= 0 or not 0 < epsilon < 1:
             raise ValueError("positive steps and epsilon in (0, 1) required")
         if final_denoise not in {"greedy", "ancestral", "none"}:
             raise ValueError("unknown final denoising policy")
         self.steps, self.epsilon, self.final_denoise = steps, epsilon, final_denoise
+        self.greedy_clean_estimate = bool(greedy_clean_estimate)
 
     def reverse_step(self, algo, state, source_time, destination_time):
         keep_t, _ = algo.schedule(source_time.expand(len(state)))
         keep_s, _ = algo.schedule(destination_time.expand(len(state)))
-        posterior = algo.sampling_prediction(state, keep_t).double().exp()
+        predict = (
+            algo.greedy_prediction
+            if self.greedy_clean_estimate
+            else algo.sampling_prediction
+        )
+        posterior = predict(state, keep_t).double().exp()
         return algo.process.reverse(state, posterior, keep_t, keep_s)
 
     def ancestral_denoise(self, algo, state, time):
@@ -53,10 +65,13 @@ class AncestralSampler(DiscreteSampler):
         epsilon=1e-5,
         final_denoise="greedy",
         *,
+        greedy_clean_estimate=False,
         update_rule=None,
         time_grid=None,
     ):
-        rule = update_rule or AbsorbingAncestralUpdate(steps, epsilon, final_denoise)
+        rule = update_rule or AbsorbingAncestralUpdate(
+            steps, epsilon, final_denoise, greedy_clean_estimate
+        )
         super().__init__(rule, steps, epsilon, time_grid)
         self.final_denoise = final_denoise
 

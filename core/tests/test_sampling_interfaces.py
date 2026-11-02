@@ -130,3 +130,27 @@ def test_probability_conversion_preserves_precision_and_unprojected_entropy(
     torch.testing.assert_close(prediction, original)
     torch.testing.assert_close(predictor.entropy(prediction), entropy)
     assert entropy.item() > 0
+
+
+def test_absorbing_ancestral_greedy_clean_estimate_preserves_reverse_process():
+    algorithm = oracle()
+    state = torch.full((1, 5), 3, dtype=torch.long)
+    with (
+        patch.object(
+            algorithm, "greedy_prediction", wraps=algorithm.greedy_prediction
+        ) as greedy,
+        patch.object(
+            algorithm, "sampling_prediction", wraps=algorithm.sampling_prediction
+        ) as sample,
+        patch.object(
+            algorithm.process, "reverse", wraps=algorithm.process.reverse
+        ) as reverse,
+    ):
+        output, metadata = algorithm.generate(
+            AncestralSampler(2, greedy_clean_estimate=True), state, state.ne(3)
+        )
+    assert greedy.call_count == 3
+    assert sample.call_count == 0
+    assert reverse.call_count == 2
+    assert metadata["nfe"] == 3
+    assert output.eq(1).all()

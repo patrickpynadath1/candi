@@ -1,0 +1,31 @@
+# @package _global_
+# Clean-token CE trains the autoencoder; latent MSE trains the denoiser.
+# CDCD observes decoded denoiser token CE, detached from both training losses.
+defaults:
+- override /algorithm: latent_autoencoder
+- override /model: latent_autoencoder
+- override /objective: latent_mse
+- override /process: gaussian
+- override /noise_schedule: linear_interpolation
+- override /time_sampler: cdcd
+- override /sampler: latent_autoencoder
+- _self_
+latent:
+  hidden_size: 512
+  n_heads: 8
+  encoder_layers: 8
+  denoiser_layers: 8
+  decoder_layers: 8
+  block_size: 32
+  dropout: 0.1
+block_diffusion:
+  enabled: false # Visibility/caching are owned by the latent model's E2D2 streams.
+self_conditioning:
+  enabled: false
+time_sampler:
+  adaptive: true
+training:
+  performance:
+    activation_checkpointing: true
+    compile:
+      enabled: true

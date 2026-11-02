@@ -1,0 +1,56 @@
+[
+  {
+    "config": "/tmp/context-memory-optimized-configs/tinystories-rnn-group8.yaml",
+    "batch_size": 8,
+    "length": 1024,
+    "steps": 5,
+    "parameters": 25644037,
+    "peak_allocated_bytes": 760526848,
+    "peak_reserved_bytes": 859832320,
+    "starting_allocated_bytes": 330752000,
+    "seconds_per_step": 0.5428479973226785,
+    "loss": 5.417689323425293,
+    "device": "NVIDIA RTX A6000",
+    "torch_version": "2.5.1+cu121",
+    "cuda_version": "12.1",
+    "precision": "bf16-mixed",
+    "compile": false,
+    "ema": false,
+    "synthetic_data": true,
+    "context_memory": {
+      "_target_": "core.models.context_memory.RecurrentMemory",
+      "_partial_": true
+    },
+    "memory_execution": "grouped",
+    "memory_group_size": 8,
+    "checkpoint_blocks": true,
+    "activation_checkpointing": false
+  },
+  {
+    "config": "/tmp/context-memory-optimized-configs/text8-rnn-group8.yaml",
+    "batch_size": 8,
+    "length": 256,
+    "steps": 5,
+    "parameters": 25413412,
+    "peak_allocated_bytes": 640745472,
+    "peak_reserved_bytes": 727711744,
+    "starting_allocated_bytes": 324783104,
+    "seconds_per_step": 0.14995067343115806,
+    "loss": 3.5305237770080566,
+    "device": "NVIDIA RTX A6000",
+    "torch_version": "2.5.1+cu121",
+    "cuda_version": "12.1",
+    "precision": "bf16-mixed",
+    "compile": false,
+    "ema": false,
+    "synthetic_data": true,
+    "context_memory": {
+      "_target_": "core.models.context_memory.RecurrentMemory",
+      "_partial_": true
+    },
+    "memory_execution": "grouped",
+    "memory_group_size": 8,
+    "checkpoint_blocks": true,
+    "activation_checkpointing": false
+  }
+]

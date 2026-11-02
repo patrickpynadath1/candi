@@ -1,0 +1,10 @@
+# @package _global_
+# Eight decoder layers attend to clean token embeddings, with no encoder.
+# Uses the same visibility, joint attention, and K/V cache as E2D2.
+defaults:
+- e2d2
+- _self_
+model:
+  n_blocks: 8
+encoder_decoder:
+  encoder_layers: 0

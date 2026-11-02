@@ -33,7 +33,9 @@ class BlockDiffusion(nn.Module):
             )
         variable_length = getattr(algorithm, "supports_variable_length", False)
         if not x0_causal and (variable_length or clean_loss != "none"):
-            raise ValueError("block-causal clean attention requires fixed lengths and clean_loss=none")
+            raise ValueError(
+                "block-causal clean attention requires fixed lengths and clean_loss=none"
+            )
         if max_length is not None and (
             not isinstance(max_length, int)
             or isinstance(max_length, bool)
@@ -45,20 +47,34 @@ class BlockDiffusion(nn.Module):
                 "clean autoregressive loss is not defined for variable active blocks"
             )
         if training is not None and variable_length:
-            raise ValueError("block-size mixtures currently require fixed-length training")
+            raise ValueError(
+                "block-size mixtures currently require fixed-length training"
+            )
         if training is not None:
             parameters = inspect.signature(algorithm.loss).parameters
             for size in training.sizes:
                 unsupported = set(training.loss_options(size)) - set(parameters)
                 if unsupported:
-                    raise TypeError(f"algorithm does not support block loss overrides: {sorted(unsupported)}")
+                    raise TypeError(
+                        f"algorithm does not support block loss overrides: {sorted(unsupported)}"
+                    )
+        from core.modifiers.encoder_decoder import EncoderDecoderModel
+
+        if isinstance(algorithm.model, EncoderDecoderModel) and (
+            variable_length or clean_loss != "none"
+        ):
+            raise ValueError(
+                "separate stream execution requires fixed lengths and clean_loss=none"
+            )
         self.training_layout = training
         self.algorithm = algorithm
         clean_encoder = getattr(
             getattr(algorithm, "representation", None), "encode", None
         )
         wrapped_model = BlockDiffusionModel(
-            algorithm.model, block_size, clean_encoder=clean_encoder,
+            algorithm.model,
+            block_size,
+            clean_encoder=clean_encoder,
             x0_causal=x0_causal,
         )
         # VariableLengthDiffusion exposes its assembly model through a read-only

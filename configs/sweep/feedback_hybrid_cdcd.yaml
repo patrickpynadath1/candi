@@ -1,0 +1,13 @@
+# @package _global_
+# Two hybrid feedback cases; only the Gaussian clock is adapted.
+defaults:
+- feedback_cdcd
+- /discrete_view: masked
+- _self_
+preparation:
+  family: feedback_hybrid_cdcd
+  path_name: gaussian_embedding_masked
+hydra:
+  sweeper:
+    params:
+      feedback: none,expected_embedding

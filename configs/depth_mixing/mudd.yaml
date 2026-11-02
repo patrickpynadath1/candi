@@ -1,0 +1,13 @@
+# @package _global_
+model:
+  mlp_hidden_size: 2032
+  block_execution:
+    _target_: core.models.depth_mixing.execution.DepthMixingBlocks
+    dim: ${model.hidden_size}
+    n_blocks: ${model.n_blocks}
+    history: states
+    mixer:
+      _target_: core.models.depth_mixing.mudd.MUDDDepthMixer
+      _partial_: true
+preparation:
+  architecture_name: mudd

@@ -1,0 +1,12 @@
+# @package _global_
+defaults:
+- feedback_cdcd
+- _self_
+preparation:
+  reference_manifest: null
+  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/feedback-depth-cdcd-sudoku-extreme-20261030
+  family: sudoku_extreme_cdcd
+hydra:
+  sweeper:
+    params:
+      task: battery/sudoku_extreme

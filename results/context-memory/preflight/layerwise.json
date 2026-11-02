@@ -1,0 +1,53 @@
+[
+  {
+    "config": "/tmp/context-memory-layerwise-configs/tinystories-baseline.yaml",
+    "batch_size": 8,
+    "length": 1024,
+    "steps": 3,
+    "parameters": 25511941,
+    "peak_allocated_bytes": 1293669888,
+    "peak_reserved_bytes": 1455423488,
+    "starting_allocated_bytes": 329154560,
+    "seconds_per_step": 0.18373241648077965,
+    "loss": 5.421542167663574,
+    "device": "NVIDIA RTX A6000",
+    "precision": "bf16-mixed",
+    "compile": false,
+    "ema": false,
+    "synthetic_data": true
+  },
+  {
+    "config": "/tmp/context-memory-layerwise-configs/tinystories-linear.yaml",
+    "batch_size": 8,
+    "length": 1024,
+    "steps": 3,
+    "parameters": 25511941,
+    "peak_allocated_bytes": 1504433664,
+    "peak_reserved_bytes": 1608515584,
+    "starting_allocated_bytes": 323911680,
+    "seconds_per_step": 0.18858150516947111,
+    "loss": 5.421915054321289,
+    "device": "NVIDIA RTX A6000",
+    "precision": "bf16-mixed",
+    "compile": false,
+    "ema": false,
+    "synthetic_data": true
+  },
+  {
+    "config": "/tmp/context-memory-layerwise-configs/tinystories-gated.yaml",
+    "batch_size": 8,
+    "length": 1024,
+    "steps": 3,
+    "parameters": 25516101,
+    "peak_allocated_bytes": 1718445568,
+    "peak_reserved_bytes": 1820327936,
+    "starting_allocated_bytes": 333410304,
+    "seconds_per_step": 0.29476842284202576,
+    "loss": 5.421675682067871,
+    "device": "NVIDIA RTX A6000",
+    "precision": "bf16-mixed",
+    "compile": false,
+    "ema": false,
+    "synthetic_data": true
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "task": "text8",
+    "checkpointing": false,
+    "normal_memory_MB": 745.217536,
+    "block_memory_MB": 1153.5232,
+    "normal_seconds": 0.03977962384621302,
+    "block_seconds": 0.04042351047197978,
+    "memory_ratio": 1.5479013097190455,
+    "time_ratio": 1.016186342743109
+  },
+  {
+    "task": "text8",
+    "checkpointing": true,
+    "normal_memory_MB": 533.69344,
+    "block_memory_MB": 548.482048,
+    "normal_seconds": 0.054410977537433305,
+    "block_seconds": 0.05352232363075018,
+    "memory_ratio": 1.0277099302550918,
+    "time_ratio": 0.9836677459788007
+  },
+  {
+    "task": "tinystories",
+    "checkpointing": false,
+    "normal_memory_MB": 1846.459904,
+    "block_memory_MB": 3884.301824,
+    "normal_seconds": 0.038774272240698335,
+    "block_seconds": 0.11007988670219977,
+    "memory_ratio": 2.1036480757504714,
+    "time_ratio": 2.838992980161146
+  },
+  {
+    "task": "tinystories",
+    "checkpointing": true,
+    "normal_memory_MB": 679.590912,
+    "block_memory_MB": 1117.502464,
+    "normal_seconds": 0.057698816247284415,
+    "block_seconds": 0.1394773917272687,
+    "memory_ratio": 1.6443752326105268,
+    "time_ratio": 2.4173354116919716
+  }
+]

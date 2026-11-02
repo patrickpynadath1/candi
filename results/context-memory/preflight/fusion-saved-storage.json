@@ -1,0 +1,364 @@
+{
+  "note": "unique saved nonparameter storage across full forward with checkpointing OFF, not production peak attribution",
+  "total_bytes": 5396805284,
+  "by_owner": {
+    "accumulator.read": 1354760192,
+    "accumulator.scan_blocks": 402653184,
+    "algorithm.model.model.blocks.0": 117964880,
+    "algorithm.model.model.blocks.1": 117964880,
+    "algorithm.model.model.blocks.2": 117964880,
+    "algorithm.model.model.blocks.3": 117964880,
+    "algorithm.model.model.blocks.4": 117964880,
+    "algorithm.model.model.blocks.5": 117964880,
+    "algorithm.model.model.blocks.6": 117964880,
+    "algorithm.model.model.blocks.7": 117964880,
+    "algorithm.model.model.blocks.0.mlp.2": 69206016,
+    "algorithm.model.model.blocks.1.mlp.2": 69206016,
+    "algorithm.model.model.blocks.2.mlp.2": 69206016,
+    "algorithm.model.model.blocks.3.mlp.2": 69206016,
+    "algorithm.model.model.blocks.4.mlp.2": 69206016,
+    "algorithm.model.model.blocks.5.mlp.2": 69206016,
+    "algorithm.model.model.blocks.6.mlp.2": 69206016,
+    "algorithm.model.model.blocks.7.mlp.2": 69206016,
+    "algorithm.model.model.blocks.0.norm1": 67239936,
+    "algorithm.model.model.blocks.0.norm2": 67239936,
+    "algorithm.model.model.blocks.1.norm1": 67239936,
+    "algorithm.model.model.blocks.1.norm2": 67239936,
+    "algorithm.model.model.blocks.2.norm1": 67239936,
+    "algorithm.model.model.blocks.2.norm2": 67239936,
+    "algorithm.model.model.blocks.3.norm1": 67239936,
+    "algorithm.model.model.blocks.3.norm2": 67239936,
+    "algorithm.model.model.blocks.4.norm1": 67239936,
+    "algorithm.model.model.blocks.4.norm2": 67239936,
+    "algorithm.model.model.blocks.5.norm1": 67239936,
+    "algorithm.model.model.blocks.5.norm2": 67239936,
+    "algorithm.model.model.blocks.6.norm1": 67239936,
+    "algorithm.model.model.blocks.6.norm2": 67239936,
+    "algorithm.model.model.blocks.7.norm1": 67239936,
+    "algorithm.model.model.blocks.7.norm2": 67239936,
+    "algorithm.model.model.blocks.0.mlp.1": 67108864,
+    "algorithm.model.model.blocks.1.mlp.1": 67108864,
+    "algorithm.model.model.blocks.2.mlp.1": 67108864,
+    "algorithm.model.model.blocks.3.mlp.1": 67108864,
+    "algorithm.model.model.blocks.4.mlp.1": 67108864,
+    "algorithm.model.model.blocks.5.mlp.1": 67108864,
+    "algorithm.model.model.blocks.6.mlp.1": 67108864,
+    "algorithm.model.model.blocks.7.mlp.1": 67108864,
+    "algorithm.model.model.output_layer.norm_final": 33619968,
+    "algorithm.model.memory_execution": 33554432,
+    "algorithm.model.model.blocks.0.mlp.0": 18874368,
+    "algorithm.model.model.blocks.1.mlp.0": 18874368,
+    "algorithm.model.model.blocks.2.mlp.0": 18874368,
+    "algorithm.model.model.blocks.3.mlp.0": 18874368,
+    "algorithm.model.model.blocks.4.mlp.0": 18874368,
+    "algorithm.model.model.blocks.5.mlp.0": 18874368,
+    "algorithm.model.model.blocks.6.mlp.0": 18874368,
+    "algorithm.model.model.blocks.7.mlp.0": 18874368,
+    "algorithm.model.model.blocks.0.attn_qkv": 18350080,
+    "algorithm.model.model.blocks.1.attn_qkv": 18350080,
+    "algorithm.model.model.blocks.2.attn_qkv": 18350080,
+    "algorithm.model.model.blocks.3.attn_qkv": 18350080,
+    "algorithm.model.model.blocks.4.attn_qkv": 18350080,
+    "algorithm.model.model.blocks.5.attn_qkv": 18350080,
+    "algorithm.model.model.blocks.6.attn_qkv": 18350080,
+    "algorithm.model.model.blocks.7.attn_qkv": 18350080,
+    "algorithm.model.model.blocks.0.attn_out": 17301504,
+    "algorithm.model.model.blocks.1.attn_out": 17301504,
+    "algorithm.model.model.blocks.2.attn_out": 17301504,
+    "algorithm.model.model.blocks.3.attn_out": 17301504,
+    "algorithm.model.model.blocks.4.attn_out": 17301504,
+    "algorithm.model.model.blocks.5.attn_out": 17301504,
+    "algorithm.model.model.blocks.6.attn_out": 17301504,
+    "algorithm.model.model.blocks.7.attn_out": 17301504,
+    "functional": 17145892,
+    "algorithm.model.model.output_layer.linear": 8655872,
+    "algorithm.model.model.vocab_embed": 131072
+  },
+  "largest_storages": [
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.0.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.0.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.1.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.1.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.2.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.2.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.3.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.3.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.4.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.4.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.5.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.5.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.6.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.6.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.7.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.7.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.0.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.0.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.1.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.1.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.2.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.2.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.3.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.3.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.4.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.4.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.5.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.5.mlp.2"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        128,
+        32,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.6.mlp.1"
+    },
+    {
+      "bytes": 16777216,
+      "shape": [
+        4096,
+        2048
+      ],
+      "dtype": "torch.bfloat16",
+      "owner": "algorithm.model.model.blocks.6.mlp.2"
+    }
+  ]
+}

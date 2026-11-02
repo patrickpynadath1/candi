@@ -1,0 +1,6 @@
+# @package _global_
+defaults:
+- /path_schedule: adaptive
+- override /hybrid_view@model.views.content: simplex
+preparation:
+  path_name: simplex

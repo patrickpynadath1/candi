@@ -1,0 +1,20 @@
+# @package _global_
+# Two tasks x three encoder K/V depths, with eight decoder blocks.
+# L levels = L-1 full encoder blocks plus one terminal K/V-only readout.
+defaults:
+- e2d2_depth_scaling
+- override /experiment: encoder_kv_depth
+- _self_
+preparation:
+  name: e2d2-encoder-kv-scaling-20k-20261101
+  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/e2d2-encoder-kv-scaling-20k-20261101
+  family: e2d2_encoder_kv_scaling
+  recipe_name: encoder-kv-${scaling.depth}-decoder-8
+  local:
+    gpu_ids: [0, 1, 3, 5]
+    concurrent_jobs: 4
+hydra:
+  sweeper:
+    params:
+      scaling_arm: encoder
+      scaling.depth: 2,4,8

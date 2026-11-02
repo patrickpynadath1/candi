@@ -27,6 +27,8 @@ class DiT(TextDiT):
         time_adapter=None,
         output_adapter=None,
         block_execution=None,
+        sublayer_factory=None,
+        mlp_hidden_size=None,
     ):
         super().__init__()
         if hidden_size % n_heads or (hidden_size // n_heads) % 2:
@@ -39,7 +41,15 @@ class DiT(TextDiT):
         self.rotary_emb = Rotary(hidden_size // n_heads)
         self.blocks = nn.ModuleList(
             [
-                DDiTBlock(hidden_size, n_heads, adaLN, cond_dim, dropout=dropout)
+                DDiTBlock(
+                    hidden_size,
+                    n_heads,
+                    adaLN,
+                    cond_dim,
+                    dropout=dropout,
+                    sublayer_factory=sublayer_factory,
+                    mlp_hidden_size=mlp_hidden_size,
+                )
                 for _ in range(n_blocks)
             ]
         )
@@ -54,13 +64,22 @@ class DiT(TextDiT):
         )
 
         self.configure_components(
-            input_adapter=input_adapter, time_adapter=time_adapter,
-            output_adapter=output_adapter, block_execution=block_execution,
+            input_adapter=input_adapter,
+            time_adapter=time_adapter,
+            output_adapter=output_adapter,
+            block_execution=block_execution,
         )
 
     def forward(
-        self, tokens, conditioning, *, self_condition=None, return_features=False,
-        attention_mask=None, position_ids=None, hidden_only=False
+        self,
+        tokens,
+        conditioning,
+        *,
+        self_condition=None,
+        return_features=False,
+        attention_mask=None,
+        position_ids=None,
+        hidden_only=False,
     ):
         with torch.autocast(tokens.device.type, enabled=False):
             embedded = self.input_adapter(tokens, self.vocab_embed)
@@ -75,15 +94,25 @@ class DiT(TextDiT):
         )
 
     def forward_with_embeddings(
-        self, hidden, conditioning, *, self_condition=None, return_features=False,
-        attention_mask=None, position_ids=None, hidden_only=False
+        self,
+        hidden,
+        conditioning,
+        *,
+        self_condition=None,
+        return_features=False,
+        attention_mask=None,
+        position_ids=None,
+        hidden_only=False,
     ):
         hidden, condition = self.prepare_hidden(
             hidden, conditioning, self_condition=self_condition
         )
         return self.forward_hidden(
-            hidden, condition, return_features=return_features,
-            attention_mask=attention_mask, position_ids=position_ids,
+            hidden,
+            condition,
+            return_features=return_features,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
             hidden_only=hidden_only,
         )
 
@@ -96,5 +125,7 @@ class DiT(TextDiT):
                 hidden = self.conditioning_adapter(hidden, self_condition)
             elif self_condition is not None:
                 raise ValueError("model does not enable self-conditioning")
-            condition = self.time_adapter(conditioning, self.sigma_map) if self.adaLN else None
+            condition = (
+                self.time_adapter(conditioning, self.sigma_map) if self.adaLN else None
+            )
         return hidden, condition

@@ -1,0 +1,17 @@
+# @package _global_
+# Extend the CDCD comparison through Hydra's existing Cartesian-product sweep.
+defaults:
+- feedback
+- override /path_schedule: cdcd
+- _self_
+preparation:
+  name: feedback-depth-cdcd-20k-20261030
+  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/feedback-geometry-cdcd-20k-20261030
+  family: feedback_geometry_cdcd
+  wandb:
+    project: feedback-depth-cdcd-20k-20261030
+hydra:
+  sweeper:
+    params:
+      ablation_path: simplex,spherical,spherical_vmf
+      feedback: none,expected_embedding

@@ -1,0 +1,19 @@
+# @package _global_
+# One raw-context control per task, matching the E2D2 depth sweep settings.
+defaults:
+- e2d2_depth_scaling
+- override /experiment: raw_context
+- _self_
+preparation:
+  name: e2d2-raw-context-20k-20261101
+  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/e2d2-raw-context-20k-20261101
+  family: e2d2_raw_context
+  recipe_name: raw-context-decoder-8
+  local:
+    gpu_ids: [0, 1, 3, 5]
+    concurrent_jobs: 2
+hydra:
+  sweeper:
+    params:
+      scaling_arm: encoder
+      scaling.depth: '0'

@@ -1,0 +1,17 @@
+{
+  "config": "/data/remote_cache/patrick/duo/plans/context-memory-pilot-20261101/configs/text8-masked-context-baseline-seed-1.yaml",
+  "batch_size": 8,
+  "length": 256,
+  "steps": 2,
+  "parameters": 25281316,
+  "peak_allocated_bytes": 601980928,
+  "peak_reserved_bytes": 683671552,
+  "starting_allocated_bytes": 324234240,
+  "seconds_per_step": 0.07895238418132067,
+  "loss": 3.536330223083496,
+  "device": "NVIDIA RTX A6000",
+  "precision": "bf16-mixed",
+  "compile": false,
+  "ema": false,
+  "synthetic_data": true
+}

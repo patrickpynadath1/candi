@@ -26,6 +26,19 @@ class TrainingModule(L.LightningModule):
             {"config": OmegaConf.to_container(self.config, resolve=True)}
         )
         self.algorithm = instantiate(self.config.algorithm)
+        encoder_decoder = self.config.get("encoder_decoder")
+        if encoder_decoder is not None:
+            if not self.config.get("block_diffusion", {}).get("enabled", False):
+                raise ValueError(
+                    "encoder_decoder currently requires block diffusion visibility"
+                )
+            if self.config.get("variable_length") is not None:
+                raise ValueError(
+                    "encoder_decoder currently requires fixed-length blocks"
+                )
+            self.algorithm.model = instantiate(
+                encoder_decoder, model=self.algorithm.model
+            )
         structural = self.config.get("variable_length")
         if structural is not None:
             self.algorithm = instantiate(structural, algorithm=self.algorithm)
@@ -119,6 +132,9 @@ class TrainingModule(L.LightningModule):
         for key in (
             "loss",
             "main_loss",
+            "latent_mse",
+            "clean_decoding_loss",
+            "decoded_denoising_ce",
             "token_feedback_loss",
             "content_loss",
             "insertion_loss",

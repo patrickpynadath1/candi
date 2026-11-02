@@ -1,0 +1,13 @@
+# @package _global_
+# E2D2 final-hidden-state architecture, using the local DiT backbone and MDLM
+# objective. This reproduces the information flow, not the paper's Qwen3 model.
+defaults:
+- bd3lm
+- _self_
+model:
+  n_blocks: 6
+block_diffusion:
+  x0_causal: false
+encoder_decoder:
+  _target_: core.modifiers.encoder_decoder.EncoderDecoderModel
+  encoder_layers: 6

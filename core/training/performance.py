@@ -2,6 +2,8 @@
 
 from core.models.components import DiffusionBlocks
 from core.models.dit import DiT
+from core.modifiers.encoder_decoder import EncoderDecoderModel
+from core.modifiers.block_diffusion.model import BlockDiffusionModel
 from core.modifiers.hybrid.model import HybridModel
 from core.objectives.uniform import UniformDiffusionObjective
 import torch
@@ -28,7 +30,9 @@ def configure_performance(module):
     checkpoint = settings.get("activation_checkpointing", False)
     if checkpoint:
         blocks = [
-            m for m in module.algorithm.modules() if isinstance(m, DiffusionBlocks)
+            m
+            for m in module.algorithm.modules()
+            if isinstance(m, (DiffusionBlocks, EncoderDecoderModel))
         ]
         if not blocks:
             raise ValueError("activation checkpointing requires DiffusionBlocks")
@@ -49,7 +53,11 @@ def configure_performance(module):
         # Compile the backbone in place: replacing it with OptimizedModule would
         # introduce _orig_mod in checkpoints and optimizer parameter patterns.
         models = [
-            m for m in module.algorithm.modules() if hasattr(m, "block_execution")
+            m
+            for m in module.algorithm.modules()
+            if hasattr(m, "block_execution")
+            # Context managers, layouts, and mutable caches stay outside graphs.
+            and not isinstance(m, BlockDiffusionModel)
         ]
         if not models:
             raise ValueError("backbone compilation requires a transformer backbone")
@@ -58,6 +66,12 @@ def configure_performance(module):
             for m in module.algorithm.modules()
             if isinstance(m, HybridModel)
         }
+        block_backbones = {
+            id(m.model)
+            for m in module.algorithm.modules()
+            if isinstance(m, BlockDiffusionModel)
+            and not isinstance(m.model, EncoderDecoderModel)
+        }
         for model in models:
             options = dict(
                 backend=compilation.get("backend", "inductor"),
@@ -65,7 +79,12 @@ def configure_performance(module):
                 dynamic=compilation.get("dynamic", True),
                 fullgraph=compilation.get("fullgraph", False),
             )
-            if id(model) in hybrid_backbones:
+            if isinstance(model, EncoderDecoderModel):
+                # Compile training math, not mutable incremental cache handling.
+                model.forward_uncached = torch.compile(
+                    model.forward_uncached, **options
+                )
+            elif id(model) in hybrid_backbones | block_backbones:
                 # Hybrid/insertion execution calls this method directly and
                 # bypasses backbone.__call__, including during generation.
                 model.forward_hidden = torch.compile(model.forward_hidden, **options)

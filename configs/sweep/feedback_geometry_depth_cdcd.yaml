@@ -1,0 +1,17 @@
+# @package _global_
+# Match the eight-layer geometry campaign, changing only depth to 16 (no SC).
+defaults:
+- feedback_geometry_cdcd
+- _self_
+preparation:
+  name: feedback-geometry-depth16-cdcd-20k-20261101
+  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/feedback-geometry-depth16-cdcd-20k-20261101
+  family: feedback_geometry_depth_cdcd
+  wandb:
+    project: feedback-geometry-depth16-cdcd-20k-20261101
+  local:
+    gpu_ids: [0, 1, 3, 5]
+hydra:
+  sweeper:
+    params:
+      feedback: double_depth

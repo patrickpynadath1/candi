@@ -1,0 +1,273 @@
+algorithm:
+  _target_: core.algorithms.mdlm.MDLM
+  model: ${model}
+  predictor: ${parameterization}
+  process: ${process}
+  schedule: ${noise_schedule}
+  time_sampler: ${time_sampler}
+  objective: ${objective}
+  length: ${task.length}
+  time_conditioning: false
+  prediction: ${prediction}
+model:
+  _target_: core.models.dit.DiT
+  vocab_size: ${token_space.model_vocab_size}
+  hidden_size: 512
+  cond_dim: 128
+  n_blocks: 8
+  n_heads: 8
+  dropout: 0.1
+  adaLN: false
+  tie_word_embeddings: false
+  self_conditioning: ${self_conditioning.enabled}
+  self_conditioning_source: ${self_conditioning.source}
+parameterization:
+  _target_: core.parameterizations.posterior.PosteriorParameterization
+  mask_index: ${token_space.mask_index}
+  temperature: 1.0
+  softcap: null
+  top_k: 0
+  top_p: 1.0
+  commitment: greedy
+prediction:
+  _target_: core.modifiers.self_conditioning.prediction.PredictionCoordinator
+  enabled: ${self_conditioning.enabled}
+  source: ${self_conditioning.source}
+  probability: ${self_conditioning.probability}
+  evaluation_probability: ${self_conditioning.evaluation_probability}
+  gradient_mode: ${oc.select:self_conditioning.gradient_mode,detached}
+representation:
+  _target_: core.representations.one_hot.OneHotRepresentation
+  vocab_size: ${task.vocab_size}
+  dimension: ${task.vocab_size}
+process:
+  _target_: core.processes.absorbing.AbsorbingProcess
+  mask_index: ${token_space.mask_index}
+objective:
+  _target_: core.objectives.weighted_ce.WeightedCrossEntropy
+time_sampler:
+  _target_: core.time_sampling.uniform.UniformTimeSampler
+  epsilon: 0.001
+  antithetic: true
+noise_schedule:
+  _target_: core.noise_schedules.log_linear.LogLinear
+  epsilon: 0.001
+token_space:
+  model_vocab_size:
+    _target_: operator.add
+    _args_:
+    - ${task.vocab_size}
+    - 1
+  mask_index: ${task.vocab_size}
+task:
+  _target_: core.tasks.tinystories.TinyStoriesTask
+  data: ${data}
+  vocab_size: 260
+  length: 1024
+  prompt_bytes: 64
+  num_eval_samples: 128
+  evaluation_seed: 23
+  variable_length: false
+  calculate_bleu: true
+data:
+  cache_dir: ${oc.env:HOME}/.cache/duo/data_cache/tinystories
+  dataset_name: roneneldan/TinyStories
+  revision: f54c09fd23315a6f9c86f9dc80f725de7d8f9c64
+  download: false
+  train_path: null
+  validation_path: null
+  max_train_examples: 100000
+  max_validation_examples: 2000
+datamodule:
+  _target_: core.data.module.TaskDataModule
+  loader_config: ${loader}
+  accumulation_steps: ${trainer.accumulate_grad_batches}
+evaluator:
+  _target_: core.evaluation.generation.evaluate
+  _partial_: true
+callback:
+  _target_: core.training.evaluation_callback.TaskEvaluation
+  _recursive_: false
+  every_n_steps: 1000
+  subset_size: 8
+  seed: 42
+  sampler_config: ${sampler}
+  batch_size: ${loader.eval_batch_size}
+  precision: ${trainer.precision}
+  output_dir: ${output_dir}/task_callback
+  sampler_configs: null
+sampler:
+  _target_: core.samplers.ancestral.AncestralSampler
+  steps: 15
+  epsilon: 1.0e-05
+  final_denoise: greedy
+lr_scheduler:
+  _target_: core.training.schedules.constant_warmup
+  warmup_steps: 250
+self_conditioning:
+  gradient_mode: detached
+  enabled: false
+  source: posterior_mean
+  probability: 0.9
+  evaluation_probability: 1.0
+block_diffusion:
+  enabled: true
+  block_size: 32
+  clean_loss: none
+  clean_loss_weight: 1.0
+  cache_clean_prefix: true
+  max_length: null
+  x0_causal: false
+  context_memory:
+    _target_: core.models.context_memory.LinearMemory
+    _partial_: true
+  checkpoint_blocks: true
+  memory_execution: grouped
+  memory_group_size: 16
+  checkpoint_memory_layers: true
+token_feedback:
+  enabled: false
+  depth: 3
+  loss_weight: 1.0
+  detach: false
+compile: true
+mode: train
+seed: 1
+output_dir: /data/remote_cache/patrick/duo/plans/context-memory-pilot-20261101/runs/tinystories-masked-context-linear-seed-1
+loader:
+  global_batch_size: 256
+  eval_batch_size: 8
+  num_workers: 2
+  pin_memory: true
+training:
+  ema: 0.9999
+  warmup_steps: 250
+  performance:
+    hidden_only_bootstrap: false
+    activation_checkpointing: false
+    compile:
+      enabled: false
+      backend: inductor
+      mode: default
+      dynamic: true
+      fullgraph: false
+      objective: false
+optimizer:
+  fused: null
+  lr: 0.0003
+  beta1: 0.9
+  beta2: 0.999
+  epsilon: 1.0e-08
+  weight_decay: 0.0
+trainer:
+  accelerator: gpu
+  devices: 1
+  num_nodes: 1
+  strategy: auto
+  precision: bf16-mixed
+  accumulate_grad_batches: 32
+  max_steps: 2000
+  gradient_clip_val: 1.0
+  log_every_n_steps: 10
+  num_sanity_val_steps: 0
+  val_check_interval: 1000
+  check_val_every_n_epoch: null
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  enable_progress_bar: false
+checkpoint:
+  resume: null
+  every_n_steps: 2000
+  save_top_k: 1
+evaluation:
+  policy: null
+  checkpoint: null
+  legacy: false
+  use_ema: true
+  device: cuda
+  max_examples: 128
+wandb:
+  entity: rz-text-dlp
+  project: context-memory-pilot-20261101
+  group: context-memory-pilot-20261101
+  name: tinystories-masked-context-linear-seed-1
+  job_type: train
+algorithm_definition:
+  model:
+    _target_: core.models.dit.DiT
+    vocab_size: ${token_space.model_vocab_size}
+    hidden_size: 512
+    cond_dim: 128
+    n_blocks: 8
+    n_heads: 8
+    dropout: 0.1
+    adaLN: false
+    tie_word_embeddings: false
+    self_conditioning: ${self_conditioning.enabled}
+    self_conditioning_source: ${self_conditioning.source}
+  algorithm:
+    _target_: core.algorithms.mdlm.MDLM
+    model: ${model}
+    predictor: ${parameterization}
+    process: ${process}
+    schedule: ${noise_schedule}
+    time_sampler: ${time_sampler}
+    objective: ${objective}
+    length: ${task.length}
+    time_conditioning: false
+    prediction: ${prediction}
+  parameterization:
+    _target_: core.parameterizations.posterior.PosteriorParameterization
+    mask_index: ${token_space.mask_index}
+    temperature: 1.0
+    softcap: null
+    top_k: 0
+    top_p: 1.0
+    commitment: greedy
+  objective:
+    _target_: core.objectives.weighted_ce.WeightedCrossEntropy
+  noise_schedule:
+    _target_: core.noise_schedules.log_linear.LogLinear
+    epsilon: 0.001
+  time_sampler:
+    _target_: core.time_sampling.uniform.UniformTimeSampler
+    epsilon: 0.001
+    antithetic: true
+  prediction:
+    _target_: core.modifiers.self_conditioning.prediction.PredictionCoordinator
+    enabled: ${self_conditioning.enabled}
+    source: ${self_conditioning.source}
+    probability: ${self_conditioning.probability}
+    evaluation_probability: ${self_conditioning.evaluation_probability}
+    gradient_mode: ${oc.select:self_conditioning.gradient_mode,detached}
+  block_diffusion:
+    enabled: true
+    block_size: 32
+    clean_loss: none
+    clean_loss_weight: 1.0
+    cache_clean_prefix: true
+    max_length: null
+    x0_causal: false
+    context_memory:
+      _target_: core.models.context_memory.LinearMemory
+      _partial_: true
+    checkpoint_blocks: true
+  self_conditioning:
+    gradient_mode: detached
+    enabled: false
+    source: posterior_mean
+    probability: 0.9
+    evaluation_probability: 1.0
+  optimizer:
+    fused: null
+    lr: 0.0003
+    beta1: 0.9
+    beta2: 0.999
+    epsilon: 1.0e-08
+    weight_decay: 0.0
+benchmark:
+  algorithm_id: 87cbb4db3766e96aebf9e6c4473244c849588170ebc64e5bfc9c6ae0c1b4294d
+  algorithm_name: masked-context-linear
+  battery_name: context-memory-pilot-20261101
+  task_id: tinystories
+  training_seed: 1

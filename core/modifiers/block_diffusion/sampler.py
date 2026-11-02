@@ -44,6 +44,7 @@ class BlockSampler:
         known = prompt_mask.bool().clone()
         length = result.shape[1]
         total = [0] * len(result)
+        cache = {} if self.cache_clean_prefix else None
         for start in range(0, length, self.block_size):
             stop = min(start + self.block_size, length)
             active_unknown = ~known[:, start:stop]
@@ -52,7 +53,6 @@ class BlockSampler:
             block_tokens = result[:, start:stop]
             block_prompt = known[:, start:stop]
             prefix = result[:, :start]
-            cache = {} if self.cache_clean_prefix else None
             with algo.model.clean_context(prefix, offset=start, cache=cache):
                 block_result, metadata = self.sampler.sample(
                     _ActiveBlock(algo.algorithm, stop - start),

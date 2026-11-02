@@ -1,0 +1,17 @@
+# @package _global_
+# Rerun only the four pure Gaussian feedback/depth cases with the new CDCD fitter.
+defaults:
+- feedback
+- override /path_schedule: cdcd
+- _self_
+preparation:
+  name: feedback-depth-cdcd-20k-20261030
+  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/feedback-depth-cdcd-20k-20261030
+  family: feedback_cdcd
+  wandb:
+    project: feedback-depth-cdcd-20k-20261030
+hydra:
+  sweeper:
+    params:
+      ablation_path: gaussian
+      feedback: none,expected_embedding,hidden,double_depth

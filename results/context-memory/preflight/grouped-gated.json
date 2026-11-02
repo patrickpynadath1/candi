@@ -1,0 +1,26 @@
+[
+  {
+    "config": "/tmp/context-memory-layerwise-configs/tinystories-gated-group8.yaml",
+    "batch_size": 8,
+    "length": 1024,
+    "steps": 2,
+    "parameters": 25516101,
+    "peak_allocated_bytes": 856265728,
+    "peak_reserved_bytes": 956301312,
+    "starting_allocated_bytes": 327905280,
+    "seconds_per_step": 0.8733524736016989,
+    "loss": 5.536025047302246,
+    "device": "NVIDIA RTX A6000",
+    "precision": "bf16-mixed",
+    "compile": false,
+    "ema": false,
+    "synthetic_data": true,
+    "context_memory": {
+      "_target_": "core.models.context_memory.GatedLinearMemory",
+      "_partial_": true
+    },
+    "memory_execution": "grouped",
+    "checkpoint_blocks": true,
+    "activation_checkpointing": false
+  }
+]

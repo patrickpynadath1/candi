@@ -1,0 +1,41 @@
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                               aten::mm         4.79%       3.394ms         7.56%       5.355ms      46.975us      15.317ms        34.63%      15.317ms     134.362us           114  
+                                                triton_         0.00%       0.000us         0.00%       0.000us       0.000us      12.305ms        27.82%      12.305ms      38.453us           320  
+void cutlass::Kernel<cutlass_80_tensorop_bf16_s16816...         0.00%       0.000us         0.00%       0.000us       0.000us       5.045ms        11.41%       5.045ms     210.227us            24  
+                              Optimizer.step#AdamW.step         0.00%       0.000us         0.00%       0.000us       0.000us       4.398ms         9.94%       4.398ms       4.398ms             1  
+                        aten::_flash_attention_backward         0.44%     309.702us         1.54%       1.088ms     136.054us       4.219ms         9.54%       4.219ms     527.350us             8  
+void pytorch_flash::flash_bwd_dq_dk_dv_loop_seqk_par...         0.00%       0.000us         0.00%       0.000us       0.000us       3.502ms         7.92%       3.502ms     437.718us             8  
+                                 aten::_index_put_impl_         0.09%      64.981us         0.40%     283.524us     283.524us       3.219ms         7.28%       3.226ms       3.226ms             1  
+void (anonymous namespace)::indexing_backward_kernel...         0.00%       0.000us         0.00%       0.000us       0.000us       3.195ms         7.22%       3.195ms       3.195ms             1  
+ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_3...         0.00%       0.000us         0.00%       0.000us       0.000us       2.915ms         6.59%       2.915ms     121.449us            24  
+                         aten::_flash_attention_forward         0.71%     503.476us         1.96%       1.390ms      86.900us       2.670ms         6.04%       2.670ms     166.883us            16  
+void pytorch_flash::flash_fwd_kernel<pytorch_flash::...         0.00%       0.000us         0.00%       0.000us       0.000us       2.670ms         6.04%       2.670ms     166.883us            16  
+                                            aten::addmm         0.83%     589.010us         1.08%     763.678us      44.922us       2.539ms         5.74%       2.539ms     149.373us            17  
+void cutlass::Kernel<cutlass_80_tensorop_bf16_s16816...         0.00%       0.000us         0.00%       0.000us       0.000us       2.494ms         5.64%       2.494ms     155.887us            16  
+    ampere_bf16_s1688gemm_bf16_128x128_ldg8_relu_f2f_tn         0.00%       0.000us         0.00%       0.000us       0.000us       2.452ms         5.54%       2.452ms     153.267us            16  
+                                triton_poi_fused_gelu_8         0.31%     221.922us         0.50%     352.607us      22.038us       2.000ms         4.52%       2.000ms     125.014us            16  
+         ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_tn         0.00%       0.000us         0.00%       0.000us       0.000us       1.895ms         4.28%       1.895ms     118.442us            16  
+                       triton_poi_fused_gelu_backward_4         0.15%     109.640us         0.25%     177.676us      22.209us       1.559ms         3.52%       1.559ms     194.841us             8  
+void cutlass::Kernel<cutlass_80_tensorop_bf16_s16816...         0.00%       0.000us         0.00%       0.000us       0.000us       1.464ms         3.31%       1.464ms     182.965us             8  
+              triton_poi_fused_add_mul_native_dropout_9         0.57%     404.057us         0.75%     534.157us      33.385us       1.458ms         3.30%       1.458ms      91.106us            16  
+                               triton_poi_fused_stack_8         0.32%     230.108us         0.47%     334.761us      41.845us     973.378us         2.20%     973.378us     121.672us             8  
+triton_per_fused__to_copy_add_mul_native_dropout_nat...         0.34%     242.415us         0.45%     315.978us      39.497us     943.750us         2.13%     943.750us     117.969us             8  
+triton_per_fused__to_copy_add_mul_native_dropout_nat...         0.65%     460.705us         0.87%     616.978us      38.561us     924.003us         2.09%     924.003us      57.750us            16  
+                                  cudaStreamIsCapturing         0.36%     253.062us         0.36%     253.062us       1.285us     909.125us         2.06%     909.125us       4.615us           197  
+                         triton_poi_fused_add_cat_mul_3         0.41%     289.028us         0.59%     420.886us      26.305us     823.269us         1.86%     823.269us      51.454us            16  
+ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_3...         0.00%       0.000us         0.00%       0.000us       0.000us     794.532us         1.80%     794.532us      49.658us            16  
+triton_per_fused__to_copy_add_mul_native_layer_norm_...         0.27%     189.543us         0.37%     260.785us      32.598us     693.603us         1.57%     693.603us      86.700us             8  
+      triton_per_fused__to_copy_mul_native_layer_norm_0         0.63%     443.904us         1.04%     740.125us      46.258us     628.836us         1.42%     628.836us      39.302us            16  
+                                    aten::_foreach_mul_         0.79%     557.969us         1.03%     728.399us     364.200us     612.642us         1.39%     612.642us     306.321us             2  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us     612.642us         1.39%     612.642us     153.161us             4  
+                                aten::_foreach_addcdiv_         0.39%     279.026us         0.48%     341.710us     341.710us     590.626us         1.34%     590.626us     590.626us             1  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us     590.626us         1.34%     590.626us     295.313us             2  
+triton_red_fused__to_copy_add_mul_native_dropout_nat...         0.39%     278.736us         0.51%     360.903us      45.113us     561.281us         1.27%     561.281us      70.160us             8  
+                                   aten::_foreach_lerp_         0.12%      86.976us         0.18%     129.032us     129.032us     460.130us         1.04%     460.130us     460.130us             1  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us     460.130us         1.04%     460.130us     230.065us             2  
+                                aten::_foreach_addcmul_         0.45%     320.795us         0.58%     409.927us     409.927us     456.674us         1.03%     456.674us     456.674us             1  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 70.882ms
+Self CUDA time total: 44.228ms
