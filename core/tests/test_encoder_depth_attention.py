@@ -117,6 +117,10 @@ def test_no_leakage_and_actual_encoder_keys_used(checkpointed):
     m = TrainingModule(config()).algorithm.model
     m.model.activation_checkpointing = checkpointed
     torch.nn.init.normal_(m.output_layer.linear.weight, std=0.1)
+    # Open AdaLN-Zero gates to exercise context and cache semantics.
+    for block in m.blocks:
+        if block.adaLN:
+            torch.nn.init.normal_(block.adaLN_modulation.weight, std=0.02)
     clean = torch.randint(0, 9, (2, 8))
     noisy = torch.randint(0, 9, (2, 8))
     time = torch.zeros(2)
@@ -155,6 +159,10 @@ def test_no_leakage_and_actual_encoder_keys_used(checkpointed):
 def test_incremental_cache_matches_parallel_and_recompute():
     m = TrainingModule(config()).algorithm.model.eval()
     torch.nn.init.normal_(m.output_layer.linear.weight, std=0.1)
+    # Open AdaLN-Zero gates to exercise context and cache semantics.
+    for block in m.blocks:
+        if block.adaLN:
+            torch.nn.init.normal_(block.adaLN_modulation.weight, std=0.02)
     clean = torch.randint(0, 9, (2, 8))
     noisy = torch.randint(0, 9, (2, 8))
     time = torch.zeros(2)
@@ -188,6 +196,10 @@ def test_terminal_readout_matches_full_block_without_unused_parameters(layers):
     cfg.encoder_decoder.encoder_layers = layers
     optimized = TrainingModule(cfg).algorithm.model.eval()
     torch.nn.init.normal_(optimized.output_layer.linear.weight, std=0.1)
+    # Open AdaLN-Zero gates to exercise context and cache semantics.
+    for block in optimized.blocks:
+        if block.adaLN:
+            torch.nn.init.normal_(block.adaLN_modulation.weight, std=0.02)
     reference_model = TrainingModule(cfg).algorithm.model.eval()
     reference_model.load_state_dict(optimized.state_dict())
     readout = optimized.model.encoder[-1]

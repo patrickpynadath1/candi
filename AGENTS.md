@@ -103,3 +103,21 @@ Raw-context and E2D2 decoder-1 recovery drivers are already tuning successfully;
 do not submit duplicates. Historical outer FAIL rows remain while retry work
 runs: the outer objective includes both training and inference search. Check
 inner trials, driver locks and live workers before declaring a case failed.
+
+## November 2: AdaLN-corrected block/E2D2 restart (current)
+
+At the user's request, stopped the old depth-scaling, raw-context, encoder-K/V
+and K/V recovery drivers. Their original outputs remain preserved. Replaced them
+with 24 fresh cases (16 depth scaling, 2 raw context, 6 encoder-K/V), using
+`model.adaLN=true` inherited from the corrected MDLM recipe. MDLM's
+`algorithm.time_conditioning=false` remains intentional: zero time input does
+not remove the learned AdaLN modulation and gates. Clean encoders remain
+unconditioned. Other training and evaluation settings are unchanged.
+
+Authoritative launch index:
+`plans/adaln-block-restart-20261102/submissions.json`.
+New plan/output names: `e2d2-{depth-scaling,raw-context,encoder-kv-scaling}-adaln-20k-20261102`.
+W&B project: `rz-text-dlp/e2d2-adaln-20k-20261102`.
+Same Ray queues: scaling on GPU 5, depth-mixture on GPU 3. Geometry on GPU 0
+and simplex recovery remain untouched. BPE is owned by another agent/server.
+70 focused tests passed, including AdaLN-active cache parity and context gradients.
