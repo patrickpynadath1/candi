@@ -65,6 +65,16 @@ Architectural/sequence modifiers have dedicated references:
 The insertion reference explains per-process birth states, shared hybrid edits,
 block-local generation, adaptive-time feedback, and the current Text8 evidence.
 
+## Architecture and experiment setup
+
+- [TinyStories BPE campaign: goals, 49 runs, and setup](experiments/tinystories-bpe/README.md)
+- [Encoder/decoder wrappers and caching](guides/encoder-decoder.md)
+- [E2D2 depth scaling](guides/e2d2-depth-scaling.md)
+- [Ray labeled queues](guides/ray-labeled-queues.md)
+- [Experimental latent autoencoder](guides/latent-autoencoder.md)
+- [Attention sublayer ablations](guides/attention-sublayer-ablation.md)
+- [Depth mixing ablations](guides/depth-mixing-ablation.md)
+
 ## Method recipes
 
 - [Feedback versus depth ablation](guides/feedback-depth-ablation.md): focused 14-method comparison.

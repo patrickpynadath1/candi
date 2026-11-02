@@ -32,18 +32,20 @@ uv run python main.py +experiment=tinystories \
 ```
 
 Cache identity includes source revision (or local file SHA256), split, source
-limit, sequence length, and prompt length. Keep the pinned revision for comparisons.
+limit, sequence length, and prompt length. BPE caches also fingerprint the
+tokenizer file and optional shared-cohort allowlist. Keep the pinned revision for comparisons.
 An existing matching cache is reused without source access. Validation-only
 standalone evaluation never prepares training data.
 
 ## Tokens and masks
 
-The dependency-free baseline uses **UTF-8 bytes**, not subword tokens: 256 byte
+The baseline uses **UTF-8 bytes**, not subword tokens: 256 byte
 values plus PAD=0, BOS=1, EOS=2, MASK=3. `task.length=1024` includes BOS/EOS;
 `task.prompt_bytes=64` is a fixed prefix budget. Prefixes back up to a valid UTF-8
 boundary. A 1,024-byte budget is not equivalent to 1,024 BPE tokens. This small
 vocabulary is useful for cheap corruption comparisons, but is not a reproduction
-of published subword TinyStories models. There is currently no subword preset.
+of published subword TinyStories models. The `task=battery/tinystories_bpe` preset loads a saved byte-BPE tokenizer; see
+[the BPE campaign setup](../experiments/tinystories-bpe/README.md).
 
 The prompt is fixed and excluded from loss/corruption. Fixed-canvas training
 learns continuation, EOS **and PAD**, rather than leaking the correct answer
@@ -104,3 +106,18 @@ handling, and actual CPU train → callback → checkpoint → standalone evalua
 for fixed and insertion presets. Fixtures do not establish real-corpus quality or
 training convergence. No full corpus, judge model, or GPU training is downloaded
 or launched by these tests.
+
+## Saved BPE tokenizers
+
+`task=battery/tinystories_bpe` accepts `bpe.vocabulary_size`,
+`bpe.tokenizer_path`, and `task.length` (default 512). Its default vocabulary is
+10,000; the file must contain exactly that many entries and PAD/BOS/EOS/MASK at
+IDs 0/1/2/3. Supply `TINYSTORIES_DATA_DIR` for local parquet shards or local JSONL
+paths as above. The BPE preset considers the full source split sizes.
+
+The prompt remains a fixed byte prefix across tokenizers. Prompt and continuation
+are encoded separately to prevent merges across the conditioning boundary.
+Length filtering uses token counts including BOS/EOS; stories are never truncated.
+`data.allowed_ids_path` optionally filters to a shared JSON list of stable source
+IDs. Different capacities can still reject different IDs; check retained cohorts
+before comparing methods or reusing validation/test indices.

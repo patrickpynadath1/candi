@@ -1,0 +1,25 @@
+# @package _global_
+# Saved BPE tokenizer; override vocabulary_size and tokenizer_path together.
+# Existing byte-only caches and model jobs remain unchanged.
+defaults:
+- /task/battery/tinystories
+- override /token_space@token_space: tinystories
+- _self_
+bpe:
+  vocabulary_size: 10000
+  tokenizer_path: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/tokenizers/tinystories-bpe-20261102/bpe-${bpe.vocabulary_size}.json
+task:
+  vocab_size: ${bpe.vocabulary_size}
+  length: 512
+  tokenizer:
+    _target_: core.data.tinystories.StoryBPETokenizer
+    path: ${bpe.tokenizer_path}
+data:
+  parquet_dir: ${oc.env:TINYSTORIES_DATA_DIR,null}
+  allowed_ids_path: null
+  max_train_examples: 2119719
+  max_validation_examples: 21990
+  cache_dir: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/data_cache/tinystories_bpe
+preparation:
+  task_name: tinystories-bpe-${bpe.vocabulary_size}
+  # Preparation must use a new partition; byte-cache row indices are not portable.

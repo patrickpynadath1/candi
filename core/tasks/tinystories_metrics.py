@@ -63,7 +63,7 @@ class TinyStoriesMetrics:
                 tail = tail[: tail.index(self.tokenizer.eos_token_id)]
             invalid_utf8 = False
             try:
-                bytes(t - 4 for t in tail if 4 <= t < 260).decode("utf-8")
+                self.tokenizer.decode_bytes(tail).decode("utf-8")
             except UnicodeDecodeError:
                 invalid_utf8 = True
             text = self.tokenizer.decode(tail)
@@ -81,7 +81,7 @@ class TinyStoriesMetrics:
                     len(tail),
                     len(words),
                     eos,
-                    sum(not 4 <= token < 260 for token in tail),
+                    sum(not 4 <= token < len(self.tokenizer) for token in tail),
                     invalid_utf8,
                     repeated / len(trigrams) if trigrams else 0.0,
                 )

@@ -25,26 +25,29 @@ class TinyStoriesTask(Task):
         evaluation_seed=23,
         variable_length=False,
         calculate_bleu=False,
+        tokenizer=None,
     ):
+        tokenizer = tokenizer if tokenizer is not None else StoryByteTokenizer()
         if (
-            vocab_size != 260
-            or not 0 < prompt_bytes < length - 2
+            vocab_size != len(tokenizer)
+            or prompt_bytes <= 0
+            or length < 3
             or num_eval_samples < 1
         ):
             raise ValueError(
-                "TinyStories needs vocab_size=260, 0 < prompt_bytes < length-2, positive eval size"
+                "TinyStories requires matching tokenizer/vocab_size, positive prompt bytes and eval size, length >= 3"
             )
         self.data, self.vocab_size, self.length = data, vocab_size, length
         self.prompt_bytes, self.num_eval_samples = prompt_bytes, num_eval_samples
         self.evaluation_seed, self.variable_length = evaluation_seed, variable_length
         self.calculate_bleu = calculate_bleu
-        self.tokenizer = StoryByteTokenizer()
+        self.tokenizer = tokenizer
         self._datasets = {}
 
     def _dataset(self, split):
         if split not in self._datasets:
             self._datasets[split] = prepare_stories(
-                self.data, split, self.length, self.prompt_bytes
+                self.data, split, self.length, self.prompt_bytes, self.tokenizer
             )
         return self._datasets[split]
 
