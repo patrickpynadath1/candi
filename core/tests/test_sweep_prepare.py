@@ -118,3 +118,34 @@ def test_blurring_defaults_are_composed_before_export():
     assert view.schedule._target_ == "core.noise_schedules.blurring.BlurringSchedule"
     instance = instantiate(view)
     assert type(instance.schedule).__name__ == "BlurringSchedule"
+
+
+def test_ar_preparation_does_not_add_steps(tmp_path):
+    config = compose(
+        "autoregressive", overrides=["+sweep=common", "task=battery/text8"]
+    )
+    config.preparation.reference_manifest = None
+    config.preparation.output = str(tmp_path)
+    config.preparation.recipe_name = "ar"
+    config.preparation.sampler_budget_parameter = None
+    config.preparation.evaluation.update(
+        {
+            "nfe": 256,
+            "tuning_indices": [0],
+            "test_indices": [1],
+            "direction": "maximize",
+            "score": {"kind": "metric", "metric": "valid_word_rate"},
+        }
+    )
+    config.preparation.inference = [
+        {
+            "name": "ar",
+            "space": {},
+            "trials": 1,
+            "budget_parameter": None,
+        }
+    ]
+    name = prepare_case(config)
+    result = OmegaConf.load(tmp_path / "configs" / f"{name}.yaml")
+    assert "steps" not in result.sampler
+    assert type(instantiate(result.sampler)).__name__ == "AutoregressiveSampler"

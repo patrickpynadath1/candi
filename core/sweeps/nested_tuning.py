@@ -13,6 +13,7 @@ import fcntl
 import hashlib
 import json
 import math
+import logging
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -67,7 +68,10 @@ def suggest(trial, space):
 
 def validate_inference(spec):
     tune_ids, test_ids = spec["tuning_indices"], spec["test_indices"]
-    if not tune_ids or not test_ids or set(tune_ids) & set(test_ids):
+    same_dataset = spec.get("test_dataset", "validation") == spec.get(
+        "dataset", "validation"
+    )
+    if not tune_ids or not test_ids or (same_dataset and set(tune_ids) & set(test_ids)):
         raise ValueError("Tuning and test indices must be nonempty and disjoint")
     for ids in (tune_ids, test_ids):
         if len(set(ids)) != len(ids) or any(type(i) is not int or i < 0 for i in ids):
@@ -82,7 +86,7 @@ def validate_inference(spec):
         raise ValueError("Invalid NFE or trial budget")
     if spec["direction"] not in ("minimize", "maximize"):
         raise ValueError("Invalid optimization direction")
-    if spec["budget_parameter"] not in ("steps", "max_steps"):
+    if spec["budget_parameter"] not in (None, "steps", "max_steps"):
         raise ValueError("Unsupported sampler budget parameter")
     for key in spec["space"]:
         if key in {"sampler.steps", "sampler.max_steps"} or not (
@@ -212,6 +216,9 @@ def search(directory, settings, direction, objective, concurrency):
                 try:
                     score = future.result()
                 except Exception as exc:
+                    logging.getLogger(__name__).exception(
+                        "Search candidate failed in %s", directory
+                    )
                     study.tell(trial, state=optuna.trial.TrialState.FAIL)
                     failure = failure or exc
                 else:
@@ -299,9 +306,19 @@ def _train_worker(payload, output):
         "dataset": payload["validation"].get("dataset", "validation"),
     }
     previous = Path(output) / "checkpoints/last.ckpt"
+    completed = False
     if previous.exists():
+        import torch
+
         config.checkpoint.resume = str(previous)
-    run(config)
+        # A worker can fail after saving the final checkpoint (e.g. logger
+        # shutdown). Recover the handoff without constructing another trainer.
+        saved = torch.load(previous, map_location="cpu", weights_only=False)
+        max_steps = config.trainer.get("max_steps", -1)
+        completed = max_steps > 0 and saved.get("global_step", -1) >= max_steps
+        del saved
+    if not completed:
+        run(config)
     if not previous.is_file():
         raise FileNotFoundError(previous)
     evaluation_path = Path(output) / "evaluation-config.yaml"
@@ -322,10 +339,12 @@ def _evaluate_worker(payload, output):
         OmegaConf.update(config, key, value, merge=False, force_add=True)
     # Resolve after trial overrides: correction count can itself be tuned.
     sampler = instantiate(config.sampler)
-    allocate = getattr(sampler, "steps_for_nfe", None)
-    config.sampler[policy["budget_parameter"]] = (
-        allocate(evaluation["nfe"]) if allocate is not None else evaluation["nfe"] - 1
-    )
+    from .budget import sampler_steps
+
+    if policy["budget_parameter"] is not None:
+        config.sampler[policy["budget_parameter"]] = sampler_steps(
+            config, sampler, evaluation["nfe"]
+        )
     config.mode = "evaluate"
     config.evaluation.checkpoint = payload["checkpoint"]["checkpoint"]
     config.evaluation.legacy = False
@@ -359,7 +378,10 @@ def execute(stage, payload, output):
     worker = _train_worker if stage == "train" else _evaluate_worker
     resources = payload["resources"]
     remote = ray.remote(
-        num_cpus=resources.get("cpu", 4), num_gpus=resources.get("gpu", 1), max_calls=1
+        num_cpus=resources.get("cpu", 4),
+        num_gpus=resources.get("gpu", 1),
+        max_calls=1,
+        label_selector=resources.get("label_selector"),
     )(worker)
     return ray.get(remote.remote(payload, str(output)))
 
@@ -396,7 +418,7 @@ def _run_case(spec, root, concurrency):
     validation = {
         k: v
         for k, v in evaluation.items()
-        if k not in ("test_indices", "test_seeds", "tuning_indices")
+        if k not in ("test_indices", "test_seeds", "test_dataset", "tuning_indices")
     }
     validation["indices"] = evaluation["tuning_indices"]
 
@@ -455,6 +477,9 @@ def _run_case(spec, root, concurrency):
     if not final_path.exists():
         final = {
             **validation,
+            "dataset": evaluation.get(
+                "test_dataset", validation.get("dataset", "validation")
+            ),
             "indices": evaluation["test_indices"],
             "seeds": evaluation["test_seeds"],
         }
@@ -484,6 +509,9 @@ def main():
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--address", default="auto")
     parser.add_argument(
+        "--working-dir", type=Path, help="Source directory shipped to Ray workers"
+    )
+    parser.add_argument(
         "--case-concurrency",
         "--study-concurrency",
         dest="case_concurrency",
@@ -496,7 +524,10 @@ def main():
         parser.error("Concurrency must be positive")
     import ray
 
-    ray.init(address=args.address)
+    options = {}
+    if args.working_dir:
+        options["runtime_env"] = {"working_dir": str(args.working_dir.resolve())}
+    ray.init(address=args.address, **options)
     with ThreadPoolExecutor(max_workers=args.case_concurrency) as pool:
         futures = [
             pool.submit(run_case, spec, args.output, args.concurrency)

@@ -14,6 +14,7 @@ import hydra
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
+from .budget import sampler_steps
 from .configuration import capture_runtime_paths
 from .nested_tuning import validate
 
@@ -44,9 +45,11 @@ def prepare_case(config):
     config = capture_runtime_paths(config)
     del config["preparation"]
     sampler = instantiate(config.sampler)
-    config.sampler.steps = getattr(sampler, "steps_for_nfe", lambda n: n - 1)(
-        evaluation["nfe"]
-    )
+    budget_parameter = metadata.get("sampler_budget_parameter", "steps")
+    if budget_parameter is not None:
+        config.sampler[budget_parameter] = sampler_steps(
+            config, sampler, evaluation["nfe"]
+        )
     recipe = {
         key: OmegaConf.to_container(config[key], resolve=False)
         for key in metadata["recipe_fields"]

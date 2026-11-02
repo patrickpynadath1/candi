@@ -185,3 +185,21 @@ predictor/corrector step cannot fit. Existing samplers without this method retai
 the one-call-per-step plus terminal-call convention. The worker also checks
 the actual reported NFE after evaluation. New samplers with a different call
 cost must implement this method.
+
+## Samplers without an iteration-count parameter
+
+For cached autoregressive decoding, set the inference policy's
+`budget_parameter: null`. The runner will not inject `steps` into that sampler;
+it still checks the measured `max_nfe` against the evaluation budget. Set the AR
+budget to the sequence capacity, and report actual model calls rather than
+claiming parity with a diffusion step budget. Hydra preparation additionally uses
+`preparation.sampler_budget_parameter: null` to leave the native sampler unchanged.
+
+## Recovering a completed training worker
+
+If a retry finds `last.ckpt` with `global_step >= trainer.max_steps`, it rebuilds
+the evaluation handoff without constructing another trainer. Partial checkpoints
+resume normally. This recovery assumes the existing case's pinned protocol and
+config; changing training settings requires a new case. Tracking shutdown errors
+are logged but cannot turn a successfully saved final checkpoint into a training
+failure. Training errors themselves still propagate.

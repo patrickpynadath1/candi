@@ -97,13 +97,25 @@ def run(config):
             trainer.fit(module, datamodule=data, ckpt_path=config.checkpoint.resume)
             final_checkpoint = output / "checkpoints" / "last.ckpt"
             trainer.save_checkpoint(final_checkpoint)
-            if tracking_run is not None:
-                tracking_run.summary["final_checkpoint"] = str(final_checkpoint)
-                tracking_run.summary["completed_training_steps"] = trainer.global_step
             exit_code = 0
+            if tracking_run is not None:
+                try:
+                    tracking_run.summary["final_checkpoint"] = str(final_checkpoint)
+                    tracking_run.summary["completed_training_steps"] = (
+                        trainer.global_step
+                    )
+                except Exception:
+                    logging.getLogger(__name__).exception(
+                        "Training checkpoint saved, but tracking summary upload failed"
+                    )
         finally:
             if tracking_run is not None:
-                tracking_run.finish(exit_code=exit_code)
+                try:
+                    tracking_run.finish(exit_code=exit_code)
+                except Exception:
+                    logging.getLogger(__name__).exception(
+                        "Tracking shutdown failed (training exit code %s)", exit_code
+                    )
     elif config.mode in {"evaluate", "sample"}:
         if not config.evaluation.checkpoint:
             raise ValueError(

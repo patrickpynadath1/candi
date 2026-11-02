@@ -305,3 +305,140 @@ def test_case_concurrency_cli_accepts_both_names(tmp_path, monkeypatch, flag):
     )
     tuning.main()
     assert connections == [{"address": "auto"}]
+
+
+def test_named_test_split_is_only_used_after_selection(tmp_path, monkeypatch):
+    settings = spec(tmp_path, fixed=True)
+    settings["evaluation"]["test_dataset"] = "test"
+    settings["evaluation"]["test_indices"] = [0, 1]  # IDs are local to each split.
+    calls = []
+
+    def execute(stage, payload, output):
+        assert stage == "evaluate"
+        evaluation = payload["evaluation"]
+        assert "test_dataset" not in evaluation
+        calls.append(copy.deepcopy(evaluation))
+        if evaluation.get("dataset", "validation") == "test":
+            assert evaluation["seeds"] == [1041]
+            return {"score": -100}
+        assert evaluation["seeds"] == [41]
+        return {"score": 1}
+
+    monkeypatch.setattr(tuning, "execute", execute)
+    winner = tuning.run_case(settings, tmp_path / "runs", 1)
+    assert winner["score"] == 1
+    assert calls[-1]["dataset"] == "test"
+    assert sum(c.get("dataset") == "test" for c in calls) == 1
+    settings["evaluation"]["test_dataset"] = "validation"
+    with pytest.raises(ValueError, match="disjoint"):
+        tuning.validate(settings)
+
+
+def test_execute_routes_train_and_evaluation_to_requested_labels(monkeypatch, tmp_path):
+    import sys
+    from types import SimpleNamespace
+
+    calls = []
+
+    def remote(**options):
+        def decorate(worker):
+            def submit(payload, output):
+                calls.append((worker, options, payload, output))
+                return "completed"
+
+            return SimpleNamespace(remote=submit)
+
+        return decorate
+
+    monkeypatch.setitem(
+        sys.modules, "ray", SimpleNamespace(remote=remote, get=lambda x: x)
+    )
+    payload = {
+        "resources": {"cpu": 2, "gpu": 1, "label_selector": {"queue": "geometry"}}
+    }
+    for stage, worker in [
+        ("train", tuning._train_worker),
+        ("evaluate", tuning._evaluate_worker),
+    ]:
+        assert tuning.execute(stage, payload, tmp_path) == "completed"
+        assert calls[-1][0] is worker
+        assert calls[-1][1]["label_selector"] == {"queue": "geometry"}
+        assert calls[-1][1]["num_gpus"] == 1
+
+
+@pytest.mark.parametrize("saved_step,should_train", [(1, False), (0, True)])
+def test_training_handoff_recovers_completed_checkpoint(
+    tmp_path, monkeypatch, saved_step, should_train
+):
+    import torch
+    from core.tests.test_programmatic_sweeps import tiny
+    from core.training import runner
+
+    config = tiny()
+    config["trainer"]["max_steps"] = 1
+    checkpoint = tmp_path / "checkpoints/last.ckpt"
+    checkpoint.parent.mkdir()
+    torch.save({"global_step": saved_step}, checkpoint)
+    calls = []
+
+    def train(cfg):
+        calls.append(cfg.checkpoint.resume)
+        torch.save({"global_step": 1}, checkpoint)
+
+    monkeypatch.setattr(runner, "run", train)
+    result = tuning._train_worker(
+        {
+            "config": config,
+            "parameters": {},
+            "validation": {"indices": [1], "seeds": [41]},
+            "resources": {"gpu": 0},
+        },
+        tmp_path,
+    )
+    assert bool(calls) == should_train
+    if calls:
+        assert calls == [str(checkpoint)]
+    assert Path(result["config"]).is_file()
+    assert result["checkpoint"] == str(checkpoint)
+
+
+def test_noniterative_sampler_keeps_native_interface(tmp_path, monkeypatch):
+    from hydra.utils import instantiate
+    from core.tests.test_programmatic_sweeps import tiny
+    from core.training import runner
+
+    settings = spec(tmp_path, fixed=True)
+    settings["inference"][0]["budget_parameter"] = None
+    tuning.validate(settings)
+    config = tmp_path / "config.yaml"
+    OmegaConf.save(OmegaConf.create(tiny()), config)
+
+    def evaluate(cfg):
+        assert "steps" not in cfg.sampler
+        assert type(instantiate(cfg.sampler)).__name__ == "AutoregressiveSampler"
+        out = Path(cfg.output_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "results.json").write_text(json.dumps({"max_nfe": 3, "accuracy": 0.5}))
+
+    monkeypatch.setattr(runner, "run", evaluate)
+    result = tuning._evaluate_worker(
+        {
+            "checkpoint": {"config": str(config), "checkpoint": "unused.ckpt"},
+            "policy": {
+                "sampler": {
+                    "_target_": "core.samplers.autoregressive.AutoregressiveSampler"
+                },
+                "budget_parameter": None,
+            },
+            "evaluation": {
+                "indices": [0],
+                "seeds": [41],
+                "nfe": 4,
+                "score": {"metric": "accuracy"},
+            },
+            "parameters": {},
+            "resources": {"gpu": 0},
+        },
+        tmp_path / "evaluation",
+    )
+    assert result["score"] == 0.5
