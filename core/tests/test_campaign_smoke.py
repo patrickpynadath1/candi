@@ -203,3 +203,24 @@ def test_ray_worker_does_not_inherit_slurm_distributed_ranks(monkeypatch):
     assert os.environ["CANDI_SLURM_JOB_ID"] == "123"
     assert os.environ["CUDA_VISIBLE_DEVICES"] == "2"
     assert os.environ["RAY_AUTH_TOKEN_PATH"] == "/shared/private-token"
+
+
+def test_start_creates_private_token_before_launch(tmp_path, monkeypatch):
+    from core.cluster import slurm
+    monkeypatch.setenv("SLURM_JOB_ID", "123")
+    monkeypatch.setenv("SLURM_RESTART_COUNT", "0")
+    monkeypatch.setenv("SLURM_JOB_NODELIST", "node1")
+    monkeypatch.setattr(slurm, "authenticate", lambda directory: None)
+
+    def reached_discovery(*args, **kwargs):
+        token = tmp_path / "123-0" / "auth_token"
+        assert token.stat().st_mode & 0o777 == 0o600
+        assert token.parent.stat().st_mode & 0o777 == 0o700
+        assert len(bytes.fromhex(token.read_text())) == 32
+        raise RuntimeError("node discovery reached")
+
+    monkeypatch.setattr(slurm.subprocess, "check_output", reached_discovery)
+    with pytest.raises(RuntimeError, match="node discovery reached"):
+        slurm.start(SimpleNamespace(directory=tmp_path))
+    with pytest.raises(FileExistsError):
+        slurm.start(SimpleNamespace(directory=tmp_path))

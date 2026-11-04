@@ -128,3 +128,8 @@ resumes saved checkpoints. A new protocol requires new case identities/output.
 This implementation is CPU-tested for train/checkpoint/evaluation and command
 construction. A real multi-node Slurm/GPU smoke remains required on the target
 cluster before the full campaign is launched.
+
+On sites with an HTTP proxy, include the Ray head's actual IP/hostname and
+worker addresses in both `NO_PROXY` and `no_proxy` before submitting. Ray Jobs
+uses the dashboard HTTP endpoint. The locked `ray[default,tune]` dependency
+includes that server's dependencies; install with `uv sync --locked`.
