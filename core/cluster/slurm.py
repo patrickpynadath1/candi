@@ -83,7 +83,7 @@ def start(args):
     directory = directory / f"{job}-{os.environ.get('SLURM_RESTART_COUNT', '0')}"
     directory.mkdir(mode=0o700, exist_ok=False)
     token = directory / "auth_token"
-    with token.open("x", opener=lambda p, flags: os.open(p, flags, 0o600)) as stream:
+    with open(token, "x", opener=lambda p, flags: os.open(p, flags, 0o600)) as stream:
         stream.write(secrets.token_hex(32))
     authenticate(directory)
     nodes = subprocess.check_output(
