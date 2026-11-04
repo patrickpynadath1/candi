@@ -111,9 +111,24 @@ def test_multi_gpu_explicit_ddp_and_rejections(tmp_path):
         _prepare({"config": cfg}, tmp_path, {"GPU": 8})
 
 
-def test_torchrun_preserves_ray_visibility_and_propagates_failure(
-    tmp_path, monkeypatch
-):
+def test_torchrun_preserves_ray_visibility_and_propagates_failure(tmp_path):
+    # CUDA/Triton cache driver discovery process-wide. Fake GPU visibility and
+    # Popen must not poison later GPU compilation tests in this pytest process.
+    import subprocess
+    import sys
+    subprocess.run(
+        [sys.executable, "-c",
+         "from pathlib import Path; from pytest import MonkeyPatch; "
+         "from core.tests.test_programmatic_sweeps import _check_torchrun_visibility; "
+         "import sys; "
+         "\nwith MonkeyPatch.context() as patch: "
+         "_check_torchrun_visibility(Path(sys.argv[1]), patch)",
+         str(tmp_path)],
+        check=True,
+    )
+
+
+def _check_torchrun_visibility(tmp_path, monkeypatch):
     import subprocess
     from core.sweeps import tune as adapter
 

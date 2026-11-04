@@ -70,7 +70,10 @@ def test_full_block_matches_unmodified_model_and_future_clean_cannot_leak():
     expected = reference(noisy, condition)
     with wrapped.model.clean_context(tokens):
         actual = wrapped.model(noisy, condition)
-    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
+    # Packed clean/noisy attention and ordinary attention reduce over different
+    # shapes. Use float32 tolerances; the independent future-leakage assertion
+    # below still checks the actual visibility invariant.
+    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=5e-6)
 
     wrapped.block_size = wrapped.model.block_size = 2
     changed = tokens.clone()

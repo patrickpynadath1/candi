@@ -94,7 +94,11 @@ def run(config):
         try:
             if tracking is not None and trainer.is_global_zero:
                 tracking_run = tracking.experiment
-            trainer.fit(module, datamodule=data, ckpt_path=config.checkpoint.resume)
+            # Full local training checkpoints contain optimizer and NumPy RNG state.
+            trainer.fit(
+                module, datamodule=data, ckpt_path=config.checkpoint.resume,
+                weights_only=False,
+            )
             final_checkpoint = output / "checkpoints" / "last.ckpt"
             trainer.save_checkpoint(final_checkpoint)
             exit_code = 0

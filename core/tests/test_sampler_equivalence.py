@@ -1,5 +1,6 @@
 """Seeded behavior snapshots from the samplers before their shared-loop refactor."""
 
+import os
 import hashlib
 import json
 from pathlib import Path
@@ -108,8 +109,26 @@ def behavior(case):
     json.loads(FIXTURE.read_text()) if FIXTURE.exists() else [],
     ids=lambda c: c["name"],
 )
+@pytest.mark.skipif(
+    os.environ.get("CANDI_CHECK_LEGACY_HASHES") != "1",
+    reason="byte snapshots require the historical runtime; set CANDI_CHECK_LEGACY_HASHES=1",
+)
 def test_legacy_behavior(case):
     assert behavior(case) == case["expected"]
+
+
+@pytest.mark.parametrize(
+    "case", json.loads(FIXTURE.read_text()), ids=lambda c: c["name"],
+)
+def test_portable_behavior(case):
+    actual = behavior(case)
+    # Repeatability is required within a runtime, not across torch RNG versions.
+    assert actual == behavior(case)
+    assert actual["info"] == case["expected"]["info"]
+    assert len(actual["states"]) == len(case["expected"]["states"])
+    assert actual["tokens"][0] == [1, 2, 3, 4, 5]
+    assert actual["tokens"][1][0] == 2
+    assert all(0 <= token < 12 for row in actual["tokens"] for token in row)
 
 
 if __name__ == "__main__":
