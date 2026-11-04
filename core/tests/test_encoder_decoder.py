@@ -19,6 +19,9 @@ def model(checkpoint=False, encoder_layers=2):
     )
     wrapped = TrainingModule(config).algorithm.model
     torch.nn.init.normal_(wrapped.output_layer.linear.weight, std=0.1)
+    # Exercise attention/context paths beyond AdaLN-Zero initialization.
+    for block in wrapped.model.model.blocks:
+        torch.nn.init.normal_(block.adaLN_modulation.weight, std=0.02)
     wrapped.model.activation_checkpointing = checkpoint
     wrapped.model.encoder_execution.activation_checkpointing = checkpoint
     return wrapped
@@ -116,7 +119,7 @@ def test_wrapper_composes_with_corruption_and_trains(recipe, encoder_layers):
     loss.backward()
 
 
-def test_depth_allocations_match_parameter_count():
+def test_depth_allocations_match_backbone_count_excluding_decoder_modulation():
     counts = []
     for enc, dec in [(10, 2), (6, 6), (2, 10)]:
         config = compose(
@@ -128,9 +131,12 @@ def test_depth_allocations_match_parameter_count():
                 f"encoder_decoder.encoder_layers={enc}",
             ],
         )
-        counts.append(
-            sum(p.numel() for p in TrainingModule(config).algorithm.parameters())
+        total = sum(p.numel() for p in TrainingModule(config).algorithm.parameters())
+        # Clean encoders have no timestep modulation; each decoder adds AdaLN.
+        decoder_modulation = (
+            dec * 6 * config.model.hidden_size * (config.model.cond_dim + 1)
         )
+        counts.append(total - decoder_modulation)
     assert len(set(counts)) == 1
 
 
@@ -155,6 +161,10 @@ def test_incremental_prefix_cache_matches_recompute_and_only_encodes_new_tokens(
         config.encoder_decoder.encoder_layers = 2
     m = TrainingModule(config).algorithm.model.eval()
     torch.nn.init.normal_(m.output_layer.linear.weight, std=0.1)
+    # Open AdaLN-Zero gates to exercise context and cache semantics.
+    for block in m.blocks:
+        if block.adaLN:
+            torch.nn.init.normal_(block.adaLN_modulation.weight, std=0.02)
     clean = torch.randint(0, 12, (2, 8))
     noisy = torch.randint(0, 12, (2, 8))
     t = torch.zeros(2)
@@ -202,6 +212,10 @@ def test_extending_incomplete_clean_block_invalidates_cache(recipe):
     )
     m = TrainingModule(config).algorithm.model.eval()
     torch.nn.init.normal_(m.output_layer.linear.weight, std=0.1)
+    # Open AdaLN-Zero gates to exercise context and cache semantics.
+    for block in m.blocks:
+        if block.adaLN:
+            torch.nn.init.normal_(block.adaLN_modulation.weight, std=0.02)
     x = torch.randint(0, 12, (1, 6))
     t = torch.zeros(1)
     cache = {}
@@ -299,3 +313,17 @@ def test_raw_context_cache_only_projects_new_tokens(monkeypatch):
         torch.testing.assert_close(actual, repeated)
     assert lengths == [2, 2, 2]
     assert cache["encoder_kv"] == []
+
+
+@pytest.mark.parametrize(
+    "recipe", ["mdlm", "bd3lm", "e2d2", "raw_context", "encoder_kv_depth"]
+)
+def test_masked_recipes_retain_adaln_with_constant_time(recipe):
+    cfg = compose(
+        recipe, ["model.hidden_size=32", "model.n_heads=4", "model.n_blocks=2"]
+    )
+    assert cfg.model.adaLN is True
+    assert cfg.algorithm.time_conditioning is False
+    algorithm = TrainingModule(cfg).algorithm
+    assert algorithm.model.adaLN is True
+    assert all(hasattr(block, "adaLN_modulation") for block in algorithm.model.blocks)

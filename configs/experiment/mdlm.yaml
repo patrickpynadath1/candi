@@ -4,3 +4,6 @@
 defaults:
 - override /sampler: ancestral
 - _self_
+# Keep DiT's learned modulation/gates even when MDLM receives constant time.
+model:
+  adaLN: true

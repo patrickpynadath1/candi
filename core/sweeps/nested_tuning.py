@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 import logging
+import traceback
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -167,9 +168,21 @@ def search(directory, settings, direction, objective, concurrency):
             if result_path.exists():
                 result = json.loads(result_path.read_text())
             else:
-                result = objective(parameters, output)
-                if not math.isfinite(result["score"]):
-                    raise ValueError("Nonfinite validation score")
+                try:
+                    result = objective(parameters, output)
+                    if not math.isfinite(result["score"]):
+                        raise ValueError("Nonfinite validation score")
+                except Exception:
+                    # Preserve the actual worker exception even if the driver is
+                    # waiting on other cases or this is a recovered trial.
+                    save(
+                        output / "failure.json",
+                        {
+                            "parameters": parameters,
+                            "traceback": traceback.format_exc(),
+                        },
+                    )
+                    raise
                 save(result_path, result)
         trial.set_user_attr("result_path", str(result_path))
         return result["score"]

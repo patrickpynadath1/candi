@@ -128,3 +128,17 @@ mixtures, check the single-depth ordinary-attention limit, all-masked rows, answ
 leakage, actual K/V provenance, cache parity, and loss/gradient execution for
 masked, uniform and Gaussian corruption. This recipe has not been added to a
 training sweep automatically.
+
+### MDLM modulation and controlled comparisons
+
+The MDLM recipe explicitly enables decoder `model.adaLN`. Its default
+`algorithm.time_conditioning=false` supplies a constant timestep to the learned
+modulation and residual gates; it does not remove those layers. E2D2, raw context,
+and encoder-K/V recipes inherit this setting. Clean encoder blocks remain
+unconditioned. Consequently, shifting a layer from encoder to decoder also adds
+that decoder layer's modulation parameters; equal total layer counts are not
+exactly equal parameter counts.
+
+The November 1 block/E2D2 campaigns inherited `adaLN=false`. Their artifacts are
+preserved as that variant. The November 2 `*-adaln-20k-*` campaigns restart from
+scratch with AdaLN; they do not resume the incompatible older checkpoints.

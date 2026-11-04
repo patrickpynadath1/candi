@@ -63,10 +63,11 @@ The simplex recovery reuses a verified 20k checkpoint and its existing Optuna
 studies. Its patched source snapshot is separate from ongoing workers' snapshots.
 Do not assume code edits here change an already-running Ray worker.
 
-## Next campaign: TinyStories BPE
+## TinyStories BPE: handed off to another agent
 
 See [the campaign README](docs/experiments/tinystories-bpe/README.md). It lists
-49 proposed training cases, data controls, objectives and setup. It is not launched
+49 proposed training cases, data controls, objectives and setup. The user handed
+this campaign to another agent on a different server; do not launch it here. It is not launched
 and its final manifest is not prepared. Shared cohorts and new validation/test
 partitions must be frozen before launch; historical byte-cache indices cannot be
 reused. No hidden-state SC or latent-autoencoder runs are included.
@@ -89,3 +90,34 @@ inputs. Existing model jobs retain their original byte configs.
 The historical notes preserve the local-to-cluster migration goals, older
 campaigns, stopped pilots, and diagnostic plots. Their process IDs and status
 reports are snapshots. Always check the launch records and current process state.
+
+## November 2: encoder-K/V recovery
+
+The text8 encoder-K/V 2-layer / decoder 8-layer checkpoint reached 20k.
+Recovered its missing training handoff and verified one-sample CPU generation
+with the original native sampler and 128 sequence NFE. Recovery launch record:
+`plans/encoder-kv-handoff-recovery-20261102/launch.json`. It reuses the existing
+case, checkpoint, partitions and Optuna study on the depth-mixture queue.
+
+Raw-context and E2D2 decoder-1 recovery drivers are already tuning successfully;
+do not submit duplicates. Historical outer FAIL rows remain while retry work
+runs: the outer objective includes both training and inference search. Check
+inner trials, driver locks and live workers before declaring a case failed.
+
+## November 2: AdaLN-corrected block/E2D2 restart (current)
+
+At the user's request, stopped the old depth-scaling, raw-context, encoder-K/V
+and K/V recovery drivers. Their original outputs remain preserved. Replaced them
+with 24 fresh cases (16 depth scaling, 2 raw context, 6 encoder-K/V), using
+`model.adaLN=true` inherited from the corrected MDLM recipe. MDLM's
+`algorithm.time_conditioning=false` remains intentional: zero time input does
+not remove the learned AdaLN modulation and gates. Clean encoders remain
+unconditioned. Other training and evaluation settings are unchanged.
+
+Authoritative launch index:
+`plans/adaln-block-restart-20261102/submissions.json`.
+New plan/output names: `e2d2-{depth-scaling,raw-context,encoder-kv-scaling}-adaln-20k-20261102`.
+W&B project: `rz-text-dlp/e2d2-adaln-20k-20261102`.
+Same Ray queues: scaling on GPU 5, depth-mixture on GPU 3. Geometry on GPU 0
+and simplex recovery remain untouched. BPE is owned by another agent/server.
+70 focused tests passed, including AdaLN-active cache parity and context gradients.
