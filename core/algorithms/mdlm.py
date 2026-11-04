@@ -32,6 +32,10 @@ class MDLM(PosteriorDiffusion):
         validate_adaptive_feedback(schedule, predictor)
         self.validate_prediction()
 
+    def sampler_adapter(self):
+        from core.samplers.adapters import KeepRateSamplerAdapter
+        return KeepRateSamplerAdapter(self)
+
     def model_inputs(self, state, keep):
         condition = -keep.clamp_min(torch.finfo(keep.dtype).tiny).log() if self.time_conditioning else torch.zeros_like(keep)
         return state, condition

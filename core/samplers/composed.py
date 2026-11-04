@@ -69,6 +69,9 @@ class ComposedSampler:
             raise TypeError(
                 "fixed-length sampling requires a separate policy for length edits"
             )
+        adapter = getattr(algo, "sampler_adapter", None)
+        if callable(adapter):
+            algo = adapter()
         if not hasattr(algo, "views") or not callable(getattr(algo, "points", None)):
             raise TypeError(
                 "sampling requires the single-view/parallel-view algorithm interface"
