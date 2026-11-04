@@ -1,5 +1,10 @@
 # Agent handoff: CANDI v2.1
 
+For a **new Slurm deployment / colleague handoff**, start with
+[CAMPAIGN_HANDOFF.md](CAMPAIGN_HANDOFF.md) and follow its readiness gates.
+Server paths, allocations and campaign status below are historical context for
+the original deployment; do not copy them as defaults on another cluster.
+
 ## Purpose and working rules
 
 This is a framework for controlled diffusion-language-model component ablations,

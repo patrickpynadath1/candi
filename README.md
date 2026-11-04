@@ -1,5 +1,9 @@
 # CANDI v2.1
 
+**Deploying the portable campaign on a new Slurm cluster?** Start with
+[the agent handoff](CAMPAIGN_HANDOFF.md), then the
+[Slurm/Ray setup and smoke commands](scripts/campaign/README.md).
+
 A framework for testing what makes diffusion language models work. Compose recipes
 from an **information path**, a **denoising task**, and **inference settings**, then
 compare them across tasks with explicit training budgets and validation-based
