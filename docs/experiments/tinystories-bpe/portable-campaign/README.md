@@ -51,10 +51,13 @@ the manifest and never include credentials in the delivery bundle.
 
 ## Data and tokenizer prerequisites
 
-Copy existing `bpe-260.json`, `bpe-500.json`, `bpe-1000.json`, `bpe-5000.json` and
-`bpe-10000.json` from the original tokenizer artifacts. Do not retrain them.
-Record and verify SHA-256 hashes. The old audit manifest contains source hashes;
-do not assume it contains tokenizer-file hashes without checking.
+The five existing tokenizer JSONs are now committed under
+`artifacts/tokenizers/tinystories-bpe-20261102/` (repository root). Do not retrain
+them. Run `sha256sum -c SHA256SUMS` in that directory. Configure each case with
+the matching vocabulary size and absolute `bpe.tokenizer_path` on shared storage.
+See that directory's README for provenance and configuration. The checksum file
+records the transferred artifacts; the original audit manifest records parquet
+hashes rather than independent tokenizer-file hashes.
 
 Download TinyStories parquet shards at revision
 `f54c09fd23315a6f9c86f9dc80f725de7d8f9c64`. Recover and transfer the frozen cohort
