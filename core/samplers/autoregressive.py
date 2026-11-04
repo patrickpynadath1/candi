@@ -6,9 +6,19 @@ from core.algorithms.autoregressive import Autoregressive
 
 class AutoregressiveSampler:
     def __init__(
-        self, use_cache=True, bos_token_id=None, eos_token_id=None, pad_token_id=None
+        self,
+        use_cache=True,
+        bos_token_id=None,
+        eos_token_id=None,
+        pad_token_id=None,
+        max_new_tokens=None,
     ):
         self.use_cache = use_cache
+        if max_new_tokens is not None and (
+            type(max_new_tokens) is not int or max_new_tokens < 1
+        ):
+            raise ValueError("max_new_tokens must be a positive integer or None")
+        self.max_new_tokens = max_new_tokens
         self.bos_token_id, self.eos_token_id, self.pad_token_id = (
             bos_token_id,
             eos_token_id,
@@ -67,7 +77,10 @@ class AutoregressiveSampler:
             )
             finished = torch.zeros(len(state), dtype=torch.bool, device=state.device)
             counts = torch.zeros(len(state), dtype=torch.long, device=state.device)
-            for index in range(start, state.shape[1]):
+            end = state.shape[1]
+            if self.max_new_tokens is not None:
+                end = min(end, start + self.max_new_tokens)
+            for index in range(start, end):
                 inputs = (
                     state[:, :index]
                     if cache is None or cache.length == 0
