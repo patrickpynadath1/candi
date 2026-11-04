@@ -1,0 +1,671 @@
+{
+  "status": "inventory_only_not_executable_manifest",
+  "protocol": "portable-bpe-sudoku-v2-draft",
+  "training": {
+    "steps": 20000,
+    "global_batch_size": 256,
+    "hidden_size": 512,
+    "n_heads": 8,
+    "lr": 0.0003,
+    "warmup_steps": 2500
+  },
+  "sudoku": {
+    "status": "sudoku_hard_selected",
+    "methods": [
+      {
+        "training_seed": 1,
+        "family": "gaussian_embedding",
+        "layers": 8,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "gaussian_embedding",
+        "layers": 8,
+        "self_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "gaussian_embedding",
+        "layers": 16,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "masked",
+        "layers": 8,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "masked",
+        "layers": 8,
+        "self_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "masked",
+        "layers": 16,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "uniform_posterior_ce",
+        "layers": 8,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "uniform_posterior_ce",
+        "layers": 8,
+        "self_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "uniform_posterior_ce",
+        "layers": 16,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "gaussian_embedding_masked",
+        "layers": 8,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "gaussian_embedding_masked",
+        "layers": 8,
+        "self_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "simplex",
+        "layers": 8,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "simplex",
+        "layers": 8,
+        "self_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "simplex",
+        "layers": 16,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "spherical",
+        "layers": 8,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "spherical",
+        "layers": 8,
+        "self_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "spherical",
+        "layers": 16,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "spherical_vmf",
+        "layers": 8,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "spherical_vmf",
+        "layers": 8,
+        "self_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "spherical_vmf",
+        "layers": 16,
+        "self_conditioning": false
+      },
+      {
+        "training_seed": 1,
+        "family": "e2d2",
+        "encoder_layers": 1,
+        "decoder_layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "e2d2",
+        "encoder_layers": 2,
+        "decoder_layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "e2d2",
+        "encoder_layers": 4,
+        "decoder_layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "e2d2",
+        "encoder_layers": 8,
+        "decoder_layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "e2d2",
+        "encoder_layers": 8,
+        "decoder_layers": 1,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "e2d2",
+        "encoder_layers": 8,
+        "decoder_layers": 2,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "e2d2",
+        "encoder_layers": 8,
+        "decoder_layers": 4,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "encoder_kv",
+        "encoder_layers": 2,
+        "decoder_layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "encoder_kv",
+        "encoder_layers": 4,
+        "decoder_layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "encoder_kv",
+        "encoder_layers": 8,
+        "decoder_layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "raw_context",
+        "encoder_layers": 0,
+        "decoder_layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "block_shared",
+        "layers": 8,
+        "adaLN": true,
+        "time_conditioning": true
+      },
+      {
+        "training_seed": 1,
+        "family": "autoregressive",
+        "layers": 8,
+        "self_conditioning": false
+      }
+    ],
+    "training_steps": 20000,
+    "note": "Default proposed budget matches TinyStories; task-specific sequence/block/NFE settings require validation."
+  },
+  "cases": [
+    {
+      "name": "tinystories-bpe-10000-gaussian_embedding-none-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "gaussian_embedding",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-gaussian_embedding-expected_embedding-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "gaussian_embedding",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-gaussian_embedding-double_depth-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "gaussian_embedding",
+      "layers": 16,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-masked-none-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "masked",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-masked-expected_embedding-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "masked",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-masked-double_depth-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "masked",
+      "layers": 16,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-uniform_posterior_ce-none-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "uniform_posterior_ce",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-uniform_posterior_ce-expected_embedding-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "uniform_posterior_ce",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-uniform_posterior_ce-double_depth-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "uniform_posterior_ce",
+      "layers": 16,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-gaussian_embedding_masked-none-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "gaussian_embedding_masked",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-gaussian_embedding_masked-expected_embedding-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "gaussian_embedding_masked",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-simplex-none-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "simplex",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-simplex-expected_embedding-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "simplex",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-simplex-double_depth-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "simplex",
+      "layers": 16,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-spherical-none-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "spherical",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-spherical-expected_embedding-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "spherical",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-spherical-double_depth-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "spherical",
+      "layers": 16,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-spherical_vmf-none-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "spherical_vmf",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-spherical_vmf-expected_embedding-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "spherical_vmf",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-spherical_vmf-double_depth-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "spherical_vmf",
+      "layers": 16,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-e2d2-encoder-1-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "e2d2",
+      "encoder_layers": 1,
+      "decoder_layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-e2d2-encoder-2-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "e2d2",
+      "encoder_layers": 2,
+      "decoder_layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-e2d2-encoder-4-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "e2d2",
+      "encoder_layers": 4,
+      "decoder_layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-e2d2-encoder-8-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "e2d2",
+      "encoder_layers": 8,
+      "decoder_layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-e2d2-decoder-1-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "e2d2",
+      "encoder_layers": 8,
+      "decoder_layers": 1,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-e2d2-decoder-2-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "e2d2",
+      "encoder_layers": 8,
+      "decoder_layers": 2,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-e2d2-decoder-4-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "e2d2",
+      "encoder_layers": 8,
+      "decoder_layers": 4,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-encoder-kv-2-decoder-8-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "encoder_kv",
+      "encoder_layers": 2,
+      "decoder_layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-encoder-kv-4-decoder-8-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "encoder_kv",
+      "encoder_layers": 4,
+      "decoder_layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-encoder-kv-8-decoder-8-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "encoder_kv",
+      "encoder_layers": 8,
+      "decoder_layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-raw-context-decoder-8-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "raw_context",
+      "encoder_layers": 0,
+      "decoder_layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-10000-block-shared-8-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "block_shared",
+      "layers": 8,
+      "adaLN": true,
+      "time_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-260-gaussian_embedding-expected_embedding-seed-1",
+      "vocabulary_size": 260,
+      "training_seed": 1,
+      "family": "gaussian_embedding",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-260-masked-expected_embedding-seed-1",
+      "vocabulary_size": 260,
+      "training_seed": 1,
+      "family": "masked",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-260-uniform_posterior_ce-expected_embedding-seed-1",
+      "vocabulary_size": 260,
+      "training_seed": 1,
+      "family": "uniform_posterior_ce",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-500-gaussian_embedding-expected_embedding-seed-1",
+      "vocabulary_size": 500,
+      "training_seed": 1,
+      "family": "gaussian_embedding",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-500-masked-expected_embedding-seed-1",
+      "vocabulary_size": 500,
+      "training_seed": 1,
+      "family": "masked",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-500-uniform_posterior_ce-expected_embedding-seed-1",
+      "vocabulary_size": 500,
+      "training_seed": 1,
+      "family": "uniform_posterior_ce",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-1000-gaussian_embedding-expected_embedding-seed-1",
+      "vocabulary_size": 1000,
+      "training_seed": 1,
+      "family": "gaussian_embedding",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-1000-masked-expected_embedding-seed-1",
+      "vocabulary_size": 1000,
+      "training_seed": 1,
+      "family": "masked",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-1000-uniform_posterior_ce-expected_embedding-seed-1",
+      "vocabulary_size": 1000,
+      "training_seed": 1,
+      "family": "uniform_posterior_ce",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-5000-gaussian_embedding-expected_embedding-seed-1",
+      "vocabulary_size": 5000,
+      "training_seed": 1,
+      "family": "gaussian_embedding",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-5000-masked-expected_embedding-seed-1",
+      "vocabulary_size": 5000,
+      "training_seed": 1,
+      "family": "masked",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-5000-uniform_posterior_ce-expected_embedding-seed-1",
+      "vocabulary_size": 5000,
+      "training_seed": 1,
+      "family": "uniform_posterior_ce",
+      "layers": 8,
+      "self_conditioning": true
+    },
+    {
+      "name": "tinystories-bpe-260-ar-8-seed-1",
+      "vocabulary_size": 260,
+      "training_seed": 1,
+      "family": "autoregressive",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-500-ar-8-seed-1",
+      "vocabulary_size": 500,
+      "training_seed": 1,
+      "family": "autoregressive",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-1000-ar-8-seed-1",
+      "vocabulary_size": 1000,
+      "training_seed": 1,
+      "family": "autoregressive",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-5000-ar-8-seed-1",
+      "vocabulary_size": 5000,
+      "training_seed": 1,
+      "family": "autoregressive",
+      "layers": 8,
+      "self_conditioning": false
+    },
+    {
+      "name": "tinystories-bpe-10000-ar-8-seed-1",
+      "vocabulary_size": 10000,
+      "training_seed": 1,
+      "family": "autoregressive",
+      "layers": 8,
+      "self_conditioning": false
+    }
+  ],
+  "selected_tasks": [
+    "sudoku_hard",
+    "tinystories_bpe_10000",
+    "text8"
+  ],
+  "total_cases_per_seed": 115,
+  "text8": {
+    "status": "selected",
+    "method_count": 33
+  },
+  "excluded_tasks": [
+    "maze",
+    "sudoku_extreme"
+  ]
+}
