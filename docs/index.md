@@ -48,6 +48,7 @@ and inference choices are selected on validation before final evaluation.
 - [Frontier sweeps](guides/frontier-sweeps.md)
 - [Checkpointing](guides/checkpointing.md)
 - [Distributed training](guides/distributed-training.md)
+- [Remote execution on the GPU server](guides/remote-execution.md)
 
 ## Component reference
 

@@ -41,7 +41,7 @@ sampler:
   final_denoise: greedy
 preparation:
   name: insertion-before-after-text8-20261028
-  output: /home/patrick/.cache/duo/plans/insertion-before-after-text8-20261028
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/duo}/plans/insertion-before-after-text8-20261028
   family: insertion-comparison
   recipe_fields:
   - model

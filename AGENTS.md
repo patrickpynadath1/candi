@@ -80,6 +80,30 @@ four specials. Full-corpus statistics, hashes and tokenizers are saved.
 `task=battery/tinystories_bpe` now supports these artifacts and local parquet
 inputs. Existing model jobs retain their original byte configs.
 
+## Laptop-to-server Ray Jobs setup (2026-10-29)
+
+- Server: `ssh ruqi6000` (patrick@10.145.21.37). Laptop checkout: `/Users/patrickpynadath/candi`.
+- Disk: `/` (holding `/home/patrick` and `/tmp`) was 97% full (131G free); `/tmp/ray` alone
+  held 50G. `~/.cache` → `/data/remote_cache/patrick` (1.3T free). **All persistent server
+  state goes under `CANDI_STORAGE_ROOT=~/.cache/duo`**, never `/tmp` or elsewhere on `/`.
+- New persistent cluster: GCS port 6390, dashboard/Jobs 8275 (loopback, token auth,
+  token at `~/.cache/duo/ray/rj.token`), temp dir `~/.cache/duo/ray/rj`, explicit GPU pool.
+  Pre-existing clusters on 6380–6383 and the main campaign's `ray/fd28` are left alone.
+- Implemented on `dev-local-to-cluster`: `scripts/cluster/{start_head.sh,entrypoint.sh,candi_remote.py}`,
+  storage-root interpolation in configs, `core/tests/test_remote_submission.py`, and
+  `docs/guides/remote-execution.md` (the usage reference). Snapshots persist under
+  `sources/<rev>-<content hash>/`; environments under `envs/<uv.lock hash>/`.
+- `pyproject.toml` now depends on `ray[default,tune]`: the Jobs API/dashboard needs the
+  `default` extra. Torch, Ray, numpy and Lightning versions are unchanged in `uv.lock`.
+- **Verified on the server (2026-10-29)**: head running in tmux session `candi-head` on GPU 7
+  (started from a copy at `~/.cache/duo/head/`); CPU smoke training; a full nested-tuning case
+  (`plans/` and `nested-tuning/remote-smoke-20261029c`): GPU-7 training worker, validation-only
+  inference selection, final evaluation; workers use the locked env via `py_executable`; a job
+  survives closing the tunnel, and status/logs work after reconnecting; Python 3.10.9 /
+  Ray 2.59.0 / Torch 2.5.1+cu121 on the server; pre-existing clusters on 6380–6383 untouched.
+  `remote-smoke-20261029` and `-b` are failed test plans (bad test manifests, not infrastructure).
+- Not yet exercised: multi-GPU pools, `submissions.py` queue appends, W&B logging from remote jobs.
+
 ## Further context
 
 - [Performance and schedule artifact index](docs/handoffs/performance-and-schedules.md)
