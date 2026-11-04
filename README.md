@@ -1,5 +1,9 @@
 # SDDC: Some DLM Design Choices
 
+**Deploying the portable campaign on a new Slurm cluster?** Start with
+[the agent handoff](CAMPAIGN_HANDOFF.md), then the
+[Slurm/Ray setup and smoke commands](scripts/campaign/README.md).
+
 SDDC is a framework for controlled experiments on diffusion language models (DLMs).
 A model is a **recipe** of interchangeable parts: how tokens are represented and
 corrupted, what the network predicts and how it is trained, and how it is sampled.
