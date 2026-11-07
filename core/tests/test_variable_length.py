@@ -220,11 +220,11 @@ def test_hydra_training_module_round_trip(experiment, views):
             config_name="config",
             overrides=[
                 f"+experiment={experiment}",
-                "model.backbone.hidden_size=16",
-                "model.backbone.n_heads=2",
-                "model.backbone.n_blocks=1",
-                "model.backbone.cond_dim=8",
-                "model.backbone.dropout=0",
+                "model.hidden_size=16",
+                "model.n_heads=2",
+                "model.n_blocks=1",
+                "model.cond_dim=8",
+                "model.dropout=0",
                 "training.ema=0",
                 "output_dir=/tmp/candi_insertion_test",
                 "data.cache_dir=/tmp/candi_insertion_data",
@@ -249,11 +249,11 @@ def test_other_view_processes_use_same_structural_sampler(kind):
             overrides=[
                 "+experiment=insertion_continuous",
                 f"hybrid_view@model.views.content={kind}",
-                "model.backbone.hidden_size=16",
-                "model.backbone.n_heads=2",
-                "model.backbone.n_blocks=1",
-                "model.backbone.cond_dim=8",
-                "model.backbone.dropout=0",
+                "model.hidden_size=16",
+                "model.n_heads=2",
+                "model.n_blocks=1",
+                "model.cond_dim=8",
+                "model.dropout=0",
             ],
         )
     algo = instantiate(config.variable_length, algorithm=instantiate(config.algorithm))

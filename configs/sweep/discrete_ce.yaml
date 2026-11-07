@@ -7,12 +7,11 @@ defaults:
 - override /task: battery/sudoku_hard
 - _self_
 model:
-  backbone:
-    n_blocks: 8
-    hidden_size: 512
-    cond_dim: 128
-    n_heads: 8
-    dropout: 0.1
+  n_blocks: 8
+  hidden_size: 512
+  cond_dim: 128
+  n_heads: 8
+  dropout: 0.1
 preparation:
   family: discrete_ce
   recipe_name: ${preparation.content_name}-native-cross_entropy-sc-${preparation.sc_name}

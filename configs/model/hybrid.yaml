@@ -1,17 +1,29 @@
 defaults:
 - /hybrid_view@views.first: gaussian
 - /hybrid_view@views.second: masked
-
-_target_: core.modifiers.hybrid.model.HybridModel
-backbone:
-  _target_: core.models.dit.DiT
-  vocab_size: ${task.vocab_size}
-  hidden_size: 512
-  cond_dim: 128
-  n_blocks: 8
-  n_heads: 8
-  dropout: 0.1
+_target_: core.models.modular.ModularDiT
+vocab_size: ${task.vocab_size}
+hidden_size: 512
+cond_dim: 128
+n_blocks: 8
+n_heads: 8
+dropout: 0.1
+tie_word_embeddings: false
+block_adaLN: true
+time:
+  _target_: core.models.modular.TimeConditioning
+  _partial_: true
+  coordinate: time
   adaLN: true
-self_conditioning: ${self_conditioning.enabled}
-self_conditioning_source: ${self_conditioning.source}
-time_conditioning: identity
+output:
+  _target_: core.models.modular.AdaLNHead
+  _partial_: true
+  adaLN: true
+self_conditioning:
+  _target_: core.models.modular.SelfConditioning
+  _partial_: true
+  enabled: ${self_conditioning.enabled}
+  source: ${self_conditioning.source}
+  initialization: zero
+fusion: null
+output_vocab_size: null

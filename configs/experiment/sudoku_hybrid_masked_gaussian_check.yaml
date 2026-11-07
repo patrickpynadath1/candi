@@ -11,7 +11,8 @@ data:
   num_valid: 2000
   cache_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/duo}/data_cache
 model:
-  time_conditioning: log_one_minus_time
+  time:
+    coordinate: log1p_negative_time
   views:
     first:
       update:

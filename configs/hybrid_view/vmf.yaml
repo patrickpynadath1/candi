@@ -9,7 +9,7 @@ schedule:
 representation:
   _target_: core.representations.noisy_inputs.ProjectedRepresentation
   state_dim: 512
-  hidden_size: ${model.backbone.hidden_size}
+  hidden_size: ${model.hidden_size}
   precondition: false
   state_representation:
     _target_: core.representations.embedding.EmbeddingRepresentation

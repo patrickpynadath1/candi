@@ -54,7 +54,7 @@ regenerate_final.py`). The reference state is tag `v2.1-blog-reference`.
 - [x] Posterior uniform on the hybrid path (bit-identical).
 - [x] Modular DiT: token / simplex / sphere / continuous presets bit-identical (core/models/modular.py, legacy.py, test_modular_dit.py).
 - [x] `ViewsInput` slot: all 40 hybrid presets are bit-identical ModularDiT presets via the converter.
-- [ ] Switch hybrid configs and their consumers (block diffusion, variable length, performance, CANDI importer) to ModularDiT.
+- [x] Hybrid configs build ModularDiT (`model.views`/`fusion` kept, `model.backbone.*` -> `model.*`, `time_conditioning` -> `model.time.coordinate`); every preset resolves to the converter's config. Block diffusion, variable length and performance use the shared interface. Posterior uniform still wraps a legacy DiT via `one_view_model`.
 - [ ] MDLM, block diffusion, E2D2 on the modular path.
 - [ ] Gaussian, simplex, spherical, blurring on the modular path.
 - [ ] Contracts and generated compatibility table.

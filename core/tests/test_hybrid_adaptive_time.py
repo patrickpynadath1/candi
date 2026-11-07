@@ -73,7 +73,7 @@ def test_simplex_hybrid_local_time_training_and_generation(kind, monkeypatch):
     assert list(cfg.algorithm.adaptive_time_views) == [0]
     assert cfg.model.views.first.process._target_.endswith('.DirichletProcess')
     cfg.task = {'_target_': 'core.tests.test_entrypoint.TinyTask', 'vocab_size': 32, 'length': 8}
-    backbone = cfg.model.backbone
+    backbone = cfg.model
     backbone.hidden_size = 32
     backbone.cond_dim = 16
     backbone.n_heads = 4

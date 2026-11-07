@@ -124,10 +124,10 @@ def test_schedule_composes_trains_and_generates(hybrid):
             "hybrid_view@model.views.content=gaussian_one_hot",
             "noise_schedule=gumbel",
             "model.views.content.schedule=${noise_schedule}",
-            "model.backbone.hidden_size=16",
-            "model.backbone.n_blocks=1",
-            "model.backbone.n_heads=2",
-            "model.backbone.cond_dim=8",
+            "model.hidden_size=16",
+            "model.n_blocks=1",
+            "model.n_heads=2",
+            "model.cond_dim=8",
         ]
         if hybrid
         else [

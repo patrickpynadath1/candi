@@ -67,10 +67,10 @@ def test_masked_recipe_second_sublayer_training_and_generation(choice):
     cfg = compose(
         overrides=["+sweep=masked_attention_sudoku", f"block_sublayer={choice}"]
     )
-    cfg.model.backbone.hidden_size = 32
-    cfg.model.backbone.cond_dim = 16
-    cfg.model.backbone.n_heads = 4
-    cfg.model.backbone.n_blocks = 2
+    cfg.model.hidden_size = 32
+    cfg.model.cond_dim = 16
+    cfg.model.n_heads = 4
+    cfg.model.n_blocks = 2
     algo = instantiate(cfg.algorithm)
     tokens = torch.randint(0, 10, (2, 8))
     loss = algo.loss(

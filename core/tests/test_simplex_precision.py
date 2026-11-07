@@ -231,7 +231,7 @@ def test_hybrid_config_preserves_fp32_prompt_clamping(preset):
     config = OmegaConf.create(
         {
             "task": {"vocab_size": 3},
-            "model": {"backbone": {"hidden_size": 8}},
+            "model": {"hidden_size": 8},
             "view": OmegaConf.to_container(view, resolve=False),
         }
     )

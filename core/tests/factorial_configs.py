@@ -28,7 +28,7 @@ def factorial_config(family):
         view.representation = {
             "_target_": "core.representations.noisy_inputs.ProjectedRepresentation",
             "state_dim": "${task.vocab_size}",
-            "hidden_size": "${model.backbone.hidden_size}",
+            "hidden_size": "${model.hidden_size}",
             "state_representation": {
                 "_target_": "core.representations.one_hot.OneHotRepresentation",
                 "vocab_size": "${task.vocab_size}",

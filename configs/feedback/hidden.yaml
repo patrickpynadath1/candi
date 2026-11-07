@@ -3,7 +3,6 @@ self_conditioning:
   enabled: true
   source: hidden
 model:
-  backbone:
-    n_blocks: 8
+  n_blocks: 8
 preparation:
   feedback_name: hidden

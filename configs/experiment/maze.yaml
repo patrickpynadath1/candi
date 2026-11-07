@@ -8,12 +8,11 @@ defaults:
 - override /task: maze
 - override /hybrid_view@model.views.content: masked
 model:
-  backbone:
-    hidden_size: 256
-    cond_dim: 64
-    n_blocks: 4
-    n_heads: 4
-    dropout: 0.1
+  hidden_size: 256
+  cond_dim: 64
+  n_blocks: 4
+  n_heads: 4
+  dropout: 0.1
 loader:
   global_batch_size: 128
   eval_batch_size: 16

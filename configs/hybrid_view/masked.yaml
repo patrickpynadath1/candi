@@ -10,6 +10,6 @@ representation:
   vocab_size:
     _target_: operator.add
     _args_: ["${task.vocab_size}", 1]
-  hidden_size: ${model.backbone.hidden_size}
+  hidden_size: ${model.hidden_size}
 update:
   _target_: core.samplers.hybrid_updates.DiscretePosteriorUpdate

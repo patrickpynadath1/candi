@@ -117,7 +117,7 @@ def test_runner_train_evaluate(tmp_path, insertion, use_bpe):
             }
     settings.data = data
     settings.output_dir = str(tmp_path / "run")
-    model = settings.model.backbone if insertion else settings.model
+    model = settings.model
     model.hidden_size = 16
     model.cond_dim = 16
     model.n_blocks = 1

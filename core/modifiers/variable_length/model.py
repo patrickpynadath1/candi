@@ -51,9 +51,8 @@ def forward_features(model, head, states, points, time, valid, conditioning=None
         )
         if blocked is not None:
             return blocked
-    hidden, condition = model.prepare_fused(
-        states, points, time, self_condition=conditioning
-    )
+    prepare = getattr(model, "prepare_fused", None) or model.prepare
+    hidden, condition = prepare(states, points, time, self_condition=conditioning)
     boundary = head.left_boundary.to(hidden).expand(len(hidden), 1, -1)
     hidden = torch.cat([boundary, hidden], 1)
     keys = F.pad(valid, (1, 0), value=True)

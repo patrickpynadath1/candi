@@ -5,6 +5,7 @@ from core.models.dit import DiT
 from core.modifiers.encoder_decoder import EncoderDecoderModel
 from core.modifiers.block_diffusion.model import BlockDiffusionModel
 from core.modifiers.hybrid.model import HybridModel
+from core.models.modular import ModularDiT
 from core.objectives.uniform import UniformDiffusionObjective
 import torch
 
@@ -25,7 +26,7 @@ def configure_performance(module):
     settings = module.config.training.get("performance", {})
     if settings.get("hidden_only_bootstrap", False):
         for model in module.algorithm.modules():
-            if isinstance(model, (DiT, HybridModel)):
+            if isinstance(model, (DiT, HybridModel, ModularDiT)):
                 model.hidden_only_bootstrap = True
     checkpoint = settings.get("activation_checkpointing", False)
     if checkpoint:

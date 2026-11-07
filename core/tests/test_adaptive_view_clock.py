@@ -16,10 +16,10 @@ from core.tests.factorial_configs import factorial_config
 @pytest.mark.parametrize("family", ["gaussian", "simplex", "spherical", "blurring"])
 def test_adaptive_clock_training_sampling_and_checkpoint(family):
     config = factorial_config(family)
-    config.model.backbone.hidden_size = 16
-    config.model.backbone.n_blocks = 1
-    config.model.backbone.n_heads = 2
-    config.model.backbone.cond_dim = 8
+    config.model.hidden_size = 16
+    config.model.n_blocks = 1
+    config.model.n_heads = 2
+    config.model.cond_dim = 8
     config.training.ema = 0
     view = config.model.views.content
     if family == "gaussian":

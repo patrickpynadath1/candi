@@ -12,11 +12,11 @@ CELLS = list(cells())
 
 def tiny(source):
     cfg = OmegaConf.create(OmegaConf.to_container(source, resolve=False))
-    cfg.model.backbone.hidden_size = 16
-    cfg.model.backbone.cond_dim = 8
-    cfg.model.backbone.n_blocks = 1
-    cfg.model.backbone.n_heads = 2
-    cfg.model.backbone.dropout = 0
+    cfg.model.hidden_size = 16
+    cfg.model.cond_dim = 8
+    cfg.model.n_blocks = 1
+    cfg.model.n_heads = 2
+    cfg.model.dropout = 0
     return cfg
 
 
@@ -25,7 +25,7 @@ def test_factorial_cells_are_balanced_and_use_the_intended_schedules():
     for family, enabled, cfg in CELLS:
         assert cfg.self_conditioning.enabled == enabled
         assert cfg.self_conditioning.source == "hidden"
-        assert cfg.model.time_conditioning == "identity"
+        assert cfg.model.time.coordinate == "time"
         assert cfg.objective._target_.endswith("CrossEntropy")
         assert cfg.time_sampler._target_.endswith("UniformTimeSampler")
         assert not cfg.block_diffusion.enabled and not cfg.token_feedback.enabled

@@ -20,11 +20,11 @@ def compose_hybrid(first, second, feedback="none"):
                 "+experiment=hybrid",
                 f"hybrid_view@model.views.first={first}",
                 f"hybrid_view@model.views.second={second}",
-                "model.backbone.hidden_size=16",
-                "model.backbone.n_heads=2",
-                "model.backbone.n_blocks=2",
-                "model.backbone.cond_dim=8",
-                "model.backbone.dropout=0",
+                "model.hidden_size=16",
+                "model.n_heads=2",
+                "model.n_blocks=2",
+                "model.cond_dim=8",
+                "model.dropout=0",
                 "sampler.steps=2",
                 f"self_conditioning.enabled={'true' if feedback == 'hidden' else 'false'}",
                 "self_conditioning.source=hidden",
@@ -97,9 +97,9 @@ def test_existing_preset_composes_and_trains(experiment):
             config_name="config",
             overrides=[
                 f"+experiment={experiment}",
-                "model.backbone.hidden_size=512",
-                "model.backbone.n_blocks=1",
-                "model.backbone.dropout=0",
+                "model.hidden_size=512",
+                "model.n_blocks=1",
+                "model.dropout=0",
             ],
         )
     algo = instantiate(config.algorithm)
@@ -150,17 +150,30 @@ def test_representation_schedule_contract_rejects_onehot_rank_on_embedding():
 def test_pre_modifier_checkpoint_weights_still_load(experiment):
     from core.sweeps import compose
 
-    config = compose(experiment, {"model.backbone.n_blocks": 1})
+    from core.models.legacy import convert_hybrid_state_dict
+
+    config = compose(experiment, {"model.n_blocks": 1})
     source = instantiate(config.algorithm)
+    # Rebuild the pre-modifier HybridModel layout of these weights: a DiT
+    # backbone, branches with adapters, and the backbone's duplicate token table.
+    legacy_names = [
+        ("model.input.views.", "model.branches."),
+        ("model.time.embedder.", "model.backbone.sigma_map."),
+        ("model.output.layer.", "model.backbone.output_layer."),
+        ("model.self_conditioning.adapter.", "model.conditioning_adapter."),
+        ("model.blocks.", "model.backbone.blocks."),
+    ]
     saved = {}
     for key, value in source.state_dict().items():
-        saved[
-            key.replace(".views.", ".branches.").replace(
-                ".representation.embedding", ".adapter.embedding"
-            )
-        ] = value.clone()
+        for new, old in legacy_names:
+            if key.startswith(new):
+                key = old + key[len(new):]
+                break
+        if key.startswith("model.input.feedback_table."):
+            continue  # Rebuilt from the representation, not stored separately.
+        saved[key.replace(".representation.embedding", ".adapter.embedding")] = value.clone()
     target = instantiate(config.algorithm)
-    target.load_state_dict(saved, strict=True)
+    target.load_state_dict(convert_hybrid_state_dict(saved, prefix="model."), strict=True)
     for key, value in target.state_dict().items():
         torch.testing.assert_close(value, source.state_dict()[key])
 

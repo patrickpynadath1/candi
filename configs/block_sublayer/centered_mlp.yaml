@@ -1,9 +1,8 @@
 # @package _global_
 model:
-  backbone:
-    sublayer_factory:
-      _target_: core.models.sublayers.CenteredMLP
-      _partial_: true
-      expansion: 4
+  sublayer_factory:
+    _target_: core.models.sublayers.CenteredMLP
+    _partial_: true
+    expansion: 4
 preparation:
   sublayer_name: centered_mlp

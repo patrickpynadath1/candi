@@ -38,8 +38,9 @@ class VariableLengthDiffusion(nn.Module):
         time_sampling_include_aux=False,
     ):
         super().__init__()
-        if not hasattr(algorithm, "views") or not callable(
-            getattr(algorithm.model, "prepare_fused", None)
+        if not hasattr(algorithm, "views") or not (
+            callable(getattr(algorithm.model, "prepare_fused", None))
+            or getattr(algorithm.model, "views", None) is not None
         ):
             raise TypeError(
                 "variable length requires a DiffusionView assembly; use one view for a single process"
@@ -88,7 +89,7 @@ class VariableLengthDiffusion(nn.Module):
                 law, ForwardInsertion
             ):
                 raise TypeError("absorbing views require MaskInsertion")
-        hidden = self.model.backbone.blocks[0].attn_qkv.in_features
+        hidden = self.model.blocks[0].attn_qkv.in_features
         if not predict_gap_tokens and any(
             getattr(law, "requires_clean_posterior", True) for law in self.insertion
         ):

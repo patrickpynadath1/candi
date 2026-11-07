@@ -3,7 +3,6 @@ self_conditioning:
   enabled: false
   source: posterior_mean
 model:
-  backbone:
-    n_blocks: 16
+  n_blocks: 16
 preparation:
   feedback_name: double_depth

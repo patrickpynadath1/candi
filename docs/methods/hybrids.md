@@ -22,7 +22,7 @@ uv run python main.py +experiment=hybrid
 uv run python main.py +experiment=hybrid \
   hybrid_view@model.views.first=spherical \
   hybrid_view@model.views.second=uniform \
-  model.time_conditioning=negative_log_keep
+  model.time.coordinate=negative_log_keep
 
 # Simplex + Gaussian
 uv run python main.py +experiment=hybrid \

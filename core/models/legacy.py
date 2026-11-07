@@ -44,15 +44,17 @@ def hybrid_modular_config(config):
     if backbone.get("self_conditioning"):
         raise ValueError("a hybrid backbone's own self-conditioning is unused; remove it")
     result = modular_config({**backbone, "self_conditioning": False})
-    result["input"] = _slot("ViewsInput", views=config["views"], fusion=config.get("fusion"))
+    del result["input"]
+    result["views"] = config["views"]
+    result["fusion"] = config.get("fusion")
     result["time"]["coordinate"] = HYBRID_TIME[config.get("time_conditioning", "identity")]
     result["output_vocab_size"] = config.get("output_vocab_size")
-    if config.get("self_conditioning", False):
-        result["self_conditioning"] = _slot(
-            "SelfConditioning",
-            source=config.get("self_conditioning_source", "posterior_mean"),
-            initialization=config.get("conditioning_initialization", "zero"),
-        )
+    result["self_conditioning"] = _slot(
+        "SelfConditioning",
+        enabled=bool(config.get("self_conditioning", False)),
+        source=config.get("self_conditioning_source", "posterior_mean"),
+        initialization=config.get("conditioning_initialization", "zero"),
+    )
     return result
 
 
@@ -65,6 +67,14 @@ def convert_hybrid_state_dict(state_dict, prefix=""):
             converted[key] = value
             continue
         rest = key[len(prefix):]
+        if rest.startswith("branches."):
+            # Pre-modifier layout (as HybridModel's load hook remapped it).
+            suffix = rest[len("branches."):]
+            if ".adapter." in suffix:
+                suffix = suffix.replace(".adapter.", ".representation.", 1)
+            else:
+                suffix = suffix.replace(".representation.", ".representation.state_representation.", 1)
+            rest = "views." + suffix
         if rest.startswith("backbone.vocab_embed."):
             continue  # The same tensor as the token view's table.
         if rest.startswith("backbone.feedback_table_adapter."):

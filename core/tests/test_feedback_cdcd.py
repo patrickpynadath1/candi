@@ -13,11 +13,11 @@ from core.time_sampling.cdcd import CDCDTimeSampler
 def test_feedback_cdcd_training_and_sampling(hybrid):
     sweep = "feedback_hybrid_cdcd" if hybrid else "feedback_cdcd"
     cfg = compose(overrides=[f"+sweep={sweep}"])
-    cfg.model.backbone.hidden_size = 32
-    cfg.model.backbone.cond_dim = 16
-    cfg.model.backbone.n_heads = 4
-    cfg.model.backbone.n_blocks = 1
-    cfg.model.backbone.dropout = 0
+    cfg.model.hidden_size = 32
+    cfg.model.cond_dim = 16
+    cfg.model.n_heads = 4
+    cfg.model.n_blocks = 1
+    cfg.model.dropout = 0
     cfg.time_sampler.warmup = 1
     algo = instantiate(cfg.algorithm)
     assert isinstance(algo.time_sampler, CDCDTimeSampler)
@@ -66,11 +66,11 @@ def test_geometry_cdcd_training_and_sampling(path, feedback):
             f"feedback={feedback}",
         ]
     )
-    cfg.model.backbone.hidden_size = 32
-    cfg.model.backbone.cond_dim = 16
-    cfg.model.backbone.n_heads = 4
-    cfg.model.backbone.n_blocks = 1
-    cfg.model.backbone.dropout = 0
+    cfg.model.hidden_size = 32
+    cfg.model.cond_dim = 16
+    cfg.model.n_heads = 4
+    cfg.model.n_blocks = 1
+    cfg.model.dropout = 0
     cfg.time_sampler.warmup = 1
     algo = instantiate(cfg.algorithm)
     assert isinstance(algo.time_sampler, CDCDTimeSampler)

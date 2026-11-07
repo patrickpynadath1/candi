@@ -19,9 +19,8 @@ variable_length:
   objective:
     content_weight: 1.0
 model:
-  backbone:
-    n_blocks: 6
-    cond_dim: 128
+  n_blocks: 6
+  cond_dim: 128
 trainer:
   max_steps: 2000
   val_check_interval: 1000

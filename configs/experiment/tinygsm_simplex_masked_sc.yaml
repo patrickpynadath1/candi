@@ -13,14 +13,12 @@ defaults:
 algorithm:
   adaptive_time_views: [0]
 model:
-  backbone:
-    hidden_size: 768
-    cond_dim: 128
-    n_blocks: 12
-    n_heads: 12
-    dropout: 0.1
-    adaLN: true
-    tie_word_embeddings: false
+  hidden_size: 768
+  cond_dim: 128
+  n_blocks: 12
+  n_heads: 12
+  dropout: 0.1
+  tie_word_embeddings: false
 parameterization:
   temperature: 0.1
 time_sampler:

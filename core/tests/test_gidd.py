@@ -78,10 +78,10 @@ def test_gidd_recipe_trains_and_samples_with_prompt_preservation(sc):
     config = compose(
         "gidd_corruption",
         {
-            "model.backbone.hidden_size": 16,
-            "model.backbone.n_heads": 2,
-            "model.backbone.n_blocks": 1,
-            "model.backbone.cond_dim": 8,
+            "model.hidden_size": 16,
+            "model.n_heads": 2,
+            "model.n_blocks": 1,
+            "model.cond_dim": 8,
             "training.ema": 0,
             "self_conditioning.enabled": sc,
             "sampler.steps": 3,

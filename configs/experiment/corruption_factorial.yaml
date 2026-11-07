@@ -9,7 +9,8 @@ defaults:
 - override /time_sampler: antithetic
 
 model:
-  time_conditioning: identity
+  time:
+    coordinate: time
 self_conditioning:
   source: hidden
   probability: 0.9

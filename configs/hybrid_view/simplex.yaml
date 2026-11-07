@@ -15,7 +15,7 @@ schedule:
 representation:
   _target_: core.representations.noisy_inputs.SimplexRepresentation
   vocab_size: ${task.vocab_size}
-  hidden_size: ${model.backbone.hidden_size}
+  hidden_size: ${model.hidden_size}
   state_precision: ${..process.precision}
   projection_precision: legacy
   projection_chunk_size: 0

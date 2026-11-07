@@ -1,6 +1,5 @@
 # @package _global_
 model:
-  backbone:
-    sublayer_factory: null
+  sublayer_factory: null
 preparation:
   sublayer_name: mlp

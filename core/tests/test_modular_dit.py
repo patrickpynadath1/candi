@@ -1,7 +1,6 @@
 """The legacy network classes are presets of ModularDiT, bit for bit."""
 
 from hydra.utils import instantiate
-from omegaconf import OmegaConf
 import pytest
 import torch
 
@@ -99,74 +98,86 @@ def test_legacy_network_is_a_modular_preset(name):
     assert torch.equal(expected.hidden, actual.hidden)
 
 
-def hybrid_presets():
-    from pathlib import Path
-
-    from core.sweeps import compose
-
-    names = []
-    for path in sorted(Path("configs/experiment").glob("*.yaml")):
-        config = compose(path.stem)
-        if OmegaConf.select(config, "model._target_") == "core.modifiers.hybrid.model.HybridModel":
-            names.append(path.stem)
-    return names
+def view(process, representation, update, schedule=None):
+    return {
+        "_target_": "core.modifiers.hybrid.views.DiffusionView",
+        "process": process,
+        "schedule": schedule or {"_target_": "core.noise_schedules.log_linear.LogLinear", "epsilon": 0.001},
+        "representation": representation,
+        "update": {"_target_": f"core.samplers.hybrid_updates.{update}"},
+    }
 
 
-HYBRID_SMALL = {
-    "model.backbone.hidden_size": 32,
-    "model.backbone.cond_dim": 16,
-    "model.backbone.n_blocks": 1,
-    "model.backbone.n_heads": 2,
-    "model.backbone.dropout": 0,
+MASKED = view(
+    {"_target_": "core.processes.absorbing.AbsorbingProcess", "mask_index": 11},
+    {"_target_": "core.representations.noisy_inputs.TokenRepresentation", "vocab_size": 12, "hidden_size": 32},
+    "DiscretePosteriorUpdate",
+)
+GAUSSIAN = view(
+    {"_target_": "core.processes.gaussian.GaussianProcess"},
+    {
+        "_target_": "core.representations.noisy_inputs.ProjectedRepresentation",
+        "state_dim": 11,
+        "hidden_size": 32,
+        "state_representation": {"_target_": "core.representations.one_hot.OneHotRepresentation", "vocab_size": 11},
+    },
+    "GaussianPosteriorUpdate",
+    schedule={"_target_": "core.noise_schedules.gaussian_rank.OneHotRankSchedule", "vocab_size": 11},
+)
+BACKBONE = {"_target_": "core.models.dit.DiT", "vocab_size": 11, "hidden_size": 32, "cond_dim": 16,
+            "n_blocks": 1, "n_heads": 2, "dropout": 0.0, "adaLN": True}
+HYBRID = "core.modifiers.hybrid.model.HybridModel"
+HYBRID_CASES = {
+    "masked": {"_target_": HYBRID, "backbone": BACKBONE, "views": [MASKED], "output_vocab_size": 11},
+    "gaussian_only": {"_target_": HYBRID, "backbone": BACKBONE, "views": [GAUSSIAN]},
+    # negative_log_keep reads the first view's keep rate, so masking goes first.
+    "masked_gaussian_sc": {
+        "_target_": HYBRID, "backbone": BACKBONE, "views": [MASKED, GAUSSIAN], "output_vocab_size": 11,
+        "self_conditioning": True, "time_conditioning": "negative_log_keep",
+    },
+    "gated_fusion_hidden_sc": {
+        "_target_": HYBRID, "backbone": BACKBONE, "views": [MASKED, GAUSSIAN], "output_vocab_size": 11,
+        "self_conditioning": True, "self_conditioning_source": "hidden", "time_conditioning": "log_one_minus_time",
+        "fusion": {"_target_": "core.modifiers.hybrid.fusion.GatedFusion", "mask_index": 11,
+                   "weights": [{"masked": 1, "revealed": 2}, {"masked": 1, "revealed": 0}]},
+    },
 }
 
 
-@pytest.mark.parametrize("self_conditioning", [False, True])
-@pytest.mark.parametrize("experiment", hybrid_presets())
-def test_legacy_hybrid_model_is_a_modular_preset(experiment, self_conditioning):
+@pytest.mark.parametrize("name", sorted(HYBRID_CASES))
+def test_legacy_hybrid_model_is_a_modular_preset(name):
     from core.models.legacy import convert_hybrid_state_dict
-    from core.sweeps import compose
+    from core.modifiers.hybrid.views import point
 
-    small = dict(HYBRID_SMALL)
-    if experiment == "candi_hybrid":
-        # Its token view hard-codes hidden_size 512 instead of interpolating.
-        small.update({"model.backbone.hidden_size": 512, "model.backbone.n_heads": 8})
-    cfg = compose(experiment, {**small, "self_conditioning.enabled": self_conditioning})
+    config = HYBRID_CASES[name]
     torch.manual_seed(0)
-    algorithm = instantiate(cfg.algorithm)
-    legacy = algorithm.model
-    model_config = OmegaConf.to_container(cfg.model, resolve=True)
+    legacy = instantiate(config)
     torch.manual_seed(99)
-    modular = instantiate(modular_config(model_config))
+    modular = instantiate(modular_config(config))
     modular.load_state_dict(convert_hybrid_state_dict(legacy.state_dict()), strict=True)
     legacy.eval()
     modular.eval()
     torch.manual_seed(3)
-    tokens = torch.randint(0, cfg.task.vocab_size, (2, 6))
+    tokens = torch.randint(0, 11, (2, 6))
     mask = torch.ones_like(tokens, dtype=torch.bool)
     mask[:, 0] = False
     time = torch.tensor([0.3, 0.8])
-    points = algorithm.points(time, training=True, corruption_mask=mask)
+    points = tuple(point(v, time, corruption_mask=mask) for v in legacy.views)
     states = tuple(
-        view.process.corrupt_state(view.representation.encode(tokens), point.coefficients, mask)
-        for view, point in zip(algorithm.views, points)
+        v.process.corrupt_state(v.representation.encode(tokens), p.coefficients, mask)
+        for v, p in zip(legacy.views, points)
     )
-    hidden_size = cfg.model.backbone.hidden_size
-    feedback = torch.randn(2, 6, hidden_size) if self_conditioning else None
+    feedback = torch.randn(2, 6, 32) if config.get("self_conditioning") else None
     with torch.no_grad():
         expected = legacy(states, points, time, self_condition=feedback, return_features=True)
         actual = modular(states, points, time, self_condition=feedback, return_features=True)
         assert torch.equal(expected.logits, actual.logits)
         assert torch.equal(expected.hidden, actual.hidden)
-        width = modular.output_width
-        probabilities = torch.rand(2, 6, width).softmax(-1)
+        probabilities = torch.rand(2, 6, modular.output_width).softmax(-1)
         assert torch.equal(legacy.clean_embedding(probabilities), modular.clean_embedding(probabilities))
         old_hidden, old_condition = legacy.clean_state_hidden(probabilities)
         new_hidden, new_condition = modular.clean_hidden(probabilities)
-        assert torch.equal(old_hidden, new_hidden)
-        assert (old_condition is None) == (new_condition is None)
-        if old_condition is not None:
-            assert torch.equal(old_condition, new_condition)
+        assert torch.equal(old_hidden, new_hidden) and torch.equal(old_condition, new_condition)
         old_table, new_table = legacy.feedback_embedding_table(), modular.feedback_embedding_table()
         assert (old_table is None) == (new_table is None)
         if old_table is not None:

@@ -81,7 +81,7 @@ Training budget, training seed, task and method stay in the source config. Each
 training candidate starts fresh (except retries of that same candidate). Training
 search keys are paths to existing configuration fields. Use unresolved Hydra
 configs when changing linked fields; in resolved snapshots, change the actual
-consumed field, such as `algorithm.model.backbone.dropout`, rather than a detached
+consumed field, such as `algorithm.model.dropout`, rather than a detached
 copy under `model`.
 
 Both search levels support categorical lists, continuous float distributions and

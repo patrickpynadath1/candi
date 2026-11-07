@@ -152,3 +152,17 @@ This detaches the predicted probabilities, not the entire feedback branch: the
 embedding table and feedback projection still receive main-loss gradients, and the
 backbone and shared output head still train through their normal final-output
 paths. Changing this flag does not change forward values or inference behavior.
+
+## View-based models (ModularDiT)
+
+Hybrid and single-view recipes use [`ModularDiT`](../../core/models/modular.py),
+one transformer assembled from slots (see the
+[design note](../design/modular-dit.md)). `model.views` lists the corrupted
+views and `model.fusion` how their embeddings combine; `model.hidden_size`,
+`n_blocks`, `n_heads`, `cond_dim` and `dropout` size the network;
+`model.time.coordinate` picks the timestep coordinate (`time`,
+`negative_log_keep`, `log1p_negative_time`, or a Gaussian-path choice above);
+`model.self_conditioning.enabled` toggles self-conditioning;
+`model.output_vocab_size` slices the logits. These replace the former
+`HybridModel` keys `model.backbone.*` and `model.time_conditioning`.
+

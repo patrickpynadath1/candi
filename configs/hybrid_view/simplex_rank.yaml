@@ -18,7 +18,7 @@ schedule:
 representation:
   _target_: core.representations.noisy_inputs.SimplexRepresentation
   vocab_size: ${task.vocab_size}
-  hidden_size: ${model.backbone.hidden_size}
+  hidden_size: ${model.hidden_size}
 update:
   _target_: core.samplers.hybrid_updates.SimplexPosteriorUpdate
   churn: 1.0

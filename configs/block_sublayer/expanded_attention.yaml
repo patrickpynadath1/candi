@@ -1,9 +1,8 @@
 # @package _global_
 model:
-  backbone:
-    sublayer_factory:
-      _target_: core.models.sublayers.ExpandedAttention
-      _partial_: true
-      expansion: 2
+  sublayer_factory:
+    _target_: core.models.sublayers.ExpandedAttention
+    _partial_: true
+    expansion: 2
 preparation:
   sublayer_name: expanded_attention

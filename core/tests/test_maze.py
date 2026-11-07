@@ -166,10 +166,10 @@ def test_cpu_training_and_evaluation(tmp_path, preset):
     cfg.data.num_waypoints = 1 if "waypoints" in preset else 0
     cfg.task.vocab_size = 48
     cfg.task.length = 64
-    cfg.model.backbone.hidden_size = 16
-    cfg.model.backbone.cond_dim = 8
-    cfg.model.backbone.n_blocks = 1
-    cfg.model.backbone.n_heads = 2
+    cfg.model.hidden_size = 16
+    cfg.model.cond_dim = 8
+    cfg.model.n_blocks = 1
+    cfg.model.n_heads = 2
     cfg.trainer.accelerator = "cpu"
     cfg.trainer.precision = "32-true"
     cfg.trainer.max_steps = 2

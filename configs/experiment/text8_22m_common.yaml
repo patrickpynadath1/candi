@@ -4,13 +4,11 @@ task:
   length: 256
   num_eval_samples: 256
 model:
-  backbone:
-    hidden_size: 512
-    cond_dim: 128
-    n_blocks: 6
-    n_heads: 8
-    dropout: 0.1
-    adaLN: true
+  hidden_size: 512
+  cond_dim: 128
+  n_blocks: 6
+  n_heads: 8
+  dropout: 0.1
 loader:
   global_batch_size: 512
   eval_batch_size: 16

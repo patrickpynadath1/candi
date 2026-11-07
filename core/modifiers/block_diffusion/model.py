@@ -8,6 +8,7 @@ from torch import nn
 from core.models.continuous_dit import ContinuousDiT
 from core.models.dit import DiT
 from core.modifiers.hybrid.model import HybridModel
+from core.models.modular import ModularDiT
 from core.models.components import DiffusionBlocks
 from core.models.prediction import ModelPrediction
 from core.models.kv_cache import append_key_value
@@ -15,11 +16,31 @@ from .layout import make_layout
 from core.modifiers.encoder_decoder import EncoderDecoderModel
 
 
+def view_stream_inputs(model, states, points, time, self_condition, clean):
+    """(noisy hidden, noisy condition, clean hidden, clean condition) for a
+    view-based model: ModularDiT, or the legacy HybridModel."""
+    if isinstance(model, ModularDiT):
+        noisy, noisy_condition = model.prepare(
+            states, points, time, self_condition=self_condition
+        )
+        width = model.output_width
+        clean_inputs = model.clean_hidden
+    else:
+        noisy, noisy_condition = model.prepare_fused(
+            states, points, time, self_condition=self_condition
+        )
+        width = model.output_vocab_size or model.output_layer.linear.out_features
+        clean_inputs = model.clean_state_hidden
+    probabilities = torch.nn.functional.one_hot(clean, width).float()
+    clean_hidden, clean_condition = clean_inputs(probabilities)
+    return noisy, noisy_condition, clean_hidden, clean_condition
+
+
 class BlockDiffusionModel(nn.Module):
     def __init__(self, model, block_size, clean_encoder=None, x0_causal=True):
         super().__init__()
         input_model = model.model if isinstance(model, EncoderDecoderModel) else model
-        if not isinstance(input_model, (DiT, ContinuousDiT, HybridModel)):
+        if not isinstance(input_model, (DiT, ContinuousDiT, HybridModel, ModularDiT)):
             raise TypeError(
                 "block diffusion requires a model with fused-stream hidden interfaces"
             )
@@ -207,16 +228,11 @@ class BlockDiffusionModel(nn.Module):
         if current is None:
             return None
         clean, offset, _cache = current
-        noisy_hidden, noisy_condition = self.model.prepare_fused(
-            states, points, time, self_condition=conditioning
+        noisy_hidden, noisy_condition, clean_hidden, clean_condition = view_stream_inputs(
+            self.model, states, points, time, conditioning, clean
         )
         boundary = head.left_boundary.to(noisy_hidden).expand(len(noisy_hidden), 1, -1)
         noisy_hidden = torch.cat([boundary, noisy_hidden], 1)
-        probabilities = torch.nn.functional.one_hot(
-            clean,
-            self.model.output_vocab_size or self.model.output_layer.linear.out_features,
-        ).float()
-        clean_hidden, clean_condition = self.model.clean_state_hidden(probabilities)
         clean_length, noisy_length = clean.shape[1], noisy_hidden.shape[1]
         condition = None
         if clean_condition is not None:
@@ -294,17 +310,12 @@ class BlockDiffusionModel(nn.Module):
         self, head, states, points, time, valid, conditioning, clean, blocks
     ):
         batch, clean_length = clean.shape
-        noisy, noisy_condition = self.model.prepare_fused(
-            states, points, time, self_condition=conditioning
+        noisy, noisy_condition, clean_hidden, clean_condition = view_stream_inputs(
+            self.model, states, points, time, conditioning, clean
         )
         boundary = head.left_boundary.to(noisy).expand(len(noisy), 1, -1)
         noisy = torch.cat([boundary, noisy], 1)
         width = noisy.shape[1]
-        probabilities = torch.nn.functional.one_hot(
-            clean,
-            self.model.output_vocab_size or self.model.output_layer.linear.out_features,
-        ).float()
-        clean_hidden, clean_condition = self.model.clean_state_hidden(probabilities)
         hidden = torch.cat([clean_hidden, noisy.reshape(batch, blocks * width, -1)], 1)
         condition = None
         if clean_condition is not None:
@@ -374,16 +385,11 @@ class BlockDiffusionModel(nn.Module):
             if isinstance(self.model, EncoderDecoderModel)
             else self.model
         )
-        if isinstance(model, HybridModel):
+        if isinstance(model, (HybridModel, ModularDiT)):
             states, points, global_time = inputs
-            noisy_hidden, noisy_condition = model.prepare_fused(
-                states, points, global_time, self_condition=self_condition
+            noisy_hidden, noisy_condition, clean_hidden, clean_condition = (
+                view_stream_inputs(model, states, points, global_time, self_condition, clean)
             )
-            probabilities = torch.nn.functional.one_hot(
-                clean,
-                model.output_vocab_size or model.output_layer.linear.out_features,
-            ).float()
-            clean_hidden, clean_condition = model.clean_state_hidden(probabilities)
         elif isinstance(model, ContinuousDiT):
             state, time, sigma, alpha = inputs
             noisy_hidden, noisy_condition = model.prepare_hidden(

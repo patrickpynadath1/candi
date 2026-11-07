@@ -83,7 +83,7 @@ def test_native_hydra_grid_and_manifest(tmp_path, reference):
         config = job["config"]
         assert config["trainer"]["max_steps"] == 20000
         assert config["trainer"]["precision"] == "bf16-mixed"
-        assert config["model"]["backbone"]["n_blocks"] == 8
+        assert config["model"]["n_blocks"] == 8
         assert config["model"]["views"]["content"]["time_map"]
         assert not config["self_conditioning"]["enabled"]
         assert "difficulty" not in config["data"]

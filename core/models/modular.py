@@ -321,9 +321,9 @@ class ModularDiT(TextDiT):
     def __init__(
         self,
         vocab_size,
-        input,
         time,
         output,
+        input=None,
         hidden_size=512,
         cond_dim=128,
         n_blocks=8,
@@ -338,9 +338,19 @@ class ModularDiT(TextDiT):
         block_execution=None,
         autocast_cache=True,
         output_vocab_size=None,
+        views=None,
+        fusion=None,
     ):
         super().__init__(autocast_cache=autocast_cache)
         self.output_vocab_size = output_vocab_size
+        if (views is None) == (input is None):
+            raise ValueError("give exactly one of input (one state) or views (hybrid)")
+        if views is not None:
+            from functools import partial
+
+            input = partial(ViewsInput, views, fusion=fusion)
+        elif fusion is not None:
+            raise ValueError("fusion requires views")
         if hidden_size % n_heads or (hidden_size // n_heads) % 2:
             raise ValueError("hidden_size must give an even integral head dimension")
         dims = dict(vocab_size=vocab_size, hidden_size=hidden_size, cond_dim=cond_dim, state_dim=state_dim)
@@ -366,8 +376,16 @@ class ModularDiT(TextDiT):
         if tie_word_embeddings:
             self.output.tie(self.input.table)
         self.time.build_input_projection(cond_dim, hidden_size)
+        # A slot may be listed with enabled=false so configs can toggle it.
+        enabled = getattr(self_conditioning, "keywords", {}).get("enabled", True)
+        if self_conditioning is not None and enabled:
+            from functools import partial
+
+            keywords = dict(self_conditioning.keywords)
+            keywords.pop("enabled", None)
+            self_conditioning = partial(self_conditioning.func, *self_conditioning.args, **keywords)
         self.self_conditioning = (
-            None if self_conditioning is None else _build(self_conditioning, **dims)
+            _build(self_conditioning, **dims) if self_conditioning is not None and enabled else None
         )
         if block_execution is not None:
             self.block_execution = block_execution
@@ -379,6 +397,11 @@ class ModularDiT(TextDiT):
     @property
     def views(self):
         return getattr(self.input, "views", None)
+
+    @property
+    def conditioning_adapter(self):
+        """The self-conditioning slot, under the name the coordinator checks."""
+        return self.self_conditioning
 
     @property
     def supports_fused_streams(self):
