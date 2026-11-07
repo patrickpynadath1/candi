@@ -10,7 +10,6 @@ from core.tests.view_inputs import view_prediction
 from torch import nn
 from hydra import compose, initialize_config_dir
 
-from core.algorithms.mdlm import MDLM
 from hydra.utils import instantiate
 from core.objectives.weighted_ce import WeightedCrossEntropy
 from core.parameterizations.posterior import PosteriorParameterization
