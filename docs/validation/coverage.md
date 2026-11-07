@@ -6,8 +6,11 @@ means that a specified fixture or integration ran. **Reproduced** means a
 comparison against a defined reference succeeded. A short pilot is evidence
 that a method can learn, not proof of convergence or paper-level performance.
 
-The regression suite with Ray Tune sweeps passed **476 tests**, including
-available CUDA checks (417 before adding sweeps).
+On 2026-11-07 the full suite passed **1665 tests** on Linux x86_64 with the
+locked CUDA 12.1 environment and one GPU (commit `2ba376f`), including CUDA
+checks and the byte-level sampler snapshots in `test_sampler_equivalence.py`.
+Those snapshots hash raw float bytes recorded on Linux x86_64 and skip on other
+platforms; on ARM macOS the remaining 1405 tests pass.
 That total is a snapshot, not a promise that every method,
 task, precision, sampler, modifier and distributed strategy combination has
 been tested. Run the current suite from the repository root:
