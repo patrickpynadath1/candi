@@ -29,25 +29,53 @@ class EntropyBoundedSampler:
         self.bound, self.max_steps = entropy_bound, max_steps
 
     def sample(self, algo, prompt_tokens, prompt_mask):
+        views = getattr(algo, "views", None)
         algo = prediction_session(algo)
-        state = initialize_state(algo, prompt_tokens, prompt_mask)
-        generated_count = state.eq(algo.process.mask_index).sum(-1).clamp_min(1)
+        if views is None:
+            process = algo.process
+            state = initialize_state(algo, prompt_tokens, prompt_mask)
+
+            def predict(state, times):
+                keep, _ = algo.schedule(times)
+                return algo.sampling_prediction(state, keep)
+
+        else:
+            # The same loop on a one-view (absorbing) recipe: time is the masked
+            # fraction, passed through the view's points.
+            from core.processes.absorbing import AbsorbingProcess
+
+            if len(views) != 1 or not isinstance(views[0].process, AbsorbingProcess):
+                raise TypeError("entropy-bounded sampling needs one absorbing view")
+            process = views[0].process
+            if prompt_tokens.ndim != 2 or prompt_tokens.shape != prompt_mask.shape:
+                raise ValueError("prompt tensors must have matching [batch, length] shapes")
+            if torch.any(prompt_tokens[prompt_mask.bool()] == process.mask_index):
+                raise ValueError("fixed prompt cannot contain the absorbing mask")
+            state = process.prior(
+                prompt_tokens.shape, prompt_tokens.device, prompt_tokens, prompt_mask
+            )
+            generated = ~prompt_mask.bool()
+
+            def predict(state, times):
+                points = algo.points(times, corruption_mask=generated)
+                return algo.sampling_prediction((state,), points, times)
+
+        generated_count = state.eq(process.mask_index).sum(-1).clamp_min(1)
         nfe = 0
         per_sample = torch.zeros(len(state), dtype=torch.long, device=state.device)
         accepted = []
         while True:
-            active = state.eq(algo.process.mask_index)
+            active = state.eq(process.mask_index)
             if not active.any():
                 break
             times = active.sum(-1) / generated_count
-            keep, _ = algo.schedule(times)
-            prediction = algo.sampling_prediction(state, keep)
+            prediction = predict(state, times)
             entropy = algo.predictor.entropy(prediction)
             selected = select_prefix(entropy, active, self.bound)
             probabilities = algo.predictor.probabilities(
                 prediction.float(), apply_commitment=True
             )
-            state = algo.process.commit(
+            state = process.commit(
                 state,
                 probabilities,
                 selected,

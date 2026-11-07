@@ -22,6 +22,7 @@ class ComposedSampler:
         synchronize_committed=False,
         require_completion=False,
         precision="float32",
+        transition_prediction="sampling",
     ):
         if int(steps) != steps or steps < 1 or not 0 <= epsilon < 1:
             raise ValueError("positive integer steps and epsilon in [0, 1) required")
@@ -29,6 +30,9 @@ class ComposedSampler:
             raise ValueError("commitment must be none, freeze, or revise")
         if final_prediction is None:
             final_prediction = "greedy" if final_denoise == "greedy" else "sampling"
+        if transition_prediction not in {"sampling", "greedy"}:
+            raise ValueError("transition_prediction must be sampling or greedy")
+        self.transition_prediction = transition_prediction
         if precision not in {"float32", "float64"}:
             raise ValueError("precision must be float32 or float64")
         if final_denoise == "reverse" and commitment != "none":
@@ -126,7 +130,11 @@ class ComposedSampler:
             time, next_time = times[index].expand(batch), times[index + 1].expand(batch)
             source = algo.points(time, corruption_mask=generated)
             destination = algo.points(next_time, corruption_mask=generated)
-            logits = algo.sampling_prediction(states, source, time)
+            logits = (
+                algo.greedy_prediction(states, source, time)
+                if self.transition_prediction == "greedy"
+                else algo.sampling_prediction(states, source, time)
+            )
             probabilities = logits.to(self.precision).exp()
             selected = self.positions(probabilities, active)
             clean = self.tokens(logits, probabilities)

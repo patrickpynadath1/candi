@@ -74,3 +74,32 @@ class AncestralSampler(DiscreteSampler):
         )
         super().__init__(rule, steps, epsilon, time_grid)
         self.final_denoise = final_denoise
+        self.greedy_clean_estimate = bool(greedy_clean_estimate)
+        self._custom = update_rule is not None or time_grid is not None
+
+    def composed(self):
+        """The shared-loop preset that is bit-identical to this sampler."""
+        from .composed import ComposedSampler
+        from .policies import ReverseTransition, TokenSelection
+
+        if self._custom or self.final_denoise == "none":
+            raise ValueError(
+                "view-based algorithms support the default rule and grid with "
+                "final_denoise=greedy or ancestral"
+            )
+        ancestral = self.final_denoise == "ancestral"
+        return ComposedSampler(
+            self.steps,
+            self.epsilon,
+            tokens=TokenSelection("posterior"),
+            transition=ReverseTransition(),
+            final_denoise="reverse" if ancestral else "greedy",
+            final_prediction="sampling" if ancestral else "greedy",
+            precision="float64",
+            transition_prediction="greedy" if self.greedy_clean_estimate else "sampling",
+        )
+
+    def sample(self, algo, prompt_tokens, prompt_mask):
+        if hasattr(algo, "views"):
+            return self.composed().sample(algo, prompt_tokens, prompt_mask)
+        return super().sample(algo, prompt_tokens, prompt_mask)

@@ -180,3 +180,36 @@ def test_mdlm_training_is_identical_on_the_view_path(variant):
         assert (a.grad is None) == (b.grad is None)
         if a.grad is not None:
             assert torch.equal(a.grad, b.grad)
+
+
+MDLM_SAMPLERS = [
+    {"_target_": "core.samplers.ancestral.AncestralSampler", "steps": 8, "final_denoise": "greedy"},
+    {"_target_": "core.samplers.ancestral.AncestralSampler", "steps": 8, "final_denoise": "ancestral"},
+    {
+        "_target_": "core.samplers.ancestral.AncestralSampler",
+        "steps": 8,
+        "final_denoise": "greedy",
+        "greedy_clean_estimate": True,
+    },
+    {"_target_": "core.samplers.entropy_bounded.EntropyBoundedSampler", "entropy_bound": 0.3, "max_steps": 180},
+]
+
+
+@pytest.mark.parametrize("variant", ["default", "adaln_negative_log_keep", "self_conditioning"])
+def test_mdlm_sampling_is_identical_on_the_view_path(variant):
+    cfg = compose("sudoku_hard", {**SMALL, **MDLM_VARIANTS[variant]})
+    torch.manual_seed(0)
+    standalone = instantiate(cfg.algorithm)
+    viewed = mdlm_one_view(standalone)
+    tokens, _ = batch(cfg)
+    prompt = tokens[:3]
+    fixed = torch.zeros_like(prompt, dtype=torch.bool)
+    fixed[:, :20] = True
+    for options in MDLM_SAMPLERS:
+        sampler = instantiate(options)
+        torch.manual_seed(11)
+        expected, expected_info = standalone.generate(sampler, prompt, fixed)
+        torch.manual_seed(11)
+        actual, actual_info = viewed.generate(sampler, prompt, fixed)
+        assert torch.equal(expected, actual), options
+        assert expected_info["nfe_per_sample"] == actual_info["nfe_per_sample"], options
