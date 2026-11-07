@@ -1,12 +1,21 @@
-"""Spherical flow matching training and prediction orchestration."""
+"""Spherical flow matching: unit-sphere embeddings, slerp corruption, CE posterior.
 
-from .posterior import PosteriorDiffusion
-from .adaptive import validate_adaptive_feedback
-from .training_loss import finish_training_loss
+Runs on the view path: one spherical view held by the algorithm, on a ModularDiT
+adopted from the configured SphereDiT (see core/models/legacy.py:adopt). The
+network reads -log(keep) with keep clamped at 1e-12 from the view's point.
+Training and sampling match the former standalone implementation, which
+core/tests/reference_algorithms/spherical_flow_matching.py keeps for comparison.
+"""
+
+from core.models.legacy import adopt
+from core.modifiers.hybrid.one_view import OneViewAlgorithm
+from core.modifiers.hybrid.training import HybridDiffusion
+from core.modifiers.hybrid.views import DiffusionView
 from core.representations.embedding import EmbeddingRepresentation
+from core.samplers.hybrid_updates import SphericalPosteriorUpdate
 
 
-class SphericalFlowMatching(PosteriorDiffusion):
+class SphericalFlowMatching(OneViewAlgorithm, HybridDiffusion):
     def __init__(
         self,
         model,
@@ -19,14 +28,6 @@ class SphericalFlowMatching(PosteriorDiffusion):
         length=180,
         prediction=None,
     ):
-        super().__init__(prediction)
-        self.model, self.predictor, self.process = model, predictor, process
-        self.schedule, self.time_sampler, self.objective = (
-            schedule,
-            time_sampler,
-            objective,
-        )
-        self.representation, self.length = representation, length
         if (
             not isinstance(representation, EmbeddingRepresentation)
             or not representation.spec.unit_normalized
@@ -41,50 +42,24 @@ class SphericalFlowMatching(PosteriorDiffusion):
             raise ValueError("model and representation dimensions must match")
         if getattr(schedule, "output_kind", None) != "keep_rate":
             raise ValueError("spherical schedule must provide keep coordinates")
-        validate_adaptive_feedback(schedule, predictor)
-        self.validate_prediction()
-
-    def model_inputs(self, state, keep):
-        return state, -keep.clamp_min(1e-12).log()
+        view = DiffusionView(process, schedule, representation, SphericalPosteriorUpdate())
+        super().__init__(
+            adopt(model, time_coordinate="negative_log_keep_floor"),
+            predictor,
+            time_sampler,
+            objective,
+            length=length,
+            prediction=prediction,
+            views=[view],
+        )
 
     def prediction_logits(self, logits):
         return logits.float()
 
     def prediction_mean(self, probabilities):
+        # Expected embedding in state space, deliberately not sphere-normalized.
         return self.representation.posterior_mean(probabilities)
 
-    def loss(
-        self,
-        tokens,
-        loss_mask,
-        corruption_mask=None,
-        *,
-        step=0,
-        training=False,
-        time_sampler=None,
-        objective=None,
-        **time_context,
-    ):
-        time_sampler = self.time_sampler if time_sampler is None else time_sampler
-        objective = self.objective if objective is None else objective
-        time = time_sampler.sample(len(tokens), tokens.device, **time_context)
-        keep, _ = self.schedule(time)
-        state = self.process.corrupt(
-            self.representation.encode(tokens),
-            keep,
-            loss_mask if corruption_mask is None else corruption_mask,
-        )
-        prediction = self.training_prediction(state, keep)
-        per_token = objective(prediction, tokens)
-        return finish_training_loss(
-            per_token,
-            loss_mask,
-            tokens=tokens,
-            prediction=prediction,
-            step=step,
-            training=training,
-            time_sampler=time_sampler,
-            sampler_time=time,
-            schedule=self.schedule,
-            schedule_time=time,
-        )
+    def _objective(self, objective, prediction, tokens, time, points, states):
+        # Plain per-token CE: the spherical path has no Gaussian alpha/sigma.
+        return objective(prediction, tokens)
