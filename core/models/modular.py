@@ -109,6 +109,76 @@ class EmbeddedProjectionInput(LinearInput):
         return self.projection(self.precondition(hidden, point))
 
 
+class ViewsInput(nn.Module):
+    """Several corrupted views of one sequence, embedded and fused (hybrid).
+
+    Reproduces HybridModel's wiring: the first view with a token table provides
+    the network's token table; token feedback reads that table when its size
+    matches the vocabulary, else the representation's clean embeddings.
+    """
+
+    state_kind = "views"
+
+    def __init__(self, views, vocab_size, hidden_size, fusion=None):
+        super().__init__()
+        from collections.abc import Mapping
+
+        from core.representations.noisy_inputs import CleanEmbeddingTable
+
+        if isinstance(views, Mapping):
+            views = list(views.values())
+        if not views:
+            raise ValueError("a views input requires at least one view")
+        if any(view.representation is None for view in views):
+            raise ValueError("every view requires a representation")
+        self.views = nn.ModuleList(views)
+        self.fusion = fusion
+        token_view = next(
+            (v for v in views if getattr(v.representation, "embedding", None) is not None),
+            None,
+        )
+        # Index, not a reference: storing the Parameter here would register it twice.
+        self._token_view = None if token_view is None else views.index(token_view)
+        for view in views:
+            bind = getattr(view.representation, "bind_embedding", None)
+            if callable(bind):
+                bind(self.token_table)
+        if self.token_table is None or len(self.token_table) != vocab_size:
+            source = views[0] if token_view is None else token_view
+            self.feedback_table = CleanEmbeddingTable(source.representation, vocab_size)
+        else:
+            self.feedback_table = None
+
+    @property
+    def token_table(self):
+        if self._token_view is None:
+            return None
+        return self.views[self._token_view].representation.embedding
+
+    @property
+    def table(self):
+        return self.token_table if self.feedback_table is None else None
+
+    def feedback(self):
+        return self.token_table if self.feedback_table is None else self.feedback_table()
+
+    def forward(self, states, points):
+        if len(states) != len(self.views) or len(points) != len(self.views):
+            raise ValueError("one state and local point are required per view")
+        embeddings = [
+            view.representation.to_model_embedding(state, point)
+            for view, state, point in zip(self.views, states, points)
+        ]
+        if self.fusion is not None:
+            return self.fusion(states, points, embeddings, self.views)
+        return torch.stack(embeddings).sum(0)
+
+    def clean_embedding(self, probabilities):
+        return torch.stack(
+            [view.representation.clean_embedding(probabilities) for view in self.views]
+        ).sum(0)
+
+
 # Time -----------------------------------------------------------------------
 
 
@@ -120,10 +190,10 @@ def _keep(point):
 TIME_COORDINATES = {
     "time": lambda time, point, epsilon: time.float(),
     "zero": lambda time, point, epsilon: torch.zeros_like(time.float()),
-    # -log(keep) for keep-rate schedules (MDLM / uniform with time conditioning).
-    "negative_log_keep": lambda time, point, epsilon: -_keep(point).clamp_min(
-        torch.finfo(_keep(point).dtype).tiny
-    ).log(),
+    # -log(keep) for keep-rate schedules, as HybridModel computes it.
+    "negative_log_keep": lambda time, point, epsilon: -torch.log(
+        _keep(point).float().clamp_min(1e-6)
+    ),
     # HybridModel's log(1 - t).
     "log1p_negative_time": lambda time, point, epsilon: torch.log1p(
         -time.float().clamp(max=1 - 1e-6)
@@ -162,6 +232,12 @@ class TimeConditioning(nn.Module):
             return None
         coordinate = TIME_COORDINATES[self.coordinate](time, point, self.epsilon)
         return F.silu(self.embedder(coordinate))
+
+    def clean_condition(self, batch, device):
+        """Condition for an already-clean stream: the embedder at raw zero."""
+        if not self.adaLN:
+            return None
+        return F.silu(self.embedder(torch.zeros(batch, device=device)))
 
     def add_to_input(self, hidden, condition):
         if self.input_projection is None:
@@ -261,8 +337,10 @@ class ModularDiT(TextDiT):
         mlp_hidden_size=None,
         block_execution=None,
         autocast_cache=True,
+        output_vocab_size=None,
     ):
         super().__init__(autocast_cache=autocast_cache)
+        self.output_vocab_size = output_vocab_size
         if hidden_size % n_heads or (hidden_size // n_heads) % 2:
             raise ValueError("hidden_size must give an even integral head dimension")
         dims = dict(vocab_size=vocab_size, hidden_size=hidden_size, cond_dim=cond_dim, state_dim=state_dim)
@@ -298,19 +376,45 @@ class ModularDiT(TextDiT):
     def adaLN(self):
         return self.time.adaLN
 
-    def prepare(self, states, points, global_time, *, self_condition=None):
-        if len(states) != 1 or len(points) != 1:
-            raise ValueError("this input slot drives exactly one view")
-        state, point = states[0], points[0]
-        with torch.autocast(state.device.type, enabled=False):
-            hidden = self.input(state, point)
-            if self.self_conditioning is not None:
+    @property
+    def views(self):
+        return getattr(self.input, "views", None)
+
+    @property
+    def supports_fused_streams(self):
+        return self.views is not None
+
+    @property
+    def output_width(self):
+        """Logit width after any output-vocabulary slicing."""
+        layer = getattr(self.output, "layer", None)
+        width = layer.linear.out_features if layer is not None else len(self.output.embedding)
+        return self.output_vocab_size or width
+
+    def prepare(self, states, points, global_time, *, self_condition=None, apply_conditioning=True):
+        """Noisy inputs -> (hidden, AdaLN condition), outside autocast."""
+        with torch.autocast(states[0].device.type, enabled=False):
+            if self.views is not None:
+                hidden = self.input(states, points)
+            elif len(states) != 1 or len(points) != 1:
+                raise ValueError("this input slot drives exactly one view")
+            else:
+                hidden = self.input(states[0], points[0])
+            if self.self_conditioning is not None and apply_conditioning:
                 hidden = self.self_conditioning(hidden, self_condition)
             elif self_condition is not None:
                 raise ValueError("model does not enable self-conditioning")
-            condition = self.time(global_time, point)
+            condition = self.time(global_time, points[0])
             hidden = self.time.add_to_input(hidden, condition)
         return hidden, condition
+
+    def clean_embedding(self, probabilities):
+        return self.input.clean_embedding(probabilities)
+
+    def clean_hidden(self, probabilities):
+        """Inputs for an already-clean stream (block diffusion's prefix)."""
+        hidden = self.clean_embedding(probabilities)
+        return hidden, self.time.clean_condition(len(hidden), hidden.device)
 
     def forward(
         self,
@@ -335,9 +439,12 @@ class ModularDiT(TextDiT):
         )
 
     def project_hidden(self, hidden, condition):
-        return self.output(hidden, condition)
+        logits = self.output(hidden, condition)
+        return logits if self.output_vocab_size is None else logits[..., : self.output_vocab_size]
 
     def feedback_embedding_table(self):
         if hasattr(self, "feedback_table_adapter"):
             return self.feedback_table_adapter()
+        if self.views is not None:
+            return self.input.feedback()
         return getattr(self.input, "table", None)

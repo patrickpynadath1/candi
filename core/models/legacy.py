@@ -18,7 +18,13 @@ LEGACY_TARGETS = {
     "core.models.spherical.SphereDiT": "sphere",
     "core.models.continuous_dit.ContinuousDiT": "continuous",
 }
+HYBRID = "core.modifiers.hybrid.model.HybridModel"
 MODULAR = "core.models.modular"
+HYBRID_TIME = {
+    "identity": "time",
+    "negative_log_keep": "negative_log_keep",
+    "log_one_minus_time": "log1p_negative_time",
+}
 
 
 def _slot(name, **options):
@@ -29,9 +35,55 @@ def _common(config, keys=("vocab_size", "hidden_size", "cond_dim", "n_blocks", "
     return {k: config[k] for k in keys if k in config}
 
 
+def hybrid_modular_config(config):
+    """ModularDiT config for a legacy HybridModel (a DiT backbone over views)."""
+    config = dict(config)
+    backbone = dict(config["backbone"])
+    if LEGACY_TARGETS.get(backbone.get("_target_")) != "dit":
+        raise ValueError("only DiT-backed HybridModel configs are converted")
+    if backbone.get("self_conditioning"):
+        raise ValueError("a hybrid backbone's own self-conditioning is unused; remove it")
+    result = modular_config({**backbone, "self_conditioning": False})
+    result["input"] = _slot("ViewsInput", views=config["views"], fusion=config.get("fusion"))
+    result["time"]["coordinate"] = HYBRID_TIME[config.get("time_conditioning", "identity")]
+    result["output_vocab_size"] = config.get("output_vocab_size")
+    if config.get("self_conditioning", False):
+        result["self_conditioning"] = _slot(
+            "SelfConditioning",
+            source=config.get("self_conditioning_source", "posterior_mean"),
+            initialization=config.get("conditioning_initialization", "zero"),
+        )
+    return result
+
+
+def convert_hybrid_state_dict(state_dict, prefix=""):
+    """Rename a legacy HybridModel state dict (under ``prefix``) for ModularDiT."""
+    converted = {}
+    backbone = prefix + "backbone."
+    for key, value in state_dict.items():
+        if not key.startswith(prefix):
+            converted[key] = value
+            continue
+        rest = key[len(prefix):]
+        if rest.startswith("backbone.vocab_embed."):
+            continue  # The same tensor as the token view's table.
+        if rest.startswith("backbone.feedback_table_adapter."):
+            rest = "input.feedback_table." + rest[len("backbone.feedback_table_adapter."):]
+        elif rest.startswith("backbone."):
+            rest = next(iter(convert_state_dict({key: None}, "core.models.dit.DiT", backbone)))[len(backbone):]
+        elif rest.startswith("views."):
+            rest = "input." + rest
+        elif rest.startswith("conditioning_adapter."):
+            rest = "self_conditioning.adapter." + rest[len("conditioning_adapter."):]
+        converted[prefix + rest] = value
+    return converted
+
+
 def modular_config(config):
     """ModularDiT config equivalent to a legacy network config (a plain dict)."""
     config = dict(config)
+    if config.get("_target_") == HYBRID:
+        return hybrid_modular_config(config)
     kind = LEGACY_TARGETS.get(config.pop("_target_", None))
     if kind is None:
         raise ValueError("not a legacy DiT/SimplexDiT/SphereDiT/ContinuousDiT config")

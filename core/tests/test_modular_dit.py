@@ -1,6 +1,7 @@
 """The legacy network classes are presets of ModularDiT, bit for bit."""
 
 from hydra.utils import instantiate
+from omegaconf import OmegaConf
 import pytest
 import torch
 
@@ -96,3 +97,77 @@ def test_legacy_network_is_a_modular_preset(name):
         actual = loaded(*modular_args, self_condition=feedback, return_features=True)
     assert torch.equal(expected.logits, actual.logits)
     assert torch.equal(expected.hidden, actual.hidden)
+
+
+def hybrid_presets():
+    from pathlib import Path
+
+    from core.sweeps import compose
+
+    names = []
+    for path in sorted(Path("configs/experiment").glob("*.yaml")):
+        config = compose(path.stem)
+        if OmegaConf.select(config, "model._target_") == "core.modifiers.hybrid.model.HybridModel":
+            names.append(path.stem)
+    return names
+
+
+HYBRID_SMALL = {
+    "model.backbone.hidden_size": 32,
+    "model.backbone.cond_dim": 16,
+    "model.backbone.n_blocks": 1,
+    "model.backbone.n_heads": 2,
+    "model.backbone.dropout": 0,
+}
+
+
+@pytest.mark.parametrize("self_conditioning", [False, True])
+@pytest.mark.parametrize("experiment", hybrid_presets())
+def test_legacy_hybrid_model_is_a_modular_preset(experiment, self_conditioning):
+    from core.models.legacy import convert_hybrid_state_dict
+    from core.sweeps import compose
+
+    small = dict(HYBRID_SMALL)
+    if experiment == "candi_hybrid":
+        # Its token view hard-codes hidden_size 512 instead of interpolating.
+        small.update({"model.backbone.hidden_size": 512, "model.backbone.n_heads": 8})
+    cfg = compose(experiment, {**small, "self_conditioning.enabled": self_conditioning})
+    torch.manual_seed(0)
+    algorithm = instantiate(cfg.algorithm)
+    legacy = algorithm.model
+    model_config = OmegaConf.to_container(cfg.model, resolve=True)
+    torch.manual_seed(99)
+    modular = instantiate(modular_config(model_config))
+    modular.load_state_dict(convert_hybrid_state_dict(legacy.state_dict()), strict=True)
+    legacy.eval()
+    modular.eval()
+    torch.manual_seed(3)
+    tokens = torch.randint(0, cfg.task.vocab_size, (2, 6))
+    mask = torch.ones_like(tokens, dtype=torch.bool)
+    mask[:, 0] = False
+    time = torch.tensor([0.3, 0.8])
+    points = algorithm.points(time, training=True, corruption_mask=mask)
+    states = tuple(
+        view.process.corrupt_state(view.representation.encode(tokens), point.coefficients, mask)
+        for view, point in zip(algorithm.views, points)
+    )
+    hidden_size = cfg.model.backbone.hidden_size
+    feedback = torch.randn(2, 6, hidden_size) if self_conditioning else None
+    with torch.no_grad():
+        expected = legacy(states, points, time, self_condition=feedback, return_features=True)
+        actual = modular(states, points, time, self_condition=feedback, return_features=True)
+        assert torch.equal(expected.logits, actual.logits)
+        assert torch.equal(expected.hidden, actual.hidden)
+        width = modular.output_width
+        probabilities = torch.rand(2, 6, width).softmax(-1)
+        assert torch.equal(legacy.clean_embedding(probabilities), modular.clean_embedding(probabilities))
+        old_hidden, old_condition = legacy.clean_state_hidden(probabilities)
+        new_hidden, new_condition = modular.clean_hidden(probabilities)
+        assert torch.equal(old_hidden, new_hidden)
+        assert (old_condition is None) == (new_condition is None)
+        if old_condition is not None:
+            assert torch.equal(old_condition, new_condition)
+        old_table, new_table = legacy.feedback_embedding_table(), modular.feedback_embedding_table()
+        assert (old_table is None) == (new_table is None)
+        if old_table is not None:
+            assert torch.equal(old_table, new_table)
