@@ -9,13 +9,14 @@ which core/tests/reference_algorithms/mdlm.py keeps for comparison.
 import torch
 
 from core.models.legacy import adopt
+from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.modifiers.hybrid.views import DiffusionView
 from core.representations.noisy_inputs import TokenRepresentation
 from core.samplers.hybrid_updates import DiscretePosteriorUpdate
 
 
-class MDLM(HybridDiffusion):
+class MDLM(OneViewAlgorithm, HybridDiffusion):
     def __init__(
         self,
         model,
@@ -43,19 +44,3 @@ class MDLM(HybridDiffusion):
             network, predictor, time_sampler, objective, length=length, prediction=prediction
         )
         self.time_conditioning = time_conditioning
-
-    @property
-    def process(self):
-        return self.views[0].process
-
-    @property
-    def schedule(self):
-        return self.views[0].schedule
-
-    def __setattr__(self, name, value):
-        # nn.Module routes module values before property setters; send the
-        # view's components to the view.
-        if name in ("process", "schedule") and "model" in self._modules:
-            setattr(self.views[0], name, value)
-        else:
-            super().__setattr__(name, value)

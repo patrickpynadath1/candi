@@ -5,7 +5,7 @@ training, sampling and checkpoints are bit-identical to the former standalone
 implementation, which core/tests/reference_algorithms keeps for comparison.
 """
 
-from core.modifiers.hybrid.one_view import one_view_model
+from core.modifiers.hybrid.one_view import OneViewAlgorithm, one_view_model
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.objectives.cross_entropy import CrossEntropy
 from core.parameterizations.posterior import PosteriorParameterization
@@ -13,7 +13,7 @@ from core.parameterizations.constraints import UnconstrainedPosterior
 from core.processes.uniform_posterior import PosteriorUniformProcess
 
 
-class PosteriorUniformDiffusion(HybridDiffusion):
+class PosteriorUniformDiffusion(OneViewAlgorithm, HybridDiffusion):
     def __init__(
         self,
         model,
@@ -57,19 +57,3 @@ class PosteriorUniformDiffusion(HybridDiffusion):
             length=length,
             prediction=prediction,
         )
-
-    @property
-    def process(self):
-        return self.views[0].process
-
-    @property
-    def schedule(self):
-        return self.views[0].schedule
-
-    def __setattr__(self, name, value):
-        # nn.Module routes module values before property setters; send the
-        # view's components to the view.
-        if name in ("process", "schedule") and "model" in self._modules:
-            setattr(self.views[0], name, value)
-        else:
-            super().__setattr__(name, value)
