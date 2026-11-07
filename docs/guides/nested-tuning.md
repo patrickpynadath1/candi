@@ -89,6 +89,42 @@ integer distributions (`type: int`, inclusive `low`/`high`, optional `step` or
 `log`). Add sampler policies to `inference` to compare multiple samplers. All
 policies use the same validation metric and examples. Each has its own budget.
 
+### Search algorithm
+
+Each study (`training` and every `inference` policy) takes an optional `search`
+block naming an Optuna sampler; options go to its constructor unchanged:
+
+```python
+"search": {"algorithm": "tpe"}                                   # default
+"search": {"algorithm": "tpe", "n_startup_trials": 4, "constant_liar": True}
+"search": {"algorithm": "random"}
+"search": {"algorithm": "qmc", "scramble": True}                 # quasi-random
+```
+
+The default is Optuna's `TPESampler` with its default options, which is what
+every existing protocol used. With 16 trials, TPE spends its first 10
+(`n_startup_trials`) on random proposals after any `initial_points`, and with
+`--concurrency` above 1 its guided proposals ignore still-running trials unless
+`constant_liar` is set. The study's `seed` (default 42) seeds the sampler; a
+resumed TPE or random study is reseeded by its trial count so it never repeats a
+proposal, while QMC keeps its seed because it indexes a fixed sequence by trial
+number. The `search` block is part of the protocol: changing it needs a new case.
+
+### Failed candidates
+
+`on_failure` (per study, default `skip`) decides what a failed candidate does,
+for example a worker exception, a non-finite score or a sampler exceeding its
+NFE budget. With `skip`, the failure is logged, appended to the study's
+`skipped.jsonl` and listed under `skipped_trials` in its `selected.json`, and the
+search continues. A skipped candidate counts against the trial budget and is not
+retried on resume; pass `--retry-skipped` to retry skipped candidates once more
+after fixing a transient cause. A policy whose every trial failed is left out of
+sampler selection; a training candidate whose every policy failed is itself
+skipped, and a case with no successful candidate stops with an error. With
+`stop`, the first failure stops the case after running work finishes (an
+enclosing training study never skips it) and a rerun retries it. Each failed
+candidate keeps its traceback in `failure.json`.
+
 ```bash
 uv run --locked --extra tuning --extra scoring --extra tracking \
   python -m core.sweeps.nested_tuning nested-manifest.json \
@@ -129,8 +165,11 @@ candidates save `trained.json`, the training checkpoint/config, and an unwrapped
 `selected.json` and `final/result.json`, including the chosen configuration.
 
 Rerunning the same manifest resumes interrupted candidates and reuses completed
-training/evaluation stages. A failed validation trial stops selection until it is
-successfully retried. Changing a protocol or source config requires a new case
+training/evaluation stages. Failed candidates follow `on_failure` (above). Every
+worker start appends a line (time, host, PID, GPUs, source, Ray task) to
+`attempts.jsonl` in its output directory, and its result records the attempt
+count, so Ray retries after a worker crash and driver-level resumes are
+visible. Changing a protocol or source config requires a new case
 name. The resume check ignores execution metadata (`resources`, including Ray
 queue labels, and `wandb`), so a case can move queues without renaming; it still
 covers the evaluation partitions, budgets, search spaces and pinned config.

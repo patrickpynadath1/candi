@@ -89,6 +89,7 @@ def suggest(trial, space):
 
 
 def validate_inference(spec):
+    validate_search(spec)
     tune_ids, test_ids = spec["tuning_indices"], spec["test_indices"]
     same_dataset = spec.get("test_dataset", "validation") == spec.get(
         "dataset", "validation"
@@ -133,6 +134,7 @@ def validate(spec):
     for policy in spec["inference"]:
         validate_inference({**evaluation, **policy})
     training = spec["training"]
+    validate_search(training)
     if training["trials"] < 1:
         raise ValueError("Training trial budget must be positive")
     for key in training["space"]:
@@ -158,37 +160,118 @@ def validate(spec):
         raise ValueError("Workers require positive CPUs and zero or one whole GPU")
 
 
-def search(directory, settings, direction, objective, concurrency):
-    """The same validation-only loop for training and inference candidates."""
+# Optuna samplers a study may use. The default reproduces the TPE search used by
+# existing protocols; options are passed to the Optuna constructor unchanged.
+SEARCH_ALGORITHMS = {
+    "tpe": "TPESampler",
+    "random": "RandomSampler",
+    "qmc": "QMCSampler",
+}
+FAILURE_POLICIES = ("skip", "stop")
+
+
+class StopSearch(RuntimeError):
+    """A failure under on_failure=stop; an enclosing search never skips it."""
+
+
+def make_sampler(settings, completed_trials=0):
+    """Build a study's Optuna sampler from its ``search`` block.
+
+    ``search: {algorithm: tpe|random|qmc, ...options}``; the seed comes from the
+    study's ``seed`` (default 42). A resumed TPE or random study is reseeded by
+    its trial count so it never replays proposals it already made. QMC indexes a
+    fixed low-discrepancy sequence by trial number, so its seed stays fixed.
+    """
+    import optuna
+
+    search = dict(settings.get("search") or {"algorithm": "tpe"})
+    algorithm = search.pop("algorithm", "tpe")
+    if algorithm not in SEARCH_ALGORITHMS:
+        raise ValueError(
+            f"Unknown search algorithm {algorithm!r}; use one of {sorted(SEARCH_ALGORITHMS)}"
+        )
+    if "seed" in search:
+        raise ValueError("Set the study seed with `seed`, not inside `search`")
+    seed = settings.get("seed", 42)
+    if algorithm != "qmc":
+        seed += completed_trials
+    return getattr(optuna.samplers, SEARCH_ALGORITHMS[algorithm])(seed=seed, **search)
+
+
+def validate_search(settings):
+    if settings.get("on_failure", "skip") not in FAILURE_POLICIES:
+        raise ValueError(f"on_failure must be one of {FAILURE_POLICIES}")
+    try:
+        import optuna  # noqa: F401
+    except ImportError:  # Validation without the tuning extra checks names only.
+        algorithm = (settings.get("search") or {}).get("algorithm", "tpe")
+        if algorithm not in SEARCH_ALGORITHMS:
+            raise ValueError(f"Unknown search algorithm {algorithm!r}")
+        return
+    try:
+        make_sampler(settings)
+    except TypeError as error:
+        raise ValueError(f"Invalid search options: {error}") from error
+
+
+def search(directory, settings, direction, objective, concurrency, retry_skipped=False):
+    """The same validation-only loop for training and inference candidates.
+
+    With ``on_failure: skip`` (the default) a failed candidate is recorded in
+    ``skipped.jsonl`` and ``selected.json`` and the search continues; it still
+    counts against the trial budget and is not retried on resume. With
+    ``on_failure: stop`` the first failure stops the search after running work
+    finishes, and a rerun retries it. ``retry_skipped`` retries skipped
+    candidates once more on this run. Returns None when every trial failed.
+    """
     import optuna
 
     directory = Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=True)
+    skip = settings.get("on_failure", "skip") == "skip"
+    log = logging.getLogger(__name__)
     study = optuna.create_study(
         storage=f"sqlite:///{directory / 'optuna.sqlite'}",
         study_name="search",
         direction=direction,
         load_if_exists=True,
-        sampler=optuna.samplers.TPESampler(seed=settings.get("seed", 42)),
+        sampler=make_sampler(settings),
     )
     if study.trials:
-        # A resumed study must not replay the seeded proposals it already made;
-        # the candidate cache would silently count a repeat as a new trial.
-        study.sampler = optuna.samplers.TPESampler(
-            seed=settings.get("seed", 42) + len(study.trials)
-        )
+        study.sampler = make_sampler(settings, len(study.trials))
     completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+
+    def still_skipped(trials):
+        # A skipped candidate later retried successfully is no longer skipped.
+        return [
+            t
+            for t in trials
+            if t.user_attrs.get("skipped")
+            and not any(c.params == t.params for c in completed)
+        ]
+
+    skipped = [] if retry_skipped else still_skipped(study.trials)
     if not study.trials:
         for point in settings.get("initial_points", []):
             study.enqueue_trial(point)
 
+    def record_skip(number, parameters, error, output):
+        entry = {
+            "trial": number,
+            "parameters": parameters,
+            "error": f"{type(error).__name__}: {error}",
+            "failure": str(output / "failure.json"),
+        }
+        with (directory / "skipped.jsonl").open("a") as handle:
+            handle.write(json.dumps(entry, sort_keys=True) + "\n")
+        log.warning("Skipped failed candidate %s in %s: %s", number, directory, entry["error"])
+        return entry
+
     def candidate(trial, parameters):
         # Retry a completed stage without repeating training or generation.
-        key = hashlib.sha256(
-            json.dumps(parameters, sort_keys=True).encode()
-        ).hexdigest()[:20]
-        output = directory / "candidates" / key
+        output = candidate_directory(parameters)
         result_path = output / "result.json"
+        trial.set_user_attr("candidate", str(output))
         with lock(output / ".candidate.lock"):
             if result_path.exists():
                 result = json.loads(result_path.read_text())
@@ -213,21 +296,43 @@ def search(directory, settings, direction, objective, concurrency):
         trial.set_user_attr("result_path", str(result_path))
         return result["score"]
 
-    # Finish interrupted candidates before proposing new training configurations.
+    def candidate_directory(parameters):
+        key = hashlib.sha256(
+            json.dumps(parameters, sort_keys=True).encode()
+        ).hexdigest()[:20]
+        return directory / "candidates" / key
+
+    # Finish interrupted candidates before proposing new configurations. Trials
+    # skipped under on_failure=skip stay skipped.
     for old in study.trials:
         if old.state == optuna.trial.TrialState.RUNNING:
             study.tell(old.number, state=optuna.trial.TrialState.FAIL)
         if old.state not in (
             optuna.trial.TrialState.RUNNING,
             optuna.trial.TrialState.FAIL,
-        ):
+        ) or (old.user_attrs.get("skipped") and not retry_skipped):
             continue
         if set(old.params) != set(settings["space"]) or any(
-            t.params == old.params for t in completed
+            t.params == old.params for t in completed + skipped
         ):
             continue
         retry = optuna.trial.FixedTrial(old.params)
-        score = candidate(retry, suggest(retry, settings["space"]))
+        parameters = suggest(retry, settings["space"])
+        try:
+            score = candidate(retry, parameters)
+        except Exception as error:
+            if not skip or isinstance(error, StopSearch):
+                raise
+            entry = record_skip(old.number, parameters, error, candidate_directory(parameters))
+            marker = optuna.trial.create_trial(
+                params=old.params,
+                distributions=old.distributions,
+                state=optuna.trial.TrialState.FAIL,
+                user_attrs={"skipped": True, "error": entry["error"]},
+            )
+            study.add_trial(marker)
+            skipped.append(marker)
+            continue
         recovered = optuna.trial.create_trial(
             params=old.params,
             distributions=old.distributions,
@@ -237,7 +342,7 @@ def search(directory, settings, direction, objective, concurrency):
         study.add_trial(recovered)
         completed.append(recovered)
 
-    remaining = settings["trials"] - len(completed)
+    remaining = settings["trials"] - len(completed) - len(skipped)
     # SQLite cannot safely claim queued trials from multiple optimizer threads.
     # The driver owns trial allocation and completion; only evaluations run in parallel.
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
@@ -247,30 +352,49 @@ def search(directory, settings, direction, objective, concurrency):
             while failure is None and remaining > 0 and len(pending) < concurrency:
                 trial = study.ask()
                 parameters = suggest(trial, settings["space"])
-                pending[pool.submit(candidate, trial, parameters)] = trial
+                pending[pool.submit(candidate, trial, parameters)] = (trial, parameters)
                 remaining -= 1
             if not pending:
                 break
             done, _ = wait(pending, return_when=FIRST_COMPLETED)
             for future in done:
-                trial = pending.pop(future)
+                trial, parameters = pending.pop(future)
                 try:
                     score = future.result()
                 except Exception as exc:
-                    logging.getLogger(__name__).exception(
-                        "Search candidate failed in %s", directory
-                    )
+                    if skip and not isinstance(exc, StopSearch):
+                        entry = record_skip(
+                            trial.number, parameters, exc, candidate_directory(parameters)
+                        )
+                        trial.set_user_attr("skipped", True)
+                        trial.set_user_attr("error", entry["error"])
+                    else:
+                        log.exception("Search candidate failed in %s", directory)
+                        failure = failure or exc
                     study.tell(trial, state=optuna.trial.TrialState.FAIL)
-                    failure = failure or exc
                 else:
                     study.tell(trial, score)
             # Save results from already-running evaluations before surfacing an error.
             if failure is not None and not pending:
-                raise failure
+                if isinstance(failure, StopSearch):
+                    raise failure
+                raise StopSearch(f"{type(failure).__name__}: {failure}") from failure
+    completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+    skipped = [
+        {"trial": t.number, "parameters": t.params, "error": t.user_attrs.get("error")}
+        for t in still_skipped(study.trials)
+    ]
+    if not any(t.state == optuna.trial.TrialState.COMPLETE for t in study.trials):
+        if skip:
+            log.warning("Every candidate failed in %s; see skipped.jsonl", directory)
+            save(directory / "selected.json", {"selected": None, "skipped_trials": skipped})
+            return None
+        raise StopSearch(f"No completed candidates in {directory}")
     best = study.best_trial
     result = json.loads(Path(best.user_attrs["result_path"]).read_text())
-    save(directory / "selected.json", {**result, "parameters": best.params})
-    return {**result, "parameters": best.params}
+    selected = {**result, "parameters": best.params, "skipped_trials": skipped}
+    save(directory / "selected.json", selected)
+    return selected
 
 
 class ValidationTask:
@@ -437,29 +561,65 @@ def _evaluate_worker(payload, output):
     return {"score": sum(scores) / len(scores), "seed_scores": scores}
 
 
+def record_attempt(output):
+    """Append this worker start to attempts.jsonl and return its number.
+
+    Ray retries a task whose worker dies (e.g. an OOM kill), and a resumed
+    driver re-runs unfinished stages; both appear here as extra attempts.
+    """
+    import datetime
+    import socket
+
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "started": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "host": socket.gethostname(),
+        "pid": os.getpid(),
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+        "source": os.environ.get("CANDI_SOURCE_ID"),
+    }
+    try:
+        import ray
+
+        if ray.is_initialized():
+            entry["ray_task_id"] = ray.get_runtime_context().get_task_id()
+    except Exception:  # Attempt logging must never fail the worker.
+        pass
+    path = output / "attempts.jsonl"
+    with path.open("a") as handle:
+        handle.write(json.dumps(entry, sort_keys=True) + "\n")
+    return sum(1 for _ in path.open())
+
+
+def _run_worker(stage, payload, output):
+    attempt = record_attempt(output)
+    worker = _train_worker if stage == "train" else _evaluate_worker
+    return {**worker(payload, output), "attempts": attempt}
+
+
 def execute(stage, payload, output):
     import ray
 
-    worker = _train_worker if stage == "train" else _evaluate_worker
     resources = payload["resources"]
     remote = ray.remote(
         num_cpus=resources.get("cpu", 4),
         num_gpus=resources.get("gpu", 1),
         max_calls=1,
         label_selector=resources.get("label_selector"),
-    )(worker)
-    return ray.get(remote.remote(payload, str(output)))
+    )(_run_worker)
+    return ray.get(remote.remote(stage, payload, str(output)))
 
 
-def run_case(spec, root, concurrency=4):
+def run_case(spec, root, concurrency=4, retry_skipped=False):
     if concurrency < 1:
         raise ValueError("Concurrency must be positive")
     path = Path(root).resolve() / spec["name"] / ".driver.lock"
     with lock(path, blocking=False):
-        return _run_case(spec, root, concurrency)
+        return _run_case(spec, root, concurrency, retry_skipped)
 
 
-def _run_case(spec, root, concurrency):
+def _run_case(spec, root, concurrency, retry_skipped=False):
     validate(spec)
     spec = copy.deepcopy(spec)
     root = Path(root).resolve() / spec["name"]
@@ -519,7 +679,14 @@ def _run_case(spec, root, concurrency):
                     direction,
                     objective,
                     concurrency,
+                    retry_skipped,
                 )
+            )
+        # A policy whose every trial failed (and was skipped) has no candidate.
+        choices = [choice for choice in choices if choice is not None]
+        if not choices:
+            raise RuntimeError(
+                f"Every inference policy failed for {checkpoint['checkpoint']}"
             )
         choose = max if direction == "maximize" else min
         return choose(choices, key=lambda r: r["score"])
@@ -545,7 +712,13 @@ def _run_case(spec, root, concurrency):
         result = inference(checkpoint, output / "inference")
         return {**result, "training_parameters": parameters}
 
-    winner = search(root / "training", spec["training"], direction, train_candidate, 1)
+    winner = search(
+        root / "training", spec["training"], direction, train_candidate, 1, retry_skipped
+    )
+    if winner is None:
+        raise RuntimeError(
+            f"Every training candidate failed for {spec['name']}; see skipped.jsonl files"
+        )
     save(root / "selected.json", winner)
     # No final evaluation occurs until both levels and sampler selection finish.
     final_path = root / "final/result.json"
@@ -595,6 +768,11 @@ def main():
         default=1,
         help="Independent experiment cases to execute concurrently",
     )
+    parser.add_argument(
+        "--retry-skipped",
+        action="store_true",
+        help="Retry candidates skipped after a failure (on_failure=skip) once more",
+    )
     args = parser.parse_args()
     if args.concurrency < 1 or args.case_concurrency < 1:
         parser.error("Concurrency must be positive")
@@ -606,7 +784,9 @@ def main():
     ray.init(address=args.address, **options)
     with ThreadPoolExecutor(max_workers=args.case_concurrency) as pool:
         futures = [
-            pool.submit(run_case, spec, args.output, args.concurrency)
+            pool.submit(
+                run_case, spec, args.output, args.concurrency, args.retry_skipped
+            )
             for spec in json.loads(args.manifest.read_text())
         ]
         for future in futures:

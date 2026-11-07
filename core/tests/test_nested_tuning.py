@@ -101,6 +101,7 @@ def test_failed_inner_search_does_not_touch_test_or_retrain_on_resume(
 ):
     settings = spec(tmp_path)
     settings["training"]["trials"] = 1
+    settings["inference"][0]["on_failure"] = "stop"
     calls = []
     fail = True
 
@@ -348,8 +349,8 @@ def test_execute_routes_train_and_evaluation_to_requested_labels(monkeypatch, tm
 
     def remote(**options):
         def decorate(worker):
-            def submit(payload, output):
-                calls.append((worker, options, payload, output))
+            def submit(stage, payload, output):
+                calls.append((worker, options, stage, payload, output))
                 return "completed"
 
             return SimpleNamespace(remote=submit)
@@ -362,12 +363,9 @@ def test_execute_routes_train_and_evaluation_to_requested_labels(monkeypatch, tm
     payload = {
         "resources": {"cpu": 2, "gpu": 1, "label_selector": {"queue": "geometry"}}
     }
-    for stage, worker in [
-        ("train", tuning._train_worker),
-        ("evaluate", tuning._evaluate_worker),
-    ]:
+    for stage in ["train", "evaluate"]:
         assert tuning.execute(stage, payload, tmp_path) == "completed"
-        assert calls[-1][0] is worker
+        assert calls[-1][0] is tuning._run_worker and calls[-1][2] == stage
         assert calls[-1][1]["label_selector"] == {"queue": "geometry"}
         assert calls[-1][1]["num_gpus"] == 1
 
@@ -503,3 +501,123 @@ def test_moving_queues_resumes_but_selection_changes_do_not(tmp_path, monkeypatc
     settings["inference"][0]["trials"] = 3
     with pytest.raises(ValueError, match="Protocol changed"):
         tuning.run_case(settings, tmp_path / "runs", concurrency=1)
+
+
+def test_failed_candidates_are_skipped_logged_and_not_retried(tmp_path):
+    settings = {
+        "trials": 4,
+        "space": {"x": [0, 1, 2, 3]},
+        "initial_points": [{"x": 0}, {"x": 1}, {"x": 2}, {"x": 3}],
+    }
+    calls = []
+
+    def objective(parameters, output):
+        calls.append(parameters["x"])
+        if parameters["x"] == 1:
+            raise ValueError("Sampler exceeded NFE budget")
+        return {"score": float(parameters["x"])}
+
+    selected = tuning.search(tmp_path, settings, "maximize", objective, 1)
+    assert selected["parameters"] == {"x": 3}
+    assert selected["skipped_trials"][0]["parameters"] == {"x": 1}
+    assert "exceeded NFE budget" in selected["skipped_trials"][0]["error"]
+    lines = (tmp_path / "skipped.jsonl").read_text().splitlines()
+    assert len(lines) == 1 and json.loads(lines[0])["parameters"] == {"x": 1}
+    assert json.loads((tmp_path / "selected.json").read_text())["skipped_trials"]
+    # Resuming neither retries the skipped candidate nor spends more budget.
+    tuning.search(tmp_path, settings, "maximize", objective, 1)
+    assert sorted(calls) == [0, 1, 2, 3]
+
+
+def test_every_candidate_failing_is_reported_not_selected(tmp_path):
+    settings = {"trials": 2, "space": {"x": [0, 1]}}
+
+    def objective(parameters, output):
+        raise RuntimeError("worker died")
+
+    assert tuning.search(tmp_path / "skip", settings, "maximize", objective, 1) is None
+    assert json.loads((tmp_path / "skip/selected.json").read_text())["selected"] is None
+    with pytest.raises(RuntimeError, match="worker died"):
+        tuning.search(
+            tmp_path / "stop", {**settings, "on_failure": "stop"}, "maximize", objective, 1
+        )
+
+
+@pytest.mark.parametrize(
+    "search", [None, {"algorithm": "random"}, {"algorithm": "qmc", "scramble": True}]
+)
+def test_search_algorithm_is_configurable(tmp_path, search):
+    settings = {
+        "trials": 5,
+        "seed": 7,
+        "space": {"x": {"type": "float", "low": 0.0, "high": 1.0}},
+        **({"search": search} if search else {}),
+    }
+    tuning.validate_search(settings)
+    seen = []
+
+    def objective(parameters, output):
+        seen.append(parameters["x"])
+        return {"score": parameters["x"]}
+
+    tuning.search(tmp_path, settings, "maximize", objective, 1)
+    assert len(seen) == 5 and len(set(seen)) == 5
+    expected = {None: "TPESampler", "random": "RandomSampler", "qmc": "QMCSampler"}
+    name = expected[(search or {}).get("algorithm")]
+    assert type(tuning.make_sampler(settings)).__name__ == name
+
+
+@pytest.mark.parametrize(
+    "settings, message",
+    [
+        ({"search": {"algorithm": "grid"}}, "Unknown search algorithm"),
+        ({"search": {"algorithm": "tpe", "seed": 1}}, "study seed"),
+        ({"search": {"algorithm": "tpe", "not_an_option": 1}}, "Invalid search options"),
+        ({"on_failure": "retry"}, "on_failure"),
+    ],
+)
+def test_invalid_search_settings_are_rejected(settings, message):
+    with pytest.raises(ValueError, match=message):
+        tuning.validate_search(settings)
+
+
+def test_worker_attempts_are_recorded(tmp_path, monkeypatch):
+    monkeypatch.setattr(tuning, "_evaluate_worker", lambda payload, output: {"score": 1.0})
+    assert tuning._run_worker("evaluate", {}, tmp_path)["attempts"] == 1
+    assert tuning._run_worker("evaluate", {}, tmp_path)["attempts"] == 2
+    entries = [json.loads(line) for line in (tmp_path / "attempts.jsonl").open()]
+    assert len(entries) == 2 and all("host" in e and "started" in e for e in entries)
+
+
+def test_stop_inside_a_policy_is_not_skipped_by_the_training_study(tmp_path, monkeypatch):
+    settings = spec(tmp_path)
+    settings["training"]["trials"] = 1
+    settings["inference"][0]["on_failure"] = "stop"
+
+    def execute(stage, payload, output):
+        if stage == "train":
+            return {"config": settings["config"], "checkpoint": str(output / "last.ckpt")}
+        raise RuntimeError("evaluation broke")
+
+    monkeypatch.setattr(tuning, "execute", execute)
+    with pytest.raises(tuning.StopSearch, match="evaluation broke"):
+        tuning.run_case(settings, tmp_path / "runs", 1)
+    assert not (tmp_path / "runs/example/training/skipped.jsonl").exists()
+
+
+def test_retry_skipped_reruns_a_skipped_candidate_once(tmp_path):
+    settings = {"trials": 2, "space": {"x": [0, 1]}, "initial_points": [{"x": 0}, {"x": 1}]}
+    broken = {"value": True}
+
+    def objective(parameters, output):
+        if parameters["x"] == 1 and broken["value"]:
+            raise RuntimeError("transient")
+        return {"score": float(parameters["x"])}
+
+    assert tuning.search(tmp_path, settings, "maximize", objective, 1)["parameters"] == {"x": 0}
+    broken["value"] = False
+    assert tuning.search(tmp_path, settings, "maximize", objective, 1)["parameters"] == {"x": 0}
+    retried = tuning.search(tmp_path, settings, "maximize", objective, 1, retry_skipped=True)
+    assert retried["parameters"] == {"x": 1} and retried["skipped_trials"] == []
+    again = tuning.search(tmp_path, settings, "maximize", objective, 1)
+    assert again["parameters"] == {"x": 1} and again["skipped_trials"] == []
