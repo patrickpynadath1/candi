@@ -1,4 +1,4 @@
-"""Compose method configurations for Python callers, including Ray Tune."""
+"""Compose method configurations and prepare per-run configs for Ray workers."""
 
 from __future__ import annotations
 
@@ -72,3 +72,40 @@ def capture_runtime_paths(config: DictConfig) -> DictConfig:
     if values["output_dir"] == "${output_dir}":
         values["output_dir"] = str(ROOT / "core/outputs/programmatic")
     return OmegaConf.create(values)
+
+
+def run_configuration(spec):
+    """Accept either a Hydra preset specification or an editable config snapshot."""
+    unknown = set(spec) - {"experiment", "overrides", "config"}
+    if unknown:
+        raise ValueError(f"Unknown run options: {sorted(unknown)}")
+    if "config" in spec:
+        if "experiment" in spec or "overrides" in spec:
+            raise ValueError("Use either config or experiment/overrides, not both")
+        return OmegaConf.create(spec["config"])
+    return compose(spec.get("experiment"), spec.get("overrides", {}))
+
+
+def prepare_run(spec, output, resources):
+    """Resolve one worker's config for its Ray reservation and output directory.
+
+    Workers hold zero or one whole GPU; the reservation sets the device, so a
+    run never uses a GPU it was not given.
+    """
+    config = run_configuration(spec)
+    gpus = resources.get("GPU", 0)
+    if isinstance(gpus, bool) or not isinstance(gpus, (int, float)) or gpus not in (0, 1):
+        raise ValueError("a run requires zero or one whole GPU")
+    gpus = int(gpus)
+    if config.trainer.get("num_nodes", 1) != 1:
+        raise ValueError("a run supports one node")
+    if config.trainer.strategy not in ("auto", None) or config.get("strategy") is not None:
+        raise ValueError("Zero/one-GPU runs require strategy=auto and no strategy config")
+    config.trainer.devices = 1
+    config.output_dir = str(Path(output).resolve())
+    config.trainer.accelerator = "gpu" if gpus else "cpu"
+    config.evaluation.device = "cuda:0" if gpus else "cpu"
+    # Freeze interpolations only after assigning the per-run output path.
+    return OmegaConf.create(
+        OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+    )

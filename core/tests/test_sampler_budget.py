@@ -48,7 +48,7 @@ def test_tuning_budget_includes_tuned_corrections(
             )
         )
 
-    monkeypatch.setattr(tuning, "_prepare", prepare)
+    monkeypatch.setattr(tuning, "prepare_run", prepare)
     monkeypatch.setattr(runner, "run", run)
     corrector = {
         "_target_": "core.samplers.correctors.SphericalLangevinCorrector",

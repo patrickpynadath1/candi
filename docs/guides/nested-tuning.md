@@ -143,24 +143,14 @@ storage visible to every Ray worker. W&B logging uses the source config's tracki
 settings through the existing training/evaluation runner. A top-level `wandb`
 configuration can override the source config tracking settings.
 
-The old standalone inference execution engine has been removed. All new searches
-use this unified entry point, including inference-only cases. Historical sweep
-results are preserved, but old Ray Tune execution state is not resumed by this
-engine. Use a new output directory for a new run.
-
-To retrain the three-task sweep with the same validation/final partitions and
-sampler searches, including insertion variants:
+This is the only execution path: inference-only cases, training searches and
+retraining all go through it. Prepare a manifest with
+[`core.sweeps.prepare`](programmatic-sweeps.md), then run it:
 
 ```bash
 uv sync --locked --extra tuning --extra scoring --extra tracking
 uv run --locked --extra tuning --extra scoring --extra tracking \
-  python -m examples.retrain_three_tasks \
-  --previous-manifest /path/to/previous/manifest.json \
-  --output /path/to/new-experiment \
-  --project adaptive-three-tasks \
-  --adaptive-continuous
-uv run --locked --extra tuning --extra scoring --extra tracking \
-  python -m core.sweeps.nested_tuning /path/to/new-experiment/manifest.json \
+  python -m core.sweeps.nested_tuning /path/to/plan/manifest.json \
   --output /path/to/new-experiment --address auto \
   --case-concurrency 4 --concurrency 1
 ```
@@ -170,16 +160,13 @@ allows independent experiment cases to progress together; `--concurrency`
 is the number of inference candidates per case. Ray reserves a GPU only for an
 actual training or evaluation worker, never for the case coordinator.
 
-`--adaptive-continuous` applies `configs/time_map/cdcd.yaml` to Gaussian,
-blurring, simplex, and spherical views. It learns base-path progress from masked
-per-example training cross-entropy, after 1,000 warmup updates, and refits every
-50 updates once the 12,800-observation buffer is full. Gaussian's existing
-adaptive wrapper is replaced by this equivalent view-clock placement, so it is
-not warped twice. Discrete and insertion schedules remain as configured.
-The learned clock is a registered module saved with the model and reused during
-inference; validation and generation do not update it. Each case trains once
-from scratch, then tunes inference, then evaluates only the validation-selected
-winner. Existing checkpoints and case directories are not overwritten.
+To learn base-path progress for continuous views (Gaussian, blurring, simplex,
+spherical), apply [`configs/time_map/cdcd.yaml`](../../configs/time_map/cdcd.yaml)
+to them in the sweep config. The learned clock is a registered module saved with
+the model and reused during inference; validation and generation do not update
+it. Each case trains once from scratch, then tunes inference, then evaluates only
+the validation-selected winner. Existing checkpoints and case directories are not
+overwritten.
 
 ### Sampler evaluation budgets
 

@@ -1,4 +1,4 @@
-"""Export Hydra multiruns for the existing queue; never launch training.
+"""Export Hydra multiruns as a nested-tuning manifest; never launch training.
 
 python -m core.sweeps.prepare -m +sweep=gaussian preparation.output=$CANDI_STORAGE_ROOT/plans/X
 python -m core.sweeps.prepare collect $CANDI_STORAGE_ROOT/plans/X
@@ -87,7 +87,8 @@ def prepare_case(config):
         "job_type": "train",
     }
     config.output_dir = str(output / "runs" / name)
-    resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+    # Fail at export, not on a worker, if anything is unresolved.
+    OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     policies = []
     for policy in metadata["inference"]:
         native = policy.get("sampler") or OmegaConf.to_container(
@@ -109,33 +110,22 @@ def prepare_case(config):
     path.parent.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(config, path)
     (destination / "case.json").write_text(json.dumps(case, indent=2) + "\n")
-    (destination / "job.json").write_text(
-        json.dumps(
-            dict(name=name, config=resolved, checkpoint="last.ckpt", inference=[])
-        )
-        + "\n"
-    )
     return name
 
 
 def collect(output):
-    """Collect exported cases into the existing queue and nested-tuning formats."""
+    """Collect exported cases into the nested-tuning manifest."""
     output = Path(output).expanduser().resolve()
-    cases, jobs = [], []
+    cases = []
     for directory in sorted((output / "cases").iterdir()):
         case = json.loads((directory / "case.json").read_text())
-        job = json.loads((directory / "job.json").read_text())
         validate(case)
-        if case["name"] != job["name"]:
-            raise ValueError(f"Mismatched case and job in {directory}")
         cases.append(case)
-        jobs.append(job)
     if not cases:
         raise ValueError("No prepared cases")
     if len({c["name"] for c in cases}) != len(cases):
         raise ValueError("Duplicate case names")
     (output / "manifest.json").write_text(json.dumps(cases, indent=2) + "\n")
-    OmegaConf.save(OmegaConf.create(jobs), output / "training-jobs.yaml")
     return len(cases)
 
 

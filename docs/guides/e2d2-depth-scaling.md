@@ -44,7 +44,6 @@ can be lower. Entropy-bounded sampling is omitted here because it can fail to
 finish a32-token block within4 NFE. This is an architecture comparison under
 fixed inference settings/budgets, not a full sampler comparison.
 
-The generated training-jobs file is also available, but the nested runner is
-the route that chains training, tuning and held-out evaluation. Results belong
+The nested runner chains training, tuning and held-out evaluation. Results belong
 under the cache output above; W&B project is `e2d2-depth-scaling-20k-20261101`.
 No training was launched while preparing this plan.

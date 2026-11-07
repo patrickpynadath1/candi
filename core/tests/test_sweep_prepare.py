@@ -65,7 +65,13 @@ def test_native_hydra_grid_and_manifest(tmp_path, reference):
     assert result.returncode == 0, result.stdout + result.stderr
     assert collect(output) == 2
     cases = json.loads((output / "manifest.json").read_text())
-    jobs = OmegaConf.to_container(OmegaConf.load(output / "training-jobs.yaml"))
+    jobs = [
+        {
+            "name": c["name"],
+            "config": OmegaConf.to_container(OmegaConf.load(c["config"]), resolve=True),
+        }
+        for c in cases
+    ]
     assert {c["name"] for c in cases} == {
         f"text8-gaussian-one_hot-{view}-adaptive-cross_entropy-sc-off-seed-1"
         for view in ["masked", "uniform"]

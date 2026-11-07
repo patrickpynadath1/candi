@@ -1,4 +1,4 @@
-# Pass to scripts/tinygsm_ray_queue.py --config-overrides.
+# TinyGSM compilation/performance profile; apply with training.performance=... overrides.
 # This is an override document, not a Hydra experiment preset.
 training:
   performance:

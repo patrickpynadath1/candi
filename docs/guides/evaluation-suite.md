@@ -1,7 +1,8 @@
 # Small-task evaluation suite
 
-Use [recipe definitions and task suites](task-batteries.md) to run the suite
-with one shared recipe definition and linked result provenance.
+Run the suite by preparing a sweep over its tasks
+([preparing sweeps](programmatic-sweeps.md)) and running the manifest with
+[nested tuning](nested-tuning.md).
 
 | Task | What it measures | Presets / documentation |
 | --- | --- | --- |

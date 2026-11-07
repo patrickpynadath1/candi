@@ -79,9 +79,6 @@ candi-remote list | status JOB | logs [--follow] JOB | info JOB | stop JOB
 ```
 
 Prepare plans on the server, as above, so manifests never contain laptop paths.
-Appending to a `core/sweeps/submissions.py` queue is likewise a submitted command
-that runs on the server against a queue file under the storage root.
-
 Each job records its git revision, upload content hash, dirty flag and lock hash
 in its Ray metadata and in `CANDI_SOURCE_*` environment variables. The driver
 reserves no CPUs or GPUs; worker tasks hold the GPUs. Workers use the same locked

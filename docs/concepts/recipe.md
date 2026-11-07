@@ -17,7 +17,7 @@ components, not a new wrapper class.
 
 Tasks supply data, conditioning masks, and metrics independently of these choices.
 A Sudoku task does not select a corruption process. An experiment combines recipes
-with a [task suite](../guides/task-batteries.md), budgets, seeds, and an evaluation
+with a set of tasks ([preparing sweeps](../guides/programmatic-sweeps.md)), budgets, seeds, and an evaluation
 protocol.
 
 ## Components and compatibility

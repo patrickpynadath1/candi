@@ -21,7 +21,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 
 from core.evaluation.reporting import metric_value
-from core.sweeps.tune import _prepare
+from core.sweeps.configuration import prepare_run
 
 
 @contextmanager
@@ -349,7 +349,7 @@ def _train_worker(payload, output):
         OmegaConf.update(config, key, value, force_add=True)
     config.mode = "train"
     config.checkpoint.resume = None
-    config = _prepare(
+    config = prepare_run(
         {"config": OmegaConf.to_container(config, resolve=False)},
         output,
         {"GPU": payload["resources"].get("gpu", 1)},
@@ -424,7 +424,7 @@ def _evaluate_worker(payload, output):
     for seed in evaluation["seeds"]:
         destination = Path(output) / f"seed-{seed}"
         config.seed = seed
-        prepared = _prepare(
+        prepared = prepare_run(
             {"config": OmegaConf.to_container(config, resolve=False)},
             destination,
             {"GPU": payload["resources"].get("gpu", 1)},

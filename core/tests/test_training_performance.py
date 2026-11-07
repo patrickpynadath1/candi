@@ -140,32 +140,6 @@ def test_fused_bf16_gradient_clipping_keeps_norm_limit():
     torch.testing.assert_close(parameter.grad.norm(), torch.tensor(0.5))
 
 
-def test_queue_overrides_apply_to_restored_snapshots(monkeypatch):
-    import json
-    from scripts import tinygsm_ray_queue as queue
-    from core.sweeps.configuration import compose
-    from omegaconf import OmegaConf
-
-    cfg = compose("tinygsm_uniform_sc")
-    monkeypatch.setenv(
-        "CANDI_TINY_GSM_OVERRIDES",
-        json.dumps(
-            {
-                "training": {"performance": {"compile": {"enabled": True}}},
-                "loader": {"eval_batch_size": 16},
-            }
-        ),
-    )
-    monkeypatch.delenv("CANDI_MASKED_RESUME", raising=False)
-    seen = []
-    monkeypatch.setattr(queue, "run_trial", lambda spec: seen.append(spec["config"]))
-    queue.run_job({"trial": {"config": OmegaConf.to_container(cfg)}})
-    assert seen[0].training.performance.compile.enabled
-    assert seen[0].callback.every_n_steps == 10000
-    assert seen[0].loader.eval_batch_size == 16
-    assert seen[0].loader.global_batch_size == 512
-
-
 def test_resume_retains_explicit_fused_optimizer_execution():
     from core.tests.test_self_conditioning import config
     from core.training.module import TrainingModule

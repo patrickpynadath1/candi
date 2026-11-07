@@ -44,9 +44,8 @@ Fresh training with no training-parameter search has one outer candidate that
 trains a model. Both use the same nested execution path.
 
 The [nested tuning guide](nested-tuning.md) defines the manifest schema and saved
-artifacts. [Task suites](task-batteries.md) explain composing tasks with recipes.
-[Programmatic sweeps](programmatic-sweeps.md) document the lower-level Ray job API;
-those jobs are not automatically nested hyperparameter searches.
+artifacts. [Preparing sweeps](programmatic-sweeps.md) explains how Hydra sweep
+configs become a manifest.
 
 ## Execution and naming
 
@@ -60,7 +59,8 @@ aliases. Existing artifact names (`training/`, `inference/`, `optuna.sqlite`,
 `selected.json`, `final/result.json`) and manifest fields are unchanged.
 
 Some established paths still use `battery` and `algorithm_definition`, including
-`configs/battery/`, `configs/algorithm_definition/`, and the example launchers.
+`configs/task/battery/` and the `algorithm_definition` block that preparation
+records in each case config.
 In the documentation these mean **task suite** and **recipe definition**. Retaining
 those paths keeps existing configs, commands, and saved experiment provenance
 usable; a terminology cleanup does not require a new parallel implementation.

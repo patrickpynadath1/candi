@@ -10,13 +10,12 @@ from omegaconf import OmegaConf
 from core.modifiers.hybrid.views import point
 from core.sweeps.configuration import ROOT
 from core.training.module import TrainingModule
-from examples.corruption_self_conditioning_sweep import base_config, parser, variants
+from core.tests.factorial_configs import factorial_config
 
 
 @pytest.mark.parametrize("family", ["gaussian", "simplex", "spherical", "blurring"])
 def test_adaptive_clock_training_sampling_and_checkpoint(family):
-    args = parser().parse_args(["--families", family])
-    config = base_config(next(variants(args)), args)
+    config = factorial_config(family)
     config.model.backbone.hidden_size = 16
     config.model.backbone.n_blocks = 1
     config.model.backbone.n_heads = 2

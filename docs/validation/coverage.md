@@ -43,43 +43,17 @@ compare shared model execution and gradients with the original direct block/head
 calculation. Existing modifier, mixed-precision, cache and checkpoint tests remain
 part of the complete suite.
 
-## Programmatic sweep execution
+## Sweep execution
 
-All 45 experiment presets resolve through the Hydra/Ray Tune adapter without
-launching training. The sweep API, scheduling and experiment state now belong
-to Ray Tune; the previous custom executor has been removed.
-
-Small MDLM and autoregressive trials trained on distinct A6000 GPUs through
-Ray Tune for two steps using BF16 and synthetic data. Both saved durable Tune
-checkpoints containing the runner's Lightning checkpoints and resolved config.
-Separate evaluation trials loaded these checkpoints and generated four records
-each. An additional check evaluated the same MDLM checkpoint with ancestral and
-entropy-bounded samplers as independent inference trials. Restoring the training
-sweep did not rewrite completed checkpoints.
-This verifies execution and restoration, not generation quality.
-
-The dynamic job queue additionally passed a two-GPU interruption/resume check
-using the dataclass job definitions: an MDLM training job produced ancestral and
-entropy-bounded inference while an autoregressive training job remained open.
-After an intentional SIGINT, `Tuner.restore` finished five unique jobs without
-rerunning the completed training or inference jobs. Queue unit tests cover
-pending/issued state, duplicate completion notifications, inference priority,
-failed parents, and independent configuration snapshots.
-
-The [base algorithm sweep](../guides/base-algorithm-sweep.md) has 11 additional
-catalogue tests. The reduced single-seed plan composes 66 supported training configurations;
-all instantiate with small model dimensions, and all 360 associated inference
-sampler configurations instantiate. Preview/no-launch and unsupported-combination
-checks pass. This is construction coverage, not training or quality validation of
-the full catalogue. Uniform plug-in self-conditioning remains explicitly blocked.
-
-Regression tests cover all preset configs, independent editable configs, nested
-Hydra overrides, unsupported resource/config combinations, aggregate-only
-metrics, real CPU Tune training, failure reporting, durable checkpoint artifacts,
-and restoration. The adapter supports CPU or one-GPU trials and reports final
-metrics; it does not implement intermediate reporting, automatic partial-training
-resume or distributed training within a trial. See the
-[programmatic sweep guide](../guides/programmatic-sweeps.md) for examples and limits.
+Every experiment preset that runs on one GPU resolves through
+`core.sweeps.configuration.prepare_run` without launching training. Sweeps run
+through `core.sweeps.prepare` and `core.sweeps.nested_tuning` only; the earlier
+Ray Tune queue (`run_trial`, `TrainingInferenceSearch`, live submissions) was
+removed on 2026-11-07. Nested-tuning tests cover validation-only selection,
+resume without retraining, protocol and checkpoint pinning, resumed-search
+seeding, failure handling and per-case Ray resources. A full nested case (GPU
+training worker, validation-only inference selection, final evaluation) ran on
+ruqi6000 on 2026-10-29 through Ray Jobs.
 
 ## Methods and tasks
 

@@ -66,7 +66,7 @@ uv run --locked --extra tuning --extra scoring --extra tracking \
 ```
 
 See [experiment terminology](docs/guides/experiments.md),
-[task suites](docs/guides/task-batteries.md), and
+[preparing sweeps](docs/guides/programmatic-sweeps.md), and
 [nested tuning](docs/guides/nested-tuning.md) for configuration and execution.
 
 ## Planned TinyStories BPE campaign

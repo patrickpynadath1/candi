@@ -16,8 +16,8 @@ BF16 mixed precision, AdamW at `3e-4`, 2,500 warmup steps, and EMA decay `0.9999
 The smoke experiment deliberately overrides these settings for a tiny CPU check.
 Task availability and preparation requirements are listed in [tasks](../tasks/overview.md).
 
-For Python-defined method grids and GPU scheduling through Ray Tune, see
-[programmatic sweeps](programmatic-sweeps.md).
+For method grids, Ray scheduling and Optuna selection, see
+[preparing sweeps](programmatic-sweeps.md) and [nested tuning](nested-tuning.md).
 
 ## Batches and optimization
 

@@ -152,7 +152,7 @@ def test_validation_adapter_restricts_loss_and_generation():
 
 
 def test_real_training_keeps_periodic_callback_with_validation_partition(tmp_path):
-    from core.tests.test_programmatic_sweeps import tiny
+    from core.tests.test_run_preparation import tiny
 
     config = tiny()
     config["trainer"].update(limit_val_batches=1, val_check_interval=1)
@@ -377,7 +377,7 @@ def test_training_handoff_recovers_completed_checkpoint(
     tmp_path, monkeypatch, saved_step, should_train
 ):
     import torch
-    from core.tests.test_programmatic_sweeps import tiny
+    from core.tests.test_run_preparation import tiny
     from core.training import runner
 
     config = tiny()
@@ -410,7 +410,7 @@ def test_training_handoff_recovers_completed_checkpoint(
 
 def test_noniterative_sampler_keeps_native_interface(tmp_path, monkeypatch):
     from hydra.utils import instantiate
-    from core.tests.test_programmatic_sweeps import tiny
+    from core.tests.test_run_preparation import tiny
     from core.training import runner
 
     settings = spec(tmp_path, fixed=True)

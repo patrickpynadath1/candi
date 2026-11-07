@@ -102,7 +102,7 @@ inputs. Existing model jobs retain their original byte configs.
   survives closing the tunnel, and status/logs work after reconnecting; Python 3.10.9 /
   Ray 2.59.0 / Torch 2.5.1+cu121 on the server; pre-existing clusters on 6380–6383 untouched.
   `remote-smoke-20261029` and `-b` are failed test plans (bad test manifests, not infrastructure).
-- Not yet exercised: multi-GPU pools, `submissions.py` queue appends, W&B logging from remote jobs.
+- Not yet exercised: multi-GPU pools, W&B logging from remote jobs.
 
 ## Further context
 
