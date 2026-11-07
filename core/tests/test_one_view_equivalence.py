@@ -111,3 +111,72 @@ def test_old_checkpoints_load_and_sample_identically(experiment, self_conditioni
         actual, actual_info = current.generate(sampler, prompt, fixed)
         assert torch.equal(expected, actual), options
         assert expected_info["nfe_per_sample"] == actual_info["nfe_per_sample"]
+
+
+MDLM_VARIANTS = {
+    "default": {},
+    "adaln_zero_time": {"model.adaLN": True},
+    "adaln_negative_log_keep": {"model.adaLN": True, "algorithm.time_conditioning": True},
+    "cross_entropy": {"objective": "cross_entropy"},
+    "self_conditioning": {
+        "model.adaLN": True,
+        "self_conditioning.enabled": True,
+        "self_conditioning.source": "posterior_mean",
+    },
+}
+
+
+def mdlm_one_view(standalone):
+    """MDLM as a one-view HybridDiffusion on an adopted ModularDiT."""
+    import copy
+
+    from core.models.legacy import adopt
+    from core.modifiers.hybrid.training import HybridDiffusion
+    from core.modifiers.hybrid.views import DiffusionView
+    from core.representations.noisy_inputs import TokenRepresentation
+    from core.samplers.hybrid_updates import DiscretePosteriorUpdate
+
+    algorithm = copy.deepcopy(standalone)
+    table = algorithm.model.vocab_embed.embedding
+    with torch.random.fork_rng():
+        representation = TokenRepresentation(*table.shape)
+    view = DiffusionView(
+        algorithm.process, algorithm.schedule, representation, DiscretePosteriorUpdate()
+    )
+    model = adopt(
+        algorithm.model,
+        views=[view],
+        time_coordinate="negative_log_keep" if algorithm.time_conditioning else "zero",
+        fp32_clean_embedding=True,
+    )
+    return HybridDiffusion(
+        model,
+        algorithm.predictor,
+        algorithm.time_sampler,
+        algorithm.objective,
+        length=algorithm.length,
+        prediction=algorithm.prediction,
+    )
+
+
+@pytest.mark.parametrize("variant", sorted(MDLM_VARIANTS))
+def test_mdlm_training_is_identical_on_the_view_path(variant):
+    cfg = compose("sudoku_hard", {**SMALL, **MDLM_VARIANTS[variant]})
+    torch.manual_seed(0)
+    standalone = instantiate(cfg.algorithm)
+    viewed = mdlm_one_view(standalone)
+    old, new = list(standalone.parameters()), list(viewed.parameters())
+    assert len(old) == len(new) and all(torch.equal(a, b) for a, b in zip(old, new))
+    tokens, mask = batch(cfg)
+    results = []
+    for algorithm in (standalone, viewed):
+        algorithm.train()
+        torch.manual_seed(7)
+        result = algorithm.loss(tokens, mask, training=True)
+        result["loss"].backward()
+        results.append(result)
+    assert torch.equal(results[0]["loss"], results[1]["loss"])
+    for a, b in zip(old, new):
+        assert (a.grad is None) == (b.grad is None)
+        if a.grad is not None:
+            assert torch.equal(a.grad, b.grad)

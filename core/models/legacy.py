@@ -221,3 +221,60 @@ def convert_parameter_order(legacy_model, modular_model, values):
     renamed = list(convert_state_dict(dict.fromkeys(names), target))
     by_name = dict(zip(renamed, values))
     return [by_name[name] for name, _ in modular_model.named_parameters()]
+
+
+
+def adopt(legacy_model, *, views=None, fusion=None, time_coordinate="time", fp32_clean_embedding=False):
+    """Move a constructed legacy DiT into an equivalent ModularDiT.
+
+    The legacy submodules (blocks, block policy, rotary, time embedder, output
+    layer, self-conditioning adapter, token table) are reused as they are, so
+    custom sublayers and depth mixing carry over, parameter order is unchanged,
+    and no random numbers are drawn. With ``views`` the token table becomes the
+    first view's representation (as HybridModel bound it); otherwise the
+    network keeps a token input.
+    """
+    import torch
+    from functools import partial
+
+    from . import modular
+    from core.representations.noisy_inputs import TokenRepresentation
+
+    if type(legacy_model).__name__ != "DiT":
+        raise ValueError("adopt currently supports the token DiT")
+    table = legacy_model.vocab_embed.embedding
+    with torch.random.fork_rng(devices=[]):
+        model = modular.ModularDiT(
+            vocab_size=table.shape[0],
+            hidden_size=table.shape[1],
+            cond_dim=legacy_model.sigma_map.mlp[0].out_features,
+            n_blocks=0,
+            n_heads=legacy_model.blocks[0].n_heads,
+            input=None if views is not None else partial(modular.TokenInput),
+            views=views,
+            fusion=fusion,
+            time=partial(modular.TimeConditioning, coordinate=time_coordinate, adaLN=legacy_model.adaLN),
+            output=partial(modular.AdaLNHead, adaLN=legacy_model.adaLN),
+            autocast_cache=legacy_model.autocast_cache,
+        )
+    model.block_execution = legacy_model.block_execution
+    model.rotary_emb = legacy_model.rotary_emb
+    model.blocks = legacy_model.blocks
+    model.time.embedder = legacy_model.sigma_map
+    model.time_adapter = legacy_model.time_adapter
+    model.output.layer = legacy_model.output_layer
+    model.output.apply_output = legacy_model.output_adapter
+    if views is None:
+        model.input.embedding = legacy_model.vocab_embed
+    else:
+        view = model.input.views[0]
+        if not isinstance(view.representation, TokenRepresentation):
+            raise TypeError("the adopted token table needs a TokenRepresentation view")
+        view.representation.embedding = table
+        view.representation.fp32_clean_embedding = bool(fp32_clean_embedding)
+    model.self_conditioning = (
+        None
+        if legacy_model.conditioning_adapter is None
+        else modular.SelfConditioning.wrap(legacy_model.conditioning_adapter)
+    )
+    return model

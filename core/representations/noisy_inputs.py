@@ -32,10 +32,18 @@ class TokenRepresentation(nn.Module):
         del point
         return F.embedding(state, self._table()) * self.scale
 
+    fp32_clean_embedding = False
+
     def clean_embedding(self, probabilities):
         table = self._table()
         if probabilities.shape[-1] > len(table):
             raise ValueError("posterior vocabulary exceeds representation vocabulary")
+        if self.fp32_clean_embedding:
+            # Standalone MDLM's posterior mean: FP32 matmul outside autocast.
+            with torch.autocast(probabilities.device.type, enabled=False):
+                return (
+                    probabilities.float() @ table[: probabilities.shape[-1]].float()
+                ) * self.scale
         return (
             probabilities.to(self.embedding)
             @ table[: probabilities.shape[-1]]

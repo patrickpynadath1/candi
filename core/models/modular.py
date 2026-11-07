@@ -262,6 +262,14 @@ class SelfConditioning(nn.Module):
             source, state_dim if space == "state" else hidden_size, hidden_size, initialization
         )
 
+    @classmethod
+    def wrap(cls, adapter, space="hidden", scale=1.0):
+        """Use an existing adapter module (no new parameters or random draws)."""
+        slot = cls.__new__(cls)
+        nn.Module.__init__(slot)
+        slot.space, slot.scale, slot.adapter = space, scale, adapter
+        return slot
+
     def forward(self, hidden, self_condition):
         if self_condition is not None and self.scale != 1.0:
             self_condition = self_condition * self.scale
