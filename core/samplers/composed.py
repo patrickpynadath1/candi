@@ -21,6 +21,7 @@ class ComposedSampler:
         final_prediction=None,
         synchronize_committed=False,
         require_completion=False,
+        precision="float32",
     ):
         if int(steps) != steps or steps < 1 or not 0 <= epsilon < 1:
             raise ValueError("positive integer steps and epsilon in [0, 1) required")
@@ -28,7 +29,11 @@ class ComposedSampler:
             raise ValueError("commitment must be none, freeze, or revise")
         if final_prediction is None:
             final_prediction = "greedy" if final_denoise == "greedy" else "sampling"
-        if final_denoise not in {"greedy", "sample"} or final_prediction not in {
+        if precision not in {"float32", "float64"}:
+            raise ValueError("precision must be float32 or float64")
+        if final_denoise == "reverse" and commitment != "none":
+            raise ValueError("a terminal reverse transition requires commitment=none")
+        if final_denoise not in {"greedy", "sample", "reverse"} or final_prediction not in {
             "greedy",
             "sampling",
         }:
@@ -42,6 +47,8 @@ class ComposedSampler:
             raise ValueError("correctors currently require commitment=none")
         self.commitment = commitment
         self.final_denoise, self.final_prediction = final_denoise, final_prediction
+        # float64 reproduces the standalone discrete samplers' probability math.
+        self.precision = torch.float64 if precision == "float64" else torch.float32
         self.synchronize_committed = bool(synchronize_committed)
         self.require_completion = bool(require_completion)
         if self.tokens.mode == "posterior" and (
@@ -62,6 +69,21 @@ class ComposedSampler:
                 "NFE budget cannot fit a predictor/corrector step and decoding"
             )
         return steps
+
+    def _reverse_to_clean(self, algo, states, prediction, points, time, generated):
+        """One last native transition from the final grid time to time zero."""
+        if len(algo.views) != 1 or states[0].is_floating_point():
+            raise ValueError("a terminal reverse transition needs one discrete view")
+        view = algo.views[0]
+        clean = algo.points(torch.zeros_like(time), corruption_mask=generated)
+        return view.update(
+            view.process,
+            view.representation,
+            states[0],
+            prediction.to(self.precision).exp(),
+            points[0],
+            clean[0],
+        )
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
@@ -105,7 +127,7 @@ class ComposedSampler:
             source = algo.points(time, corruption_mask=generated)
             destination = algo.points(next_time, corruption_mask=generated)
             logits = algo.sampling_prediction(states, source, time)
-            probabilities = logits.float().exp()
+            probabilities = logits.to(self.precision).exp()
             selected = self.positions(probabilities, active)
             clean = self.tokens(logits, probabilities)
             next_output = (
@@ -182,11 +204,14 @@ class ComposedSampler:
                 if self.final_prediction == "greedy"
                 else algo.sampling_prediction(states, points, time)
             )
-            final_tokens = (
-                prediction.argmax(-1)
-                if self.final_denoise == "greedy"
-                else torch.distributions.Categorical(logits=prediction).sample()
-            )
+            if self.final_denoise == "reverse":
+                final_tokens = self._reverse_to_clean(
+                    algo, states, prediction, points, time, generated
+                )
+            elif self.final_denoise == "greedy":
+                final_tokens = prediction.argmax(-1)
+            else:
+                final_tokens = torch.distributions.Categorical(logits=prediction).sample()
             nfe += 1
             if self.commitment == "none":
                 output = final_tokens

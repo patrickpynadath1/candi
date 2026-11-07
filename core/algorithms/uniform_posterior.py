@@ -1,17 +1,19 @@
-"""Uniform corruption trained as clean-token posterior prediction with CE."""
+"""Uniform corruption trained as clean-token posterior prediction with CE.
 
-import torch
+Runs on the hybrid path as one view (see core/modifiers/hybrid/one_view.py);
+training, sampling and checkpoints are bit-identical to the former standalone
+implementation, which core/tests/reference_algorithms keeps for comparison.
+"""
 
-from .posterior import PosteriorDiffusion
-from .adaptive import validate_adaptive_feedback
-from .training_loss import finish_training_loss
+from core.modifiers.hybrid.one_view import one_view_model
+from core.modifiers.hybrid.training import HybridDiffusion
 from core.objectives.cross_entropy import CrossEntropy
 from core.parameterizations.posterior import PosteriorParameterization
 from core.parameterizations.constraints import UnconstrainedPosterior
 from core.processes.uniform_posterior import PosteriorUniformProcess
 
 
-class PosteriorUniformDiffusion(PosteriorDiffusion):
+class PosteriorUniformDiffusion(HybridDiffusion):
     def __init__(
         self,
         model,
@@ -23,14 +25,6 @@ class PosteriorUniformDiffusion(PosteriorDiffusion):
         length=180,
         prediction=None,
     ):
-        super().__init__(prediction)
-        self.model, self.predictor, self.process = model, predictor, process
-        self.schedule, self.time_sampler, self.objective = (
-            schedule,
-            time_sampler,
-            objective,
-        )
-        self.length = length
         if (
             not isinstance(predictor, PosteriorParameterization)
             or not isinstance(predictor.constraints, UnconstrainedPosterior)
@@ -55,44 +49,19 @@ class PosteriorUniformDiffusion(PosteriorDiffusion):
             )
         if process.vocab_size != model.output_layer.linear.out_features:
             raise ValueError("model and process vocabulary sizes must agree")
-        validate_adaptive_feedback(schedule, predictor)
-        self.validate_prediction()
-
-    def model_inputs(self, state, keep):
-        return state, -keep.clamp_min(torch.finfo(keep.dtype).tiny).log()
-
-    def loss(
-        self,
-        tokens,
-        loss_mask,
-        corruption_mask=None,
-        *,
-        step=0,
-        training=False,
-        time_sampler=None,
-        objective=None,
-        pure_noise=False,
-        **time_context,
-    ):
-        corruption_mask = loss_mask if corruption_mask is None else corruption_mask
-        time_sampler = self.time_sampler if time_sampler is None else time_sampler
-        objective = self.objective if objective is None else objective
-        times = time_sampler.sample(len(tokens), tokens.device, **time_context)
-        keep, _ = self.schedule(times)
-        if pure_noise:
-            keep = torch.zeros_like(keep)
-        state = self.process.corrupt(tokens, keep, corruption_mask)
-        prediction = self.training_prediction(state, keep)
-        per_token = objective(prediction, tokens)
-        return finish_training_loss(
-            per_token,
-            loss_mask,
-            tokens=tokens,
+        super().__init__(
+            one_view_model(model, process, schedule),
+            predictor,
+            time_sampler,
+            objective,
+            length=length,
             prediction=prediction,
-            step=step,
-            training=training,
-            time_sampler=time_sampler,
-            sampler_time=times,
-            schedule=self.schedule,
-            schedule_time=times,
         )
+
+    @property
+    def process(self):
+        return self.views[0].process
+
+    @property
+    def schedule(self):
+        return self.views[0].schedule

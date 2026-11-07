@@ -189,6 +189,21 @@ class HybridModel(nn.Module):
         return self._slice_output(self.backbone.project_hidden(*args, **kwargs))
 
     def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        # Standalone single-process checkpoints store the bare backbone (e.g.
+        # ``model.blocks.0...``). Their one-view hybrid holds the same tensors
+        # under ``backbone.``, the token table also in the view, and the
+        # self-conditioning adapter at this level.
+        if prefix + "blocks.0.attn_qkv.weight" in state_dict and not any(
+            key.startswith(prefix + "backbone.") for key in state_dict
+        ):
+            for key in [k for k in state_dict if k.startswith(prefix)]:
+                rest = key[len(prefix) :]
+                if rest.startswith("conditioning_adapter."):
+                    continue
+                value = state_dict.pop(key)
+                state_dict[prefix + "backbone." + rest] = value
+                if rest == "vocab_embed.embedding" and len(self.views) == 1:
+                    state_dict[prefix + "views.0.representation.embedding"] = value
         # Existing core CANDI/uniform-simplex checkpoints retain identical tensors.
         old_prefix = prefix + "branches."
         for key in list(state_dict):

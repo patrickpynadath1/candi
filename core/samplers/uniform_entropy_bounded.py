@@ -33,6 +33,12 @@ class UniformEntropyBoundedSampler:
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
+        if hasattr(algo, "views"):
+            raise TypeError(
+                "UniformEntropyBoundedSampler drives standalone uniform algorithms; "
+                "for view-based ones (incl. posterior uniform) use "
+                "sampler=parallel_entropy_bounded"
+            )
         algo = prediction_session(algo)
         state = initialize_uniform(algo, prompt_tokens, prompt_mask)
         generated = ~prompt_mask.bool()

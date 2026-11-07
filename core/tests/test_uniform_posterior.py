@@ -84,7 +84,10 @@ def test_config_training_sampling_and_unconstrained_observations(self_conditioni
     assert loss.isfinite()
     loss.backward()
     assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in algo.parameters())
-    probabilities = algo.training_prediction(tokens, torch.full((2,), 0.4)).exp()
+    # Prediction endpoints take the hybrid (states, points, time) form.
+    time = torch.full((2,), 0.6)
+    points = algo.points(time, corruption_mask=mask)
+    probabilities = algo.training_prediction((tokens,), points, time).exp()
     assert (probabilities > 0).all()  # No absorbing-state clamp of observed tokens.
     generated, info = algo.generate(sampler, tokens, ~mask)
     assert generated.shape == tokens.shape and info["nfe"] == 3

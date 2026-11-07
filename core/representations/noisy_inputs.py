@@ -12,10 +12,17 @@ class TokenRepresentation(nn.Module):
     def clean_state(self, tokens):
         return tokens
 
-    def __init__(self, vocab_size, hidden_size, scale=1.0, normalize=False):
+    def __init__(self, vocab_size, hidden_size, scale=1.0, normalize=False, embedding=None):
         super().__init__()
-        self.embedding = nn.Parameter(torch.empty(vocab_size, hidden_size))
-        nn.init.normal_(self.embedding, std=hidden_size**-0.5)
+        if embedding is None:
+            self.embedding = nn.Parameter(torch.empty(vocab_size, hidden_size))
+            nn.init.normal_(self.embedding, std=hidden_size**-0.5)
+        else:
+            # Adopt an existing table (e.g. a standalone backbone's) without
+            # drawing random numbers, so initialization stays bit-identical.
+            if tuple(embedding.shape) != (vocab_size, hidden_size):
+                raise ValueError("adopted embedding must be [vocab_size, hidden_size]")
+            self.embedding = embedding
         self.scale, self.normalize = float(scale), bool(normalize)
 
     def _table(self):
