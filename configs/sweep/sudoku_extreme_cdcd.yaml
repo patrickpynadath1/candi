@@ -4,7 +4,7 @@ defaults:
 - _self_
 preparation:
   reference_manifest: null
-  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/feedback-depth-cdcd-sudoku-extreme-20261030
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/plans/feedback-depth-cdcd-sudoku-extreme-20261030
   family: sudoku_extreme_cdcd
 hydra:
   sweeper:

@@ -6,12 +6,9 @@ defaults:
 - _self_
 preparation:
   name: masked-attention-sudoku-20k-20261030
-  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/masked-attention-sudoku-20k-20261030
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/plans/masked-attention-sudoku-20k-20261030
   family: masked_attention
   recipe_name: ${preparation.path_name}-${preparation.feedback_name}-${preparation.sublayer_name}
-  local:
-    gpu_ids: [3, 4]
-    concurrent_jobs: 2
   wandb:
     project: masked-attention-sudoku-20k-20261030
 hydra:

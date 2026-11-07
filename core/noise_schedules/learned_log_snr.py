@@ -129,6 +129,3 @@ class PlaidGammaSchedule(LearnedLogSNRSchedule):
 
     def bounds(self):
         return self.gamma_min, self.gamma_max
-
-    def endpoint_parameters(self):
-        return [self.gamma_min, self.gamma_max]

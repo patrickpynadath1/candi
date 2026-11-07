@@ -7,7 +7,7 @@ defaults:
 - _self_
 bpe:
   vocabulary_size: 10000
-  tokenizer_path: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/tokenizers/tinystories-bpe-20261102/bpe-${bpe.vocabulary_size}.json
+  tokenizer_path: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/tokenizers/tinystories-bpe-20261102/bpe-${bpe.vocabulary_size}.json
 task:
   vocab_size: ${bpe.vocabulary_size}
   length: 512
@@ -19,7 +19,7 @@ data:
   allowed_ids_path: null
   max_train_examples: 2119719
   max_validation_examples: 21990
-  cache_dir: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/data_cache/tinystories_bpe
+  cache_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/data_cache/tinystories_bpe
 preparation:
   task_name: tinystories-bpe-${bpe.vocabulary_size}
   # Preparation must use a new partition; byte-cache row indices are not portable.

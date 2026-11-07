@@ -395,12 +395,10 @@ class DDiTFinalLayer(nn.Module):
             self.adaLN_modulation.weight.data.zero_()
             self.adaLN_modulation.bias.data.zero_()
 
-    def forward(self, x, c, c_anchor=None):
+    def forward(self, x, c):
         x = self.norm_final(x)
         if self.adaLN:
             modulation = self.adaLN_modulation(c)
-            if c_anchor is not None:
-                modulation = modulation - self.adaLN_modulation(c_anchor)
             if modulation.ndim == 2:
                 modulation = modulation[:, None]
             shift, scale = modulation.chunk(2, dim=-1)

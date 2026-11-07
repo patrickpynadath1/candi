@@ -74,12 +74,3 @@ class AncestralSampler(DiscreteSampler):
         )
         super().__init__(rule, steps, epsilon, time_grid)
         self.final_denoise = final_denoise
-
-    def reverse_step(self, algo, state, source_time, destination_time):
-        return self.update_rule.reverse_step(algo, state, source_time, destination_time)
-
-    def ancestral_denoise(self, algo, state, time):
-        return self.update_rule.ancestral_denoise(algo, state, time)
-
-    def greedy_denoise(self, algo, state, time):
-        return self.update_rule.greedy_denoise(algo, state, time)

@@ -73,10 +73,3 @@ class AnalyticSampler(DiscreteSampler):
         )
         super().__init__(rule, steps, epsilon, time_grid)
         self.final_denoise, self.use_float64 = final_denoise, use_float64
-
-    def _scores(self, log_scores):
-        return self.update_rule._scores(log_scores)
-
-    @torch.no_grad()
-    def sample(self, algo, prompt_tokens, prompt_mask):
-        return super().sample(algo, prompt_tokens, prompt_mask)

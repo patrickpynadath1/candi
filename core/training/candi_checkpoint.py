@@ -4,7 +4,6 @@ from collections import OrderedDict
 
 import torch
 
-from . import legacy_pickle
 
 
 _TABLE = "backbone.vocab_embed.embedding"
@@ -65,36 +64,3 @@ def map_legacy_candi_state(state_dict, algorithm):
             )
         target[key] = value.to(target[key])
     return target
-
-
-def load_legacy_candi_checkpoint(algorithm, path, *, use_ema=True, map_location="cpu"):
-    # These are trusted local training artifacts. The restricted legacy
-    # unpickler avoids importing the old repository's tokenizer or packages.
-    checkpoint = torch.load(
-        path, map_location=map_location, weights_only=False, mmap=True,
-        pickle_module=legacy_pickle,
-    )
-    state = legacy_candi_state(checkpoint, use_ema=use_ema)
-    algorithm.load_state_dict(map_legacy_candi_state(state, algorithm), strict=True)
-    return int(checkpoint.get("global_step", 0))
-
-
-def load_candi_training_module(module, checkpoint):
-    """Import final parameters and EMA separately for normal evaluation selection."""
-    algorithm = module.algorithm
-    algorithm.load_state_dict(
-        map_legacy_candi_state(legacy_candi_state(checkpoint), algorithm), strict=True
-    )
-    if module.ema is not None:
-        mapped = map_legacy_candi_state(
-            legacy_candi_state(checkpoint, use_ema=True), algorithm
-        )
-        module.ema.load_state_dict({
-            "decay": checkpoint["ema"]["decay"],
-            "num_updates": checkpoint["ema"]["num_updates"],
-            "shadow_params": [
-                mapped[name] for name, parameter in algorithm.named_parameters()
-                if parameter.requires_grad
-            ],
-        })
-    return int(checkpoint.get("global_step", 0))

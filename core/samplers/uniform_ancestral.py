@@ -92,10 +92,3 @@ class UniformAncestralSampler(DiscreteSampler):
         )
         super().__init__(rule, steps, epsilon, time_grid)
         self.final_denoise, self.use_float64 = final_denoise, use_float64
-
-    def _probabilities(self, prediction):
-        return self.update_rule._probabilities(prediction)
-
-    @torch.no_grad()
-    def sample(self, algo, prompt_tokens, prompt_mask):
-        return super().sample(algo, prompt_tokens, prompt_mask)

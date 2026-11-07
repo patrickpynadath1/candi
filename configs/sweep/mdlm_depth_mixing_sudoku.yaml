@@ -8,12 +8,9 @@ defaults:
 - _self_
 preparation:
   name: mdlm-depth-mixing-sudoku-20k-20261031
-  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/mdlm-depth-mixing-sudoku-20k-20261031
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/plans/mdlm-depth-mixing-sudoku-20k-20261031
   family: mdlm_depth_mixing
   recipe_name: mdlm-${preparation.architecture_name}
-  local:
-    gpu_ids: [6, 7]
-    concurrent_jobs: 2
   wandb:
     project: mdlm-depth-mixing-sudoku-20k-20261031
   # The MDLM algorithm uses discrete sampler adapters, not parallel-view adapters.

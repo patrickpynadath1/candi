@@ -57,12 +57,6 @@ preparation:
   - self_conditioning
   - optimizer
   local:
-    gpu_ids:
-    - 0
-    - 1
-    - 2
-    - 5
-    concurrent_jobs: 4
     resources_per_job:
       cpu: 4
       gpu: 1

@@ -19,13 +19,10 @@ self_conditioning:
   enabled: false
 preparation:
   name: e2d2-depth-scaling-20k-20261101
-  output: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/plans/e2d2-depth-scaling-20k-20261101
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/plans/e2d2-depth-scaling-20k-20261101
   family: e2d2_depth_scaling
   recipe_name: e2d2-${preparation.arm}-${scaling.depth}
   recipe_fields: [scaling, model, encoder_decoder, block_diffusion, representation, algorithm, parameterization, objective, noise_schedule, time_sampler, prediction, self_conditioning, optimizer]
-  local:
-    gpu_ids: [5, 7]
-    concurrent_jobs: 2
   wandb:
     project: e2d2-depth-scaling-20k-20261101
   inference:

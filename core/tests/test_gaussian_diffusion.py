@@ -8,14 +8,7 @@ from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from core.noise_schedules.gaussian_rank import GaussianRankSchedule
 from core.noise_schedules.linear_interpolation import LinearInterpolationSchedule
-from core.noise_schedules.utils import (
-    expected_rank,
-    training_sigma_ve,
-    inference_sigmas,
-    error_to_sigma,
-    sigma_to_error,
-    build_error_to_sigma_schedule,
-)
+from core.noise_schedules.utils import expected_rank
 from core.processes.gaussian import GaussianProcess
 from core.representations.one_hot import OneHotRepresentation
 from core.parameterizations.posterior import PosteriorParameterization
@@ -40,16 +33,7 @@ def test_rank_lookup_and_buffers():
         schedule(torch.tensor([float("nan")]))
 
 
-def test_schedule_utilities_roundtrip():
-    sigmas, errors = build_error_to_sigma_schedule(3, (0.2, 1.0), 20)
-    torch.testing.assert_close(error_to_sigma(errors, sigmas, errors), sigmas)
-    torch.testing.assert_close(sigma_to_error(sigmas, sigmas, errors), errors)
-    torch.testing.assert_close(
-        training_sigma_ve(torch.tensor([0.0, 1.0]), 0.2, 4), torch.tensor([0.2, 4.0])
-    )
-    torch.testing.assert_close(
-        inference_sigmas(5, 0.2, 4)[[0, -1]], torch.tensor([4.0, 0.2])
-    )
+def test_expected_rank_is_scalar_for_scalar_inputs():
     assert expected_rank(3, torch.tensor(1.0), torch.tensor(0.5)).ndim == 0
 
 

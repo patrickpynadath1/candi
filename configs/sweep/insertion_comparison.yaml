@@ -51,9 +51,6 @@ preparation:
   - self_conditioning
   - sampler
   - optimizer
-  local:
-    gpu_ids: [4, 6]
-    concurrent_jobs: 2
   wandb:
     project: insertion-before-after-text8-20261028
   evaluation:

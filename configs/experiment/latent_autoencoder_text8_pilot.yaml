@@ -5,7 +5,7 @@ defaults:
 - override /task: battery/text8
 - _self_
 seed: 1
-output_dir: ${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}/outputs/latent-autoencoder-text8-pilot-20261101
+output_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/outputs/latent-autoencoder-text8-pilot-20261101
 loader:
   global_batch_size: 256
   eval_batch_size: 8

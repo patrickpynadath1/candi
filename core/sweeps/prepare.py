@@ -1,7 +1,7 @@
 """Export Hydra multiruns for the existing queue; never launch training.
 
-python -m core.sweeps.prepare -m +sweep=gaussian preparation.output=/tmp/plan
-python -m core.sweeps.prepare collect /tmp/plan
+python -m core.sweeps.prepare -m +sweep=gaussian preparation.output=$CANDI_STORAGE_ROOT/plans/X
+python -m core.sweeps.prepare collect $CANDI_STORAGE_ROOT/plans/X
 """
 
 import argparse

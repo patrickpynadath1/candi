@@ -128,7 +128,7 @@ class TrainingModule(L.LightningModule):
         )
         # Accumulate detached, token-weighted metrics across microbatches.
         # Logging only the last microbatch aliases the stratified time ranges.
-        count = result.get("normalization_count", result["num_tokens"]).detach().float()
+        count = result["num_tokens"].detach().float()
         for key in (
             "loss",
             "main_loss",
