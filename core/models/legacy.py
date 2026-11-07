@@ -224,15 +224,116 @@ def convert_parameter_order(legacy_model, modular_model, values):
 
 
 
-def adopt(legacy_model, *, views=None, fusion=None, time_coordinate="time", fp32_clean_embedding=False):
-    """Move a constructed legacy DiT into an equivalent ModularDiT.
+def _legacy_config(legacy_model):
+    """The constructor config of a built legacy network (blocks excluded)."""
+    name = type(legacy_model).__name__
+    common = {"vocab_size": legacy_model.vocab_size, "n_blocks": 0, "dropout": 0.0}
+    common["cond_dim"] = legacy_model.sigma_map.mlp[0].out_features
+    common["n_heads"] = legacy_model.blocks[0].n_heads
+    if name == "SimplexDiT":
+        adapter = legacy_model.input_adapter
+        return {
+            "_target_": "core.models.simplex.SimplexDiT",
+            **common,
+            "hidden_size": legacy_model.vocab_embed.embedding.shape[1],
+            "adaLN": legacy_model.adaLN,
+            "input_mode": legacy_model.input_mode,
+            "projection_precision": getattr(adapter, "precision", "legacy"),
+            "projection_chunk_size": getattr(adapter, "chunk_size", 0),
+        }
+    if name == "SphereDiT":
+        return {
+            "_target_": "core.models.spherical.SphereDiT",
+            **common,
+            "hidden_size": legacy_model.hidden_dim,
+            "state_dim": legacy_model.state_dim,
+            "learn_temperature_scaling": legacy_model.learn_temperature,
+        }
+    if name == "ContinuousDiT":
+        linear = legacy_model.input_architecture == "linear"
+        embedding_head = legacy_model.output_architecture == "embedding_projection"
+        return {
+            "_target_": "core.models.continuous_dit.ContinuousDiT",
+            **common,
+            "hidden_size": legacy_model.input_projection.out_features,
+            "state_dim": legacy_model.state_dim,
+            "input_dim": None if linear else legacy_model.input_embedding.shape[1],
+            "output_dim": legacy_model.output_embedding.shape[1] if embedding_head else None,
+            "epsilon": legacy_model.epsilon,
+            "input_preconditioning": legacy_model.input_preconditioning,
+            "time_conditioning": legacy_model.time_conditioning,
+            "input_architecture": legacy_model.input_architecture,
+            "output_architecture": legacy_model.output_architecture,
+            "time_input": legacy_model.time_input_projection is not None,
+            "input_projection_bias": linear and legacy_model.input_projection.bias is not None,
+        }
+    raise ValueError(f"no adopter for {name}")
+
+
+def _move(model, path, value):
+    *owners, leaf = path.split(".")
+    owner = model
+    for name in owners:
+        owner = getattr(owner, name)
+    setattr(owner, leaf, value)
+
+
+def _adopt_state_network(legacy_model, time_coordinate=None):
+    """SimplexDiT, SphereDiT or ContinuousDiT as its ModularDiT preset.
+
+    The preset comes from ``modular_config`` (proven equal in
+    test_modular_dit); the legacy submodules and parameters then replace the
+    preset's under the ``_RENAMES`` table, so nothing is reinitialized.
+    """
+    import torch
+    from hydra.utils import instantiate
+
+    from . import modular
+
+    config = _legacy_config(legacy_model)
+    kind = LEGACY_TARGETS[config["_target_"]]
+    preset = modular_config(config)
+    if time_coordinate is not None:
+        preset["time"]["coordinate"] = time_coordinate
+    with torch.random.fork_rng(devices=[]):
+        model = instantiate(preset)
+    for old, new in _RENAMES[kind]:
+        name = old.rstrip(".")
+        if name in ("conditioning_adapter", "vocab_embed"):
+            continue
+        value = getattr(legacy_model, name, None)
+        if value is not None:
+            _move(model, new.rstrip("."), value)
+    if kind == "simplex":
+        model.input.embedding = legacy_model.vocab_embed
+    model.block_execution = legacy_model.block_execution
+    model.rotary_emb = legacy_model.rotary_emb
+    model.blocks = legacy_model.blocks
+    if getattr(model.output, "layer", None) is not None:
+        model.output.apply_output = legacy_model.output_adapter
+    adapter = legacy_model.conditioning_adapter
+    if adapter is not None:
+        model.self_conditioning = modular.SelfConditioning.wrap(
+            adapter,
+            space="hidden" if kind == "simplex" else "state",
+            scale=getattr(legacy_model, "conditioning_scale", 1.0),
+        )
+    return model
+
+
+def adopt(legacy_model, *, views=None, fusion=None, time_coordinate=None, fp32_clean_embedding=False):
+    """Move a constructed legacy network into an equivalent ModularDiT.
 
     The legacy submodules (blocks, block policy, rotary, time embedder, output
     layer, self-conditioning adapter, token table) are reused as they are, so
-    custom sublayers and depth mixing carry over, parameter order is unchanged,
-    and no random numbers are drawn. With ``views`` the token table becomes the
-    first view's representation (as HybridModel bound it); otherwise the
-    network keeps a token input.
+    custom sublayers and depth mixing carry over, the parameters are the same
+    tensors, and no random numbers are drawn.
+
+    A token DiT with ``views`` binds its table to the first view's
+    representation (as HybridModel did); without views it keeps a token input.
+    SimplexDiT, SphereDiT and ContinuousDiT keep their single-state input slot:
+    their recipes hold the view on the algorithm (``HybridDiffusion(views=...)``).
+    ``time_coordinate`` overrides the network's own time coordinate.
     """
     import torch
     from functools import partial
@@ -241,7 +342,10 @@ def adopt(legacy_model, *, views=None, fusion=None, time_coordinate="time", fp32
     from core.representations.noisy_inputs import TokenRepresentation
 
     if type(legacy_model).__name__ != "DiT":
-        raise ValueError("adopt currently supports the token DiT")
+        if views is not None or fusion is not None:
+            raise ValueError("only the token DiT binds views; pass them to HybridDiffusion")
+        return _adopt_state_network(legacy_model, time_coordinate)
+    time_coordinate = "time" if time_coordinate is None else time_coordinate
     table = legacy_model.vocab_embed.embedding
     with torch.random.fork_rng(devices=[]):
         model = modular.ModularDiT(
