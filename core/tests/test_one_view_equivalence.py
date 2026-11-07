@@ -36,8 +36,11 @@ FAMILIES = {
 }
 
 
-def build(experiment, target, self_conditioning, seed=0):
-    cfg = compose(experiment, {**SMALL, "self_conditioning.enabled": self_conditioning})
+def build(experiment, target, self_conditioning, seed=0, overrides=None):
+    options = {**SMALL, **(overrides or {})}
+    if self_conditioning is not None:
+        options["self_conditioning.enabled"] = self_conditioning
+    cfg = compose(experiment, options)
     if target is not None:
         OmegaConf.update(cfg, "algorithm._target_", target)
     torch.manual_seed(seed)
@@ -126,45 +129,14 @@ MDLM_VARIANTS = {
 }
 
 
-def mdlm_one_view(standalone):
-    """MDLM as a one-view HybridDiffusion on an adopted ModularDiT."""
-    import copy
-
-    from core.models.legacy import adopt
-    from core.modifiers.hybrid.training import HybridDiffusion
-    from core.modifiers.hybrid.views import DiffusionView
-    from core.representations.noisy_inputs import TokenRepresentation
-    from core.samplers.hybrid_updates import DiscretePosteriorUpdate
-
-    algorithm = copy.deepcopy(standalone)
-    table = algorithm.model.vocab_embed.embedding
-    with torch.random.fork_rng():
-        representation = TokenRepresentation(*table.shape)
-    view = DiffusionView(
-        algorithm.process, algorithm.schedule, representation, DiscretePosteriorUpdate()
-    )
-    model = adopt(
-        algorithm.model,
-        views=[view],
-        time_coordinate="negative_log_keep" if algorithm.time_conditioning else "zero",
-        fp32_clean_embedding=True,
-    )
-    return HybridDiffusion(
-        model,
-        algorithm.predictor,
-        algorithm.time_sampler,
-        algorithm.objective,
-        length=algorithm.length,
-        prediction=algorithm.prediction,
-    )
+MDLM_REFERENCE = "core.tests.reference_algorithms.mdlm.MDLM"
 
 
 @pytest.mark.parametrize("variant", sorted(MDLM_VARIANTS))
 def test_mdlm_training_is_identical_on_the_view_path(variant):
     cfg = compose("sudoku_hard", {**SMALL, **MDLM_VARIANTS[variant]})
-    torch.manual_seed(0)
-    standalone = instantiate(cfg.algorithm)
-    viewed = mdlm_one_view(standalone)
+    _, standalone = build("sudoku_hard", MDLM_REFERENCE, None, overrides=MDLM_VARIANTS[variant])
+    _, viewed = build("sudoku_hard", None, None, overrides=MDLM_VARIANTS[variant])
     old, new = list(standalone.parameters()), list(viewed.parameters())
     assert len(old) == len(new) and all(torch.equal(a, b) for a, b in zip(old, new))
     tokens, mask = batch(cfg)
@@ -198,9 +170,8 @@ MDLM_SAMPLERS = [
 @pytest.mark.parametrize("variant", ["default", "adaln_negative_log_keep", "self_conditioning"])
 def test_mdlm_sampling_is_identical_on_the_view_path(variant):
     cfg = compose("sudoku_hard", {**SMALL, **MDLM_VARIANTS[variant]})
-    torch.manual_seed(0)
-    standalone = instantiate(cfg.algorithm)
-    viewed = mdlm_one_view(standalone)
+    _, standalone = build("sudoku_hard", MDLM_REFERENCE, None, overrides=MDLM_VARIANTS[variant])
+    _, viewed = build("sudoku_hard", None, None, overrides=MDLM_VARIANTS[variant])
     tokens, _ = batch(cfg)
     prompt = tokens[:3]
     fixed = torch.zeros_like(prompt, dtype=torch.bool)

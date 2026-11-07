@@ -5,6 +5,8 @@ from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 import torch
 
+from core.tests.view_inputs import token_call
+
 from core.modifiers.block_diffusion import BlockDiffusion, BlockSampler
 from core.modifiers.block_diffusion.layout import make_layout
 from core.samplers.ancestral import AncestralSampler
@@ -67,18 +69,18 @@ def test_full_block_matches_unmodified_model_and_future_clean_cannot_leak():
     tokens = torch.randint(0, 12, (2, 8))
     noisy = torch.randint(0, 12, (2, 8))
     condition = torch.zeros(2)
-    expected = reference(noisy, condition)
+    expected = token_call(reference, noisy, condition)
     with wrapped.model.clean_context(tokens):
-        actual = wrapped.model(noisy, condition)
+        actual = token_call(wrapped.model, noisy, condition)
     torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
 
     wrapped.block_size = wrapped.model.block_size = 2
     changed = tokens.clone()
     changed[:, 2:] = (changed[:, 2:] + 1) % 12
     with wrapped.model.clean_context(tokens):
-        first = wrapped.model(noisy, condition)
+        first = token_call(wrapped.model, noisy, condition)
     with wrapped.model.clean_context(changed):
-        second = wrapped.model(noisy, condition)
+        second = token_call(wrapped.model, noisy, condition)
     torch.testing.assert_close(first[:, :2], second[:, :2])
 
 
@@ -94,7 +96,7 @@ def test_shifted_clean_loss_respects_target_mask_and_backpropagates():
     mask = torch.tensor([[0, 0, 0, 0, 1, 1, 0, 0], [0, 0, 1, 1, 0, 0, 0, 0]])
     result = algorithm.loss(tokens, mask)
     with algorithm.model.clean_context(tokens):
-        algorithm.model(tokens, torch.zeros(len(tokens)))
+        token_call(algorithm.model, tokens, torch.zeros(len(tokens)))
         logits = algorithm.model.last_clean_logits
     losses = torch.nn.functional.cross_entropy(
         logits[:, :-1].transpose(1, 2), tokens[:, 1:], reduction="none"
@@ -102,7 +104,7 @@ def test_shifted_clean_loss_respects_target_mask_and_backpropagates():
     expected = (losses * mask[:, 1:]).sum() / mask[:, 1:].sum()
     torch.testing.assert_close(result["clean_loss"], expected)
     result["loss"].backward()
-    assert algorithm.model.model.vocab_embed.embedding.grad is not None
+    assert algorithm.model.model.token_table.grad is not None
 
 
 @torch.no_grad()
@@ -114,24 +116,24 @@ def test_middle_block_visibility_and_prefix_kv_cache():
     noisy = torch.randint(0, 12, (1, 8))
     condition = torch.zeros(1)
     with algorithm.model.clean_context(clean):
-        baseline = algorithm.model(noisy, condition)
+        baseline = token_call(algorithm.model, noisy, condition)
     forbidden_clean = clean.clone()
     forbidden_clean[:, 2:] = (forbidden_clean[:, 2:] + 1) % 12
     forbidden_noisy = noisy.clone()
     forbidden_noisy[:, :2] = (forbidden_noisy[:, :2] + 1) % 12
     forbidden_noisy[:, 4:] = (forbidden_noisy[:, 4:] + 1) % 12
     with algorithm.model.clean_context(forbidden_clean):
-        unchanged = algorithm.model(forbidden_noisy, condition)
+        unchanged = token_call(algorithm.model, forbidden_noisy, condition)
     torch.testing.assert_close(baseline[:, 2:4], unchanged[:, 2:4])
     earlier = clean.clone()
     earlier[:, :2] = (earlier[:, :2] + 1) % 12
     with algorithm.model.clean_context(earlier):
-        changed = algorithm.model(noisy, condition)
+        changed = token_call(algorithm.model, noisy, condition)
     assert not torch.equal(baseline[:, 2:4], changed[:, 2:4])
 
     prefix, active = clean[:, :4], noisy[:, 4:6]
     with algorithm.model.clean_context(prefix, offset=4):
-        uncached = algorithm.model(active, condition)
+        uncached = token_call(algorithm.model, active, condition)
     calls = 0
 
     def count(*unused):
@@ -141,8 +143,8 @@ def test_middle_block_visibility_and_prefix_kv_cache():
     handle = algorithm.model.model.blocks[0].attn_qkv.register_forward_hook(count)
     cache = {}
     with algorithm.model.clean_context(prefix, offset=4, cache=cache):
-        cached_first = algorithm.model(active, condition)
-        cached_second = algorithm.model(active, condition)
+        cached_first = token_call(algorithm.model, active, condition)
+        cached_second = token_call(algorithm.model, active, condition)
     handle.remove()
     torch.testing.assert_close(cached_first, uncached, rtol=1e-5, atol=1e-6)
     torch.testing.assert_close(cached_second, uncached, rtol=1e-5, atol=1e-6)

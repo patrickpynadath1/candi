@@ -1,7 +1,7 @@
 """Parallel-view hybrid diffusion with one shared clean-token posterior."""
 
 import torch
-from .views import point, clamp
+from .views import ViewPoint, point, clamp
 
 from core.algorithms.posterior import PosteriorDiffusion
 from core.algorithms.adaptive import validate_adaptive_feedback, observe_training_loss
@@ -130,14 +130,24 @@ class HybridDiffusion(PosteriorDiffusion):
         step=0,
         training=False,
         sequence_layout=None,
+        time_sampler=None,
+        objective=None,
+        pure_noise=False,
         **time_context,
     ):
+        """``time_sampler``/``objective`` override the defaults for this call and
+        ``pure_noise`` trains a one-view keep-rate recipe at keep=0 (block-size
+        mixtures use these)."""
         if corruption_mask is None:
             corruption_mask = loss_mask
+        default_sampler = self.time_sampler if time_sampler is None else time_sampler
+        objective = self.objective if objective is None else objective
+        if self.adaptive_time_views and time_sampler is not None:
+            raise ValueError("per-call time samplers do not combine with adaptive views")
         # Keep the coordinator/discrete clock uniform. Only selected continuous
         # views receive the learned quantile map, in training AND generation.
         sampler = (
-            self.time_sampler.uniform if self.adaptive_time_views else self.time_sampler
+            default_sampler.uniform if self.adaptive_time_views else default_sampler
         )
         time = sampler.sample(len(tokens), tokens.device, **time_context)
         feedback_time = self._adaptive_time(time) if self.adaptive_time_views else time
@@ -147,6 +157,15 @@ class HybridDiffusion(PosteriorDiffusion):
             corruption_mask=corruption_mask,
             sequence_layout=sequence_layout,
         )
+        if pure_noise:
+            from core.objectives.cross_entropy import CrossEntropy
+
+            if not isinstance(objective, CrossEntropy):
+                raise ValueError("pure-noise training requires a CE objective")
+            if len(points) != 1 or not isinstance(points[0].coefficients, tuple):
+                raise ValueError("pure-noise training needs one keep-rate view")
+            keep, derivative = points[0].coefficients
+            points = (ViewPoint(points[0].time, (torch.zeros_like(keep), derivative)),)
         states = tuple(
             view.process.corrupt_state(
                 view.representation.encode(tokens), local.coefficients, corruption_mask
@@ -156,7 +175,7 @@ class HybridDiffusion(PosteriorDiffusion):
         if self.synchronize_committed:
             states = self._synchronize_committed(states)
         prediction = self.training_prediction(states, points, time)
-        per_token = self.objective(
+        per_token = objective(
             prediction,
             tokens,
             **(
@@ -171,7 +190,7 @@ class HybridDiffusion(PosteriorDiffusion):
                         ),
                     )
                 }
-                if getattr(self.objective, "requires_context", False)
+                if getattr(objective, "requires_context", False)
                 else {}
             ),
         )
@@ -180,7 +199,7 @@ class HybridDiffusion(PosteriorDiffusion):
         if count <= 0:
             raise ValueError("loss mask must include at least one target")
         if training:
-            observe_time = getattr(self.time_sampler, "observe", None)
+            observe_time = getattr(default_sampler, "observe", None)
             if observe_time is not None:
                 observe_time(feedback_time, per_token, loss_mask, step)
             for view, point in zip(self.views, points):

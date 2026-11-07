@@ -5,6 +5,8 @@ from pathlib import Path
 import ast
 import pytest
 import torch
+
+from core.tests.view_inputs import view_prediction
 from torch import nn
 from hydra import compose, initialize_config_dir
 
@@ -139,6 +141,10 @@ class Oracle(nn.Module):
 
 
 def oracle():
+    # Sampler orchestration on the standalone (state, keep) interface, which
+    # D3PM and the other standalone families still use.
+    from core.tests.reference_algorithms.mdlm import MDLM
+
     return MDLM(
         Oracle(),
         PosteriorParameterization(3),
@@ -251,12 +257,13 @@ def test_recursive_config_construction_tracks_overrides_and_serializes():
     assert algorithm.predictor.temperature == 0.7
     keep, _ = algorithm.schedule(torch.ones(1))
     torch.testing.assert_close(keep, torch.tensor([0.02]))
-    logits = algorithm.model_logits(torch.zeros(1, 20, dtype=torch.long), torch.ones(1))
+    logits = view_prediction(algorithm.model_logits, torch.zeros(1, 20, dtype=torch.long), torch.ones(1))
     assert logits.shape == (1, 20, 18)
     # Selection isn't hardcoded to MDLM in the caller.
     settings.algorithm._target_ = "types.SimpleNamespace"
     alternative = instantiate(settings.algorithm)
-    assert alternative.model.__class__ == algorithm.model.__class__
+    # MDLM adopts the configured DiT into its view network; the config is unchanged.
+    assert type(alternative.model).__name__ == "DiT"
     assert alternative.predictor.mask_index == 17
 
 

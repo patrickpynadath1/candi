@@ -6,6 +6,8 @@ from hydra import compose, initialize_config_dir
 import pytest
 import torch
 
+from core.tests.view_inputs import view_prediction
+
 from core.modifiers.block_diffusion.layout import make_layout
 from core.training.module import TrainingModule
 
@@ -47,14 +49,31 @@ def test_recipe_loss_backward_and_time_independence(kind):
     assert algorithm.model.output_layer.linear.weight.grad.abs().sum() > 0
 
     seen = []
-    handle = algorithm.model.register_forward_pre_hook(
-        lambda _module, inputs: seen.append(inputs[1].detach().clone())
-    )
+    viewed = hasattr(algorithm, "views")
+    network = algorithm.model.model if viewed else None
+
+    def record(_module, inputs):
+        if viewed:
+            # The conditioning the network computes from (points, time).
+            seen.append(network.time(inputs[2], inputs[1][0]).detach().clone())
+        else:
+            seen.append(inputs[1].detach().clone())
+
+    handle = algorithm.model.register_forward_pre_hook(record)
     with algorithm.model.clean_context(tokens):
-        algorithm.training_prediction(tokens, torch.tensor([0.2, 0.8]))
-        algorithm.sampling_prediction(tokens, torch.tensor([0.3, 0.9]))
+        for endpoint, keep in (
+            (algorithm.training_prediction, torch.tensor([0.2, 0.8])),
+            (algorithm.sampling_prediction, torch.tensor([0.3, 0.9])),
+        ):
+            if viewed:
+                view_prediction(endpoint, tokens, keep)
+            else:
+                endpoint(tokens, keep)
     handle.remove()
-    assert len(seen) == 2 and all(torch.equal(t, torch.zeros(2)) for t in seen)
+    # Time-independent: the same conditioning at different times (zero input).
+    assert len(seen) == 2 and torch.equal(seen[0], seen[1])
+    if not viewed:
+        assert all(torch.equal(t, torch.zeros(2)) for t in seen)
 
 
 def test_masked_ce_has_no_time_weight_and_counts_all_eligible_positions():

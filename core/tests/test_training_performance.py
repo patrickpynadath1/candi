@@ -3,6 +3,8 @@
 import copy
 import pytest
 import torch
+
+from core.tests.view_inputs import view_prediction
 from core.tests.test_self_conditioning import algorithm, inputs
 from core.models.components import DiffusionBlocks
 
@@ -20,8 +22,8 @@ def test_execution_preserves_outputs_gradients_and_checkpoint_keys(optimization)
     else:
         optimized.model.hidden_only_bootstrap = True
     tokens, keep = inputs(original)
-    expected = original.training_prediction(tokens, keep)
-    actual = optimized.training_prediction(tokens, keep)
+    expected = view_prediction(original.training_prediction, tokens, keep)
+    actual = view_prediction(optimized.training_prediction, tokens, keep)
     torch.testing.assert_close(actual, expected)
     expected[..., 0].sum().backward()
     actual[..., 0].sum().backward()
@@ -43,7 +45,7 @@ def test_hidden_only_bootstrap_skips_unused_vocabulary_projection():
     handle = model.model.output_layer.register_forward_hook(
         lambda *args: seen.append(1)
     )
-    model.training_prediction(*inputs(model))
+    view_prediction(model.training_prediction, *inputs(model))
     handle.remove()
     assert len(seen) == 1  # Only the differentiable pass needs vocabulary logits.
 

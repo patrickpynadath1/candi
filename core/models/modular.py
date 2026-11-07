@@ -194,6 +194,10 @@ TIME_COORDINATES = {
     "negative_log_keep": lambda time, point, epsilon: -torch.log(
         _keep(point).float().clamp_min(1e-6)
     ),
+    # Standalone MDLM's -log(keep): keep clamped at the dtype's smallest normal.
+    "negative_log_keep_exact": lambda time, point, epsilon: -_keep(point).clamp_min(
+        torch.finfo(_keep(point).dtype).tiny
+    ).log(),
     # HybridModel's log(1 - t).
     "log1p_negative_time": lambda time, point, epsilon: torch.log1p(
         -time.float().clamp(max=1 - 1e-6)
@@ -405,6 +409,19 @@ class ModularDiT(TextDiT):
     @property
     def views(self):
         return getattr(self.input, "views", None)
+
+    @property
+    def token_table(self):
+        """The token embedding table (token input or the token view's), if any."""
+        return getattr(self.input, "token_table", None) if self.views is not None else getattr(self.input, "table", None)
+
+    @property
+    def output_layer(self):
+        """The final AdaLN layer (the DiT name), when the head has one."""
+        layer = getattr(self.output, "layer", None)
+        if layer is None:
+            raise AttributeError("this output head has no final AdaLN layer")
+        return layer
 
     @property
     def conditioning_adapter(self):

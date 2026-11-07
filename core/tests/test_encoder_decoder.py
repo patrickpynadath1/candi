@@ -1,6 +1,8 @@
 import pytest
 import torch
 
+from core.tests.view_inputs import token_call
+
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
 
@@ -37,7 +39,7 @@ def test_no_current_or_future_answer_leakage_and_context_has_effect(encoder_laye
 
     def predict(x):
         with m.clean_context(x):
-            return m(noisy, t)
+            return token_call(m, noisy, t)
 
     baseline = predict(clean)
     changed = clean.clone()
@@ -57,11 +59,11 @@ def test_parallel_matches_blockwise_and_cached(start, encoder_layers):
     noisy = torch.randint(0, 12, (2, 8))
     t = torch.zeros(2)
     with m.clean_context(clean):
-        expected = m(noisy, t)[:, start : start + 2]
+        expected = token_call(m, noisy, t)[:, start : start + 2]
     cache = {}
     with m.clean_context(clean[:, :start], offset=start, cache=cache):
-        actual = m(noisy[:, start : start + 2], t)
-        cached = m(noisy[:, start : start + 2], t)
+        actual = token_call(m, noisy[:, start : start + 2], t)
+        cached = token_call(m, noisy[:, start : start + 2], t)
     torch.testing.assert_close(actual, expected, atol=1e-6, rtol=1e-5)
     torch.testing.assert_close(actual, cached)
     assert "decoder_context_kv" in cache
@@ -78,7 +80,7 @@ def test_checkpoint_gradients_and_encoder_receives_training_signal():
     t = torch.zeros(2)
     for m in (eager, checked):
         with m.clean_context(clean):
-            m(noisy, t)[:, 2:].square().mean().backward()
+            token_call(m, noisy, t)[:, 2:].square().mean().backward()
     for (name, a), (_, b) in zip(eager.named_parameters(), checked.named_parameters()):
         if a.grad is not None:
             torch.testing.assert_close(a.grad, b.grad, atol=1e-6, rtol=1e-4)
@@ -173,7 +175,7 @@ def test_incremental_prefix_cache_matches_recompute_and_only_encodes_new_tokens(
     cache = {}
     for start in (0, 2, 4, 6):
         with m.clean_context(clean[:, :start], offset=start):
-            expected = m(noisy[:, start : start + 2], t)
+            expected = token_call(m, noisy[:, start : start + 2], t)
 
         def record(_module, args, kwargs):
             if kwargs.get("return_key_value", False):
@@ -181,8 +183,8 @@ def test_incremental_prefix_cache_matches_recompute_and_only_encodes_new_tokens(
 
         hook = encoder[0].register_forward_pre_hook(record, with_kwargs=True)
         with m.clean_context(clean[:, :start], offset=start, cache=cache):
-            actual = m(noisy[:, start : start + 2], t)
-            repeated = m(noisy[:, start : start + 2], t)
+            actual = token_call(m, noisy[:, start : start + 2], t)
+            repeated = token_call(m, noisy[:, start : start + 2], t)
         hook.remove()
         torch.testing.assert_close(expected, actual, atol=1e-6, rtol=1e-5)
         torch.testing.assert_close(actual, repeated)
@@ -191,9 +193,9 @@ def test_incremental_prefix_cache_matches_recompute_and_only_encodes_new_tokens(
     changed = clean[:, :6].clone()
     changed[:, 0] = (changed[:, 0] + 1) % 12
     with m.clean_context(changed, offset=6):
-        expected = m(noisy[:, 6:], t)
+        expected = token_call(m, noisy[:, 6:], t)
     with m.clean_context(changed, offset=6, cache=cache):
-        actual = m(noisy[:, 6:], t)
+        actual = token_call(m, noisy[:, 6:], t)
     torch.testing.assert_close(actual, expected, atol=1e-6, rtol=1e-5)
 
 
@@ -220,11 +222,11 @@ def test_extending_incomplete_clean_block_invalidates_cache(recipe):
     t = torch.zeros(1)
     cache = {}
     with m.clean_context(x[:, :1], offset=4, cache=cache):
-        m(x[:, 4:], t)
+        token_call(m, x[:, 4:], t)
     with m.clean_context(x[:, :4], offset=4, cache=cache):
-        actual = m(x[:, 4:], t)
+        actual = token_call(m, x[:, 4:], t)
     with m.clean_context(x[:, :4], offset=4):
-        expected = m(x[:, 4:], t)
+        expected = token_call(m, x[:, 4:], t)
     torch.testing.assert_close(actual, expected, atol=1e-6, rtol=1e-5)
 
 
@@ -281,10 +283,10 @@ def test_raw_context_projects_embeddings_and_trains_them(checkpoint, monkeypatch
 
     monkeypatch.setattr(block, "project_context_key_value", record)
     with m.clean_context(clean, offset=4):
-        m(noisy, torch.zeros(2)).square().mean().backward()
-    torch.testing.assert_close(seen[0], m.vocab_embed(clean))
+        token_call(m, noisy, torch.zeros(2)).square().mean().backward()
+    torch.testing.assert_close(seen[0], m.token_table[clean])
     # Token1 occurs only in clean context, proving gradients through that path.
-    assert m.vocab_embed.embedding.grad[1].norm() > 0
+    assert m.token_table.grad[1].norm() > 0
 
 
 @torch.no_grad()
@@ -303,12 +305,12 @@ def test_raw_context_cache_only_projects_new_tokens(monkeypatch):
     cache = {}
     for start in (0, 2, 4, 6):
         with m.clean_context(clean[:, :start], offset=start):
-            expected = m(noisy[:, start : start + 2], torch.zeros(2))
+            expected = token_call(m, noisy[:, start : start + 2], torch.zeros(2))
         with monkeypatch.context() as patch:
             patch.setattr(block, "project_context_key_value", record)
             with m.clean_context(clean[:, :start], offset=start, cache=cache):
-                actual = m(noisy[:, start : start + 2], torch.zeros(2))
-                repeated = m(noisy[:, start : start + 2], torch.zeros(2))
+                actual = token_call(m, noisy[:, start : start + 2], torch.zeros(2))
+                repeated = token_call(m, noisy[:, start : start + 2], torch.zeros(2))
         torch.testing.assert_close(actual, expected, atol=1e-6, rtol=1e-5)
         torch.testing.assert_close(actual, repeated)
     assert lengths == [2, 2, 2]

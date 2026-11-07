@@ -24,7 +24,7 @@ class RecordingSchedule(nn.Module):
         return self.base(time)
 
     def training_time(self, time):
-        return self.base.training_time(time)
+        return getattr(self.base, "training_time", lambda value: value)(time)
 
     def observe(self, time, loss, step, *, training):
         assert training

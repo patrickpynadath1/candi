@@ -1,15 +1,21 @@
-"""MDLM training orchestration and model-to-posterior prediction."""
+"""MDLM: absorbing (masked) diffusion trained as clean-token posterior prediction.
 
-from .adaptive import validate_adaptive_feedback
-from .training_loss import finish_training_loss
+Runs on the view path: one absorbing view on a ModularDiT adopted from the
+configured DiT (see core/models/legacy.py:adopt). Training, sampling and
+parameter order are bit-identical to the former standalone implementation,
+which core/tests/reference_algorithms/mdlm.py keeps for comparison.
+"""
 
 import torch
-from .posterior import PosteriorDiffusion
-from core.objectives.cross_entropy import CrossEntropy
-from core.objectives.weighting import ObjectiveContext
+
+from core.models.legacy import adopt
+from core.modifiers.hybrid.training import HybridDiffusion
+from core.modifiers.hybrid.views import DiffusionView
+from core.representations.noisy_inputs import TokenRepresentation
+from core.samplers.hybrid_updates import DiscretePosteriorUpdate
 
 
-class MDLM(PosteriorDiffusion):
+class MDLM(HybridDiffusion):
     def __init__(
         self,
         model,
@@ -22,64 +28,34 @@ class MDLM(PosteriorDiffusion):
         time_conditioning=False,
         prediction=None,
     ):
-        super().__init__(prediction)
-        self.model, self.predictor, self.process = model, predictor, process
-        self.schedule, self.time_sampler, self.objective = (
-            schedule,
-            time_sampler,
-            objective,
+        table = model.vocab_embed.embedding
+        with torch.random.fork_rng(devices=[]):  # The table is adopted below.
+            representation = TokenRepresentation(*table.shape)
+        view = DiffusionView(process, schedule, representation, DiscretePosteriorUpdate())
+        network = adopt(
+            model,
+            views=[view],
+            # -log(keep) exactly as MDLM computed it, or zero time input.
+            time_coordinate="negative_log_keep_exact" if time_conditioning else "zero",
+            fp32_clean_embedding=True,
         )
-        self.length, self.time_conditioning = length, time_conditioning
-        validate_adaptive_feedback(schedule, predictor)
-        self.validate_prediction()
+        super().__init__(
+            network, predictor, time_sampler, objective, length=length, prediction=prediction
+        )
+        self.time_conditioning = time_conditioning
 
-    def model_inputs(self, state, keep):
-        condition = -keep.clamp_min(torch.finfo(keep.dtype).tiny).log() if self.time_conditioning else torch.zeros_like(keep)
-        return state, condition
+    @property
+    def process(self):
+        return self.views[0].process
 
-    def loss(
-        self,
-        tokens,
-        loss_mask,
-        corruption_mask=None,
-        *,
-        step=0,
-        training=False,
-        time_sampler=None,
-        objective=None,
-        pure_noise=False,
-        **time_context,
-    ):
-        time_sampler = self.time_sampler if time_sampler is None else time_sampler
-        objective = self.objective if objective is None else objective
-        if corruption_mask is None:
-            corruption_mask = loss_mask
-        times = time_sampler.sample(len(tokens), tokens.device, **time_context)
-        keep, derivative = self.schedule(times)
-        if pure_noise:
-            if not isinstance(objective, CrossEntropy):
-                raise ValueError("pure-noise discrete training requires a CE objective")
-            keep = torch.zeros_like(keep)
-        noisy = self.process.corrupt(tokens, keep, corruption_mask)
-        prediction = self.training_prediction(
-            noisy, keep
-        )  # Shaping cannot enter this path.
-        if isinstance(objective, CrossEntropy):
-            per_token = objective(
-                prediction, tokens,
-                context=ObjectiveContext(time=times, alpha=keep, sigma=-keep.clamp_min(torch.finfo(keep.dtype).tiny).log()),
-            )
+    @property
+    def schedule(self):
+        return self.views[0].schedule
+
+    def __setattr__(self, name, value):
+        # nn.Module routes module values before property setters; send the
+        # view's components to the view.
+        if name in ("process", "schedule") and "model" in self._modules:
+            setattr(self.views[0], name, value)
         else:
-            per_token = objective(prediction, tokens, keep, derivative)
-        return finish_training_loss(
-            per_token,
-            loss_mask,
-            tokens=tokens,
-            prediction=prediction,
-            step=step,
-            training=training,
-            time_sampler=time_sampler,
-            sampler_time=times,
-            schedule=self.schedule,
-            schedule_time=times,
-        )
+            super().__setattr__(name, value)

@@ -65,3 +65,11 @@ class PosteriorUniformDiffusion(HybridDiffusion):
     @property
     def schedule(self):
         return self.views[0].schedule
+
+    def __setattr__(self, name, value):
+        # nn.Module routes module values before property setters; send the
+        # view's components to the view.
+        if name in ("process", "schedule") and "model" in self._modules:
+            setattr(self.views[0], name, value)
+        else:
+            super().__setattr__(name, value)

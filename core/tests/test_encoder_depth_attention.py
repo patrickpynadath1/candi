@@ -4,6 +4,8 @@ import math
 
 import pytest
 import torch
+
+from core.tests.view_inputs import token_call
 from omegaconf import OmegaConf
 
 from core.models.layers import regular_attention_multi_headed
@@ -129,14 +131,14 @@ def test_no_leakage_and_actual_encoder_keys_used(checkpointed):
         lambda _m, _a, out: seen.append(out[1])
     )
     with m.clean_context(clean):
-        baseline = m(noisy, time)
+        baseline = token_call(m, noisy, time)
     hook.remove()
     # Keys and values returned by the actual encoder attention, not final states.
     with torch.no_grad():
         layout = make_layout(
             8, 2, clean.device, batch_size=2, clean_length=8, x0_causal=False
         )
-        hidden = m.vocab_embed(clean)
+        hidden = m.token_table[clean]
         rotary = m.rotary_emb(hidden, position_ids=layout.position_ids[:, :8])
         context = m.model._encode(hidden, rotary, layout.attention_mask[:, :, :8, :8])
     torch.testing.assert_close(context[0][:, :, 0], seen[0][0])
@@ -144,12 +146,12 @@ def test_no_leakage_and_actual_encoder_keys_used(checkpointed):
     changed = clean.clone()
     changed[:, 2:] = (changed[:, 2:] + 1) % 9
     with m.clean_context(changed):
-        other = m(noisy, time)
+        other = token_call(m, noisy, time)
     torch.testing.assert_close(baseline[:, :4], other[:, :4])
     changed = clean.clone()
     changed[:, :2] = (changed[:, :2] + 1) % 9
     with m.clean_context(changed):
-        other = m(noisy, time)
+        other = token_call(m, noisy, time)
     assert not torch.allclose(baseline[:, 2:4], other[:, 2:4])
     baseline.square().mean().backward()
     assert m.model.encoder[0].attn_qkv.weight.grad is not None
@@ -167,7 +169,7 @@ def test_incremental_cache_matches_parallel_and_recompute():
     noisy = torch.randint(0, 9, (2, 8))
     time = torch.zeros(2)
     with m.clean_context(clean):
-        parallel = m(noisy, time)
+        parallel = token_call(m, noisy, time)
     cache = {}
     lengths = []
     hook = m.model.encoder[0].register_forward_pre_hook(
@@ -175,8 +177,8 @@ def test_incremental_cache_matches_parallel_and_recompute():
     )
     for start in (0, 2, 4, 6):
         with m.clean_context(clean[:, :start], offset=start, cache=cache):
-            actual = m(noisy[:, start : start + 2], time)
-            repeated = m(noisy[:, start : start + 2], time)
+            actual = token_call(m, noisy[:, start : start + 2], time)
+            repeated = token_call(m, noisy[:, start : start + 2], time)
         torch.testing.assert_close(
             actual, parallel[:, start : start + 2], atol=1e-6, rtol=1e-5
         )
@@ -218,7 +220,7 @@ def test_terminal_readout_matches_full_block_without_unused_parameters(layers):
     outputs = []
     for model in (optimized, reference_model):
         with model.clean_context(clean):
-            outputs.append(model(noisy, torch.zeros(2)))
+            outputs.append(token_call(model, noisy, torch.zeros(2)))
         outputs[-1].square().sum().backward()
     torch.testing.assert_close(*outputs, atol=1e-6, rtol=1e-5)
     torch.testing.assert_close(
@@ -228,8 +230,8 @@ def test_terminal_readout_matches_full_block_without_unused_parameters(layers):
         rtol=1e-4,
     )
     torch.testing.assert_close(
-        optimized.vocab_embed.embedding.grad,
-        reference_model.vocab_embed.embedding.grad,
+        optimized.token_table.grad,
+        reference_model.token_table.grad,
         atol=1e-5,
         rtol=1e-4,
     )

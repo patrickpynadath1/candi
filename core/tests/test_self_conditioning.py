@@ -9,6 +9,8 @@ from omegaconf import OmegaConf
 import pytest
 import torch
 
+from core.tests.view_inputs import view_prediction
+
 from core.models.dit import DiT
 from core.noise_schedules.log_linear import LogLinear
 from core.samplers.ancestral import AncestralSampler
@@ -55,7 +57,7 @@ def recorder(model):
     def record(module, args, kwargs, output):
         calls.append(
             (
-                tuple(x.detach().clone() for x in args),
+                tuple(x.detach().clone() if torch.is_tensor(x) else x for x in args),
                 kwargs,
                 output,
                 torch.is_grad_enabled(),
@@ -70,11 +72,12 @@ def test_bootstrap_same_input_detached_and_adapter_gradients(source):
     algo = algorithm(source)
     state, keep = inputs(algo)
     calls, handle = recorder(algo.model)
-    prediction = algo.training_prediction(state, keep)
+    prediction = view_prediction(algo.training_prediction, state, keep)
     handle.remove()
     assert len(calls) == 2
-    for bootstrap, main in zip(calls[0][0], calls[1][0]):
-        torch.testing.assert_close(bootstrap, main)
+    # Model args are (states, points, time): same state and time both calls.
+    torch.testing.assert_close(calls[0][0][0][0], calls[1][0][0][0])
+    torch.testing.assert_close(calls[0][0][2], calls[1][0][2])
     assert not calls[0][3] and calls[1][3]
     feedback = calls[1][1]["self_condition"]
     assert not feedback.requires_grad and feedback.grad_fn is None
@@ -85,13 +88,13 @@ def test_bootstrap_same_input_detached_and_adapter_gradients(source):
     else:
         expected = (
             algo.predictor.training_posterior(calls[0][2].logits, state).exp()
-            @ algo.model.vocab_embed.embedding
+            @ algo.model.token_table
         )
         torch.testing.assert_close(feedback, expected)
     (-prediction[..., 1].mean()).backward()
     for parameter in [
         next(algo.model.conditioning_adapter.parameters()),
-        algo.model.vocab_embed.embedding,
+        algo.model.token_table,
     ]:
         assert parameter.grad is not None and torch.isfinite(parameter.grad).all()
         assert parameter.grad.abs().sum() > 0
@@ -105,19 +108,19 @@ def test_probability_selection_and_validation_bootstrap(source):
     selected = torch.rand(len(state)) < 0.5
     calls, handle = recorder(algo.model)
     torch.manual_seed(16)
-    algo.training_prediction(state, keep)
+    view_prediction(algo.training_prediction, state, keep)
     assert len(calls) == 2
-    torch.testing.assert_close(calls[0][0][0], state[selected])
+    torch.testing.assert_close(calls[0][0][0][0], state[selected])
     feedback = calls[1][1]["self_condition"]
     assert feedback[~selected].count_nonzero() == 0
     assert feedback[selected].count_nonzero() > 0
     calls.clear()
     algo.eval()
-    algo.training_prediction(state, keep)
-    assert len(calls) == 2 and calls[0][0][0].shape == state.shape
+    view_prediction(algo.training_prediction, state, keep)
+    assert len(calls) == 2 and calls[0][0][0][0].shape == state.shape
     calls.clear()
     algo.prediction.evaluation_probability = 0
-    algo.training_prediction(state, keep)
+    view_prediction(algo.training_prediction, state, keep)
     assert len(calls) == 1 and calls[0][1]["self_condition"] is None
     handle.remove()
 
@@ -132,8 +135,8 @@ def test_sessions_unshaped_feedback_reset_and_nested_independence(source):
     shaped.predictor.top_p = 0.1
     plain_session, shaped_session = prediction_session(algo), prediction_session(shaped)
     with torch.no_grad():
-        plain = plain_session.sampling_prediction(state, keep)
-        sharp = shaped_session.sampling_prediction(state, keep)
+        plain = view_prediction(plain_session.sampling_prediction, state, keep)
+        sharp = view_prediction(shaped_session.sampling_prediction, state, keep)
     assert not torch.allclose(plain, sharp)
     torch.testing.assert_close(
         plain_session.state.conditioning, shaped_session.state.conditioning
@@ -142,11 +145,11 @@ def test_sessions_unshaped_feedback_reset_and_nested_independence(source):
     assert fresh.state.conditioning is None
     saved = plain_session.state.conditioning.clone()
     with torch.no_grad():
-        fresh.sampling_prediction(state, keep)
+        view_prediction(fresh.sampling_prediction, state, keep)
     torch.testing.assert_close(plain_session.state.conditioning, saved)
     assert not plain_session.state.conditioning.requires_grad
     # The public raw model endpoint stays stateless and tensor-valued.
-    assert isinstance(algo.model_logits(state, keep), torch.Tensor)
+    assert isinstance(view_prediction(algo.model_logits, state, keep), torch.Tensor)
 
 
 @pytest.mark.parametrize("source", ["posterior_mean", "hidden"])
@@ -269,12 +272,12 @@ def test_disabled_preserves_old_checkpoint_keys_rng_and_prediction():
     # Its optimized graph may consume RNG even for p=0, so compare against the
     # direct baseline rather than assuming the model itself never draws randomness.
     for _ in range(3):
-        algo.model_logits(state, keep)
+        view_prediction(algo.model_logits, state, keep)
     rng = torch.get_rng_state().clone()
-    baseline = algo.predictor.training_posterior(algo.model_logits(state, keep), state)
+    baseline = algo.predictor.training_posterior(view_prediction(algo.model_logits, state, keep), state)
     baseline_rng = torch.get_rng_state().clone()
     torch.set_rng_state(rng)
-    result = algo.training_prediction(state, keep)
+    result = view_prediction(algo.training_prediction, state, keep)
     assert torch.equal(baseline_rng, torch.get_rng_state())
     torch.testing.assert_close(result, baseline, atol=0, rtol=0)
     assert prediction_session(algo) is algo
@@ -316,7 +319,7 @@ def test_hidden_source_does_not_request_embedding_table():
 
     algo.prediction_embedding_table = unavailable
     state, keep = inputs(algo)
-    assert algo.training_prediction(state, keep).shape == (*state.shape, 13)
+    assert view_prediction(algo.training_prediction, state, keep).shape == (*state.shape, 13)
 
 
 def test_time_conditioned_mdlm_uses_same_bootstrap_coordinate():
@@ -325,10 +328,11 @@ def test_time_conditioned_mdlm_uses_same_bootstrap_coordinate():
     )
     state, keep = inputs(algo)
     calls, handle = recorder(algo.model)
-    algo.training_prediction(state, keep)
+    view_prediction(algo.training_prediction, state, keep)
     assert len(calls) == 2
-    torch.testing.assert_close(calls[0][0][1], -keep.log())
-    torch.testing.assert_close(calls[1][0][1], -keep.log())
+    # Both calls condition on the same keep rate (the model takes -log keep).
+    torch.testing.assert_close(calls[0][0][1][0].coefficients[0], keep)
+    torch.testing.assert_close(calls[1][0][1][0].coefficients[0], keep)
     handle.remove()
 
 

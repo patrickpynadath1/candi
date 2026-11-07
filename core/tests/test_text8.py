@@ -7,6 +7,8 @@ from hydra.utils import instantiate
 import numpy as np
 import torch
 
+from core.tests.view_inputs import view_prediction
+
 from core.data.text8 import Text8Tokenizer, pack_text
 from core.tasks.metrics.text import (
     WordAccumulator,
@@ -113,7 +115,7 @@ def test_task_reference_uses_training_vocabulary_and_unconditional_inputs(tmp_pa
     assert asdict(result)["records"][0]["generated"]["words"]
     model = instantiate(settings.algorithm)
     assert model.process.mask_index == model.predictor.mask_index == 4
-    assert model.model_logits(prompt, torch.ones(1)).shape == (1, 32, 35)
+    assert view_prediction(model.model_logits, prompt, torch.ones(1)).shape == (1, 32, 35)
 
 
 def test_text8_trains_and_evaluates_both_samplers(tmp_path):
