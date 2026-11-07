@@ -198,6 +198,8 @@ TIME_COORDINATES = {
     "negative_log_keep_exact": lambda time, point, epsilon: -_keep(point).clamp_min(
         torch.finfo(_keep(point).dtype).tiny
     ).log(),
+    # Standalone spherical flow matching's -log(keep): keep clamped at 1e-12.
+    "negative_log_keep_floor": lambda time, point, epsilon: -_keep(point).clamp_min(1e-12).log(),
     # HybridModel's log(1 - t).
     "log1p_negative_time": lambda time, point, epsilon: torch.log1p(
         -time.float().clamp(max=1 - 1e-6)
@@ -217,11 +219,18 @@ TIME_COORDINATES = {
 class TimeConditioning(nn.Module):
     """Global time (or a path coefficient) -> AdaLN conditioning vector."""
 
-    def __init__(self, cond_dim, coordinate="time", adaLN=True, epsilon=1e-6, input_projection=False):
+    def __init__(
+        self, cond_dim, coordinate="time", adaLN=True, epsilon=1e-6, input_projection=False, time_source="global"
+    ):
         super().__init__()
         if coordinate not in TIME_COORDINATES:
             raise ValueError(f"time coordinate must be one of {sorted(TIME_COORDINATES)}")
+        if time_source not in {"global", "point"}:
+            raise ValueError("time_source must be global or point")
         self.coordinate, self.adaLN, self.epsilon = coordinate, bool(adaLN), epsilon
+        # "point": the first view's local time (in training, after the
+        # schedule's training_time map), not the global time.
+        self.time_source = time_source
         self.wants_input_projection = bool(input_projection)
         # Kept even without AdaLN, for identical initialization and checkpoints.
         self.embedder = TimestepEmbedder(cond_dim)
@@ -234,6 +243,8 @@ class TimeConditioning(nn.Module):
     def forward(self, time, point):
         if not self.adaLN:
             return None
+        if self.time_source == "point":
+            time = point.time
         coordinate = TIME_COORDINATES[self.coordinate](time, point, self.epsilon)
         return F.silu(self.embedder(coordinate))
 
@@ -463,6 +474,29 @@ class ModularDiT(TextDiT):
         """Inputs for an already-clean stream (block diffusion's prefix)."""
         hidden = self.clean_embedding(probabilities)
         return hidden, self.time.clean_condition(len(hidden), hidden.device)
+
+    def clean_token_hidden(self, tokens, encode=None):
+        """Clean-stream inputs from token ids for a single-state input slot.
+
+        Token tables embed the ids (the legacy DiT/SimplexDiT prefix); other
+        slots run the encoded clean state at time 0, sigma 0, alpha 1 without
+        self-conditioning (the legacy ContinuousDiT prefix).
+        """
+        if self.views is not None:
+            width = self.output_width
+            return self.clean_hidden(F.one_hot(tokens, width).float())
+        if isinstance(self.input, TokenInput):
+            with torch.autocast(tokens.device.type, enabled=False):
+                hidden = self.input.embedding(tokens)
+            return hidden, self.time.clean_condition(len(tokens), tokens.device)
+        from core.modifiers.hybrid.views import ViewPoint
+        from core.noise_schedules.gaussian_path import GaussianPath
+
+        state = encode(tokens) if encode is not None else tokens
+        zeros = torch.zeros(len(state), device=state.device)
+        ones = torch.ones_like(zeros)
+        point = ViewPoint(zeros, GaussianPath(ones, zeros, zeros, zeros))
+        return self.prepare((state,), (point,), zeros, apply_conditioning=False)
 
     def forward(
         self,

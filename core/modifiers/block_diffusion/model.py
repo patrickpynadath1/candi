@@ -16,15 +16,15 @@ from .layout import make_layout
 from core.modifiers.encoder_decoder import EncoderDecoderModel
 
 
-def view_stream_inputs(model, states, points, time, self_condition, clean):
+def view_stream_inputs(model, states, points, time, self_condition, clean, clean_encoder=None):
     """(noisy hidden, noisy condition, clean hidden, clean condition) for a
     view-based model: ModularDiT, or the legacy HybridModel."""
     if isinstance(model, ModularDiT):
         noisy, noisy_condition = model.prepare(
             states, points, time, self_condition=self_condition
         )
-        width = model.output_width
-        clean_inputs = model.clean_hidden
+        clean_hidden, clean_condition = model.clean_token_hidden(clean, clean_encoder)
+        return noisy, noisy_condition, clean_hidden, clean_condition
     else:
         noisy, noisy_condition = model.prepare_fused(
             states, points, time, self_condition=self_condition
@@ -229,7 +229,7 @@ class BlockDiffusionModel(nn.Module):
             return None
         clean, offset, _cache = current
         noisy_hidden, noisy_condition, clean_hidden, clean_condition = view_stream_inputs(
-            self.model, states, points, time, conditioning, clean
+            self.model, states, points, time, conditioning, clean, self.clean_encoder
         )
         boundary = head.left_boundary.to(noisy_hidden).expand(len(noisy_hidden), 1, -1)
         noisy_hidden = torch.cat([boundary, noisy_hidden], 1)
@@ -311,7 +311,7 @@ class BlockDiffusionModel(nn.Module):
     ):
         batch, clean_length = clean.shape
         noisy, noisy_condition, clean_hidden, clean_condition = view_stream_inputs(
-            self.model, states, points, time, conditioning, clean
+            self.model, states, points, time, conditioning, clean, self.clean_encoder
         )
         boundary = head.left_boundary.to(noisy).expand(len(noisy), 1, -1)
         noisy = torch.cat([boundary, noisy], 1)
@@ -388,7 +388,9 @@ class BlockDiffusionModel(nn.Module):
         if isinstance(model, (HybridModel, ModularDiT)):
             states, points, global_time = inputs
             noisy_hidden, noisy_condition, clean_hidden, clean_condition = (
-                view_stream_inputs(model, states, points, global_time, self_condition, clean)
+                view_stream_inputs(
+                    model, states, points, global_time, self_condition, clean, self.clean_encoder
+                )
             )
         elif isinstance(model, ContinuousDiT):
             state, time, sigma, alpha = inputs
