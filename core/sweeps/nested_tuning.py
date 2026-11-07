@@ -150,6 +150,12 @@ def search(directory, settings, direction, objective, concurrency):
         load_if_exists=True,
         sampler=optuna.samplers.TPESampler(seed=settings.get("seed", 42)),
     )
+    if study.trials:
+        # A resumed study must not replay the seeded proposals it already made;
+        # the candidate cache would silently count a repeat as a new trial.
+        study.sampler = optuna.samplers.TPESampler(
+            seed=settings.get("seed", 42) + len(study.trials)
+        )
     completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
     if not study.trials:
         for point in settings.get("initial_points", []):
@@ -270,6 +276,24 @@ class ValidationTask:
                 "Training callbacks may evaluate only the validation partition"
             )
         return self.validation_dataset()
+
+
+def checkpoint_fingerprint(path):
+    stat = Path(path).stat()
+    return {"size": stat.st_size, "mtime_ns": stat.st_mtime_ns}
+
+
+def verify_checkpoint(checkpoint):
+    """Fail if a recorded checkpoint file was replaced after it was scored."""
+    expected = checkpoint.get("fingerprint")
+    path = Path(checkpoint["checkpoint"])
+    if expected is not None and (
+        not path.is_file() or checkpoint_fingerprint(path) != expected
+    ):
+        raise ValueError(
+            f"Checkpoint {checkpoint['checkpoint']} changed since it was recorded; "
+            "use a new case name"
+        )
 
 
 def obtain_checkpoint(spec, config, parameters, validation, resources, output):
@@ -473,12 +497,19 @@ def _run_case(spec, root, concurrency):
     def train_candidate(parameters, output):
         output.mkdir(parents=True, exist_ok=True)
         checkpoint_path = output / "trained.json"
-        if checkpoint_path.exists():
+        recorded = checkpoint_path.exists()
+        if recorded:
             checkpoint = json.loads(checkpoint_path.read_text())
+            verify_checkpoint(checkpoint)
         else:
             checkpoint = obtain_checkpoint(
                 spec, config, parameters, validation, resources, output / "training"
             )
+        # Pin the file actually scored; older records pin it at their first resume.
+        pin = "fingerprint" not in checkpoint and Path(checkpoint["checkpoint"]).is_file()
+        if pin:
+            checkpoint["fingerprint"] = checkpoint_fingerprint(checkpoint["checkpoint"])
+        if pin or not recorded:
             save(checkpoint_path, checkpoint)
         result = inference(checkpoint, output / "inference")
         return {**result, "training_parameters": parameters}
@@ -488,6 +519,7 @@ def _run_case(spec, root, concurrency):
     # No final evaluation occurs until both levels and sampler selection finish.
     final_path = root / "final/result.json"
     if not final_path.exists():
+        verify_checkpoint(winner["checkpoint"])
         final = {
             **validation,
             "dataset": evaluation.get(

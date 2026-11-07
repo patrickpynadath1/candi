@@ -90,6 +90,7 @@ evaluation:
   checkpoint: null
   legacy: false
   use_ema: true
+  allow_config_mismatch: false
   device: cuda
   max_examples: null
 wandb: null

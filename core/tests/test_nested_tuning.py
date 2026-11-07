@@ -448,3 +448,41 @@ def test_noniterative_sampler_keeps_native_interface(tmp_path, monkeypatch):
         tmp_path / "evaluation",
     )
     assert result["score"] == 0.5
+
+
+def test_replaced_fixed_checkpoint_blocks_resume(tmp_path, monkeypatch):
+    settings = spec(tmp_path, fixed=True)
+    checkpoint = Path(settings["training"]["checkpoint"])
+
+    def execute(stage, payload, output):
+        return {"score": 1.0}
+
+    monkeypatch.setattr(tuning, "execute", execute)
+    tuning.run_case(settings, tmp_path / "runs", concurrency=1)
+    root = tmp_path / "runs/example"
+    recorded = json.loads(next(root.rglob("trained.json")).read_text())
+    assert recorded["fingerprint"] == tuning.checkpoint_fingerprint(checkpoint)
+    # Interrupted before the final evaluation, then the file is overwritten.
+    (root / "final/result.json").unlink()
+    checkpoint.write_bytes(b"different weights")
+    with pytest.raises(ValueError, match="changed since it was recorded"):
+        tuning.run_case(settings, tmp_path / "runs", concurrency=1)
+
+
+def test_resumed_search_does_not_replay_seeded_proposals(tmp_path):
+    settings = {
+        "trials": 2,
+        "seed": 3,
+        "space": {"x": {"type": "float", "low": 0.0, "high": 1.0}},
+    }
+    seen = []
+
+    def objective(parameters, output):
+        seen.append(parameters["x"])
+        return {"score": parameters["x"]}
+
+    tuning.search(tmp_path, settings, "maximize", objective, 1)
+    settings["trials"] = 4
+    tuning.search(tmp_path, settings, "maximize", objective, 1)
+    # Before reseeding, trials 3 and 4 replayed trials 1 and 2 from the cache.
+    assert len(seen) == 4 and len(set(seen)) == 4

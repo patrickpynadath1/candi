@@ -110,6 +110,17 @@ class TinyGSMMetrics:
     def compute(self):
         if not self.records:
             raise ValueError("cannot score an empty evaluation")
+        executable = [r for r in self.records if r.parsed]
+        if (
+            self.scoring == "code"
+            and executable
+            and all(r.sandbox_error for r in executable)
+        ):
+            # A missing bwrap or user namespace would otherwise score every
+            # program as wrong and let tuning rank candidates on noise.
+            raise RuntimeError(
+                "every parsed program failed in the sandbox; check bwrap on this worker"
+            )
         correct = np.asarray([r.correct for r in self.records], dtype=np.float64)
         accuracy = float(correct.mean())
         low = high = accuracy

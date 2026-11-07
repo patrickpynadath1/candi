@@ -122,7 +122,7 @@ class BlockDiffusionModel(nn.Module):
             length,
             self._training_block_size.get() or self.block_size,
             noisy.device,
-            batch_size=len(inputs[0]),
+            batch_size=len(noisy),
             offset=offset,
             clean_length=clean_length,
             x0_causal=self.x0_causal,

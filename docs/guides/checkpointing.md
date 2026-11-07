@@ -45,7 +45,17 @@ including checkpoints trained with `training.ema=0`. When the configured module
 has EMA enabled, loading rejects missing EMA state rather than silently falling
 back. With `training.ema=0`, there is no EMA object and evaluation uses raw weights
 even if `evaluation.use_ema=true`; select false explicitly to make that intent clear. Native state dicts are loaded
-strictly, and EMA loading validates parameter counts/shapes.
+strictly, and EMA loading validates parameter counts/shapes. `results.json`
+records the checkpoint path and whether EMA weights were used under `weights`.
+
+Strict parameter loading cannot see parameter-free choices such as the noise
+schedule, process or time conditioning. Native evaluation therefore compares the
+checkpoint's saved `algorithm`, `block_diffusion`, `variable_length`,
+`token_feedback` and `encoder_decoder` sections with the current config and
+raises on any difference. Sampling knobs (`predictor.temperature`, `top_k`,
+`top_p`, `commitment`), the time sampler and the training objective may differ.
+Set `evaluation.allow_config_mismatch=true` only for a deliberate cross-recipe
+evaluation. Legacy imports are not checked.
 
 ## Import supported legacy weights
 

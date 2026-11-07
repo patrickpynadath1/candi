@@ -38,8 +38,24 @@ def prepare_case(config):
             Path(metadata["reference_manifest"]).expanduser().read_text()
         )
         reference = next(
-            c for c in references if c["name"] == metadata["reference_case"]
+            (c for c in references if c["name"] == metadata.get("reference_case")),
+            None,
         )
+        if reference is None:
+            raise ValueError(
+                f"reference case {metadata.get('reference_case')!r} not in manifest"
+            )
+        # Partition indices only mean something for the task they were drawn from.
+        reference_config = Path(reference.get("config", ""))
+        if reference.get("config") and reference_config.is_file():
+            reference_task = OmegaConf.select(
+                OmegaConf.load(reference_config), "benchmark.task_id"
+            )
+            if reference_task is not None and reference_task != metadata["task_name"]:
+                raise ValueError(
+                    f"reference case uses task {reference_task!r}, "
+                    f"not {metadata['task_name']!r}; prepare a new partition"
+                )
         evaluation.update(reference["evaluation"])
     evaluation.update(metadata["evaluation"])
     config = capture_runtime_paths(config)

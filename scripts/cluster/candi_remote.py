@@ -43,6 +43,8 @@ EXCLUDES = [
     "*.pt",
     "*.safetensors",
     "*.sqlite",
+    "*.tar.gz",
+    "jev-out",
 ]
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
@@ -76,14 +78,15 @@ def source_identity(repo=REPO):
     revision = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
-    digest = hashlib.sha256()
-    size = 0
-    for name in upload_files(repo):
-        data = (repo / name).read_bytes()
-        size += len(data)
-        digest.update(name.encode() + b"\0" + hashlib.sha256(data).digest())
+    names = upload_files(repo)
+    # Check sizes before reading, so a stray archive fails fast.
+    size = sum((repo / name).stat().st_size for name in names)
     if size > MAX_UPLOAD_BYTES:
         raise SystemExit(f"Upload would be {size / 2**20:.0f} MiB; check EXCLUDES/.gitignore")
+    digest = hashlib.sha256()
+    for name in names:
+        data = (repo / name).read_bytes()
+        digest.update(name.encode() + b"\0" + hashlib.sha256(data).digest())
     lock = hashlib.sha256((repo / "uv.lock").read_bytes()).hexdigest()[:12]
     return revision, digest.hexdigest()[:12], lock
 

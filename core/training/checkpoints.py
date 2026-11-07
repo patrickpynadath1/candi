@@ -22,7 +22,71 @@ def initialize_weights(module, path):
         module.ema.copy_to(module.algorithm.parameters())
 
 
-def load_weights(module, path, *, legacy=False):
+# Sections whose values change the evaluated mathematics or architecture.
+RECIPE_SECTIONS = (
+    "algorithm",
+    "block_diffusion",
+    "variable_length",
+    "token_feedback",
+    "encoder_decoder",
+)
+# Inference-only predictor knobs and training-only components may differ.
+INFERENCE_KEYS = {
+    "algorithm.predictor.temperature",
+    "algorithm.predictor.top_k",
+    "algorithm.predictor.top_p",
+    "algorithm.predictor.commitment",
+    "algorithm.time_sampler",
+    "algorithm.objective",
+}
+
+
+def _differences(saved, current, prefix):
+    if prefix in INFERENCE_KEYS:
+        return []
+    if isinstance(saved, dict) and isinstance(current, dict):
+        return [
+            difference
+            for key in sorted(set(saved) | set(current))
+            for difference in _differences(
+                saved.get(key), current.get(key), f"{prefix}.{key}"
+            )
+        ]
+    return [] if saved == current else [prefix]
+
+
+def recipe_mismatches(saved, current):
+    """Dotted recipe keys whose resolved values differ between two configs."""
+    return [
+        difference
+        for section in RECIPE_SECTIONS
+        for difference in _differences(
+            saved.get(section), current.get(section), section
+        )
+    ]
+
+
+def check_recipe(module, checkpoint, *, allow_mismatch=False):
+    """Parameter-free math (schedule, process, time conditioning) must match too."""
+    saved = (checkpoint.get("hyper_parameters") or {}).get("config")
+    if saved is None:
+        return []
+    from omegaconf import OmegaConf
+    from core.modifiers.hybrid.checkpoint import upgrade_config
+
+    # The module's own config passed through the same upgrade at construction.
+    current = OmegaConf.to_container(module.config, resolve=True)
+    mismatches = recipe_mismatches(upgrade_config(saved), current)
+    if mismatches and not allow_mismatch:
+        raise ValueError(
+            "checkpoint was trained with a different recipe: "
+            + ", ".join(mismatches[:10])
+            + "; set evaluation.allow_config_mismatch=true to override"
+        )
+    return mismatches
+
+
+def load_weights(module, path, *, legacy=False, allow_config_mismatch=False):
     # Checkpoints are user-supplied trusted training artifacts, not remote input.
     checkpoint = torch.load(
         path,
@@ -52,6 +116,7 @@ def load_weights(module, path, *, legacy=False):
                 "not a core checkpoint; use evaluation.legacy=true for an MDLM import"
             )
         module.load_state_dict(state, strict=True)
+        check_recipe(module, checkpoint, allow_mismatch=allow_config_mismatch)
     if module.ema:
         if "ema" not in checkpoint:
             raise ValueError(

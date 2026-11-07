@@ -149,3 +149,37 @@ def test_ar_preparation_does_not_add_steps(tmp_path):
     result = OmegaConf.load(tmp_path / "configs" / f"{name}.yaml")
     assert "steps" not in result.sampler
     assert type(instantiate(result.sampler)).__name__ == "AutoregressiveSampler"
+
+
+def test_reference_partition_must_come_from_the_same_task(tmp_path):
+    reference_config = tmp_path / "reference.yaml"
+    OmegaConf.save(
+        OmegaConf.create({"benchmark": {"task_id": "tinystories"}}), reference_config
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "text8-gaussian-rank-linear-cdcd-sc-off_20m",
+                    "config": str(reference_config),
+                    "evaluation": {"tuning_indices": [0], "test_indices": [1]},
+                }
+            ]
+        )
+    )
+    config = compose(
+        "autoregressive", overrides=["+sweep=common", "task=battery/text8"]
+    )
+    config.preparation.reference_manifest = str(manifest)
+    config.preparation.output = str(tmp_path / "plan")
+    config.preparation.recipe_name = "ar"
+    with pytest.raises(ValueError, match="prepare a new partition"):
+        prepare_case(config)
+
+
+def test_bpe_preset_does_not_inherit_byte_partition():
+    config = compose(
+        "autoregressive", overrides=["+sweep=common", "task=battery/tinystories_bpe"]
+    )
+    assert config.preparation.reference_case is None

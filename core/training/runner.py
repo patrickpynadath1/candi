@@ -124,7 +124,12 @@ def run(config):
         if not config.evaluation.use_ema:
             module.ema = None
         step = load_weights(
-            module, config.evaluation.checkpoint, legacy=config.evaluation.legacy
+            module,
+            config.evaluation.checkpoint,
+            legacy=config.evaluation.legacy,
+            allow_config_mismatch=config.evaluation.get(
+                "allow_config_mismatch", False
+            ),
         )
         module.to(config.evaluation.device)
         evaluation_name = (
@@ -147,6 +152,12 @@ def run(config):
             "dataset": evaluation_name,
         }
         result["checkpoint_step"] = step
+        # Record which weights were scored; use_ema silently falls back to raw
+        # weights when the run trained without EMA.
+        result["weights"] = {
+            "checkpoint": str(Path(config.evaluation.checkpoint).resolve()),
+            "ema": module.ema is not None,
+        }
         if config.get("benchmark") is not None:
             result["benchmark"] = OmegaConf.to_container(config.benchmark, resolve=True)
         result["seed"] = config.seed

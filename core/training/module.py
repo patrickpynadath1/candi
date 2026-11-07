@@ -178,6 +178,13 @@ class TrainingModule(L.LightningModule):
             self.algorithm.train(was_training)
 
     def on_validation_epoch_start(self):
+        # Validation corruption draws must neither depend on nor perturb the
+        # training stream, or val/nll (and best.ckpt) would vary with how often
+        # validation runs, and resumed runs would diverge.
+        devices = [self.device.index] if self.device.type == "cuda" else []
+        self._validation_rng = torch.random.fork_rng(devices=devices)
+        self._validation_rng.__enter__()
+        torch.manual_seed(self.config.get("seed", 0) + self.global_rank)
         self._validation_context = self.evaluation_weights()
         self._validation_context.__enter__()
         self._valid_sum = torch.zeros((), device=self.device)
@@ -209,6 +216,7 @@ class TrainingModule(L.LightningModule):
             sync_dist=False,
         )
         self._validation_context.__exit__(None, None, None)
+        self._validation_rng.__exit__(None, None, None)
 
     def optimizer_step(self, *args, **kwargs):
         super().optimizer_step(*args, **kwargs)

@@ -78,7 +78,8 @@ def test_continuous_pairs_and_view_order_with_block_and_feedback(first, second):
     algo = TokenFeedback(
         BlockDiffusion(algo, block_size=2, clean_loss="autoregressive"), depth=0
     )
-    tokens = torch.randint(0, 12, (2, 6))
+    # A batch size different from the view count catches mask batch errors.
+    tokens = torch.randint(0, 12, (3, 6))
     mask = torch.ones_like(tokens, dtype=torch.bool)
     result = algo.loss(tokens, mask, training=True)
     assert result["loss"].isfinite()

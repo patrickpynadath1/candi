@@ -226,3 +226,17 @@ def test_code_metrics_use_sandbox_return_and_stdout():
     assert [record.correct for record in result.records] == [True, True, False]
     assert all(record.parsed and record.executed for record in result.records[:2])
     assert not result.records[2].parsed and not result.records[2].executed
+
+
+def test_code_scoring_refuses_a_broken_sandbox():
+    from core.tasks.tinygsm_metrics import TinyGSMRecord
+
+    metrics = TinyGSMMetrics(Tokenizer(), scoring="code")
+    broken = TinyGSMRecord(0, "q", "#### 1", "r", 1, 1, True, parsed=True, sandbox_error=True)
+    unparsed = TinyGSMRecord(1, "q", "#### 1", "r", 1, 1, True)
+    metrics.records = [broken, unparsed]
+    with pytest.raises(RuntimeError, match="sandbox"):
+        metrics.compute()
+    # One program that ran is enough to trust the sandbox on this worker.
+    metrics.records.append(TinyGSMRecord(2, "q", "#### 1", "r", 1, 1, True, parsed=True, executed=True))
+    assert metrics.compute().sandbox_error_rate == 1 / 3
