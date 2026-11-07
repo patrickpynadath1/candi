@@ -8,6 +8,7 @@ from hydra.utils import instantiate
 from core.processes.spherical import exp_map, log_map, sphere_normalize, slerp
 from core.noise_schedules.spherical import SphericalSchedule
 from core.samplers.spherical import posterior_velocity
+from core.tests.view_inputs import view_prediction
 
 
 def config(experiment="sudoku_spherical_truncated_adaptive"):
@@ -138,8 +139,10 @@ def test_cuda_bfloat16_training_prediction():
     tokens = torch.randint(0, 12, (2, 10), device="cuda")
     mask = torch.ones_like(tokens, dtype=torch.bool)
     with torch.autocast("cuda", dtype=torch.bfloat16):
-        prediction = algo.training_prediction(
-            algo.representation.encode(tokens), torch.full((2,), 0.1, device="cuda")
+        prediction = view_prediction(
+            algo.training_prediction,
+            algo.representation.encode(tokens),
+            torch.full((2,), 0.1, device="cuda"),
         )
         assert prediction.dtype == torch.float32
         result = algo.loss(tokens, mask)
