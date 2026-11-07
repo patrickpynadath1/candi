@@ -131,7 +131,13 @@ candidates save `trained.json`, the training checkpoint/config, and an unwrapped
 Rerunning the same manifest resumes interrupted candidates and reuses completed
 training/evaluation stages. A failed validation trial stops selection until it is
 successfully retried. Changing a protocol or source config requires a new case
-name. File locks prevent concurrent drivers or duplicate candidates from writing
+name. The resume check ignores execution metadata (`resources`, including Ray
+queue labels, and `wandb`), so a case can move queues without renaming; it still
+covers the evaluation partitions, budgets, search spaces and pinned config.
+A fixed or trained checkpoint is pinned by size and modification time in
+`trained.json`; replacing that file stops the case. Candidate results,
+`trained.json` and `final/result.json` record the source snapshot
+(`CANDI_SOURCE_ID`, `_REV`, `_DIRTY`) that produced them. File locks prevent concurrent drivers or duplicate candidates from writing
 the same artifacts simultaneously. Checkpoints and output directories must be on
 storage visible to every Ray worker. W&B logging uses the source config's tracking
 settings through the existing training/evaluation runner. A top-level `wandb`

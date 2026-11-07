@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 import logging
+import os
 import traceback
 from pathlib import Path
 
@@ -40,6 +41,26 @@ def save(path, value):
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True))
     temporary.replace(path)
+
+
+# Recorded in protocol.json but not compared on resume: where a case runs and
+# where it logs do not change what is selected or scored.
+EXECUTION_FIELDS = ("resources", "wandb")
+
+
+def selection_protocol(protocol):
+    """The part of a stored protocol (v1 or later) that a resume must match."""
+    spec = {k: v for k, v in protocol["spec"].items() if k not in EXECUTION_FIELDS}
+    config = {k: v for k, v in protocol["config"].items() if k != "wandb"}
+    return {"spec": spec, "config": config}
+
+
+def source_identity():
+    """Snapshot that produced a result, as set by scripts/cluster/candi_remote.py."""
+    return {
+        key: os.environ.get(f"CANDI_SOURCE_{key.upper()}")
+        for key in ("id", "rev", "dirty")
+    }
 
 
 def suggest(trial, space):
@@ -187,6 +208,7 @@ def search(directory, settings, direction, objective, concurrency):
                         },
                     )
                     raise
+                result = {**result, "source": source_identity()}
                 save(result_path, result)
         trial.set_user_attr("result_path", str(result_path))
         return result["score"]
@@ -442,7 +464,9 @@ def _run_case(spec, root, concurrency):
         config["wandb"] = spec["wandb"]
     protocol = {"spec": spec, "config": config}
     path = root / "protocol.json"
-    if path.exists() and json.loads(path.read_text()) != protocol:
+    if path.exists() and selection_protocol(
+        json.loads(path.read_text())
+    ) != selection_protocol(protocol):
         raise ValueError("Protocol changed; use a new case name")
     save(path, protocol)
     pinned_config = root / "config.yaml"
@@ -505,6 +529,7 @@ def _run_case(spec, root, concurrency):
             checkpoint = obtain_checkpoint(
                 spec, config, parameters, validation, resources, output / "training"
             )
+            checkpoint["source"] = source_identity()
         # Pin the file actually scored; older records pin it at their first resume.
         pin = "fingerprint" not in checkpoint and Path(checkpoint["checkpoint"]).is_file()
         if pin:
@@ -539,7 +564,7 @@ def _run_case(spec, root, concurrency):
             },
             root / "final",
         )
-        save(final_path, {**result, "selection": winner})
+        save(final_path, {**result, "selection": winner, "source": source_identity()})
     return winner
 
 

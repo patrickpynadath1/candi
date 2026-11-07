@@ -486,3 +486,20 @@ def test_resumed_search_does_not_replay_seeded_proposals(tmp_path):
     tuning.search(tmp_path, settings, "maximize", objective, 1)
     # Before reseeding, trials 3 and 4 replayed trials 1 and 2 from the cache.
     assert len(seen) == 4 and len(set(seen)) == 4
+
+
+def test_moving_queues_resumes_but_selection_changes_do_not(tmp_path, monkeypatch):
+    settings = spec(tmp_path, fixed=True)
+    monkeypatch.setattr(tuning, "execute", lambda stage, payload, output: {"score": 1.0})
+    monkeypatch.setenv("CANDI_SOURCE_ID", "abc123-def456")
+    tuning.run_case(settings, tmp_path / "runs", concurrency=1)
+    root = tmp_path / "runs/example"
+    assert json.loads((root / "final/result.json").read_text())["source"]["id"] == (
+        "abc123-def456"
+    )
+    settings["resources"] = {"cpu": 2, "gpu": 1, "label_selector": {"queue": "b"}}
+    settings["wandb"] = {"project": "elsewhere"}
+    tuning.run_case(settings, tmp_path / "runs", concurrency=1)
+    settings["inference"][0]["trials"] = 3
+    with pytest.raises(ValueError, match="Protocol changed"):
+        tuning.run_case(settings, tmp_path / "runs", concurrency=1)
