@@ -59,6 +59,11 @@ class HybridModel(nn.Module):
         if hasattr(backbone, "vocab_embed"):
             vocab_size = backbone.vocab_embed.embedding.shape[0]
             if token_embedding is not None:
+                output = getattr(getattr(backbone, "output_layer", None), "linear", None)
+                if getattr(output, "weight", None) is backbone.vocab_embed.embedding:
+                    raise ValueError(
+                        "hybrid views replace the token table; tie_word_embeddings is unsupported"
+                    )
                 backbone.vocab_embed.embedding = token_embedding
                 if len(token_embedding) != vocab_size:
                     backbone.feedback_table_adapter = CleanEmbeddingTable(

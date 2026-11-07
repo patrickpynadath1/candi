@@ -5,6 +5,7 @@ import random
 from pathlib import Path
 
 import datasets
+from core.data.cache import save_dataset
 
 
 class NQueensTokenizer:
@@ -103,8 +104,7 @@ def get_nqueens_dataset(config):
             )
         outputs[name] = datasets.Dataset.from_list(records)
     result = datasets.DatasetDict(outputs)
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    result.save_to_disk(str(cache))
+    save_dataset(result, cache)
     return result.with_format("torch")
 
 

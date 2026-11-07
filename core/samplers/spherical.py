@@ -29,6 +29,12 @@ class SphericalFlowSampler:
         self.steps, self.epsilon, self.velocity = steps, epsilon, velocity
         self.use_float64 = use_float64
 
+    def steps_for_nfe(self, nfe):
+        """One model call per step; the last step decodes without another call."""
+        if isinstance(nfe, bool) or int(nfe) != nfe:
+            raise ValueError("NFE budget must be an integer")
+        return max(1, int(nfe))
+
     def sample(self, algo, prompt_tokens, prompt_mask):
         from core.algorithms.spherical_flow_matching import SphericalFlowMatching
 

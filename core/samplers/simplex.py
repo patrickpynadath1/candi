@@ -32,6 +32,12 @@ class SimplexBridgeSampler:
         self.steps, self.churn, self.time_grid = steps, churn, time_grid
         self.guidance, self.confidence_power = guidance_scale, confidence_power
 
+    def steps_for_nfe(self, nfe):
+        """One model call per step (two with guidance); no terminal call."""
+        if isinstance(nfe, bool) or int(nfe) != nfe:
+            raise ValueError("NFE budget must be an integer")
+        return max(1, int(nfe) // (2 if self.guidance is not None else 1))
+
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
         conditional = prediction_session(algo)

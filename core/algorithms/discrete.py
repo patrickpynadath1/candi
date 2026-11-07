@@ -48,7 +48,7 @@ class DiscreteDiffusion(nn.Module):
             )
 
     def model_logits(self, state, keep):
-        return self.model(state, -keep.log())
+        return self.model(state, -keep.clamp_min(torch.finfo(keep.dtype).tiny).log())
 
     def loss(
         self,

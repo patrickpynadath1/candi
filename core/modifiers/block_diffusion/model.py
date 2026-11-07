@@ -103,16 +103,24 @@ class BlockDiffusionModel(nn.Module):
         finally:
             self._clean.reset(token)
 
-    def forward(self, *inputs, self_condition=None, return_features=False):
+    def forward(
+        self, *inputs, self_condition=None, return_features=False, hidden_only=False
+    ):
         current = self._clean.get()
         if current is None:
             if isinstance(self.model, EncoderDecoderModel):
                 raise ValueError(
                     "encoder-decoder prediction requires a clean block context"
                 )
+            extra = {"hidden_only": True} if hidden_only else {}
             return self.model(
-                *inputs, self_condition=self_condition, return_features=return_features
+                *inputs,
+                self_condition=self_condition,
+                return_features=return_features,
+                **extra,
             )
+        # With a clean block context, hidden_only is only a saving: the block
+        # paths still return the hidden state alongside logits.
         clean, offset, cache = current
         noisy = inputs[0][0] if isinstance(inputs[0], (tuple, list)) else inputs[0]
         length = noisy.shape[1]

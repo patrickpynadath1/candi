@@ -70,7 +70,7 @@ def upgrade_config(value):
         value["_target_"] = target.replace(
             "core.hybrid.time_maps.", "core.modifiers.hybrid.time_maps."
         )
-    if target == "core.models.hybrid.HybridModel":
+    if target == "core.models.hybrid.HybridModel" and "branches" in value:
         value["views"] = value.pop("branches")
     if target == "core.models.hybrid.CANDIFusion" and "discrete_branch" in value:
         value["discrete_view"] = value.pop("discrete_branch")

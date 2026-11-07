@@ -219,3 +219,13 @@ def test_gaussian_hybrid_default_updates_embedding_codebook(discrete):
     assert table.grad.abs().sum() > 0
     optimizer.step()
     assert not torch.equal(before, table.detach())
+
+
+def test_legacy_target_that_already_uses_views_upgrades():
+    from core.modifiers.hybrid.checkpoint import upgrade_config
+
+    upgraded = upgrade_config(
+        {"_target_": "core.models.hybrid.HybridModel", "views": [{"x": 1}]}
+    )
+    assert upgraded["_target_"] == "core.modifiers.hybrid.model.HybridModel"
+    assert upgraded["views"] == [{"x": 1}]

@@ -45,6 +45,9 @@ class PlugInParameterization:
 
     def training_plugin(self, logits, observed=None):
         """Apply model softcapping, without inference-only shaping."""
+        # Softcap in at least FP32, as the posterior path does; unchanged when off.
+        if self.softcap is not None and logits.dtype in (torch.float16, torch.bfloat16):
+            logits = logits.float()
         return softcap_logits(logits, self.softcap).log_softmax(-1)
 
     def sampling_plugin(self, logits, observed=None):

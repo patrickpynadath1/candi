@@ -38,6 +38,8 @@ class CANDIEntropyBoundedSampler:
         accepted = prompt_mask.bool().clone()
         output = prompt_tokens.clone()
         per_sample = torch.zeros(batch, dtype=torch.long, device=output.device)
+        # Fully prompted rows need no evaluations and keep a count of zero.
+        generating = (~accepted).any(-1)
         accepted_per_step = []
         nfe = 0
         for index in range(self.steps):
@@ -96,7 +98,7 @@ class CANDIEntropyBoundedSampler:
             counts = selected.sum(-1)
             accepted_per_step.append(counts.cpu().tolist())
             complete = accepted.all(-1)
-            per_sample[(per_sample == 0) & complete] = nfe
+            per_sample[(per_sample == 0) & complete & generating] = nfe
         if not accepted.all():
             raise RuntimeError(
                 "hybrid entropy-bounded sampling exhausted steps before completion"

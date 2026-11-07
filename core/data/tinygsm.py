@@ -6,6 +6,7 @@ import itertools
 from pathlib import Path
 
 import datasets
+from core.data.cache import save_dataset
 
 
 def _token_ids(tokenizer, text):
@@ -133,6 +134,5 @@ def get_tinygsm_dataset(data, tokenizer, block_size):
     dataset = datasets.DatasetDict(
         {"train": split["train"], "validation": split["test"]}
     )
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    dataset.save_to_disk(str(cache))
+    save_dataset(dataset, cache)
     return dataset.with_format("torch")

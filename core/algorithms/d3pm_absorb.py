@@ -21,6 +21,13 @@ class D3PMAbsorb(DiscreteDiffusion):
             raise TypeError(
                 "D3PM requires token probabilities without observed-token clamping"
             )
+        if (
+            isinstance(self.predictor.constraints, TokenExclusion)
+            and self.predictor.constraints.token_id == self.process.mask_index
+        ):
+            raise ValueError(
+                "D3PM cannot exclude its mask token; the bound needs its probability"
+            )
         if not isinstance(self.process, AbsorbingProcess) or not isinstance(
             self.objective, D3PMAbsorbingObjective
         ):

@@ -51,6 +51,15 @@ class VariableLengthDiffusion(nn.Module):
                 "use an unconstrained token posterior; observations are enforced per view"
             )
         self.algorithm = algorithm
+        prediction = getattr(algorithm, "prediction", None)
+        if (
+            prediction is not None
+            and prediction.enabled
+            and getattr(prediction, "gradient_mode", "detached") != "detached"
+        ):
+            raise ValueError(
+                "variable-length self-conditioning supports only gradient_mode=detached"
+            )
         defaults = [
             UniformInsertion()
             if isinstance(view.process, PosteriorUniformProcess)
@@ -172,7 +181,8 @@ class VariableLengthDiffusion(nn.Module):
             else None
         )
         next_feedback = None
-        if policy.enabled:
+        # Training never consumes the next-step feedback; skip its cost.
+        if policy.enabled and not training:
             next_feedback = policy.feedback(
                 output,
                 self.algorithm.predictor,

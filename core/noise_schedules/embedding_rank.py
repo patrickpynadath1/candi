@@ -82,7 +82,10 @@ class EmbeddingSphereRankSchedule(nn.Module):
         ranks = np.concatenate(
             ([0.0], ndtr(-ratio[:, None] * np.sqrt((1 - c) / 2)) @ weights)
         )
-        ranks, indices = np.unique(ranks, return_index=True)
+        if np.any(np.diff(ranks) < -1e-12):
+            raise ValueError("expected rank must be monotone in interpolation")
+        # Same guard as RankLinearClock: rounding must not reorder the table.
+        ranks, indices = np.unique(np.maximum.accumulate(ranks), return_index=True)
         self.register_buffer("ranks", torch.tensor(ranks, dtype=torch.float64))
         self.register_buffer(
             "interpolations", torch.tensor(u[indices], dtype=torch.float64)

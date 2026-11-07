@@ -22,6 +22,13 @@ class BlurAncestralSampler:
         self.greedy_clean_estimate = bool(greedy_clean_estimate)
         self.self_conditioning_mode = self_conditioning_mode
 
+    def steps_for_nfe(self, nfe):
+        """Each of steps + 1 predictions costs one call, two with SC bootstrap."""
+        if isinstance(nfe, bool) or int(nfe) != nfe:
+            raise ValueError("NFE budget must be an integer")
+        calls = 2 if self.self_conditioning_mode == "bootstrap" else 1
+        return max(1, int(nfe) // calls - 1)
+
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
         if not isinstance(algo.predictor, PosteriorParameterization):

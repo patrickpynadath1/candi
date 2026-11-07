@@ -6,6 +6,7 @@ import datasets
 import torch
 
 from .sudoku_generator import generate_grids
+from core.data.cache import save_dataset
 
 
 class SudokuTokenizer:
@@ -98,8 +99,7 @@ def get_sudoku_dataset(config, tokenizer):
             ),
         }
     )
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    dataset.save_to_disk(str(cache))
+    save_dataset(dataset, cache)
     return dataset.with_format("torch")
 
 

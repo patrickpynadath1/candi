@@ -395,6 +395,12 @@ def _evaluate_worker(payload, output):
         OmegaConf.update(config, key, value, merge=False, force_add=True)
     config.sampler = OmegaConf.create(policy["sampler"])
     for key, value in payload["parameters"].items():
+        # A tuned algorithm key that does not exist (e.g. a temperature on an
+        # algorithm without a predictor) would make every trial identical.
+        if key.startswith("algorithm.") and (
+            OmegaConf.select(config, key, default="__missing__") == "__missing__"
+        ):
+            raise ValueError(f"Unknown inference parameter for this recipe: {key}")
         OmegaConf.update(config, key, value, merge=False, force_add=True)
     # Resolve after trial overrides: correction count can itself be tuned.
     sampler = instantiate(config.sampler)

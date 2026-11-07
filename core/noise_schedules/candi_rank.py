@@ -1,5 +1,7 @@
 """The CANDI rank-calibrated variance-exploding path."""
 
+import warnings
+
 import torch
 from torch import nn
 from core.noise_schedules.gaussian_path import GaussianPath
@@ -23,6 +25,19 @@ class CANDIRankSchedule(nn.Module):
         ) / vocab_size
         self.register_buffer("sigmas", sigmas)
         self.register_buffer("errors", errors)
+        reachable = float(errors[-1])
+        if reachable < self.max_percentile:
+            # Small vocabularies cannot reach the requested rank at sigma=4,
+            # so late times all map to sigma_max and those steps do nothing.
+            flat = (reachable - self.min_percentile) / (
+                self.max_percentile - self.min_percentile
+            )
+            warnings.warn(
+                f"CANDI rank schedule saturates: vocab_size={vocab_size} reaches "
+                f"rank {reachable:.3f} < max_percentile={self.max_percentile}; "
+                f"times above {flat:.3f} all use sigma=4",
+                stacklevel=2,
+            )
 
     def training_time(self, time):
         return time

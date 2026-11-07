@@ -137,7 +137,9 @@ class TrainingInferenceSearch(Searcher):
             return
         job = self.issued[trial_id]
         children = []
-        if not error and job.stage == "train" and job.inference:
+        # A cancelled training job has no checkpoint and no inference children.
+        cancelled = bool(result and result.get("cancelled"))
+        if not error and not cancelled and job.stage == "train" and job.inference:
             if not result or not result.get("checkpoint_dir_name"):
                 raise ValueError(
                     "Training finished without a persisted Tune checkpoint"

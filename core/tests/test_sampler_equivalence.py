@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import platform
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,14 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 FIXTURE = Path(__file__).with_name("fixtures") / "sampler_behavior.json"
+# The snapshots hash raw float bytes of intermediate states, so they are only
+# defined on the CPU kernels that recorded them. Other platforms (e.g. ARM macOS)
+# round differently in the last bits; the samplers' math is covered elsewhere.
+REFERENCE_PLATFORM = ("Linux", "x86_64")
+pytestmark = pytest.mark.skipif(
+    (platform.system(), platform.machine()) != REFERENCE_PLATFORM,
+    reason="byte-level sampler snapshots were recorded on Linux x86_64",
+)
 
 
 @pytest.fixture(autouse=True)

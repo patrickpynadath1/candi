@@ -1,5 +1,7 @@
 """SEDD absorbing training and model-to-score orchestration."""
 
+import torch
+
 from .discrete import DiscreteDiffusion
 from core.parameterizations.score import AbsorbingScoreParameterization
 from core.processes.absorbing import AbsorbingProcess
@@ -26,7 +28,8 @@ class SeddAbsorb(DiscreteDiffusion):
             )
 
     def training_prediction(self, state, keep):
-        return self.predictor(self.model_logits(state, keep), state, -keep.log())
+        sigma = -keep.clamp_min(torch.finfo(keep.dtype).tiny).log()
+        return self.predictor(self.model_logits(state, keep), state, sigma)
 
     def sampling_prediction(self, state, keep):
         return self.training_prediction(state, keep)
