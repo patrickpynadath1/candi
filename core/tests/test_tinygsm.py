@@ -63,10 +63,13 @@ def make_task(tmp_path, **kwargs):
             val_seed=42,
         )
     )
+    validation = tmp_path / "gsm_validation.json"
+    validation.write_text(evaluation.read_text())
     scoring = OmegaConf.create(
         dict(
             cache_dir=str(tmp_path),
             data_path=str(evaluation),
+            validation_data_path=str(validation),
             separator="\n",
             scoring="numeric",
             timeout=0.5,
@@ -240,3 +243,17 @@ def test_code_scoring_refuses_a_broken_sandbox():
     # One program that ran is enough to trust the sandbox on this worker.
     metrics.records.append(TinyGSMRecord(2, "q", "#### 1", "r", 1, 1, True, parsed=True, executed=True))
     assert metrics.compute().sandbox_error_rate == 1 / 3
+
+
+def test_selection_reads_validation_and_test_only_by_name(tmp_path):
+    task = make_task(tmp_path)
+    (tmp_path / "gsm_validation.json").write_text(
+        json.dumps([{"prompt": "held out", "response_ground_truth": "#### 7"}])
+    )
+    assert task.primary_metric.dataset == "gsm8k_validation"
+    validation = task.evaluation_dataset(task.primary_metric.dataset)
+    test = task.evaluation_dataset("gsm8k")
+    assert [r["prompt"] for r in validation] == ["held out"]
+    assert len(test) == 2
+    with pytest.raises(ValueError, match="unknown TinyGSM"):
+        task.evaluation_dataset("validation")

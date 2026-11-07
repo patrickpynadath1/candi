@@ -9,6 +9,10 @@ length: 512
 evaluation:
   cache_dir: ${data.cache_dir}
   data_path: null
+  # Held-out GSM8K train slice used for selection (primary metric).
+  validation_data_path: null
+  validation_size: 500
+  validation_seed: 0
   separator: ${data.separator}
   scoring: code
   timeout: 3.0

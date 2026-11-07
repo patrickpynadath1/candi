@@ -1,5 +1,7 @@
 """Likelihood training orchestration for continuous RePlaid."""
 
+from types import SimpleNamespace
+
 import torch
 
 from core.modifiers.self_conditioning.gradient_routing import detach_selected, embedding_mean
@@ -18,25 +20,46 @@ class RePlaid(GaussianDiffusion):
             logits, state, path.alpha, path.sigma, table, selected
         )
 
+    def _training_posterior(
+        self,
+        state,
+        time,
+        path,
+        selected,
+        bootstrap_path,
+        feedback_transform=None,
+        table=None,
+    ):
+        """The one training prediction path, shared by loss and the endpoint."""
+        table = self.representation.codebook() if table is None else table
+        return self.prediction.predict(
+            self.model,
+            self.predictor,
+            self.model_inputs(state, time, path),
+            state,
+            "training_posterior",
+            selected=selected,
+            mean=self.prediction_mean,
+            logits_transform=lambda logits: self._correct(
+                logits, state, path, table, selected
+            ),
+            bootstrap_feedback_transform=feedback_transform or (lambda value: value),
+            bootstrap_logits_transform=lambda logits: self._correct(
+                logits, state[selected], bootstrap_path, table
+            ),
+        )
+
+    def training_prediction(self, state, time, path):
+        """Training posterior without prompt context: no clean-prompt feedback
+        substitution, which loss() applies when ``corrupt_all`` is false."""
+        selected = self.prediction.select(len(state), state.device, self.model.training)
+        bootstrap_path = SimpleNamespace(
+            alpha=path.alpha[selected], sigma=path.sigma[selected]
+        )
+        return self._training_posterior(state, time, path, selected, bootstrap_path)
+
     def _prediction(self, pathway, state, time, path, trajectory=None):
         table = self.representation.codebook()
-        bootstrap = {}
-        if pathway == "training_posterior" and trajectory is None:
-            selected = self.prediction.select(
-                len(state), state.device, self.model.training
-            )
-            bootstrap = {
-                "selected": selected,
-                "bootstrap_logits_transform": lambda logits: (
-                    self.predictor.corrected_logits(
-                        logits,
-                        state[selected],
-                        path.alpha[selected],
-                        path.sigma[selected],
-                        table,
-                    )
-                ),
-            }
         return self.prediction.predict(
             self.model,
             self.predictor,
@@ -46,7 +69,6 @@ class RePlaid(GaussianDiffusion):
             mean=self.prediction_mean,
             logits_transform=lambda logits: self._correct(logits, state, path, table),
             trajectory=trajectory,
-            **bootstrap,
         )
 
     def loss(
@@ -100,18 +122,13 @@ class RePlaid(GaussianDiffusion):
         bootstrap_path = self.schedule.coefficients(
             effective_gamma[selected], effective_derivative[selected]
         )
-        log_probs = self.prediction.predict(
-            self.model,
-            self.predictor,
-            self.model_inputs(state, time, path),
+        log_probs = self._training_posterior(
             state,
-            "training_posterior",
-            selected=selected,
-            mean=self.prediction_mean,
-            logits_transform=lambda logits: self._correct(
-                logits, state, path, table, selected
-            ),
-            bootstrap_feedback_transform=lambda feedback: (
+            time,
+            path,
+            selected,
+            bootstrap_path,
+            feedback_transform=lambda feedback: (
                 torch.where(
                     ~corruption_mask[selected].bool()[..., None],
                     effective_clean[selected].detach(),
@@ -120,9 +137,7 @@ class RePlaid(GaussianDiffusion):
                 if self.prediction.source == "posterior_mean"
                 else feedback
             ),
-            bootstrap_logits_transform=lambda logits: self._correct(
-                logits, state[selected], bootstrap_path, table
-            ),
+            table=table,
         )
         predicted = embedding_mean(log_probs.exp(), table, selected)
         terminal_gamma, _, _ = self.schedule.gamma(torch.ones(1, device=tokens.device))

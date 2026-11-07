@@ -11,7 +11,10 @@ from .tinygsm_metrics import TinyGSMMetrics
 
 class TinyGSMTask(Task):
     name = "tinygsm"
-    primary_metric = PrimaryMetric("accuracy", "max", "gsm8k")
+    # Selection reads a held-out slice of GSM8K train; the test split ("gsm8k")
+    # is only scored when requested by name, e.g. evaluator.evaluation_name=gsm8k.
+    primary_metric = PrimaryMetric("accuracy", "max", "gsm8k_validation")
+    evaluation_splits = {"gsm8k": "test", "gsm8k_validation": "validation"}
 
     def __init__(self, data, evaluation, vocab_size=49153, length=512, tokenizer=None):
         if length < 2:
@@ -24,7 +27,7 @@ class TinyGSMTask(Task):
         self.vocab_size, self.length = vocab_size, length
         self._tokenizer = tokenizer
         self._datasets = None
-        self._evaluation_dataset = None
+        self._evaluation_datasets = {}
 
     @property
     def tokenizer(self):
@@ -67,13 +70,13 @@ class TinyGSMTask(Task):
         return self._load()["validation"]
 
     def evaluation_dataset(self, name):
-        if name != "gsm8k":
+        if name not in self.evaluation_splits:
             raise ValueError(f"unknown TinyGSM evaluation dataset: {name}")
-        if self._evaluation_dataset is None:
-            self._evaluation_dataset = get_gsm8k_dataset(
-                self.evaluation, self.tokenizer
+        if name not in self._evaluation_datasets:
+            self._evaluation_datasets[name] = get_gsm8k_dataset(
+                self.evaluation, self.tokenizer, self.evaluation_splits[name]
             )
-        return self._evaluation_dataset
+        return self._evaluation_datasets[name]
 
     def collate_training(self, examples):
         batch = default_collate(examples)
@@ -105,7 +108,7 @@ class TinyGSMTask(Task):
                 yield bucket[start : start + batch_size]
 
     def create_metric_accumulator(self, evaluation_name):
-        if evaluation_name != "gsm8k":
+        if evaluation_name not in self.evaluation_splits:
             raise ValueError(f"unknown TinyGSM evaluation dataset: {evaluation_name}")
         return TinyGSMMetrics(
             self.tokenizer,

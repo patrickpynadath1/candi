@@ -13,9 +13,12 @@ class GumbelSchedule(nn.Module):
     """VP Gaussian path with gamma=log(sigma²/alpha²) at Gumbel quantiles.
 
     Schedule parameters are fitted only by detached CE feedback, not by the
-    denoiser optimizer. The existing observe hook performs a separate SGD step
-    on H(gamma)=entropy*CDF(gamma). Log coordinates enforce positive scale and
-    entropy. All fitted state is checkpointed as buffers, like adaptive clocks.
+    denoiser optimizer. observe accumulates the gradient of the squared fit
+    error of H(gamma)=entropy*CDF(gamma); post_optimizer_step applies one SGD
+    step per optimizer step, so the fit does not depend on how the global batch
+    is split into microbatches or GPUs. Log coordinates enforce positive scale
+    and entropy. Fitted state is checkpointed as buffers, like adaptive clocks;
+    the pending sums are not (a resume restarts the current window).
     """
 
     representation_requirements = RepresentationRequirements()
@@ -54,6 +57,10 @@ class GumbelSchedule(nn.Module):
         )
         self.register_buffer("fit_steps", torch.tensor(0, dtype=torch.long))
         self.register_buffer("last_fit_loss", torch.tensor(0.0, dtype=torch.float64))
+        # gradient (3), squared error, count, summed over one optimizer step.
+        self.register_buffer(
+            "pending", torch.zeros(5, dtype=torch.float64), persistent=False
+        )
 
     @property
     def loc(self):
@@ -123,6 +130,16 @@ class GumbelSchedule(nn.Module):
         statistics = torch.cat(
             (gradient, squared.detach().reshape(1), gradient.new_tensor([len(target)]))
         )
+        if torch.isfinite(statistics).all():
+            self.pending.add_(statistics.to(self.pending))
+
+    @torch.no_grad()
+    def post_optimizer_step(self):
+        """Apply the accumulated fit once per optimizer step, on every rank."""
+        if not self.training or not self.learnable:
+            return
+        statistics = self.pending.clone()
+        self.pending.zero_()
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             torch.distributed.all_reduce(statistics)
         count = statistics[-1]

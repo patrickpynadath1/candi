@@ -25,9 +25,17 @@ both be enabled. Padding is also identified separately in `padding_mask`.
 Validation uses `val_ratio=.01` and `val_seed=42`. Cache identity includes
 tokenizer, separator, preparation settings, and local source content.
 
-The evaluation dataset is named `gsm8k`. By default it uses the GSM8K test split;
-`task.evaluation.data_path` accepts local JSON records with `prompt` and
-`response_ground_truth`. Only the question prefix enters generation, and batches
+Two evaluation datasets exist. `gsm8k_validation` is the primary metric's
+dataset, used by the periodic training callback and by `mode=evaluate` unless
+told otherwise: a fixed slice of the GSM8K *train* split (`validation_size=500`,
+`validation_seed=0`). `gsm8k` is the GSM8K test split and is read only when named,
+e.g. `evaluator.evaluation_name=gsm8k` for a final number; select checkpoints and
+settings on `gsm8k_validation`. TinyGSM is synthetic GSM8K-style data, so the
+train slice can contain near-duplicates of training problems: use it for
+selection, not as an unbiased estimate. Before 2026-11-07 the callback and default
+evaluation scored the test split. `task.evaluation.data_path` and
+`validation_data_path` accept local JSON records with `prompt` and
+`response_ground_truth` for the test and validation datasets. Only the question prefix enters generation, and batches
 group equal prompt lengths. Completions are cut at their first EOS before
 scoring. Longer prompts consume the available generation window.
 

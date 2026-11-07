@@ -66,12 +66,15 @@ def test_profile_fit_improves_and_checkpoint_resumes_identically():
     for step in range(400):
         gamma, _ = schedule.gamma(time)
         schedule.observe(time, target(gamma), step, training=True)
+        schedule.post_optimizer_step()
     assert error() < before * 0.05
     restored = GumbelSchedule(learning_rate=0.02)
     restored.load_state_dict(schedule.state_dict())
     losses = target(schedule.gamma(time)[0])
     schedule.observe(time, losses, 401, training=True)
     restored.observe(time, losses, 401, training=True)
+    schedule.post_optimizer_step()
+    restored.post_optimizer_step()
     for key, value in schedule.state_dict().items():
         torch.testing.assert_close(value, restored.state_dict()[key], rtol=0, atol=0)
 
@@ -82,15 +85,19 @@ def test_detached_feedback_eval_and_empty_batch_do_not_update():
     loss = torch.tensor([1.0, 2.0], requires_grad=True)
     schedule.observe(time, loss, 0, training=True)
     assert time.grad is None and loss.grad is None
+    schedule.pending.zero_()
     saved = schedule.fit_parameters.clone()
     schedule.observe(time, loss, 1, training=False)
     schedule.observe(time[:0], loss[:0], 1, training=True)
+    schedule.post_optimizer_step()
     schedule.eval()
     schedule.observe(time, loss, 1, training=True)
+    schedule.post_optimizer_step()
     torch.testing.assert_close(schedule.fit_parameters, saved)
     schedule.train()
     schedule.learnable = False
     schedule.observe(time, loss, 1, training=True)
+    schedule.post_optimizer_step()
     torch.testing.assert_close(schedule.fit_parameters, saved)
 
 
@@ -144,9 +151,28 @@ def test_schedule_composes_trains_and_generates(hybrid):
     mask = torch.tensor([[False, True, True, True]] * 2)
     result = algo.loss(tokens, mask, training=True)
     result["loss"].backward()
+    assert schedule.fit_steps == 0  # The fit is applied after the optimizer step,
+    for module in algo.modules():  # through the hook TrainingModule calls.
+        hook = getattr(module, "post_optimizer_step", None)
+        if callable(hook):
+            hook()
     assert schedule.fit_steps == 1
     assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in algo.parameters())
     output, metadata = algo.generate(sampler, tokens, ~mask)
     assert torch.equal(output[~mask], tokens[~mask])
     assert torch.isfinite(result["loss"]) and metadata["nfe"] == 3
     assert schedule.fit_steps == 1
+
+
+def test_fit_is_independent_of_how_a_step_is_split_into_microbatches():
+    whole, split = GumbelSchedule(), GumbelSchedule()
+    time = torch.linspace(0.05, 0.95, 8, dtype=torch.float64)
+    loss = torch.linspace(0.5, 3.0, 8, dtype=torch.float64)
+    whole.observe(time, loss, 0, training=True)
+    for part in range(4):
+        split.observe(time[part::4], loss[part::4], 0, training=True)
+    assert whole.fit_steps == split.fit_steps == 0
+    whole.post_optimizer_step()
+    split.post_optimizer_step()
+    assert whole.fit_steps == split.fit_steps == 1
+    torch.testing.assert_close(whole.fit_parameters, split.fit_parameters)
