@@ -4,7 +4,8 @@ from core.representations.one_hot import OneHotRepresentation
 from core.objectives.weighting import ObjectiveContext
 
 from .posterior import PosteriorDiffusion
-from .adaptive import validate_adaptive_feedback, observe_training_loss
+from .adaptive import validate_adaptive_feedback
+from .training_loss import finish_training_loss
 
 
 class GaussianDiffusion(PosteriorDiffusion):
@@ -89,26 +90,17 @@ class GaussianDiffusion(PosteriorDiffusion):
             )
         else:
             per_token = objective(prediction, tokens)
-        weights = loss_mask.to(per_token)
-        count = weights.sum()
-        if count <= 0:
-            raise ValueError("loss mask must include at least one target")
-        observe = getattr(self.time_sampler, "observe", None)
-        if training and observe is not None:
-            observe(time, per_token, loss_mask, step)
-        observe_training_loss(
-            self.schedule,
-            time,
-            prediction,
-            tokens,
+        # The sampler observes the schedule's training-time coordinate, as in
+        # existing adaptive Gaussian runs (a <=training_epsilon rescaling).
+        return finish_training_loss(
             per_token,
             loss_mask,
+            tokens=tokens,
+            prediction=prediction,
             step=step,
             training=training,
+            time_sampler=time_sampler,
+            sampler_time=time,
+            schedule=self.schedule,
+            schedule_time=time,
         )
-        total = (per_token * weights).sum()
-        return {
-            "loss": total / count,
-            "loss_sum": total.detach(),
-            "num_tokens": count.detach(),
-        }

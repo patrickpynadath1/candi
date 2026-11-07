@@ -11,6 +11,62 @@ from hydra.utils import instantiate
 from .ema import ExponentialMovingAverage
 
 
+def build_algorithm(config):
+    """Instantiate the algorithm and wrap it with the configured modifiers.
+
+    The order (encoder-decoder, variable length, block diffusion, token
+    feedback) fixes parameter paths, so existing checkpoints keep loading.
+    """
+    algorithm = instantiate(config.algorithm)
+    encoder_decoder = config.get("encoder_decoder")
+    if encoder_decoder is not None:
+        if not config.get("block_diffusion", {}).get("enabled", False):
+            raise ValueError(
+                "encoder_decoder currently requires block diffusion visibility"
+            )
+        if config.get("variable_length") is not None:
+            raise ValueError(
+                "encoder_decoder currently requires fixed-length blocks"
+            )
+        algorithm.model = instantiate(
+            encoder_decoder, model=algorithm.model
+        )
+    structural = config.get("variable_length")
+    if structural is not None:
+        algorithm = instantiate(structural, algorithm=algorithm)
+    block = config.get("block_diffusion", {})
+    if block.get("enabled", False):
+        from core.modifiers.block_diffusion import BlockDiffusion
+
+        algorithm = BlockDiffusion(
+            algorithm,
+            block_size=block.block_size,
+            clean_loss=block.get("clean_loss", "none"),
+            clean_loss_weight=block.get("clean_loss_weight", 1.0),
+            cache_clean_prefix=block.get("cache_clean_prefix", True),
+            max_length=block.get("max_length"),
+            x0_causal=block.get("x0_causal", True),
+            training=instantiate(block.get("training")),
+        )
+    feedback = config.get("token_feedback", {})
+    if feedback.get("enabled", False):
+        from core.modifiers.token_feedback import TokenFeedback
+
+        algorithm = TokenFeedback(
+            algorithm,
+            depth=feedback.depth,
+            loss_weight=feedback.get("loss_weight", 1.0),
+            detach=feedback.get("detach", False),
+        )
+    if config.get("self_conditioning", {}).get("enabled", False):
+        policy = getattr(algorithm, "prediction", None)
+        if policy is None or not policy.enabled:
+            raise ValueError(
+                "self-conditioning requires an enabled prediction coordinator on this algorithm"
+            )
+    return algorithm
+
+
 class TrainingModule(L.LightningModule):
     def __init__(self, config):
         super().__init__()
@@ -25,53 +81,7 @@ class TrainingModule(L.LightningModule):
         self.save_hyperparameters(
             {"config": OmegaConf.to_container(self.config, resolve=True)}
         )
-        self.algorithm = instantiate(self.config.algorithm)
-        encoder_decoder = self.config.get("encoder_decoder")
-        if encoder_decoder is not None:
-            if not self.config.get("block_diffusion", {}).get("enabled", False):
-                raise ValueError(
-                    "encoder_decoder currently requires block diffusion visibility"
-                )
-            if self.config.get("variable_length") is not None:
-                raise ValueError(
-                    "encoder_decoder currently requires fixed-length blocks"
-                )
-            self.algorithm.model = instantiate(
-                encoder_decoder, model=self.algorithm.model
-            )
-        structural = self.config.get("variable_length")
-        if structural is not None:
-            self.algorithm = instantiate(structural, algorithm=self.algorithm)
-        block = self.config.get("block_diffusion", {})
-        if block.get("enabled", False):
-            from core.modifiers.block_diffusion import BlockDiffusion
-
-            self.algorithm = BlockDiffusion(
-                self.algorithm,
-                block_size=block.block_size,
-                clean_loss=block.get("clean_loss", "none"),
-                clean_loss_weight=block.get("clean_loss_weight", 1.0),
-                cache_clean_prefix=block.get("cache_clean_prefix", True),
-                max_length=block.get("max_length"),
-                x0_causal=block.get("x0_causal", True),
-                training=instantiate(block.get("training")),
-            )
-        feedback = self.config.get("token_feedback", {})
-        if feedback.get("enabled", False):
-            from core.modifiers.token_feedback import TokenFeedback
-
-            self.algorithm = TokenFeedback(
-                self.algorithm,
-                depth=feedback.depth,
-                loss_weight=feedback.get("loss_weight", 1.0),
-                detach=feedback.get("detach", False),
-            )
-        if self.config.get("self_conditioning", {}).get("enabled", False):
-            policy = getattr(self.algorithm, "prediction", None)
-            if policy is None or not policy.enabled:
-                raise ValueError(
-                    "self-conditioning requires an enabled prediction coordinator on this algorithm"
-                )
+        self.algorithm = build_algorithm(self.config)
         self.ema = (
             ExponentialMovingAverage(
                 self.algorithm.parameters(), self.config.training.ema

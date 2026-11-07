@@ -3,23 +3,12 @@
 from core.objectives.cross_entropy import CrossEntropy
 from core.objectives.weighting import ObjectiveContext
 
-from .adaptive import validate_adaptive_feedback, observe_training_loss
+from .adaptive import validate_adaptive_feedback
+# reduce_token_loss is re-exported for existing importers.
+from .training_loss import finish_training_loss, reduce_token_loss  # noqa: F401
 
 import torch
 from torch import nn
-
-
-def reduce_token_loss(per_token, loss_mask):
-    weights = loss_mask.to(per_token)
-    count = weights.sum()
-    if count <= 0:
-        raise ValueError("loss mask must include at least one target")
-    total = (per_token * weights).sum()
-    return {
-        "loss": total / count,
-        "loss_sum": total.detach(),
-        "num_tokens": count.detach(),
-    }
 
 
 class DiscreteDiffusion(nn.Module):
@@ -95,17 +84,18 @@ class DiscreteDiffusion(nn.Module):
             per_token = objective(
                 prediction, state, tokens, keep[:, None], derivative[:, None]
             )
-        observe_training_loss(
-            self.schedule,
-            times,
-            prediction,
-            tokens,
+        return finish_training_loss(
             per_token,
             loss_mask,
+            tokens=tokens,
+            prediction=prediction,
             step=step,
             training=training,
+            time_sampler=time_sampler,
+            sampler_time=times,
+            schedule=self.schedule,
+            schedule_time=times,
         )
-        return reduce_token_loss(per_token, loss_mask)
 
     @torch.no_grad()
     def generate(self, sampler, prompt_tokens, prompt_mask):

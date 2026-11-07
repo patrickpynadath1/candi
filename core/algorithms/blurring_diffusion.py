@@ -2,7 +2,7 @@
 
 import torch
 from core.sequences import resolve_sequence_layout
-from .adaptive import observe_training_loss
+from .training_loss import finish_training_loss
 from .posterior import PosteriorDiffusion
 
 
@@ -76,26 +76,15 @@ class BlurringDiffusion(PosteriorDiffusion):
         state = self.process.corrupt(process_clean, path)
         prediction = self.training_prediction(state, time)
         per_token = self.objective(prediction, tokens)
-        weights = loss_mask.to(per_token)
-        count = weights.sum()
-        if count <= 0:
-            raise ValueError("loss mask must include at least one target")
-        observe = getattr(self.time_sampler, "observe", None)
-        if training and observe is not None:
-            observe(time, per_token, loss_mask, step)
-        observe_training_loss(
-            self.schedule,
-            time,
-            prediction,
-            tokens,
+        return finish_training_loss(
             per_token,
             loss_mask,
+            tokens=tokens,
+            prediction=prediction,
             step=step,
             training=training,
+            time_sampler=self.time_sampler,
+            sampler_time=time,
+            schedule=self.schedule,
+            schedule_time=time,
         )
-        total = (per_token * weights).sum()
-        return {
-            "loss": total / count,
-            "loss_sum": total.detach(),
-            "num_tokens": count.detach(),
-        }

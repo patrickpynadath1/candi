@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import functional as F
 import weakref
 
+from core.models.components import DiffusionBlocks
 from .model import TokenFeedbackBlocks
 
 
@@ -76,6 +77,12 @@ class TokenFeedback(nn.Module):
             )
         if not 0 <= depth < len(blocks):
             raise ValueError(f"token feedback depth must be in [0, {len(blocks) - 1}]")
+        if type(model.block_execution) is not DiffusionBlocks:
+            # Replacing another policy (e.g. depth mixing) would silently drop it.
+            raise ValueError(
+                "token feedback requires the standard block policy, not "
+                f"{type(model.block_execution).__name__}"
+            )
         hidden_size = table.shape[1]
         model.block_execution = TokenFeedbackBlocks(
             blocks[depth], depth, hidden_size, detach=detach

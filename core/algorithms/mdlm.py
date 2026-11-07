@@ -1,6 +1,7 @@
 """MDLM training orchestration and model-to-posterior prediction."""
 
-from .adaptive import validate_adaptive_feedback, observe_training_loss
+from .adaptive import validate_adaptive_feedback
+from .training_loss import finish_training_loss
 
 import torch
 from .posterior import PosteriorDiffusion
@@ -70,23 +71,15 @@ class MDLM(PosteriorDiffusion):
             )
         else:
             per_token = objective(prediction, tokens, keep, derivative)
-        weights = loss_mask.to(per_token)
-        count = weights.sum()
-        if count <= 0:
-            raise ValueError("loss mask must include at least one target")
-        observe_training_loss(
-            self.schedule,
-            times,
-            prediction,
-            tokens,
+        return finish_training_loss(
             per_token,
             loss_mask,
+            tokens=tokens,
+            prediction=prediction,
             step=step,
             training=training,
+            time_sampler=time_sampler,
+            sampler_time=times,
+            schedule=self.schedule,
+            schedule_time=times,
         )
-        total = (per_token * weights).sum()
-        return {
-            "loss": total / count,
-            "loss_sum": total.detach(),
-            "num_tokens": count.detach(),
-        }

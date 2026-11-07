@@ -1,6 +1,7 @@
 """Simplex training orchestration; process and sampler own transition mathematics."""
 
 from .posterior import PosteriorDiffusion
+from .training_loss import finish_training_loss
 
 
 class SimplexDiffusion(PosteriorDiffusion):
@@ -60,16 +61,13 @@ class SimplexDiffusion(PosteriorDiffusion):
             )
         prediction = self.training_prediction(state, time)
         per_token = objective(prediction, tokens)
-        weights = loss_mask.to(per_token)
-        count = weights.sum()
-        if count <= 0:
-            raise ValueError("loss mask must include at least one target")
-        observe = getattr(time_sampler, "observe", None)
-        if training and observe is not None:
-            observe(time, per_token, loss_mask, step)
-        total = (per_token * weights).sum()
-        return {
-            "loss": total / count,
-            "loss_sum": total.detach(),
-            "num_tokens": count.detach(),
-        }
+        return finish_training_loss(
+            per_token,
+            loss_mask,
+            tokens=tokens,
+            prediction=prediction,
+            step=step,
+            training=training,
+            time_sampler=time_sampler,
+            sampler_time=time,
+        )

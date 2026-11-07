@@ -3,8 +3,8 @@
 import torch
 
 from .posterior import PosteriorDiffusion
-from .discrete import reduce_token_loss
-from .adaptive import validate_adaptive_feedback, observe_training_loss
+from .adaptive import validate_adaptive_feedback
+from .training_loss import finish_training_loss
 from core.objectives.cross_entropy import CrossEntropy
 from core.parameterizations.posterior import PosteriorParameterization
 from core.parameterizations.constraints import UnconstrainedPosterior
@@ -84,14 +84,15 @@ class PosteriorUniformDiffusion(PosteriorDiffusion):
         state = self.process.corrupt(tokens, keep, corruption_mask)
         prediction = self.training_prediction(state, keep)
         per_token = objective(prediction, tokens)
-        observe_training_loss(
-            self.schedule,
-            times,
-            prediction,
-            tokens,
+        return finish_training_loss(
             per_token,
             loss_mask,
+            tokens=tokens,
+            prediction=prediction,
             step=step,
             training=training,
+            time_sampler=time_sampler,
+            sampler_time=times,
+            schedule=self.schedule,
+            schedule_time=times,
         )
-        return reduce_token_loss(per_token, loss_mask)

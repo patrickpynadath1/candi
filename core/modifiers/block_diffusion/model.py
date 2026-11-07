@@ -8,6 +8,7 @@ from torch import nn
 from core.models.continuous_dit import ContinuousDiT
 from core.models.dit import DiT
 from core.modifiers.hybrid.model import HybridModel
+from core.models.components import DiffusionBlocks
 from core.models.prediction import ModelPrediction
 from core.models.kv_cache import append_key_value
 from .layout import make_layout
@@ -139,12 +140,12 @@ class BlockDiffusionModel(nn.Module):
                 cache=cache,
             )
             return result if return_features else result.logits
+        # The cached path runs model.blocks directly, so it is only valid for
+        # the standard policy (not token feedback or depth mixing).
         if (
             cache is not None
             and not self.training
-            and not getattr(
-                self.model.block_execution, "uses_intermediate_feedback", False
-            )
+            and type(self.model.block_execution) is DiffusionBlocks
         ):
             return self._cached_forward(
                 inputs, clean, offset, cache, layout, self_condition, return_features
