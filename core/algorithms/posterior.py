@@ -7,6 +7,10 @@ from core.modifiers.self_conditioning.sources import posterior_mean
 
 
 class PosteriorDiffusion(nn.Module):
+    # Parameterization endpoints are named "<use>_<pathway>", e.g.
+    # training_posterior or sampling_plugin.
+    prediction_pathway = "posterior"
+
     def __init__(self, prediction=None):
         super().__init__()
         self.prediction = (
@@ -14,7 +18,12 @@ class PosteriorDiffusion(nn.Module):
         )
 
     def validate_prediction(self):
-        self.prediction.validate(self.model, self.predictor)
+        self.prediction.validate(
+            self.model, self.predictor, training_pathway=self._pathway("training")
+        )
+
+    def _pathway(self, use):
+        return f"{use}_{self.prediction_pathway}"
 
     def model_logits(self, *state):
         return self.model(*self.model_inputs(*state))
@@ -38,16 +47,17 @@ class PosteriorDiffusion(nn.Module):
             mean=self.prediction_mean,
             logits_transform=self.prediction_logits,
             trajectory=trajectory,
+            training_pathway=self._pathway("training"),
         )
 
     def training_prediction(self, *state):
-        return self._prediction("training_posterior", *state)
+        return self._prediction(self._pathway("training"), *state)
 
     def sampling_prediction(self, *state, trajectory=None):
-        return self._prediction("sampling_posterior", *state, trajectory=trajectory)
+        return self._prediction(self._pathway("sampling"), *state, trajectory=trajectory)
 
     def greedy_prediction(self, *state, trajectory=None):
-        return self._prediction("greedy_posterior", *state, trajectory=trajectory)
+        return self._prediction(self._pathway("greedy"), *state, trajectory=trajectory)
 
     @torch.no_grad()
     def generate(self, sampler, prompt_tokens, prompt_mask):
