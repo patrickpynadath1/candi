@@ -6,7 +6,7 @@ import ast
 import pytest
 import torch
 
-from core.tests.view_inputs import view_prediction
+from core.tests.view_inputs import token_call, view_prediction
 from torch import nn
 from hydra import compose, initialize_config_dir
 
@@ -306,7 +306,7 @@ def test_rotary_cache_remains_fp32_under_gpu_autocast():
     model = instantiate(config().algorithm).model.cuda().eval()
     tokens = torch.zeros(1, 180, dtype=torch.long, device="cuda")
     with torch.autocast("cuda", dtype=torch.bfloat16):
-        model(tokens, torch.zeros(1, device="cuda"))
+        token_call(model, tokens, torch.zeros(1, device="cuda"))
     assert model.rotary_emb.cos_cached.dtype == torch.float32
     frequency = torch.einsum(
         "i,j->ij", torch.arange(180, device="cuda").float(), model.rotary_emb.inv_freq
