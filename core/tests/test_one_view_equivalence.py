@@ -7,19 +7,15 @@ stored by position), loss, gradients, old-checkpoint loading and samples.
 """
 
 from hydra.utils import instantiate
-from omegaconf import OmegaConf
 import pytest
 import torch
 
-from core.sweeps import compose
-
-SMALL = {
-    "model.hidden_size": 32,
-    "model.n_blocks": 2,
-    "model.n_heads": 2,
-    "model.cond_dim": 16,
-    "model.dropout": 0,
-}
+from core.tests.view_equivalence import (
+    assert_sampling_identical,
+    assert_training_identical,
+    batch,
+    build,
+)
 
 FAMILIES = {
     "uniform_posterior": (
@@ -36,30 +32,11 @@ FAMILIES = {
 }
 
 
-def build(experiment, target, self_conditioning, seed=0, overrides=None):
-    options = {**SMALL, **(overrides or {})}
-    if self_conditioning is not None:
-        options["self_conditioning.enabled"] = self_conditioning
-    cfg = compose(experiment, options)
-    if target is not None:
-        OmegaConf.update(cfg, "algorithm._target_", target)
-    torch.manual_seed(seed)
-    return cfg, instantiate(cfg.algorithm)
-
-
 def pair(experiment, self_conditioning):
     reference_target, _ = FAMILIES[experiment]
     cfg, reference = build(experiment, reference_target, self_conditioning)
     _, current = build(experiment, None, self_conditioning)
     return cfg, reference, current
-
-
-def batch(cfg):
-    torch.manual_seed(1)
-    tokens = torch.randint(0, cfg.task.vocab_size, (4, cfg.task.length))
-    mask = torch.ones_like(tokens, dtype=torch.bool)
-    mask[:, :5] = False
-    return tokens, mask
 
 
 @pytest.mark.parametrize("self_conditioning", [False, True])
@@ -134,24 +111,9 @@ MDLM_REFERENCE = "core.tests.reference_algorithms.mdlm.MDLM"
 
 @pytest.mark.parametrize("variant", sorted(MDLM_VARIANTS))
 def test_mdlm_training_is_identical_on_the_view_path(variant):
-    cfg = compose("sudoku_hard", {**SMALL, **MDLM_VARIANTS[variant]})
-    _, standalone = build("sudoku_hard", MDLM_REFERENCE, None, overrides=MDLM_VARIANTS[variant])
-    _, viewed = build("sudoku_hard", None, None, overrides=MDLM_VARIANTS[variant])
-    old, new = list(standalone.parameters()), list(viewed.parameters())
-    assert len(old) == len(new) and all(torch.equal(a, b) for a, b in zip(old, new))
-    tokens, mask = batch(cfg)
-    results = []
-    for algorithm in (standalone, viewed):
-        algorithm.train()
-        torch.manual_seed(7)
-        result = algorithm.loss(tokens, mask, training=True)
-        result["loss"].backward()
-        results.append(result)
-    assert torch.equal(results[0]["loss"], results[1]["loss"])
-    for a, b in zip(old, new):
-        assert (a.grad is None) == (b.grad is None)
-        if a.grad is not None:
-            assert torch.equal(a.grad, b.grad)
+    cfg, standalone = build("sudoku_hard", MDLM_REFERENCE, overrides=MDLM_VARIANTS[variant])
+    _, viewed = build("sudoku_hard", None, overrides=MDLM_VARIANTS[variant])
+    assert_training_identical(standalone, viewed, *batch(cfg))
 
 
 MDLM_SAMPLERS = [
@@ -169,18 +131,10 @@ MDLM_SAMPLERS = [
 
 @pytest.mark.parametrize("variant", ["default", "adaln_negative_log_keep", "self_conditioning"])
 def test_mdlm_sampling_is_identical_on_the_view_path(variant):
-    cfg = compose("sudoku_hard", {**SMALL, **MDLM_VARIANTS[variant]})
-    _, standalone = build("sudoku_hard", MDLM_REFERENCE, None, overrides=MDLM_VARIANTS[variant])
-    _, viewed = build("sudoku_hard", None, None, overrides=MDLM_VARIANTS[variant])
+    cfg, standalone = build("sudoku_hard", MDLM_REFERENCE, overrides=MDLM_VARIANTS[variant])
+    _, viewed = build("sudoku_hard", None, overrides=MDLM_VARIANTS[variant])
     tokens, _ = batch(cfg)
     prompt = tokens[:3]
     fixed = torch.zeros_like(prompt, dtype=torch.bool)
     fixed[:, :20] = True
-    for options in MDLM_SAMPLERS:
-        sampler = instantiate(options)
-        torch.manual_seed(11)
-        expected, expected_info = standalone.generate(sampler, prompt, fixed)
-        torch.manual_seed(11)
-        actual, actual_info = viewed.generate(sampler, prompt, fixed)
-        assert torch.equal(expected, actual), options
-        assert expected_info["nfe_per_sample"] == actual_info["nfe_per_sample"], options
+    assert_sampling_identical(standalone, viewed, prompt, fixed, MDLM_SAMPLERS)

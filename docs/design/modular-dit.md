@@ -56,6 +56,7 @@ regenerate_final.py`). The reference state is tag `v2.1-blog-reference`.
 - [x] `ViewsInput` slot: all 40 hybrid presets are bit-identical ModularDiT presets via the converter.
 - [x] Hybrid configs build ModularDiT (`model.views`/`fusion` kept, `model.backbone.*` -> `model.*`, `time_conditioning` -> `model.time.coordinate`); every preset resolves to the converter's config. Block diffusion, variable length and performance use the shared interface. Posterior uniform still wraps a legacy DiT via `one_view_model`.
 - [x] MDLM on the view path (adopts the configured DiT; bit-identical training and ancestral / entropy-bounded sampling vs the frozen class). Block diffusion, BlockGen mixtures and E2D2 run on it; their tests use the view interface.
+- [x] Foundation for the remaining families (tag `unify-4-foundation`): `adopt` for every network kind, `OneViewAlgorithm`, `HybridDiffusion` extension points and algorithm-held views, view sampler calls, shared equivalence helpers. Guide: [family-migration.md](family-migration.md).
 - [ ] MDLM checkpoint importers (`evaluation.legacy`, CANDI) through the converter; MDLM model configs to ModularDiT.
 - [ ] Gaussian, simplex, spherical, blurring on the modular path.
 - [ ] Contracts and generated compatibility table.
