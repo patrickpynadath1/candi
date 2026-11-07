@@ -1,14 +1,23 @@
-"""Training orchestration for separable positional/feature blurring diffusion."""
+"""Separable positional/feature blurring diffusion as a one-view recipe.
 
-import torch
-from core.sequences import resolve_sequence_layout
-from .training_loss import finish_training_loss
-from .posterior import PosteriorDiffusion
+Runs on the view path: one blurring view, held on the algorithm, over a
+ModularDiT adopted from the configured ContinuousDiT (see
+core/models/legacy.py:adopt). Training and sampling behave as the former
+standalone implementation, which core/tests/reference_algorithms keeps for
+comparison.
+"""
+
+from core.models.legacy import adopt
+from core.modifiers.hybrid.one_view import OneViewAlgorithm
+from core.modifiers.hybrid.training import HybridDiffusion
+from core.modifiers.hybrid.views import DiffusionView
+from core.samplers.hybrid_updates import BlurringPosteriorUpdate
+
+# HybridDiffusion's per-call overrides; blurring never supported them.
+_UNSUPPORTED_LOSS_OPTIONS = ("time_sampler", "objective", "pure_noise")
 
 
-class BlurringDiffusion(PosteriorDiffusion):
-    supports_sequence_layout = True
-
+class BlurringDiffusion(OneViewAlgorithm, HybridDiffusion):
     def __init__(
         self,
         model,
@@ -22,15 +31,6 @@ class BlurringDiffusion(PosteriorDiffusion):
         prediction=None,
         detach_forward_embedding=False,
     ):
-        super().__init__(prediction)
-        self.model, self.predictor, self.process = model, predictor, process
-        self.schedule, self.time_sampler, self.objective = (
-            schedule,
-            time_sampler,
-            objective,
-        )
-        self.representation, self.length = representation, length
-        self.detach_forward_embedding = bool(detach_forward_embedding)
         if getattr(objective, "requires_context", False):
             raise TypeError(
                 "blurring diffusion supports token cross entropy without scalar Gaussian weighting"
@@ -43,15 +43,28 @@ class BlurringDiffusion(PosteriorDiffusion):
             raise ValueError(
                 "blurring diffusion requires raw time and no input preconditioning"
             )
-        self.validate_prediction()
-
-    def model_inputs(self, state, time):
-        # ContinuousDiT's generic interface accepts path scalars. These are not
-        # used by the configured raw-time/no-preconditioning architecture.
-        return state, time, torch.ones_like(time), torch.ones_like(time)
+        view = DiffusionView(process, schedule, representation, BlurringPosteriorUpdate())
+        super().__init__(
+            adopt(model),
+            predictor,
+            time_sampler,
+            objective,
+            length=length,
+            prediction=prediction,
+            views=[view],
+        )
+        self.detach_forward_embedding = bool(detach_forward_embedding)
 
     def prediction_mean(self, probabilities):
+        # Self-conditioning feeds back the expected codebook vector (state space).
         return self.representation.posterior_mean(probabilities)
+
+    def _corrupt(self, tokens, points, corruption_mask):
+        # The schedule's layout path already restricts corruption to active spans.
+        clean = self.representation.encode(tokens)
+        if self.detach_forward_embedding:
+            clean = clean.detach()  # Only the forward process input.
+        return (self.process.corrupt(clean, points[0].coefficients),)
 
     def loss(
         self,
@@ -64,27 +77,15 @@ class BlurringDiffusion(PosteriorDiffusion):
         training=False,
         **time_context,
     ):
-        if corruption_mask is None:
-            corruption_mask = loss_mask
-        time = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
-        clean = self.representation.encode(tokens)
-        process_clean = clean.detach() if self.detach_forward_embedding else clean
-        layout = resolve_sequence_layout(corruption_mask, sequence_layout)
-        path = self.schedule.for_layout(
-            time.to(clean), corruption_mask, clean.shape[-1], layout
-        )
-        state = self.process.corrupt(process_clean, path)
-        prediction = self.training_prediction(state, time)
-        per_token = self.objective(prediction, tokens)
-        return finish_training_loss(
-            per_token,
+        unsupported = sorted(set(time_context) & set(_UNSUPPORTED_LOSS_OPTIONS))
+        if unsupported:
+            raise TypeError(f"blurring diffusion does not support loss overrides: {unsupported}")
+        return super().loss(
+            tokens,
             loss_mask,
-            tokens=tokens,
-            prediction=prediction,
+            corruption_mask,
+            sequence_layout=sequence_layout,
             step=step,
             training=training,
-            time_sampler=self.time_sampler,
-            sampler_time=time,
-            schedule=self.schedule,
-            schedule_time=time,
+            **time_context,
         )
