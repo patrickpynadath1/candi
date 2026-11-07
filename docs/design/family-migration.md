@@ -9,9 +9,19 @@ network) and `core/algorithms/uniform_posterior.py`.
 
 The family's class keeps its name, constructor arguments, checks and every preset
 config, but becomes a one-view `HybridDiffusion` recipe on an adopted `ModularDiT`.
-It must be **bit-identical** to the former class: `torch.equal` on initialization,
-loss, every gradient, sampled tokens and NFE. Never loosen a tolerance. If identity
-is impossible, stop and report the exact difference with numbers.
+It must be **behaviorally equivalent** to the former class. Bit-for-bit equality is
+not the goal, and clean code is never compromised to get it.
+
+- **May differ:** rounding, summation order, parameter registration or initialization
+  order, and the order random numbers are drawn in.
+- **Must match:** the math; which time, keep or coefficient feeds the network,
+  objective and observers; clamp and epsilon values; exposed precision options;
+  masked and counted positions; self-conditioning source and space; prompt handling;
+  terminal steps; NFE; schedule and time-sampler feedback; constructor checks.
+- **Tests:** compare loss and gradients with `torch.testing.assert_close` at tight
+  float32 tolerances. Compare samples exactly while the draw order is unchanged;
+  otherwise compare per-step outputs under shared noise, plus NFE. Keep exact checks
+  where they come for free. Report every intentional behavior-neutral difference.
 
 ## Building blocks (already in place, tag `unify-4-foundation`)
 
