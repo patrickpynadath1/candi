@@ -32,23 +32,6 @@ def test_insufficient_block_budget_rejected():
         sampler_steps(config, AncestralSampler(), 32)
 
 
-def test_latent_budget_is_split_across_latent_blocks():
-    from core.samplers.latent_autoencoder import LatentAutoencoderSampler
-
-    config = OmegaConf.create(
-        {
-            "algorithm": {
-                "_target_": "core.algorithms.latent_autoencoder.LatentAutoencoderDiffusion"
-            },
-            "task": {"length": 256},
-            "latent": {"block_size": 32},
-        }
-    )
-    # 8 blocks x (steps + terminal denoise + decode) must fit in 128 calls.
-    steps = sampler_steps(config, LatentAutoencoderSampler(), 128)
-    assert 8 * (steps + 2) <= 128 and steps == 14
-
-
 @pytest.mark.parametrize(
     "factory, used",
     [

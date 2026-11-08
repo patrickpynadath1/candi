@@ -137,7 +137,7 @@ def test_masking_empty_observations_and_warmup():
             torch.testing.assert_close(s.state_dict()[k], v)
 
 
-def test_legacy_state_rejected_without_explicit_migration():
+def test_legacy_proposal_state_is_rejected():
     from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
 
     with pytest.raises(RuntimeError):
@@ -204,47 +204,6 @@ def test_distributed_fit_matches_single_global_batch(tmp_path):
         state = torch.load(str(tmp_path / "state") + str(rank), weights_only=True)
         for k, v in s.state_dict().items():
             torch.testing.assert_close(state[k], v)
-
-
-def test_explicit_migration_preserves_model_optimizer_and_ema():
-    from core.training.cdcd_migration import migrate_checkpoint
-    from core.training.module import TrainingModule
-    from core.sweeps.configuration import compose
-    from omegaconf import OmegaConf
-
-    cfg = compose("tinygsm_blurring_sc_adaptive")
-    cfg.task.vocab_size = 11
-    cfg.task.length = 8
-    cfg.model.hidden_size = 16
-    cfg.model.cond_dim = 8
-    cfg.model.n_blocks = 1
-    cfg.model.n_heads = 2
-    cfg.model.output_dim = 8
-    cfg.representation.dimension = 8
-    cfg.time_sampler = OmegaConf.load("configs/time_sampler/loss_derivative.yaml")
-    cfg.time_sampler.adaptive = True
-    old = TrainingModule(cfg)
-    original = {
-        "state_dict": old.state_dict(),
-        "hyper_parameters": {"config": OmegaConf.to_container(cfg, resolve=True)},
-        "global_step": 190000,
-        "optimizer_states": [{"sentinel": torch.ones(1)}],
-        "ema": old.ema.state_dict(),
-    }
-    settings = OmegaConf.load("configs/time_sampler/cdcd.yaml")
-    settings.adaptive = True
-    migrated = migrate_checkpoint(original, settings)
-    assert migrated["optimizer_states"] is original["optimizer_states"]
-    assert migrated["ema"] is original["ema"]
-    assert "algorithm.time_sampler.times" in original["state_dict"]
-    fresh = TrainingModule(OmegaConf.create(migrated["hyper_parameters"]["config"]))
-    fresh.load_state_dict(migrated["state_dict"], strict=True)
-    for a, b in zip(old.algorithm.parameters(), fresh.algorithm.parameters()):
-        torch.testing.assert_close(a, b)
-    assert (
-        fresh.algorithm.time_sampler.updates == 0
-        and not fresh.algorithm.time_sampler.ready
-    )
 
 
 def test_collapsed_legacy_proposal_still_gets_low_noise_observations_with_cdcd():

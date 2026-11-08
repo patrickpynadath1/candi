@@ -30,7 +30,7 @@ from pathlib import Path
 
 import ray
 
-STORAGE = Path(os.environ.get("CANDI_STORAGE_ROOT", Path.home() / ".cache/duo"))
+STORAGE = Path(os.environ.get("CANDI_STORAGE_ROOT", Path.home() / ".cache/candi"))
 ROOT = STORAGE / "nested-tuning/feedback-depth-cdcd-20k-20261030"
 TASKS = ["text8", "tinystories", "sudoku_hard"]
 PATHS = ["gaussian_embedding", "simplex", "spherical", "spherical_vmf"]

@@ -1,8 +1,0 @@
-{
-  "relative_gradient_norm_error": 0.0026705695781856775,
-  "output_max_absolute_error": 0.005859375,
-  "early_clean_context_gradient": true,
-  "dropout": 0,
-  "precision": "bf16",
-  "layers": 2
-}

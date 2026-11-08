@@ -7,7 +7,7 @@ defaults:
 - _self_
 preparation:
   name: e2d2-encoder-kv-scaling-20k-20261101
-  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/plans/e2d2-encoder-kv-scaling-20k-20261101
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/e2d2-encoder-kv-scaling-20k-20261101
   family: e2d2_encoder_kv_scaling
   recipe_name: encoder-kv-${scaling.depth}-decoder-8
 hydra:

@@ -89,15 +89,6 @@ embeddings of dimension 128, the eight-layer 512-width backbone, CE, no SC,
 with the physical-time endpoint clamp used by the completed CDCD campaigns.
 CDCD alters the continuous view's time mapping in training and inference.
 The production sampler config is 127 updates plus terminal prediction = 128 NFE.
-A one-seed production Sudoku run was launched on 2026-11-01, on GPU 6 via Ray.
-Plan/source: `/home/patrick/.cache/duo/plans/sudoku-pca-blurring-cdcd-20k-20261101/`.
-Results/logs/checkpoints: `/home/patrick/.cache/duo/nested-tuning/sudoku-pca-blurring-cdcd-20k-20261101/`.
-`launch.json` records the command, frozen source and environment. W&B is disabled;
-logging is local only because external upload approval was rejected. Training uses
-the cached Sudoku dataset; inference tuning copies the established renoising
-validation/test partitions and sampled/greedy policies at 128 NFE. Initial driver
-PID 193684 is historical; verify live state from the launch artifacts.
-
 Tests in `core/tests/test_pca_blurring.py` cover exact endpoints, mean attenuation,
 prompt preservation, active-mask covariance isolation, rotation equivariance,
 degenerate and near-degenerate spectra, near-noise continuity, Gaussian isotropic
@@ -108,9 +99,8 @@ migration. An additional regression covers floating-point endpoint clamping.
 
 Reproducible isolated validation (select an idle GPU explicitly):
 
-    CUDA_VISIBLE_DEVICES=6 UV_PROJECT_ENVIRONMENT=/home/patrick/.codex/worktrees/54f2/duo/.venv \
-      uv run --no-sync python -m scripts.validation.pca_blurring \
-      --output results/pca-blurring/validation.json
+    CUDA_VISIBLE_DEVICES=0 uv run --locked python -m scripts.validation.pca_blurring \
+      --output pca-blurring-validation.json
 
 This only reads the existing dataset cache and writes local reports; it neither
 submits jobs nor logs to W&B. The smoke uses a small two-layer backbone, 128-D
@@ -130,7 +120,7 @@ noise. Truncation is a timing comparison only: it does not implement the full
 spectral kernel. Updating a basis every four calls would amortize the measured
 basis cost to ~7.12 ms/call, but reusing a basis after changing predicted clean
 sequences changes the kernel. It is not enabled. Timings exclude the denoiser and
-are not full-model speedups. Detailed report: `results/pca-blurring/validation.json`.
+are not full-model speedups.
 
 ## Comparison protocol still to run
 

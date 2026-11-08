@@ -27,8 +27,7 @@ uv run --extra mazes python main.py +experiment=maze mode=evaluate \
 ```
 
 The optional dependencies pin `muutils` and `zanj` because newer releases remove
-an import required by this generator version. An alternative requirements file is
-`core/tasks/requirements-maze.txt`. No maze corpus download is required.
+an import required by this generator version. No maze corpus download is required.
 
 Defaults are 10×10 grids, mixed DFS trees and cyclic DFS/percolation maps,
 4,000 training maps and 256 each for validation and test. Training runs 5k

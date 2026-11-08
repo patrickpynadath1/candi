@@ -22,10 +22,12 @@ import sys
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-HOST = os.environ.get("CANDI_REMOTE_HOST", "ruqi6000")
+# The server is configured per user: CANDI_REMOTE_HOST is an ssh host (alias)
+# and CANDI_REMOTE_STORAGE_ROOT its persistent storage root (absolute path).
+HOST = os.environ.get("CANDI_REMOTE_HOST")
 DASHBOARD_PORT = int(os.environ.get("CANDI_REMOTE_DASHBOARD_PORT", "8275"))
 ADDRESS = os.environ.get("CANDI_REMOTE_ADDRESS", f"http://127.0.0.1:{DASHBOARD_PORT}")
-STORAGE_ROOT = os.environ.get("CANDI_REMOTE_STORAGE_ROOT", "/home/patrick/.cache/duo")
+STORAGE_ROOT = os.environ.get("CANDI_REMOTE_STORAGE_ROOT")
 TOKEN_PATH = Path(
     os.environ.get("CANDI_REMOTE_TOKEN", "~/.config/candi/ray_token")
 ).expanduser()
@@ -178,9 +180,14 @@ def main():
             p.add_argument("--follow", action="store_true")
     commands.add_parser("list")
     commands.add_parser("gpus", help="Advisory GPU use: nvidia-smi plus Ray reservations")
-    commands.add_parser("tunnel", help=f"Forward port {DASHBOARD_PORT} from {HOST} (blocks)")
-    commands.add_parser("fetch-token", help=f"Copy the cluster token from {HOST}")
+    commands.add_parser("tunnel", help=f"Forward port {DASHBOARD_PORT} from CANDI_REMOTE_HOST (blocks)")
+    commands.add_parser("fetch-token", help="Copy the cluster token from CANDI_REMOTE_HOST")
     args = parser.parse_args()
+    needs = {"submit": ("CANDI_REMOTE_STORAGE_ROOT",), "tunnel": ("CANDI_REMOTE_HOST",),
+             "fetch-token": ("CANDI_REMOTE_HOST", "CANDI_REMOTE_STORAGE_ROOT")}
+    missing = [name for name in needs.get(args.action, ()) if not os.environ.get(name)]
+    if missing:
+        parser.error(f"set {' and '.join(missing)} (see docs/guides/remote-execution.md)")
 
     if args.action == "submit":
         submit(args)

@@ -7,7 +7,7 @@
 #   ray stop --address=127.0.0.1:$PORT   (from the same environment)
 set -euo pipefail
 
-root=${CANDI_STORAGE_ROOT:-$HOME/.cache/duo}
+root=${CANDI_STORAGE_ROOT:-$HOME/.cache/candi}
 gpus=${GPUS:?Set GPUS to the comma-separated GPU pool, e.g. GPUS=7}
 port=${PORT:-6390}
 dashboard_port=${DASHBOARD_PORT:-8275}

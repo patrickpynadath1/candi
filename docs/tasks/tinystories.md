@@ -44,8 +44,8 @@ values plus PAD=0, BOS=1, EOS=2, MASK=3. `task.length=1024` includes BOS/EOS;
 `task.prompt_bytes=64` is a fixed prefix budget. Prefixes back up to a valid UTF-8
 boundary. A 1,024-byte budget is not equivalent to 1,024 BPE tokens. This small
 vocabulary is useful for cheap corruption comparisons, but is not a reproduction
-of published subword TinyStories models. The `task=battery/tinystories_bpe` preset loads a saved byte-BPE tokenizer; see
-[the BPE campaign setup](../experiments/tinystories-bpe/README.md).
+of published subword TinyStories models. The `task=battery/tinystories_bpe` preset loads one of the versioned byte-BPE
+tokenizers in `artifacts/tokenizers/tinystories-bpe` (vocabularies 260 to 10,000).
 
 The prompt is fixed and excluded from loss/corruption. Fixed-canvas training
 learns continuation, EOS **and PAD**, rather than leaking the correct answer
@@ -89,9 +89,6 @@ uv run python main.py +experiment=tinystories mode=evaluate \
   output_dir=/path/to/story-evaluation
 ```
 
-Score the saved `results.json` with the separate optional judge tool (see
-[story judge documentation](../guides/story-judging.md)). Judging is intentionally outside
-training callbacks to avoid loading a 7B model alongside each training worker.
 The task itself never calls an external service. References are examples of valid
 continuations, not the only allowable stories.
 

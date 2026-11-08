@@ -75,18 +75,9 @@ def test_compiled_uniform_objective_matches_values_and_gradients():
     "experiment",
     [
         "tinygsm_simplex_sc",
-        "tinygsm_simplex_masked_sc",
-        "tinygsm_simplex_uniform_sc",
-        "tinygsm_simplex_gaussian_sc",
-        "tinygsm_simplex_sc_insertion",
-        "tinygsm_masked_sc",
         "tinygsm_uniform_sc",
         "tinygsm_masked_gaussian_sc_adaptive",
         "tinygsm_uniform_gaussian_sc_adaptive",
-        "tinygsm_masked_sc_insertion",
-        "tinygsm_uniform_sc_insertion",
-        "tinygsm_masked_gaussian_sc_adaptive_insertion",
-        "tinygsm_uniform_gaussian_sc_adaptive_insertion",
     ],
 )
 def test_all_tinygsm_variants_compile_and_preserve_checkpoint_layout(experiment):

@@ -4,11 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CANDI v2.1 is a framework for controlled diffusion-language-model experiments, not a single algorithm. Recipes compose an **information path** (representation, corruption process, noise schedule), a **denoising task** (backbone, output parameterization, objective, training time sampler) and **inference settings** (initialization, inference time/noise grid, update rule, terminal decoding); see `docs/concepts/recipe.md`. Library code lives in `core/`, Hydra configs in `configs/`, docs in `docs/` (start at `docs/index.md`). Legacy implementations exist only in Git history before the `candiv2.1` cleanup. PRs target `candiv2.1`, not `main`.
 
-## Server, campaign and migration rules
+## Server rules
 
-@AGENTS.md
-
-`AGENTS.md` is a dated snapshot (2026-10-29) of the GPU server, running campaigns, storage paths and the local-to-cluster (Ray Jobs) migration plan. Its working rules are binding: never stop clusters / `ray stop` / kill jobs, delete caches or overwrite results without explicit authorization. Re-check live state rather than trusting the snapshot.
+Never stop clusters / `ray stop` / kill jobs, delete caches or overwrite results without explicit authorization. Check live state rather than trusting notes.
 
 ## Remote execution (laptop → `ruqi6000`)
 

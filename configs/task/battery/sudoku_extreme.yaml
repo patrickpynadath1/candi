@@ -12,7 +12,7 @@ task:
 data:
   source_repo: sapientinc/sudoku-extreme
   revision: 58942f96baeb572ca3127e2a9e9c70f330783d6b
-  cache_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/duo}/data_cache
+  cache_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/data_cache
   num_train: 1000
   num_valid: 2000
   data_seed: 42

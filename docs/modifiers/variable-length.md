@@ -366,8 +366,7 @@ Its final 32-sample test evaluation (EMA, seed 23, temperature 0.7) had 75% vali
 words, 37.4% valid words of length at least five, mean block length 32.35
 (range 31–37), and no truncated sequences. The text still contains malformed
 words, misplaced EOS tokens, and repetition. The small callback evaluation
-peaked at step 4,000 rather than improving monotonically. See the
-[portable results and all 32 samples](../../results/text8-insertion/parallel-block-gaussian-5k.json).
+peaked at step 4,000 rather than improving monotonically.
 
 ## Adaptive training-time feedback
 
@@ -393,11 +392,9 @@ sampling counts. Its default is 1; values below/above 1 decrease/increase birth
 rates. It does not change the relative gap preferences at a given step or the
 birth-state law. Protected gaps remain excluded and the length limit still applies.
 
-`examples/tune_insertion_counts.py SOURCE OUTPUT --project PROJECT` creates a
-fixed-checkpoint manifest from completed insertion cases. It searches count scale
-in `[0.25, 4]` on a log scale, holding each case's previously selected token
-settings and final decoding fixed. The original validation/final partitions and
-NFE budget are retained. Submit this manifest with the normal nested-tuning CLI.
+To tune it, run inference-only nested tuning on a fixed insertion checkpoint with
+`sampler.count_scale` in the search space (e.g. log-uniform on `[0.25, 4]`), holding
+the other selected token settings fixed.
 
 For mask and uniform births, the gap-token posterior is not used to initialize
 new positions: births are masks or uniform noise. Consequently, gap-token

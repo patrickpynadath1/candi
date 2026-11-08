@@ -9,10 +9,8 @@ from core.sweeps.configuration import compose
 from core.time_sampling.cdcd import CDCDTimeSampler
 
 
-@pytest.mark.parametrize("hybrid", [False, True])
-def test_feedback_cdcd_training_and_sampling(hybrid):
-    sweep = "feedback_hybrid_cdcd" if hybrid else "feedback_cdcd"
-    cfg = compose(overrides=[f"+sweep={sweep}"])
+def test_feedback_cdcd_training_and_sampling():
+    cfg = compose(overrides=["+sweep=feedback_cdcd"])
     cfg.model.hidden_size = 32
     cfg.model.cond_dim = 16
     cfg.model.n_heads = 4
@@ -43,8 +41,6 @@ def test_feedback_cdcd_training_and_sampling(hybrid):
     for training in (False, True):
         points = algo.points(t, training=training)
         torch.testing.assert_close(points[0].time, expected)
-        if hybrid:
-            torch.testing.assert_close(points[1].time, t)
     torch.testing.assert_close(
         algo._adaptive_time(torch.tensor([0.0, 1.0])), torch.tensor([0.0, 1.0])
     )

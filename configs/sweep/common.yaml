@@ -43,8 +43,8 @@ self_conditioning:
   evaluation_probability: 1.0
 preparation:
   name: local-diffusion-20k-20261027
-  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/duo}/plans/local-diffusion-20k-20261027-hydra
-  reference_manifest: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/duo}/nested-tuning/adaptive-three-tasks-20261014/manifest.json
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/local-diffusion-20k-20261027-hydra
+  reference_manifest: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/nested-tuning/adaptive-three-tasks-20261014/manifest.json
   recipe_fields:
   - model
   - representation
@@ -61,8 +61,9 @@ preparation:
       cpu: 4
       gpu: 1
   wandb:
-    entity: rz-text-dlp
-    project: local-diffusion-20k-20261027
+    # W&B is optional; set WANDB_ENTITY (and log in) to enable tracking.
+    entity: ${oc.env:WANDB_ENTITY,null}
+    project: candi
   training:
     space: {}
     trials: 1

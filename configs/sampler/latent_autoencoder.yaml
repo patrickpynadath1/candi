@@ -1,5 +1,0 @@
-_target_: core.samplers.latent_autoencoder.LatentAutoencoderSampler
-steps: 15
-epsilon: 1.0e-5
-temperature: 1.0
-greedy: true

@@ -148,11 +148,6 @@ endpoint prediction and metadata marks the sequence as not entropy-complete.
 Frozen EB on continuous-only models is an inference experiment, not a
 paper-native sampler. The historical CANDI sampler remains separate.
 
-`examples/evaluate_adaptive_sweep.py` records the 24-run adaptive Sudoku sweep's
-regular evaluations and evaluates both EB bounds (0.1 and 0.01), with frozen and
-revisable variants for uniform hybrids. Its output includes per-puzzle JSON,
-checkpoint/config provenance, and a compiled CSV/Markdown comparison.
-
 ## Variable-length views
 
 The [insertion modifier](../modifiers/variable-length.md) applies one shared

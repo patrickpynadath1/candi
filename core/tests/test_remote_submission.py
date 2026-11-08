@@ -13,7 +13,6 @@ from scripts.cluster import candi_remote as remote
     [
         ("core/outputs/run/config.yaml", True),
         ("core/data_cache/sudoku/train.npy", True),
-        ("results/README.md", True),
         ("core/models/dit.py", False),
         ("configs/sweep/feedback.yaml", False),
         ("nested/model.ckpt", True),

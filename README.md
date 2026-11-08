@@ -69,12 +69,6 @@ See [experiment terminology](docs/guides/experiments.md),
 [preparing sweeps](docs/guides/programmatic-sweeps.md), and
 [nested tuning](docs/guides/nested-tuning.md) for configuration and execution.
 
-## Planned TinyStories BPE campaign
-
-See the [campaign README](docs/experiments/tinystories-bpe/README.md) for the
-research questions, exact 49-run matrix, tokenizer measurements, data controls,
-and setup instructions. The campaign is not launched.
-
 ## Documentation
 
 - [Getting started](docs/getting-started.md) and [configuration](docs/concepts/configuration.md)

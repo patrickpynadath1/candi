@@ -28,8 +28,7 @@ uv sync --locked --extra mazes --extra scoring
 Include `--extra tracking` for W&B. These options do not themselves enable logging;
 use the normal `wandb` configuration. Each task exports metrics through the shared
 periodic evaluation callback and saves standalone evaluation records in
-`results.json`. [Story judging](story-judging.md) is a separate pass over generated
-records; it need not load a 7B judge into every training worker.
+`results.json`.
 
 For hypothesis tests, keep data splits/seeds and model/training budgets matched.
 Tune sampler/temperature on validation and report held-out results. Task presets

@@ -142,7 +142,6 @@ class TrainingModule(L.LightningModule):
         for key in (
             "loss",
             "main_loss",
-            "latent_mse",
             "clean_decoding_loss",
             "decoded_denoising_ce",
             "token_feedback_loss",
