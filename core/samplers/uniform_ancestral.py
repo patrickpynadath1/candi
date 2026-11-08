@@ -7,10 +7,21 @@ from core.processes.uniform import UniformProcess
 from core.processes.uniform_posterior import PosteriorUniformProcess
 from core.parameterizations.posterior import PosteriorParameterization
 from core.parameterizations.constraints import UnconstrainedPosterior
+from . import requirements
+
+
+def _single_process(algo):
+    """The recipe's process: its own, or its only view's (one-view recipes)."""
+    process = getattr(algo, "process", None)
+    views = getattr(algo, "views", None)
+    if process is None and views is not None and len(views) == 1:
+        process = views[0].process
+    return process
 
 
 def initialize_uniform(algo, prompt_tokens, prompt_mask):
-    posterior_process = isinstance(algo.process, PosteriorUniformProcess)
+    process = _single_process(algo)
+    posterior_process = isinstance(process, PosteriorUniformProcess)
     valid_predictor = (
         (
             isinstance(algo.predictor, PosteriorParameterization)
@@ -20,7 +31,7 @@ def initialize_uniform(algo, prompt_tokens, prompt_mask):
         if posterior_process
         else isinstance(algo.predictor, PlugInParameterization)
     )
-    if not isinstance(algo.process, UniformProcess) or not valid_predictor:
+    if not isinstance(process, UniformProcess) or not valid_predictor:
         raise TypeError(
             "uniform samplers require matching posterior/process or plug-in/process semantics"
         )
@@ -30,7 +41,7 @@ def initialize_uniform(algo, prompt_tokens, prompt_mask):
         or not len(prompt_tokens)
     ):
         raise ValueError("expected matching nonempty [batch, length] prompts and masks")
-    state = algo.process.prior(prompt_tokens.shape, prompt_tokens.device)
+    state = process.prior(prompt_tokens.shape, prompt_tokens.device)
     return torch.where(prompt_mask.bool(), prompt_tokens, state)
 
 
@@ -119,4 +130,5 @@ class UniformAncestralSampler(DiscreteSampler):
         # Posterior uniform diffusion runs on the hybrid (view) path.
         if hasattr(algo, "views"):
             return self.composed().sample(algo, prompt_tokens, prompt_mask)
+        requirements.process_method(algo, "reverse", "uniform ancestral sampling", "uniform")
         return super().sample(algo, prompt_tokens, prompt_mask)

@@ -11,6 +11,7 @@ from core.modifiers.self_conditioning.session import (
 )
 from .loop import FixedGridLoop, LinearTimeGrid
 from .decoding import PosteriorDecoding, RepresentationDecoding, posterior_mean
+from . import requirements
 
 
 class PosteriorMeanVelocity:
@@ -48,6 +49,7 @@ class ContinuousSampler:
     def sample(self, algo, prompt_tokens, prompt_mask):
         if not isinstance(getattr(algo, "predictor", None), PosteriorParameterization):
             raise TypeError("continuous sampling requires PosteriorParameterization")
+        requirements.process_method(algo, "reverse_vector_field", "continuous sampling", "Gaussian")
         algo = prediction_session(algo)
         if (
             isinstance(algo, PredictionSession)

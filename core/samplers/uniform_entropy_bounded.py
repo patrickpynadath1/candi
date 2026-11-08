@@ -15,6 +15,7 @@ from .uniform_ancestral import initialize_uniform
 from .entropy_bounded import select_prefix
 from .view_calls import is_view_algorithm, predict
 from core.modifiers.self_conditioning.session import prediction_session
+from . import requirements
 
 
 class UniformEntropyBoundedSampler:
@@ -38,6 +39,8 @@ class UniformEntropyBoundedSampler:
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
         views = is_view_algorithm(algo)
+        if not views:
+            requirements.process_method(algo, "reverse", "uniform entropy-bounded sampling", "uniform")
         if views and len(algo.views) != 1:
             raise TypeError(
                 "UniformEntropyBoundedSampler drives one-view uniform algorithms; "

@@ -12,6 +12,7 @@ from core.modifiers.self_conditioning.session import (
     prediction_session,
 )
 from core.parameterizations.posterior import PosteriorParameterization
+from . import requirements
 
 
 class BlurAncestralSampler:
@@ -35,6 +36,10 @@ class BlurAncestralSampler:
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
+        requirements.require(
+            hasattr(getattr(algo, "schedule", None), "for_layout"),
+            "blur ancestral sampling requires a blurring recipe (a sequence-layout schedule)",
+        )
         if not isinstance(algo.predictor, PosteriorParameterization):
             raise TypeError("blur ancestral sampling requires a clean-token posterior")
         algo = prediction_session(algo)

@@ -28,6 +28,13 @@ class BlockDiffusionModel(nn.Module):
             raise TypeError(
                 "block diffusion requires a model with fused-stream hidden interfaces"
             )
+        if input_model.views is None and input_model.time.coordinate.startswith("negative_log_keep"):
+            # The clean prefix of a single-state network runs on a Gaussian path
+            # (time 0, sigma 0, alpha 1), where a keep-rate coordinate is undefined.
+            raise TypeError(
+                "block diffusion needs a network whose clean prefix has a time coordinate; "
+                f"{input_model.time.coordinate} reads a keep rate"
+            )
         self.model = model
         self.block_size = block_size
         self.x0_causal = x0_causal

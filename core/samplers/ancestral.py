@@ -2,6 +2,7 @@ import torch
 from .discrete import DiscreteSampler
 
 from .utils import initialize_state
+from . import requirements
 
 
 class AbsorbingAncestralUpdate:
@@ -102,4 +103,5 @@ class AncestralSampler(DiscreteSampler):
     def sample(self, algo, prompt_tokens, prompt_mask):
         if hasattr(algo, "views"):
             return self.composed().sample(algo, prompt_tokens, prompt_mask)
+        requirements.process_method(algo, "reverse", "ancestral sampling", "discrete")
         return super().sample(algo, prompt_tokens, prompt_mask)

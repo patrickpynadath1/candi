@@ -49,6 +49,12 @@ class TokenFeedback(nn.Module):
             raise TypeError(
                 "token feedback auxiliary loss requires compacted target alignment for variable-length sequences"
             )
+        passes = getattr(algorithm, "training_passes", 1)
+        if passes != 1:
+            raise TypeError(
+                f"token feedback needs one network pass per training loss; "
+                f"{type(algorithm).__name__} makes {passes}"
+            )
         self.algorithm = algorithm
         model = _backbone(algorithm.model)
         blocks = getattr(model, "blocks", None)

@@ -3,6 +3,7 @@ import torch
 
 from .utils import initialize_state
 from core.modifiers.self_conditioning.session import prediction_session
+from . import requirements
 
 
 def select_prefix(entropy, active, bound):
@@ -30,6 +31,8 @@ class EntropyBoundedSampler:
 
     def sample(self, algo, prompt_tokens, prompt_mask):
         views = getattr(algo, "views", None)
+        if views is None:
+            requirements.process_method(algo, "reverse", "entropy-bounded sampling", "absorbing")
         algo = prediction_session(algo)
         if views is None:
             process = algo.process
@@ -47,6 +50,12 @@ class EntropyBoundedSampler:
             if len(views) != 1 or not isinstance(views[0].process, AbsorbingProcess):
                 raise TypeError("entropy-bounded sampling needs one absorbing view")
             process = views[0].process
+            # It commits argmax tokens, so the posterior must never choose the mask.
+            requirements.require(
+                getattr(algo.predictor, "mask_index", None) == process.mask_index,
+                "entropy-bounded sampling needs a posterior that excludes the mask token "
+                "(parameterization.mask_index); this recipe's posterior can choose it",
+            )
             if prompt_tokens.ndim != 2 or prompt_tokens.shape != prompt_mask.shape:
                 raise ValueError("prompt tensors must have matching [batch, length] shapes")
             if torch.any(prompt_tokens[prompt_mask.bool()] == process.mask_index):

@@ -41,6 +41,10 @@ class EmbeddingRepresentation(nn.Module):
             F.normalize(self.table, dim=-1) if self.spec.unit_normalized else self.table
         )
 
+    def clean_state(self, tokens):
+        """The view state of known clean tokens (prompt clamping)."""
+        return self.encode(tokens)
+
     def encode(self, tokens):
         return F.embedding(tokens, self.codebook())
 

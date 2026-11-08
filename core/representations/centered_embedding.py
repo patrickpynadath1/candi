@@ -38,6 +38,10 @@ class CenteredEmbeddingRepresentation(nn.Module):
         table = F.normalize(self.table, dim=-1)
         return table.detach() if detach else table
 
+    def clean_state(self, tokens):
+        """The view state of known clean tokens (prompt clamping)."""
+        return self.encode(tokens)
+
     def encode(self, values):
         table = self.codebook()
         if values.dtype.is_floating_point:

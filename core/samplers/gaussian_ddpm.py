@@ -4,6 +4,7 @@ import math
 import torch
 from .decoding import prediction
 from .loop import FixedGridLoop
+from . import requirements
 
 from core.parameterizations.posterior import PosteriorParameterization
 from core.modifiers.self_conditioning.session import (
@@ -50,6 +51,7 @@ class GaussianDDPMSampler:
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
+        requirements.process_method(algo, "reverse_posterior", "Gaussian DDPM", "Gaussian")
         if not isinstance(algo.predictor, PosteriorParameterization):
             raise TypeError("Gaussian DDPM requires a clean-token posterior")
         algo = prediction_session(algo)

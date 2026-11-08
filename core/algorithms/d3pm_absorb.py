@@ -22,6 +22,8 @@ class D3PMAbsorb(OneViewAlgorithm, HybridDiffusion):
     # predicted mask probability and a nonzero reconstruction loss at clean
     # inputs. Generation pathways keep observed tokens (see _prediction).
     clamp_observed = False
+    # The loss runs the network twice: the noisy state and the clean reconstruction.
+    training_passes = 2
 
     def __init__(
         self,

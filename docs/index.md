@@ -99,6 +99,7 @@ See [task conventions](tasks/overview.md), then
 - [Add a method](extending/adding-a-method.md)
 - [Add a task](extending/adding-a-task.md)
 - [Coverage and limitations](validation/coverage.md)
+- [Compatibility of families, samplers and modifiers](validation/compatibility.md) (generated)
 - [Reproduction results](validation/reproduction-results.md)
 
 An available config does not establish benchmark parity. The validation pages

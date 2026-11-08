@@ -7,6 +7,7 @@ from core.modifiers.hybrid.views import ViewPoint, prior, clamp
 from core.modifiers.self_conditioning.session import prediction_session
 from .entropy_bounded import select_prefix
 from .parallel_entropy_bounded import ParallelEntropyBoundedSampler
+from . import requirements
 
 
 class CANDIEntropyBoundedSampler:
@@ -20,6 +21,7 @@ class CANDIEntropyBoundedSampler:
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
+        requirements.views(algo, type(self).__name__)
         algo = prediction_session(algo)
         batch, length = prompt_tokens.shape
         # Historical CANDI solver grid deliberately stops short of both endpoints.
@@ -130,6 +132,7 @@ class MaskedHybridEntropyBoundedSampler(ParallelEntropyBoundedSampler):
     def sample(self, algo, prompt_tokens, prompt_mask):
         from core.processes.absorbing import AbsorbingProcess
 
+        requirements.views(algo, type(self).__name__)
         if not any(isinstance(v.process, AbsorbingProcess) for v in algo.views):
             raise ValueError("Masked hybrid EB requires an absorbing process view")
         output, info = super().sample(algo, prompt_tokens, prompt_mask)

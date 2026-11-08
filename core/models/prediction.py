@@ -41,7 +41,9 @@ class ConditioningProjection(nn.Module):
             raise ValueError(
                 "self-conditioning feature dimension must match its input projection"
             )
-        return hidden + self.projection(conditioning.to(hidden.dtype))
+        # In the projection's own dtype: a float64 view state (e.g. CANDI's EB
+        # sampler) gives float64 hidden inputs, but the weights stay float32.
+        return hidden + self.projection(conditioning.to(self.projection.weight.dtype))
 
 
 class HiddenConditioning(nn.Module):

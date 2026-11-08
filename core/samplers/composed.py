@@ -4,6 +4,7 @@ import torch
 from core.modifiers.hybrid.views import prior, clamp
 from core.modifiers.self_conditioning.session import prediction_session
 from .policies import AllPositions, TokenSelection, ReverseTransition, select_state
+from . import requirements
 
 
 class ComposedSampler:
@@ -91,6 +92,7 @@ class ComposedSampler:
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
+        requirements.views(algo, type(self).__name__)
         if getattr(algo, "supports_variable_length", False):
             raise TypeError(
                 "fixed-length sampling requires a separate policy for length edits"

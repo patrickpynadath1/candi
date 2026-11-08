@@ -13,6 +13,10 @@ class OneHotRepresentation(nn.Module):
             raise ValueError("one-hot dimension must equal vocabulary size")
         self.spec = RepresentationSpec("one_hot", vocab_size, vocab_size, True)
 
+    def clean_state(self, tokens):
+        """The view state of known clean tokens (prompt clamping)."""
+        return self.encode(tokens)
+
     def encode(self, tokens):
         return F.one_hot(tokens, self.spec.vocab_size).float()
 

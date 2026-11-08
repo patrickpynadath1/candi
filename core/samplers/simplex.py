@@ -7,6 +7,7 @@ from core.modifiers.self_conditioning.session import prediction_session
 from core.time_sampling.simplex_grid import SimplexInferenceGrid
 from .simplex_utils import guided_log_probs, confidence_commit
 from .view_calls import is_view_algorithm, predict
+from . import requirements
 
 
 class SimplexBridgeSampler:
@@ -41,6 +42,7 @@ class SimplexBridgeSampler:
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
+        requirements.process_method(algo, "drop_condition", "simplex bridge sampling", "Dirichlet")
         conditional = prediction_session(algo)
         unconditional = prediction_session(algo)
         batch = len(prompt_tokens)
