@@ -4,6 +4,7 @@ import torch
 from .loop import FixedGridLoop
 from core.processes.spherical import log_map
 from core.modifiers.self_conditioning.session import prediction_session
+from .view_calls import predict
 
 
 def posterior_velocity(state, embeddings, probabilities, mode="exact", eps=1e-6):
@@ -59,8 +60,9 @@ class SphericalFlowSampler:
 
         def update(state, time, next_time, index):
             nonlocal prediction
-            keep, _ = algo.schedule(time.expand(len(state)))
-            prediction = algo.sampling_prediction(state, keep)
+            time = time.expand(len(state))
+            keep, _ = algo.schedule(time)
+            prediction = predict(algo, state, time)
             if self.use_float64:
                 prediction = prediction.double()
             if index == self.steps - 1:

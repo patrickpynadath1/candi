@@ -412,8 +412,15 @@ def test_continuous_sources_train_and_sampler_feedback(experiment, source):
     calls, handle = recorder(algo.model)
     loss = algo.loss(tokens, ~prompt)["loss"]
     assert len(calls) == 2
-    for bootstrap, main in zip(calls[0][0], calls[1][0]):
-        torch.testing.assert_close(bootstrap, main)
+    if experiment == "spherical_flow_matching":
+        # View call (states, points, time): same state and keep in both calls.
+        (states, points, time), (main_states, main_points, main_time) = calls[0][0], calls[1][0]
+        torch.testing.assert_close(states, main_states)
+        torch.testing.assert_close(points[0].coefficients, main_points[0].coefficients)
+        torch.testing.assert_close(time, main_time)
+    else:
+        for bootstrap, main in zip(calls[0][0], calls[1][0]):
+            torch.testing.assert_close(bootstrap, main)
     feedback = calls[1][1]["self_condition"]
     expected_width = 32 if source == "hidden" else algo.representation.spec.dimension
     assert feedback.shape == (2, 7, expected_width)
