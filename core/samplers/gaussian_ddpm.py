@@ -2,6 +2,7 @@
 
 import math
 import torch
+from .decoding import prediction
 from .loop import FixedGridLoop
 
 from core.parameterizations.posterior import PosteriorParameterization
@@ -93,10 +94,10 @@ class GaussianDDPMSampler:
                 and self.self_conditioning_mode == "bootstrap"
             ):
                 algo.state.conditioning = None
-                algo.sampling_prediction(value, time, path)
+                prediction(algo, value, time, path)
                 nfe += 1
                 preserve_feedback()
-            result = algo.sampling_prediction(value, time, path)
+            result = prediction(algo, value, time, path)
             nfe += 1
             preserve_feedback()
             return result

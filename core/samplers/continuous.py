@@ -10,7 +10,7 @@ from core.modifiers.self_conditioning.session import (
     prediction_session,
 )
 from .loop import FixedGridLoop, LinearTimeGrid
-from .decoding import PosteriorDecoding, RepresentationDecoding
+from .decoding import PosteriorDecoding, RepresentationDecoding, posterior_mean
 
 
 class PosteriorMeanVelocity:
@@ -18,7 +18,7 @@ class PosteriorMeanVelocity:
 
     def __call__(self, algo, state, time):
         path = algo.schedule(time)
-        mean = algo.posterior_mean(state, time, path)
+        mean = posterior_mean(algo, state, time, path)
         return algo.process.reverse_vector_field(
             state, mean, path.alpha, path.sigma, path.dalpha_dt, path.dsigma_dt
         )

@@ -5,10 +5,67 @@ from types import SimpleNamespace
 import torch
 
 from core.modifiers.self_conditioning.gradient_routing import detach_selected, embedding_mean
-from .gaussian_diffusion import GaussianDiffusion
+from core.representations.one_hot import OneHotRepresentation
+
+from .adaptive import validate_adaptive_feedback
+from .posterior import PosteriorDiffusion
 
 
-class RePlaid(GaussianDiffusion):
+class _StandaloneGaussian(PosteriorDiffusion):
+    """RePlaid's single-state base until it moves onto the view path."""
+
+    def __init__(
+        self,
+        model,
+        predictor,
+        process,
+        schedule,
+        time_sampler,
+        objective,
+        length=180,
+        representation=None,
+        prediction=None,
+    ):
+        super().__init__(prediction)
+        self.model, self.predictor, self.process = model, predictor, process
+        self.schedule, self.time_sampler, self.objective = (
+            schedule,
+            time_sampler,
+            objective,
+        )
+        self.length = length
+        validate_adaptive_feedback(schedule, predictor)
+        # The default also reconstructs saved pre-representation one-hot configs.
+        self.representation = (
+            representation
+            if representation is not None
+            else OneHotRepresentation(model.vocab_size)
+        )
+        self._validate_schedule_representation()
+        self.validate_prediction()
+
+    def _validate_schedule_representation(self):
+        spec = self.representation.spec
+        self.schedule.representation_requirements.validate(
+            spec, type(self.schedule).__name__
+        )
+        if self.model.state_dim != spec.dimension:
+            raise ValueError("model state_dim must match representation dimension")
+        if self.model.vocab_size != spec.vocab_size:
+            raise ValueError("model vocabulary must match representation vocabulary")
+
+    def model_inputs(self, state, time, path):
+        return state, time, path.sigma, path.alpha
+
+    def prediction_mean(self, probabilities):
+        return self.representation.posterior_mean(probabilities)
+
+    def posterior_mean(self, state, time, path):
+        probabilities = self.sampling_prediction(state, time, path).float().exp()
+        return self.representation.posterior_mean(probabilities)
+
+
+class RePlaid(_StandaloneGaussian):
     def __init__(self, *args, corrupt_all=True, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.representation.spec.unit_normalized:

@@ -6,6 +6,8 @@ import pytest
 import torch
 from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
+from core.modifiers.hybrid.views import ViewPoint
+from core.noise_schedules.gaussian_path import GaussianPath
 from core.noise_schedules.gaussian_rank import GaussianRankSchedule
 from core.noise_schedules.linear_interpolation import LinearInterpolationSchedule
 from core.noise_schedules.utils import expected_rank
@@ -152,7 +154,8 @@ def test_gaussian_hydra_single_example_loss_and_sampling(schedule):
         clean = algo.representation.encode(tokens)
         state = clean + sigma[:, None, None] * torch.randn_like(clean)
         state = torch.where(mask.bool()[..., None], state, clean)
-        logits = algo.model(state, time, sigma, torch.ones_like(sigma))
+        path = GaussianPath(torch.ones_like(sigma), sigma, sigma * 0, sigma * 0)
+        logits = algo.model((state,), (ViewPoint(time, path),), time)
         ce = (
             -(logits - logits.logsumexp(-1, keepdim=True))
             .gather(-1, tokens[..., None])
