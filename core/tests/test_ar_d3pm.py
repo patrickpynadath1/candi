@@ -194,11 +194,11 @@ def test_configs_optimizer_checkpoint_and_generation(method):
         torch.testing.assert_close(times * 10, (times * 10).round())
         assert times.min() > 0 and times.max() <= 1
         # Unconstrained prediction must still learn reconstruction at clean inputs.
-        keep, _ = algo.schedule(torch.zeros(2))
-        assert (
-            algo.training_prediction(tokens, keep).exp().gather(-1, tokens[..., None])
-            < 1
-        ).all()
+        clean = torch.zeros(2)
+        reconstruction = algo.training_prediction(
+            (tokens,), algo.points(clean, training=True), clean
+        )
+        assert (reconstruction.exp().gather(-1, tokens[..., None]) < 1).all()
     else:
         assert stats["cache_used"]
 
