@@ -8,9 +8,10 @@ from pathlib import Path
 
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
+from core.sweeps.configuration import compose
+from core.tests.networks import TINY16
 
 FIXTURE = Path(__file__).with_name("fixtures") / "sampler_behavior.json"
 # The snapshots hash raw float bytes of intermediate states, so they hold only on
@@ -41,23 +42,15 @@ def preserve_snapshot_denormals():
 
 def build_algorithm(family, discrete, sc):
     torch.manual_seed(123)
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=corruption_factorial",
-                f"information_path/hybrid_view@model.views.content={family}",
-                "model.hidden_size=16",
-                "model.n_heads=2",
-                "model.n_blocks=1",
-                "model.cond_dim=8",
-                "model.dropout=0",
-                f"self_conditioning.enabled={str(sc != 'none').lower()}",
-                f"self_conditioning.source={sc if sc != 'none' else 'hidden'}",
-            ],
-        )
+    cfg = compose(
+        "corruption_factorial",
+        [
+            f"information_path/hybrid_view@model.views.content={family}",
+            *TINY16,
+            f"self_conditioning.enabled={str(sc != 'none').lower()}",
+            f"self_conditioning.source={sc if sc != 'none' else 'hidden'}",
+        ],
+    )
     if discrete:
         OmegaConf.update(
             cfg,

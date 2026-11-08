@@ -1,12 +1,10 @@
-from pathlib import Path
-
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 
 from core.noise_schedules.linear_interpolation import LinearInterpolationSchedule
 from core.processes.pca_blurring import PCABlurringProcess
+from core.sweeps.configuration import compose
 
 
 def test_endpoints_mean_mask_and_gradients():
@@ -100,24 +98,20 @@ def test_conditional_forward_moments_and_composition():
 
 
 def test_sudoku_recipe_trains_and_renoises():
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=sudoku_pca_blurring",
-                "model.hidden_size=32",
-                "model.n_heads=2",
-                "model.n_blocks=1",
-                "model.cond_dim=16",
-                "model.dropout=0",
-                "model.views.content.representation.state_dim=8",
-                "model.views.content.representation.state_representation.dimension=8",
-                "sampler.steps=3",
-                "time_sampler.warmup=0",
-            ],
-        )
+    cfg = compose(
+        "sudoku_pca_blurring",
+        [
+            "model.hidden_size=32",
+            "model.n_heads=2",
+            "model.n_blocks=1",
+            "model.cond_dim=16",
+            "model.dropout=0",
+            "model.views.content.representation.state_dim=8",
+            "model.views.content.representation.state_representation.dimension=8",
+            "sampler.steps=3",
+            "time_sampler.warmup=0",
+        ],
+    )
     algo = instantiate(cfg.algorithm)
     tokens = torch.randint(0, 12, (2, 180))
     mask = torch.ones_like(tokens, dtype=torch.bool)

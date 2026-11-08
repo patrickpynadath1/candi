@@ -1,17 +1,15 @@
 """Adaptive fit mathematics, clock derivatives and persisted observation state."""
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from scipy.interpolate import PchipInterpolator
 from sklearn.linear_model import Ridge
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import SplineTransformer
 
+from core.sweeps.configuration import compose
 from core.noise_schedules.adaptive import (
     SFLMAdaptiveSchedule,
     CDCDAdaptiveSchedule,
@@ -154,11 +152,8 @@ def test_gaussian_chain_rule_representation_and_training_clock(cls):
     ],
 )
 def test_hydra_schedule_configs(name):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(config_name="config", overrides=[f"information_path/noise_schedule={name}"])
-        schedule = instantiate(config.noise_schedule)
+    config = compose(overrides=[f"information_path/noise_schedule={name}"])
+    schedule = instantiate(config.noise_schedule)
     assert schedule.loss_signal == (
         "cross_entropy" if name.startswith("cdcd") else "objective"
     )
@@ -207,15 +202,11 @@ def test_cdcd_flat_loss_fallback_and_finite_buffer_filter():
 
 
 def test_gaussian_base_is_a_replaceable_hydra_group():
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(
-            config_name="config",
-            overrides=[
-                "information_path/noise_schedule=sflm_gaussian_adaptive",
-                "information_path/noise_schedule@noise_schedule.base=linear_interpolation",
-            ],
-        )
+    config = compose(
+        overrides=[
+            "information_path/noise_schedule=sflm_gaussian_adaptive",
+            "information_path/noise_schedule@noise_schedule.base=linear_interpolation",
+        ]
+    )
     schedule = instantiate(config.noise_schedule)
     assert isinstance(schedule.base, LinearInterpolationSchedule)

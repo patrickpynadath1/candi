@@ -1,35 +1,30 @@
 """Integration contracts for independent views and shared model modifiers."""
 
-from pathlib import Path
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 
 from core.modifiers.block_diffusion.training import BlockDiffusion
 from core.modifiers.token_feedback.training import TokenFeedback
+from core.sweeps.configuration import compose
 
 
 def compose_hybrid(first, second, feedback="none"):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=hybrid",
-                f"information_path/hybrid_view@model.views.first={first}",
-                f"information_path/hybrid_view@model.views.second={second}",
-                "model.hidden_size=16",
-                "model.n_heads=2",
-                "model.n_blocks=2",
-                "model.cond_dim=8",
-                "model.dropout=0",
-                "sampler.steps=2",
-                f"self_conditioning.enabled={'true' if feedback == 'hidden' else 'false'}",
-                "self_conditioning.source=hidden",
-            ],
-        )
+    config = compose(
+        "hybrid",
+        [
+            f"information_path/hybrid_view@model.views.first={first}",
+            f"information_path/hybrid_view@model.views.second={second}",
+            "model.hidden_size=16",
+            "model.n_heads=2",
+            "model.n_blocks=2",
+            "model.cond_dim=8",
+            "model.dropout=0",
+            "sampler.steps=2",
+            f"self_conditioning.enabled={'true' if feedback == 'hidden' else 'false'}",
+            "self_conditioning.source=hidden",
+        ],
+    )
     return instantiate(config.algorithm), instantiate(config.sampler)
 
 
@@ -90,18 +85,9 @@ def test_continuous_pairs_and_view_order_with_block_and_feedback(first, second):
 
 @pytest.mark.parametrize("experiment", ["candi_hybrid", "uniform_simplex_hybrid"])
 def test_existing_preset_composes_and_trains(experiment):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(
-            config_name="config",
-            overrides=[
-                f"+experiment={experiment}",
-                "model.hidden_size=512",
-                "model.n_blocks=1",
-                "model.dropout=0",
-            ],
-        )
+    config = compose(
+        experiment, ["model.hidden_size=512", "model.n_blocks=1", "model.dropout=0"]
+    )
     algo = instantiate(config.algorithm)
     tokens = torch.randint(0, 12, (2, 6))
     result = algo.loss(tokens, torch.ones_like(tokens, dtype=torch.bool), training=True)
@@ -148,8 +134,6 @@ def test_representation_schedule_contract_rejects_onehot_rank_on_embedding():
 
 @pytest.mark.parametrize("experiment", ["candi_hybrid", "uniform_simplex_hybrid"])
 def test_pre_modifier_checkpoint_weights_still_load(experiment):
-    from core.sweeps import compose
-
     from core.training.checkpoint_imports import convert_hybrid_state_dict
 
     config = compose(experiment, {"model.n_blocks": 1})

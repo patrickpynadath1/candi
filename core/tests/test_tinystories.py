@@ -4,9 +4,9 @@ from dataclasses import asdict
 import pytest
 import torch
 from omegaconf import OmegaConf, open_dict
-from hydra import compose, initialize_config_dir
 from pathlib import Path
 
+from core.sweeps.configuration import compose
 from core.tasks.tinystories import TinyStoriesTask
 from core.tasks.tinystories_metrics import TinyStoriesMetrics
 from core.data.tinystories import StoryByteTokenizer
@@ -92,21 +92,16 @@ def test_filters_truncation_and_deduplicates(tmp_path):
 @pytest.mark.parametrize("use_bpe", [False, True])
 def test_runner_train_evaluate(tmp_path, insertion, use_bpe):
     data = fixture_data(tmp_path)
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        settings = compose(
-            config_name="config",
-            overrides=[
-                "+experiment="
-                + ("tinystories_insertion" if insertion else "tinystories"),
-                "task.length=40",
-                "task.prompt_bytes=4",
-                "output_dir=/tmp/stories_smoke",
-                "data.cache_dir=/tmp/stories_smoke_cache",
-                *([] if insertion else ["inference/sampler=ancestral"]),
-            ],
-        )
+    settings = compose(
+        "tinystories_insertion" if insertion else "tinystories",
+        [
+            "task.length=40",
+            "task.prompt_bytes=4",
+            "output_dir=/tmp/stories_smoke",
+            "data.cache_dir=/tmp/stories_smoke_cache",
+            *([] if insertion else ["inference/sampler=ancestral"]),
+        ],
+    )
     if use_bpe:
         path, bpe, _ = make_bpe(tmp_path)
         settings.task.vocab_size = len(bpe)
@@ -269,18 +264,14 @@ def test_bpe_preset_composes_complete_task(tmp_path):
     from hydra.utils import instantiate
 
     path, tokenizer, _ = make_bpe(tmp_path)
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        settings = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=mdlm",
-                "task=battery/tinystories_bpe",
-                f"bpe.vocabulary_size={len(tokenizer)}",
-                f"bpe.tokenizer_path={path}",
-            ],
-        )
+    settings = compose(
+        "mdlm",
+        [
+            "task=battery/tinystories_bpe",
+            f"bpe.vocabulary_size={len(tokenizer)}",
+            f"bpe.tokenizer_path={path}",
+        ],
+    )
     task = instantiate(settings.task)
     assert isinstance(task, TinyStoriesTask)
     assert task.vocab_size == len(tokenizer)

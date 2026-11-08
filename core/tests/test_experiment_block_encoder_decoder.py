@@ -1,16 +1,14 @@
 """experiments/block-encoder-decoder: the sweep prepares, one tiny case runs, analysis reads it."""
 
-import importlib.util
 import json
 import os
-import subprocess
-import sys
 
 from omegaconf import OmegaConf
 import pytest
 
 from core.sweeps.configuration import ROOT
 from core.sweeps.prepare import collect
+from core.tests.helpers import load_module, run_python
 
 EXAMPLE = ROOT / "experiments/block-encoder-decoder"
 SHAPES = {
@@ -23,13 +21,6 @@ SHAPES = {
 TASKS = ["sudoku_hard", "text8", "tinystories-bpe-10000"]
 
 
-def load(name, directory=None):
-    spec = importlib.util.spec_from_file_location(name, (directory or EXAMPLE) / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def environment():
     env = {**os.environ, "OMP_NUM_THREADS": "1", "RAY_ENABLE_UV_RUN_RUNTIME_ENV": "0"}
     for key in ("RAY_ADDRESS", "RAY_JOB_CONFIG_JSON_ENV_VAR", "WANDB_ENTITY"):
@@ -38,12 +29,8 @@ def environment():
 
 
 def prepare(output, *overrides):
-    result = subprocess.run(
-        [sys.executable, "-m", "core.sweeps.prepare", "-m", "+sweep=block_encoder_decoder",
-         f"preparation.output={output}", *overrides],
-        cwd=ROOT, env=environment(), capture_output=True, text=True, timeout=120,
-    )
-    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-3000:]
+    run_python("-m", "core.sweeps.prepare", "-m", "+sweep=block_encoder_decoder",
+               f"preparation.output={output}", *overrides, env=environment(), timeout=120)
     return collect(output)
 
 
@@ -52,7 +39,7 @@ def test_sweep_prepares_the_27_published_cases(tmp_path):
     cases = json.loads((tmp_path / "plan/manifest.json").read_text())
     expected = {f"{task}-{recipe}-seed-1" for task in TASKS for recipe in SHAPES}
     assert {case["name"] for case in cases} == expected
-    architecture = load("analyze").architecture
+    architecture = load_module(EXAMPLE / "analyze.py").architecture
     for case in cases:
         task = next(t for t in TASKS if case["name"].startswith(t + "-"))
         recipe = case["name"][len(task) + 1 : -len("-seed-1")]
@@ -99,17 +86,10 @@ def test_one_tiny_case_runs_through_nested_tuning_and_analysis(tmp_path):
         OmegaConf.save(config, case["config"])
     manifest.write_text(json.dumps(cases))
     runs = tmp_path / "runs"
-    result = subprocess.run(
-        [sys.executable, "-m", "core.sweeps.nested_tuning", str(manifest), "--output", str(runs),
-         "--address", "local", "--concurrency", "1"],
-        cwd=ROOT, env=environment(), capture_output=True, text=True, timeout=300,
-    )
-    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-3000:]
-    result = subprocess.run(
-        [sys.executable, str(EXAMPLE / "analyze.py"), str(runs), "--output", str(tmp_path / "out")],
-        cwd=ROOT, env=environment(), capture_output=True, text=True, timeout=120,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
+    run_python("-m", "core.sweeps.nested_tuning", str(manifest), "--output", str(runs),
+               "--address", "local", "--concurrency", "1", env=environment(), timeout=300)
+    run_python(str(EXAMPLE / "analyze.py"), str(runs), "--output", str(tmp_path / "out"),
+               env=environment(), timeout=120)
     (row,) = json.loads((tmp_path / "out/block_scaling.json").read_text())["rows"]
     assert (row["task"], row["kind"], row["enc"], row["dec"]) == ("sudoku_hard", "e2d2", 1, 8)
     assert row["status"] == "completed" and row["policy"] in ("native", "native_greedy")
@@ -121,7 +101,7 @@ def test_data_preparation_rebuilds_the_cohort_rule(tmp_path):
     pa = pytest.importorskip("pyarrow")
     pq = pytest.importorskip("pyarrow.parquet")
     pytest.importorskip("tokenizers")
-    data = load("prepare_data", ROOT / "scripts")
+    data = load_module(ROOT / "scripts/prepare_data.py")
     story = "Once upon a time, there was a little girl named Lily who loved to play outside. "
     shared, long = story + "She smiled.", story * 40
     texts = {"train": [shared, story + "The end.", long, "Too short."],

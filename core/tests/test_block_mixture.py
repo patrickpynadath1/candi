@@ -7,6 +7,7 @@ import torch
 from core.modifiers.block_diffusion.mixture import BlockSizeMixture
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY16_MAP
 
 
 def test_stratification_across_ranks_and_accumulation_is_resume_stable():
@@ -40,11 +41,7 @@ def tiny(recipe):
     return compose(
         recipe,
         {
-            "model.hidden_size": 16,
-            "model.n_heads": 2,
-            "model.n_blocks": 1,
-            "model.cond_dim": 8,
-            "model.dropout": 0.0,
+            **TINY16_MAP,
             "task.length": 8,
             "block_diffusion.block_size": 4,
             "training.ema": 0,

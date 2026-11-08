@@ -3,7 +3,6 @@
 import copy
 from pathlib import Path
 
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import pytest
@@ -17,26 +16,23 @@ from core.noise_schedules.log_linear import LogLinear
 from core.samplers.ancestral import AncestralSampler
 from core.samplers.entropy_bounded import EntropyBoundedSampler
 from core.modifiers.self_conditioning.session import prediction_session
+from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
 
 
 def config(source="posterior_mean", *overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        return compose(
-            config_name="config",
-            overrides=[
-                "+experiment=smoke",
-                "output_dir=/tmp/self_conditioning_test",
-                "data.cache_dir=/tmp/self_conditioning_data",
-                "algorithm.length=7",
-                "self_conditioning.enabled=true",
-                f"self_conditioning.source={source}",
-                "self_conditioning.probability=1",
-                *overrides,
-            ],
-        )
+    return compose(
+        "smoke",
+        [
+            "output_dir=/tmp/self_conditioning_test",
+            "data.cache_dir=/tmp/self_conditioning_data",
+            "algorithm.length=7",
+            "self_conditioning.enabled=true",
+            f"self_conditioning.source={source}",
+            "self_conditioning.probability=1",
+            *overrides,
+        ],
+    )
 
 
 def algorithm(source="posterior_mean", *overrides):
@@ -344,46 +340,34 @@ def test_time_conditioned_mdlm_uses_same_bootstrap_coordinate():
     ],
 )
 def test_unsupported_method_rejects_requested_flag(experiment):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(
-            config_name="config",
-            overrides=[
-                f"+experiment={experiment}",
-                "self_conditioning.enabled=true",
-                "model.hidden_size=32",
-                "model.n_blocks=1",
-                "model.n_heads=4",
-                "output_dir=/tmp/self_conditioning_test",
-                "data.cache_dir=/tmp/self_conditioning_data",
-            ],
-        )
+    cfg = compose(
+        experiment,
+        [
+            "self_conditioning.enabled=true",
+            "model.hidden_size=32",
+            "model.n_blocks=1",
+            "model.n_heads=4",
+            "output_dir=/tmp/self_conditioning_test",
+            "data.cache_dir=/tmp/self_conditioning_data",
+        ],
+    )
     with pytest.raises(Exception, match="self-conditioning"):
         TrainingModule(OmegaConf.to_container(cfg, resolve=True))
 
 
 def continuous_algorithm(experiment, source, device="cpu"):
     overrides = [
-        f"+experiment={experiment}",
         "self_conditioning.enabled=true",
         f"self_conditioning.source={source}",
         "self_conditioning.probability=1",
-        "model.hidden_size=32",
-        "model.cond_dim=16",
-        "model.n_blocks=1",
-        "model.n_heads=4",
-        "model.dropout=0",
+        *networks.TINY32,
         "algorithm.length=7",
         "output_dir=/tmp/self_conditioning_test",
         "data.cache_dir=/tmp/self_conditioning_data",
     ]
     if experiment != "gaussian_diffusion_sudoku":
         overrides.append("representation.dimension=8")
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(config_name="config", overrides=overrides)
+    cfg = compose(experiment, overrides)
     algo = instantiate(cfg.algorithm).to(device)
     if hasattr(algo.model, "output_layer"):
         torch.nn.init.normal_(algo.model.output_layer.linear.weight, std=0.1)
@@ -579,9 +563,5 @@ def test_default_bootstrap_probability():
     from core.modifiers.self_conditioning.prediction import PredictionCoordinator
 
     assert PredictionCoordinator().probability == 0.9
-    with initialize_config_dir(
-        config_dir=str(Path(__file__).resolve().parents[2] / "configs"),
-        version_base=None,
-    ):
-        cfg = compose(config_name="config")
+    cfg = compose()
     assert cfg.self_conditioning.probability == 0.9

@@ -7,6 +7,7 @@ from hydra.utils import instantiate
 from core.sweeps.configuration import compose
 from core.tests.test_self_conditioning import recorder
 from core.tests.view_inputs import view_prediction
+from core.tests.networks import TINY16_MAP
 
 
 @pytest.mark.parametrize("source", ["hidden", "posterior_mean"])
@@ -15,11 +16,7 @@ def test_plugin_bootstrap_and_sampling_feedback(source, sampler):
     cfg = compose(
         "uniform_diffusion",
         {
-            "model.hidden_size": 16,
-            "model.cond_dim": 8,
-            "model.n_blocks": 1,
-            "model.n_heads": 2,
-            "model.dropout": 0.0,
+            **TINY16_MAP,
             "self_conditioning.enabled": True,
             "self_conditioning.source": source,
             "self_conditioning.probability": 1.0,

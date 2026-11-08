@@ -1,35 +1,28 @@
 """Causal cache equivalence and absorbing D3PM objective/lifecycle checks."""
 
 from contextlib import nullcontext
-from pathlib import Path
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from core.models.causal import CausalDiT
 from core.objectives.d3pm import D3PMAbsorbingObjective
 from core.samplers.autoregressive import AutoregressiveSampler
+from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY32_2BLOCKS
 
 
 def config(method, *extra):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        args = [
-            f"+experiment={method}",
-            "model.hidden_size=32",
-            "model.n_heads=4",
-            "model.n_blocks=2",
-            "model.dropout=0",
-            "algorithm.length=10",
-            "data.cache_dir=/tmp/core_ar_d3pm",
-            "output_dir=/tmp/core_ar_d3pm",
-            "training.warmup_steps=0",
-        ]
-        if method == "d3pm_absorb":
-            args += ["model.cond_dim=16", "time_sampler.steps=10", "sampler.steps=4"]
-        return compose(config_name="config", overrides=args + list(extra))
+    args = [
+        *TINY32_2BLOCKS,
+        "algorithm.length=10",
+        "data.cache_dir=/tmp/core_ar_d3pm",
+        "output_dir=/tmp/core_ar_d3pm",
+        "training.warmup_steps=0",
+    ]
+    if method == "d3pm_absorb":
+        args += ["model.cond_dim=16", "time_sampler.steps=10", "sampler.steps=4"]
+    return compose(method, args + list(extra))
 
 
 def model(device="cpu"):

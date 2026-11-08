@@ -1,28 +1,18 @@
 """The agent-facing tools: manifest check, run status, archiver and doctor."""
 
-import importlib.util
 import json
 import os
 import sys
 import tarfile
 import time
-from pathlib import Path
 
 import pytest
 
 from core.analysis import load_cases
 from core.analysis.status import case_status, main as status_main
 import core.sweeps.nested_tuning as tuning
+from core.tests.helpers import ROOT, load_module
 from core.tests.test_nested_tuning import spec
-
-ROOT = Path(__file__).resolve().parents[2]
-
-
-def script(name):
-    loaded = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
-    module = importlib.util.module_from_spec(loaded)
-    loaded.loader.exec_module(module)
-    return module
 
 
 def finished_run(tmp_path, monkeypatch):
@@ -105,7 +95,7 @@ def test_status_states(tmp_path, monkeypatch, capsys):
 
 def test_archive_drops_checkpoints_keeps_mtimes_and_verifies(tmp_path, monkeypatch, capsys):
     _, runs = finished_run(tmp_path, monkeypatch)
-    archive = script("archive_runs")
+    archive = load_module(ROOT / "scripts/archive_runs.py")
     analysis = tmp_path / "analyze.py"
     analysis.write_text(
         "import json, sys\n"
@@ -146,7 +136,7 @@ def test_archive_drops_checkpoints_keeps_mtimes_and_verifies(tmp_path, monkeypat
 
 def test_doctor_reports_each_check(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("SDDC_STORAGE_ROOT", str(tmp_path / "storage"))
-    doctor = script("doctor")
+    doctor = load_module(ROOT / "scripts/doctor.py")
     code = doctor.main([])
     out = capsys.readouterr().out
     for name in ("python", "torch", "storage root", "tokenizers", "configs compose"):

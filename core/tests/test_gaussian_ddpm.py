@@ -169,20 +169,11 @@ def test_low_precision_zero_alpha_is_finite(dtype):
 
 
 def test_generic_config_and_reference_replaid_policies():
-    from pathlib import Path
-    from hydra import compose, initialize_config_dir
+    from core.sweeps.configuration import compose
 
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        generic = compose(
-            config_name="config",
-            overrides=["+experiment=onehot_gaussian", "inference/sampler=gaussian_ddpm"],
-        )
-        plaid = compose(config_name="config", overrides=["+experiment=replaid"])
-        sudoku = compose(
-            config_name="config", overrides=["+experiment=replaid_sudoku_hard"]
-        )
+    generic = compose("onehot_gaussian", ["inference/sampler=gaussian_ddpm"])
+    plaid = compose("replaid")
+    sudoku = compose("replaid_sudoku_hard")
     assert generic.sampler.prior_mode == "schedule"
     assert generic.sampler.prompt_mode == "clean"
     assert not generic.sampler.final_transition_noise

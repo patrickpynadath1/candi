@@ -1,10 +1,7 @@
 """SNR-equivalent paths, derivative transport, and adaptive composition."""
 
-from pathlib import Path
-
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 
 from core.noise_schedules.adaptive import CDCDGaussianSchedule, SFLMGaussianSchedule
@@ -15,6 +12,7 @@ from core.noise_schedules.gaussian_rank import OneHotRankSchedule
 from core.noise_schedules.linear_interpolation import LinearInterpolationSchedule
 from core.noise_schedules.rescaled_gaussian import RescaledGaussianSchedule
 from core.representations.spec import RepresentationSpec
+from core.sweeps.configuration import compose
 
 
 @pytest.mark.parametrize("kind", ["ve", "vp", "linear"])
@@ -133,17 +131,13 @@ def test_representation_requirements_and_hydra_base():
         incompatible.representation_requirements.validate(
             RepresentationSpec("embedding", 8, 12, True), "test"
         )
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(
-            config_name="config",
-            overrides=[
-                "information_path/noise_schedule=rescaled_gaussian",
-                "information_path/noise_schedule@noise_schedule.base=exponential_ve",
-                "noise_schedule.path_type=linear",
-            ],
-        )
+    config = compose(
+        overrides=[
+            "information_path/noise_schedule=rescaled_gaussian",
+            "information_path/noise_schedule@noise_schedule.base=exponential_ve",
+            "noise_schedule.path_type=linear",
+        ]
+    )
     schedule = instantiate(config.noise_schedule)
     assert isinstance(schedule.base, ExponentialVESchedule)
     assert schedule.path_type == "linear"

@@ -7,6 +7,7 @@ from omegaconf import OmegaConf
 
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY16_MAP
 
 
 @pytest.mark.parametrize('recipe', ['blockgen_masked', 'blockgen_uniform',
@@ -27,8 +28,7 @@ def test_blockgen_task_composition(recipe, task):
 def test_blockgen_trains_and_generates_with_cache_parity(recipe, block_size):
     torch.manual_seed(19)
     cfg = compose(recipe, {
-        'model.hidden_size': 16, 'model.n_heads': 2, 'model.n_blocks': 1,
-        'model.cond_dim': 8, 'model.dropout': 0.0, 'task.length': 8,
+        **TINY16_MAP, 'task.length': 8,
         'block_diffusion.block_size': block_size, 'sampler.steps': 2,
         'training.ema': 0,
     })

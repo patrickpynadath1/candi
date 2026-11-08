@@ -1,16 +1,15 @@
 """Posterior uniform bridges differ from plugging weights into Bayes' rule."""
 
-from pathlib import Path
-
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 
 from core.processes.uniform import UniformProcess
 from core.processes.uniform_posterior import PosteriorUniformProcess
 from core.modifiers.hybrid.views import ViewPoint, DiffusionView
 from core.samplers.hybrid_updates import DiscretePosteriorUpdate
+from core.sweeps.configuration import compose
+from core.tests.networks import TINY16
 
 
 @pytest.mark.parametrize(
@@ -59,23 +58,15 @@ def test_posterior_does_not_recondition_clean_prediction():
 
 @pytest.mark.parametrize("self_conditioning", [False, True])
 def test_config_training_sampling_and_unconstrained_observations(self_conditioning):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=uniform_posterior",
-                "model.hidden_size=16",
-                "model.n_heads=2",
-                "model.n_blocks=1",
-                "model.cond_dim=8",
-                "model.dropout=0",
-                "sampler.steps=2",
-                f"self_conditioning.enabled={str(self_conditioning).lower()}",
-                "self_conditioning.source=hidden",
-            ],
-        )
+    config = compose(
+        "uniform_posterior",
+        [
+            *TINY16,
+            "sampler.steps=2",
+            f"self_conditioning.enabled={str(self_conditioning).lower()}",
+            "self_conditioning.source=hidden",
+        ],
+    )
     algo, sampler = instantiate(config.algorithm), instantiate(config.sampler)
     tokens = torch.randint(algo.process.vocab_size, (2, 6))
     mask = torch.ones_like(tokens, dtype=torch.bool)

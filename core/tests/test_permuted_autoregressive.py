@@ -1,33 +1,26 @@
 """Permutation targets, decoupled-position cache parity, and task composition."""
 
 from contextlib import nullcontext
-from pathlib import Path
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from core.generation_order import GenerationOrder
 from core.models.causal import CausalDiT
+from core.sweeps.configuration import compose
+from core.tests.networks import TINY32_2BLOCKS
 
 
 def config(*overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        return compose(
-            config_name="config",
-            overrides=[
-                "+experiment=permuted_autoregressive",
-                "task=text8",
-                "task.length=12",
-                "model.hidden_size=32",
-                "model.n_heads=4",
-                "model.n_blocks=2",
-                "model.dropout=0",
-                "output_dir=/tmp/permuted_test",
-                *overrides,
-            ],
-        )
+    return compose(
+        "permuted_autoregressive",
+        [
+            "task=text8",
+            "task.length=12",
+            *TINY32_2BLOCKS,
+            "output_dir=/tmp/permuted_test",
+            *overrides,
+        ],
+    )
 
 
 @pytest.mark.parametrize(

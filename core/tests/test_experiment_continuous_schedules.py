@@ -9,22 +9,17 @@ including the schedule, loss-bin and corruption tables from the checkpoint.
 import csv
 import json
 import os
-from pathlib import Path
-import subprocess
-import sys
 
 from omegaconf import OmegaConf
 
-ROOT = Path(__file__).resolve().parents[2]
+from core.tests.helpers import ROOT, run_python
+
 EXAMPLE = ROOT / "experiments/continuous-schedules"
 CASE = "text8-gaussian_embedding-none-seed-1"
 
 
-def run(*args, cwd=ROOT):
-    env = {**os.environ, "PYTHONPATH": str(ROOT)}
-    result = subprocess.run([sys.executable, *args], cwd=cwd, env=env, capture_output=True, text=True)
-    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-3000:]
-    return result.stdout
+def run(*args):
+    return run_python(*args, env={**os.environ, "PYTHONPATH": str(ROOT)})
 
 
 def tiny_case(plan, tmp_path):

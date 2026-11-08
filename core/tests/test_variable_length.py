@@ -1,9 +1,7 @@
 """Structural invariants, insertion laws, and train/sample integration."""
 
-from pathlib import Path
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 
 from core.sequence_edits import SequenceEdit
@@ -13,7 +11,9 @@ from core.modifiers.hybrid.views import point
 from core.noise_schedules.insertion import PowerInsertionSchedule
 from core.processes.deletion import DeletionProcess
 from core.samplers.insertion import InsertionSampler
+from core.sweeps.configuration import compose
 from core.tests.test_hybrid_diffusion import make_algorithm
+from core.tests.networks import TINY16
 
 
 def assembly(feedback=False, *, continuous=False):
@@ -210,23 +210,15 @@ def test_overflow_is_explicit_and_prompt_is_never_truncated(monkeypatch):
 def test_hydra_training_module_round_trip(experiment, views):
     from core.training.module import TrainingModule
 
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(
-            config_name="config",
-            overrides=[
-                f"+experiment={experiment}",
-                "model.hidden_size=16",
-                "model.n_heads=2",
-                "model.n_blocks=1",
-                "model.cond_dim=8",
-                "model.dropout=0",
-                "training.ema=0",
-                "output_dir=/tmp/candi_insertion_test",
-                "data.cache_dir=/tmp/candi_insertion_data",
-            ],
-        )
+    config = compose(
+        experiment,
+        [
+            *TINY16,
+            "training.ema=0",
+            "output_dir=/tmp/candi_insertion_test",
+            "data.cache_dir=/tmp/candi_insertion_data",
+        ],
+    )
     module = TrainingModule(config)
     assert len(module.algorithm.views) == views
     module.algorithm.loss(
@@ -238,21 +230,10 @@ def test_hydra_training_module_round_trip(experiment, views):
 
 @pytest.mark.parametrize("kind", ["spherical", "simplex", "uniform", "masked"])
 def test_other_view_processes_use_same_structural_sampler(kind):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=insertion_continuous",
-                f"information_path/hybrid_view@model.views.content={kind}",
-                "model.hidden_size=16",
-                "model.n_heads=2",
-                "model.n_blocks=1",
-                "model.cond_dim=8",
-                "model.dropout=0",
-            ],
-        )
+    config = compose(
+        "insertion_continuous",
+        [f"information_path/hybrid_view@model.views.content={kind}", *TINY16],
+    )
     algo = instantiate(config.variable_length, algorithm=instantiate(config.algorithm))
     x = torch.randint(0, 12, (2, 4))
     algo.loss(x, torch.ones_like(x, dtype=torch.bool))["loss"].backward()

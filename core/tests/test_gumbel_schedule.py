@@ -1,14 +1,13 @@
 """LangFlow quantile/reference parity, schedule fitting and recipe integration."""
 
 import math
-from pathlib import Path
 
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 
 from core.noise_schedules.gumbel import GumbelSchedule
+from core.sweeps.configuration import compose
 
 
 def test_quantiles_match_released_gumbel_proposal():
@@ -139,12 +138,7 @@ def test_schedule_composes_trains_and_generates(hybrid):
             "model.cond_dim=8",
         ]
     )
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        config = compose(
-            config_name="config", overrides=overrides + ["sampler.steps=2"]
-        )
+    config = compose(overrides=overrides + ["sampler.steps=2"])
     algo, sampler = instantiate(config.algorithm), instantiate(config.sampler)
     schedule = algo.views[0].schedule if hybrid else algo.schedule
     tokens = torch.tensor([[1, 2, 3, 4], [2, 3, 4, 5]])

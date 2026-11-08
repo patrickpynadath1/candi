@@ -6,6 +6,7 @@ from core.noise_schedules.gidd import GIDDSchedule
 from core.processes.gidd import GIDDProcess
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY16_SIZES
 
 
 @pytest.mark.parametrize("gamma", [0.5, 1.0, 2.0])
@@ -78,10 +79,7 @@ def test_gidd_recipe_trains_and_samples_with_prompt_preservation(sc):
     config = compose(
         "gidd_corruption",
         {
-            "model.hidden_size": 16,
-            "model.n_heads": 2,
-            "model.n_blocks": 1,
-            "model.cond_dim": 8,
+            **TINY16_SIZES,
             "training.ema": 0,
             "self_conditioning.enabled": sc,
             "sampler.steps": 3,

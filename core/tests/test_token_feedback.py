@@ -1,15 +1,14 @@
 """Intermediate token feedback architecture and auxiliary objective."""
 
 import copy
-from pathlib import Path
 
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 import pytest
 import torch
 
 from core.modifiers.block_diffusion import BlockDiffusion
 from core.modifiers.token_feedback import TokenFeedback
+from core.sweeps.configuration import compose
 from core.tests import networks
 from core.tests.view_inputs import token_call
 
@@ -21,14 +20,7 @@ def model(*, self_conditioning=False, source="posterior_mean"):
 
 
 def algorithm(*overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(
-            config_name="config",
-            overrides=["+experiment=smoke", "algorithm.length=7", *overrides],
-        )
-    return instantiate(cfg.algorithm)
+    return instantiate(compose("smoke", ["algorithm.length=7", *overrides]).algorithm)
 
 
 @pytest.mark.parametrize("return_features", [False, True])

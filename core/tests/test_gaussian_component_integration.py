@@ -1,8 +1,5 @@
 """Composed Gaussian choices retain training, adaptive feedback, and resume contracts."""
 
-from pathlib import Path
-
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 import pytest
 import torch
@@ -10,37 +7,31 @@ import torch
 from core.noise_schedules.adaptive.gaussian import CDCDGaussianSchedule
 from core.noise_schedules.rescaled_gaussian import RescaledGaussianSchedule
 from core.samplers.euler import EulerSampler
+from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY16
 
 
 def configuration():
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        return compose(
-            config_name="config",
-            overrides=[
-                "+experiment=gaussian_diffusion_embedding_sudoku",
-                "information_path/noise_schedule=linear_interpolation",
-                "model.hidden_size=16",
-                "model.n_heads=2",
-                "model.n_blocks=1",
-                "model.cond_dim=8",
-                "model.dropout=0",
-                "model.input.preconditioning=none",
-                "model.time.coordinate=log_snr",
-                "representation.dimension=8",
-                "representation.trainable=true",
-                "parameterization.softcap=2",
-                "denoising_task/objective=cross_entropy_learned",
-                "objective.label_smoothing=0.1",
-                "objective.weighting.cond_dim=8",
-                "objective.weighting.hidden_dim=8",
-                "training.warmup_steps=0",
-                "data.cache_dir=/tmp/core_component_data",
-                "output_dir=/tmp/core_component_integration",
-            ],
-        )
+    return compose(
+        "gaussian_diffusion_embedding_sudoku",
+        [
+            "information_path/noise_schedule=linear_interpolation",
+            *TINY16,
+            "model.input.preconditioning=none",
+            "model.time.coordinate=log_snr",
+            "representation.dimension=8",
+            "representation.trainable=true",
+            "parameterization.softcap=2",
+            "denoising_task/objective=cross_entropy_learned",
+            "objective.label_smoothing=0.1",
+            "objective.weighting.cond_dim=8",
+            "objective.weighting.hidden_dim=8",
+            "training.warmup_steps=0",
+            "data.cache_dir=/tmp/core_component_data",
+            "output_dir=/tmp/core_component_integration",
+        ],
+    )
 
 
 def batch():

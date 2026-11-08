@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from core.tests.view_inputs import token_call, view_prediction
-from hydra import compose, initialize_config_dir
+from core.sweeps.configuration import compose
 
 from hydra.utils import instantiate
 from core.objectives.weighted_ce import WeightedCrossEntropy
@@ -23,18 +23,10 @@ from core.data.sudoku import SudokuTokenizer, encode_example, sudoku_metrics
 
 
 def config(*overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        return compose(
-            config_name="config",
-            overrides=[
-                "+experiment=smoke",
-                "output_dir=/tmp/core_test",
-                "data.cache_dir=/tmp/core_test_data",
-                *overrides,
-            ],
-        )
+    return compose(
+        "smoke",
+        ["output_dir=/tmp/core_test", "data.cache_dir=/tmp/core_test_data", *overrides],
+    )
 
 
 def test_training_and_validation_posterior_ignore_sampling_configuration():

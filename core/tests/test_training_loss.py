@@ -1,8 +1,5 @@
 """Every algorithm reduces the same way and feeds the sampler that drew its times."""
 
-from pathlib import Path
-
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 import pytest
 import torch
@@ -10,6 +7,7 @@ from torch import nn
 
 from core.algorithms.training_loss import finish_training_loss
 from core.modifiers.token_feedback import TokenFeedback
+from core.sweeps.configuration import compose
 
 
 class RecordingSampler:
@@ -24,13 +22,7 @@ class RecordingSampler:
 
 
 def mdlm():
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(
-            config_name="config", overrides=["+experiment=smoke", "algorithm.length=7"]
-        )
-    return instantiate(cfg.algorithm)
+    return instantiate(compose("smoke", ["algorithm.length=7"]).algorithm)
 
 
 def test_finish_reduces_and_observes_only_in_training():

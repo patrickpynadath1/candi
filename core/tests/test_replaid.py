@@ -1,8 +1,5 @@
 """Reference equations, gradient ownership and core lifecycle for RePlaid."""
 
-from pathlib import Path
-
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 import pytest
 import torch
@@ -16,30 +13,21 @@ from core.modifiers.self_conditioning.gradient_routing import detach_selected, e
 from core.modifiers.self_conditioning.prediction import PredictionCoordinator
 from core.samplers.gaussian_ddpm import GaussianDDPMSampler
 from core.time_sampling.adaptive_allocation import AdaptiveTimeAllocation
+from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
-
-ROOT = Path(__file__).resolve().parents[2]
-
+from core.tests.networks import TINY32
 
 def config(*overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(ROOT / "configs")
-    ):
-        return compose(
-            config_name="config",
-            overrides=[
-                "+experiment=replaid_sudoku_hard",
-                "model.hidden_size=32",
-                "model.cond_dim=16",
-                "model.n_blocks=1",
-                "model.n_heads=4",
-                "model.dropout=0",
-                "training.warmup_steps=0",
-                "output_dir=/tmp/replaid_test",
-                "data.cache_dir=/tmp/replaid_test_data",
-                *overrides,
-            ],
-        )
+    return compose(
+        "replaid_sudoku_hard",
+        [
+            *TINY32,
+            "training.warmup_steps=0",
+            "output_dir=/tmp/replaid_test",
+            "data.cache_dir=/tmp/replaid_test_data",
+            *overrides,
+        ],
+    )
 
 
 def test_variance_hook_changes_only_shape_gradients():

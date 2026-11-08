@@ -1,13 +1,13 @@
 """Forward resampling across process families and shared-view conditioning."""
 
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
+from core.sweeps.configuration import compose
+from core.tests.networks import TINY16
 
 
 @pytest.mark.parametrize(
@@ -28,26 +28,18 @@ from hydra.utils import instantiate
 )
 @pytest.mark.parametrize("source", ["none", "hidden", "posterior_mean"])
 def test_pure_and_hybrid_forward_resampling(family, source, device):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=corruption_factorial",
-                f"information_path/hybrid_view@model.views.content={family}",
-                "inference/sampler=forward_resampling",
-                "sampler.steps=3",
-                "model.hidden_size=16",
-                "model.n_heads=2",
-                "model.n_blocks=1",
-                "model.cond_dim=8",
-                "model.dropout=0",
-                "training.ema=0",
-                f"self_conditioning.enabled={str(source != 'none').lower()}",
-                f"self_conditioning.source={source if source != 'none' else 'hidden'}",
-            ],
-        )
+    cfg = compose(
+        "corruption_factorial",
+        [
+            f"information_path/hybrid_view@model.views.content={family}",
+            "inference/sampler=forward_resampling",
+            "sampler.steps=3",
+            *TINY16,
+            "training.ema=0",
+            f"self_conditioning.enabled={str(source != 'none').lower()}",
+            f"self_conditioning.source={source if source != 'none' else 'hidden'}",
+        ],
+    )
     tokens = torch.randint(0, 12, (3, 8), device=device)
     prompt = torch.zeros_like(tokens, dtype=torch.bool)
     prompt[0] = True

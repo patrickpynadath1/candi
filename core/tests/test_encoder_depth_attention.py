@@ -13,6 +13,7 @@ from core.modifiers.block_diffusion.layout import make_layout
 from core.modifiers.encoder_decoder.attention import EncoderDepthAttention
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY32_2BLOCKS
 
 
 def reference(q, k, v, ck, cv, mask):
@@ -71,10 +72,7 @@ def config(recipe="encoder_kv_depth"):
     cfg = compose(
         recipe,
         [
-            "model.hidden_size=32",
-            "model.n_heads=4",
-            "model.n_blocks=2",
-            "model.dropout=0",
+            *TINY32_2BLOCKS,
             "task.length=8",
             "block_diffusion.enabled=true",
             "block_diffusion.block_size=2",

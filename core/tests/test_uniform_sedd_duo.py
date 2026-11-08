@@ -1,12 +1,10 @@
 """Discrete process mathematics, distinct parameterizations and DUO curriculum."""
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
-from hydra import initialize_config_dir, compose
 from hydra.utils import instantiate
 from hydra.errors import InstantiationException
 from scipy.integrate import quad
@@ -31,6 +29,7 @@ from core.samplers.uniform_ancestral import UniformAncestralSampler
 from core.samplers.uniform_entropy_bounded import UniformEntropyBoundedSampler
 from core.samplers.analytic import AnalyticSampler
 from core.samplers.ancestral import AncestralSampler
+from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
 
 
@@ -42,30 +41,22 @@ def table_path(tmp_path_factory):
 
 
 def config(method, table_path=None, *overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        args = [
-            f"+experiment={method}",
-            "model.hidden_size=32",
-            "model.n_heads=4",
-            "model.n_blocks=1",
-            "model.cond_dim=16",
-            "model.dropout=0",
-            "sampler.steps=3",
-            "output_dir=/tmp/core_discrete_test",
-            "data.cache_dir=/tmp/core_discrete_data",
-            "algorithm.length=10",
-            "loader.global_batch_size=2",
-            "trainer.accumulate_grad_batches=1",
+    args = [
+        *networks.TINY32,
+        "sampler.steps=3",
+        "output_dir=/tmp/core_discrete_test",
+        "data.cache_dir=/tmp/core_discrete_data",
+        "algorithm.length=10",
+        "loader.global_batch_size=2",
+        "trainer.accumulate_grad_batches=1",
+    ]
+    if method == "duo":
+        args += [
+            f"calibration.cache_path={table_path}",
+            "curriculum.start_step=1",
+            "curriculum.end_step=2",
         ]
-        if method == "duo":
-            args += [
-                f"calibration.cache_path={table_path}",
-                "curriculum.start_step=1",
-                "curriculum.end_step=2",
-            ]
-        return compose(config_name="config", overrides=[*args, *overrides])
+    return compose(method, [*args, *overrides])
 
 
 def test_plugin_not_posterior_and_normalization_isolated():
@@ -324,30 +315,27 @@ def test_integral_generation_matches_reference_quadrature():
 
 
 def test_composed_recipes_retain_reference_defaults():
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        for method in ("uniform_diffusion", "sedd_absorb", "duo"):
-            c = compose(config_name="config", overrides=[f"+experiment={method}"])
+    for method in ("uniform_diffusion", "sedd_absorb", "duo"):
+        c = compose(method)
+        assert (
+            c.model.hidden_size,
+            c.model.n_blocks,
+            c.model.n_heads,
+            c.model.time.adaLN,
+        ) == (768, 12, 12, True)
+        assert c.trainer.max_steps == 1000000 and c.loader.global_batch_size == 512
+        assert c.sampler.steps == 1024 and c.sampler.epsilon == 0.001
+        assert c.sampler.final_denoise == "ancestral" and c.sampler.use_float64
+        if method == "duo":
+            assert (c.curriculum.start_step, c.curriculum.end_step) == (
+                100000,
+                200000,
+            )
             assert (
-                c.model.hidden_size,
-                c.model.n_blocks,
-                c.model.n_heads,
-                c.model.time.adaLN,
-            ) == (768, 12, 12, True)
-            assert c.trainer.max_steps == 1000000 and c.loader.global_batch_size == 512
-            assert c.sampler.steps == 1024 and c.sampler.epsilon == 0.001
-            assert c.sampler.final_denoise == "ancestral" and c.sampler.use_float64
-            if method == "duo":
-                assert (c.curriculum.start_step, c.curriculum.end_step) == (
-                    100000,
-                    200000,
-                )
-                assert (
-                    c.curriculum.log10_temperature_start,
-                    c.curriculum.log10_temperature_end,
-                ) == (-1.0, -2.0)
-                assert (c.calibration.gamma_min, c.calibration.gamma_max) == (
-                    -3.5,
-                    -1.75,
-                )
+                c.curriculum.log10_temperature_start,
+                c.curriculum.log10_temperature_end,
+            ) == (-1.0, -2.0)
+            assert (c.calibration.gamma_min, c.calibration.gamma_max) == (
+                -3.5,
+                -1.75,
+            )

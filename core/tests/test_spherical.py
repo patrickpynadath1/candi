@@ -1,32 +1,26 @@
-from pathlib import Path
-
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 
 from core.processes.spherical import exp_map, log_map, sphere_normalize, slerp
 from core.noise_schedules.spherical import SphericalSchedule
 from core.samplers.spherical import posterior_velocity
+from core.sweeps.configuration import compose
 from core.tests.view_inputs import view_prediction
 
 
 def config(experiment="sudoku_spherical_truncated_adaptive"):
-    with initialize_config_dir(
-        config_dir=str(Path("configs").resolve()), version_base=None
-    ):
-        return compose(
-            config_name="config",
-            overrides=[
-                f"+experiment={experiment}",
-                "model.hidden_size=32",
-                "model.n_blocks=1",
-                "model.n_heads=4",
-                "model.dropout=0",
-                "representation.dimension=32",
-                "sampler.steps=4",
-            ],
-        )
+    return compose(
+        experiment,
+        [
+            "model.hidden_size=32",
+            "model.n_blocks=1",
+            "model.n_heads=4",
+            "model.dropout=0",
+            "representation.dimension=32",
+            "sampler.steps=4",
+        ],
+    )
 
 
 def test_geometry_endpoints_and_gradient():
@@ -120,16 +114,9 @@ def test_truncation_and_adaptive_coordinate():
 
 
 def test_default_adaptation_uses_sampled_time():
-    with initialize_config_dir(
-        config_dir=str(Path("configs").resolve()), version_base=None
-    ):
-        cfg = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=spherical_flow_matching",
-                "information_path/noise_schedule=spherical_adaptive",
-            ],
-        )
+    cfg = compose(
+        "spherical_flow_matching", ["information_path/noise_schedule=spherical_adaptive"]
+    )
     assert instantiate(cfg.noise_schedule).coordinate == "legacy_time"
 
 

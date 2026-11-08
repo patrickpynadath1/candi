@@ -1,26 +1,20 @@
 """BlockGen recipe construction and the semantics needed by its two losses."""
 
-from pathlib import Path
-
-from hydra import compose, initialize_config_dir
 import pytest
 import torch
 
 from core.tests.view_inputs import view_prediction
 
 from core.modifiers.block_diffusion.layout import make_layout
+from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY32
 
 
 def recipe(kind, *overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        return compose(config_name="config", overrides=[
-            f"+experiment=tinygsm_blockgen_{kind}",
-            "output_dir=/tmp/blockgen-test", "data.cache_dir=/tmp/blockgen-data",
-            *overrides,
-        ])
+    return compose(f"tinygsm_blockgen_{kind}", [
+        "output_dir=/tmp/blockgen-test", "data.cache_dir=/tmp/blockgen-data", *overrides,
+    ])
 
 
 @pytest.mark.parametrize("kind", ["masked", "uniform"])
@@ -77,9 +71,7 @@ def test_recipe_loss_backward_and_time_independence(kind):
 
 
 def test_masked_ce_has_no_time_weight_and_counts_all_eligible_positions():
-    cfg = recipe("masked", "model.hidden_size=32", "model.cond_dim=16",
-                 "model.n_blocks=1", "model.n_heads=4", "model.dropout=0",
-                 "task.vocab_size=3", "task.length=4")
+    cfg = recipe("masked", *TINY32, "task.vocab_size=3", "task.length=4")
     algorithm = TrainingModule(cfg).algorithm.algorithm
     tokens = torch.tensor([[0, 1, 2, 2]])
     eligible = torch.tensor([[0, 1, 1, 1]])  # final position represents PAD

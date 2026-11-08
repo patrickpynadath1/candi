@@ -5,16 +5,14 @@ from core.tests.view_inputs import token_call
 
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY32_2BLOCKS
 
 
 def model(checkpoint=False, encoder_layers=2):
     config = compose(
         "e2d2",
         [
-            "model.hidden_size=32",
-            "model.n_heads=4",
-            "model.n_blocks=2",
-            "model.dropout=0",
+            *TINY32_2BLOCKS,
             "block_diffusion.block_size=2",
             f"encoder_decoder.encoder_layers={encoder_layers}",
         ],
@@ -97,10 +95,7 @@ def test_wrapper_composes_with_corruption_and_trains(recipe, encoder_layers):
     config = compose(
         recipe,
         [
-            "model.hidden_size=32",
-            "model.n_heads=4",
-            "model.n_blocks=2",
-            "model.dropout=0",
+            *TINY32_2BLOCKS,
             "task.length=8",
             "block_diffusion.enabled=true",
             "block_diffusion.block_size=2",
@@ -151,10 +146,7 @@ def test_incremental_prefix_cache_matches_recompute_and_only_encodes_new_tokens(
     config = compose(
         recipe,
         [
-            "model.hidden_size=32",
-            "model.n_heads=4",
-            "model.n_blocks=2",
-            "model.dropout=0",
+            *TINY32_2BLOCKS,
             "block_diffusion.block_size=2",
             f"block_diffusion.x0_causal={str(causal).lower()}",
         ],
@@ -205,10 +197,7 @@ def test_extending_incomplete_clean_block_invalidates_cache(recipe):
     config = compose(
         recipe,
         [
-            "model.hidden_size=32",
-            "model.n_heads=4",
-            "model.n_blocks=2",
-            "model.dropout=0",
+            *TINY32_2BLOCKS,
             "block_diffusion.block_size=2",
         ],
     )
@@ -239,10 +228,7 @@ def test_generation_reuses_prefix_cache_but_starts_fresh_each_time(recipe):
     config = compose(
         recipe,
         [
-            "model.hidden_size=32",
-            "model.n_heads=4",
-            "model.n_blocks=2",
-            "model.dropout=0",
+            *TINY32_2BLOCKS,
             "block_diffusion.block_size=2",
             "task.length=8",
         ],

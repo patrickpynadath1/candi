@@ -16,6 +16,7 @@ from core.processes.dirichlet import DirichletProcess
 from core.processes.spherical import SphericalProcess
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY16_SIZES
 
 
 @pytest.mark.parametrize("vocab", [12, 260])
@@ -95,10 +96,7 @@ def test_rank_schedule_hybrid_train_and_generate(family, discrete, sc):
         "corruption_factorial",
         {
             "information_path/hybrid_view@model.views.content": family + "_rank",
-            "model.hidden_size": 16,
-            "model.n_heads": 2,
-            "model.n_blocks": 1,
-            "model.cond_dim": 8,
+            **TINY16_SIZES,
             "training.ema": 0,
             "self_conditioning.enabled": sc,
             "sampler.steps": 3,

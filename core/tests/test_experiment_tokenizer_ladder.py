@@ -6,27 +6,17 @@ synthetic stories; a fresh local Ray cluster, never an existing one.
 
 import csv
 import hashlib
-import importlib.util
 import json
 import os
-from pathlib import Path
-import subprocess
-import sys
 
 from omegaconf import OmegaConf
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
+from core.tests.helpers import ROOT, load_module, run_python
+
 EXAMPLE = ROOT / "experiments" / "tokenizer-ladder"
 NAMES = ["Amy", "Bob", "Cal", "Dan", "Eve", "Flo", "Gil", "Hal", "Ivy", "Jon", "Kim", "Lou"]
 THINGS = ["red ball", "small boat", "blue kite"]
-
-
-def load(name):
-    spec = importlib.util.spec_from_file_location(name, EXAMPLE / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def write_stories(directory):
@@ -49,11 +39,7 @@ def run(*command, timeout=120):
     environment = {**os.environ, "OMP_NUM_THREADS": "1", "PYTHONPATH": str(ROOT), "WANDB_MODE": "disabled"}
     for name in ("WANDB_ENTITY", "RAY_ADDRESS"):
         environment.pop(name, None)
-    result = subprocess.run(
-        [sys.executable, *command], cwd=ROOT, env=environment, capture_output=True, text=True, timeout=timeout
-    )
-    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-6000:]
-    return result.stdout
+    return run_python(*command, env=environment, timeout=timeout)
 
 
 def test_one_tiny_case_prepares_tunes_and_analyzes(tmp_path):
@@ -115,7 +101,7 @@ def test_one_tiny_case_prepares_tunes_and_analyzes(tmp_path):
         "-m", "core.sweeps.nested_tuning", str(plan / "manifest.json"), "--output", str(runs),
         "--address", "local", "--concurrency", "1", timeout=240,
     )
-    data = load("analyze").main([str(runs), "--output", str(tmp_path / "analysis")])
+    data = load_module(EXAMPLE / "analyze.py").main([str(runs), "--output", str(tmp_path / "analysis")])
     (row,) = data["rows"]
     assert (row["vocab"], row["method"], row["sc"]) == (260, "masked", False)
     assert set(row["samplers"]) == {"native", "native_greedy", "eb_greedy", "renoise_sample", "renoise_greedy"}
@@ -125,7 +111,7 @@ def test_one_tiny_case_prepares_tunes_and_analyzes(tmp_path):
 
 
 def test_sweep_expands_to_the_published_35_case_grid(tmp_path):
-    recipes = {value: name for name, value in load("analyze").RECIPES.items()}
+    recipes = {value: name for name, value in load_module(EXAMPLE / "analyze.py").RECIPES.items()}
     with open(EXAMPLE / "expected.csv") as handle:
         expected = {
             f"tinystories-bpe-{r['vocab']}-"
@@ -134,13 +120,8 @@ def test_sweep_expands_to_the_published_35_case_grid(tmp_path):
         }
     assert len(expected) == 35
     plan = tmp_path / "plan"
-    environment = {**os.environ, "OMP_NUM_THREADS": "1"}
-    result = subprocess.run(
-        [sys.executable, "-m", "core.sweeps.prepare", "-m", "+sweep=tokenizer_ladder",
-         f"preparation.output={plan}"],
-        cwd=ROOT, env=environment, capture_output=True, text=True, timeout=120,
-    )
-    assert result.returncode == 0, result.stderr[-3000:]
+    run_python("-m", "core.sweeps.prepare", "-m", "+sweep=tokenizer_ladder",
+               f"preparation.output={plan}", env={**os.environ, "OMP_NUM_THREADS": "1"}, timeout=120)
     run("-m", "core.sweeps.prepare", "collect", str(plan))
     cases = {c["name"]: c for c in json.loads((plan / "manifest.json").read_text())}
     assert set(cases) == expected

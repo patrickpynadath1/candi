@@ -9,6 +9,7 @@ from hydra.utils import instantiate
 from core.objectives.weighting import ObjectiveContext
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY16_SIZES
 
 
 def test_terms_match_reference_and_composition_gradients():
@@ -73,10 +74,7 @@ def test_configured_objective_trains(objective, sc):
         "gidd_corruption",
         {
             "denoising_task/objective": objective,
-            "model.hidden_size": 16,
-            "model.n_heads": 2,
-            "model.n_blocks": 1,
-            "model.cond_dim": 8,
+            **TINY16_SIZES,
             "training.ema": 0,
             "self_conditioning.enabled": sc,
         },
@@ -175,10 +173,7 @@ def test_gaussian_objective_training_uses_same_composition():
         {
             "information_path/hybrid_view@model.views.content": "gaussian",
             "denoising_task/objective": "gaussian_forward_kl",
-            "model.hidden_size": 16,
-            "model.n_heads": 2,
-            "model.n_blocks": 1,
-            "model.cond_dim": 8,
+            **TINY16_SIZES,
             "training.ema": 0,
         },
     )

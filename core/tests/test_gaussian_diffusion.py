@@ -1,11 +1,10 @@
 """Gaussian schedule, process, predictor and Euler integration contracts."""
 
-from pathlib import Path
 from types import SimpleNamespace
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
+from core.sweeps.configuration import compose
 from core.modifiers.hybrid.views import ViewPoint
 from core.noise_schedules.gaussian_path import GaussianPath
 from core.noise_schedules.gaussian_rank import GaussianRankSchedule
@@ -116,20 +115,16 @@ def test_euler_preserves_prompts_and_matches_constant_mean_solution():
 
 @pytest.mark.parametrize("schedule", ["gaussian_rank", "linear_interpolation"])
 def test_gaussian_hydra_single_example_loss_and_sampling(schedule):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(
-            config_name="config",
-            overrides=[
-                "+experiment=gaussian_diffusion_sudoku",
-                "model.hidden_size=32",
-                "model.n_heads=4",
-                "model.n_blocks=1",
-                "model.cond_dim=16",
-                f"information_path/noise_schedule={schedule}",
-            ],
-        )
+    cfg = compose(
+        "gaussian_diffusion_sudoku",
+        [
+            "model.hidden_size=32",
+            "model.n_heads=4",
+            "model.n_blocks=1",
+            "model.cond_dim=16",
+            f"information_path/noise_schedule={schedule}",
+        ],
+    )
     algo = instantiate(cfg.algorithm)
     tokens = torch.randint(0, 12, (1, 10))
     mask = torch.tensor([[0] * 5 + [1] * 5])

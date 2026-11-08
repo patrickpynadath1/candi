@@ -1,11 +1,9 @@
 """Representation geometry, schedule compatibility and shared solver integration."""
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from hydra.errors import InstantiationException
 
@@ -21,24 +19,12 @@ from core.parameterizations.posterior import PosteriorParameterization
 from core.samplers.euler import EulerSampler
 from core.samplers.heun import HeunSampler
 from core.samplers.ode import ODESampler
+from core.sweeps.configuration import compose
+from core.tests.networks import TINY16
 
 
 def configuration(*overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        return compose(
-            config_name="config",
-            overrides=[
-                "+experiment=gaussian_diffusion_sudoku",
-                "model.hidden_size=16",
-                "model.n_heads=2",
-                "model.n_blocks=1",
-                "model.cond_dim=8",
-                "model.dropout=0",
-                *overrides,
-            ],
-        )
+    return compose("gaussian_diffusion_sudoku", [*TINY16, *overrides])
 
 
 def test_representation_operations_and_trainable_geometry():

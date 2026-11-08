@@ -1,7 +1,5 @@
 from copy import deepcopy
-from pathlib import Path
 
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 import torch
 
@@ -10,25 +8,13 @@ from core.tests.view_inputs import token_call
 from core.modifiers.block_diffusion import BlockDiffusion, BlockSampler
 from core.modifiers.block_diffusion.layout import make_layout
 from core.samplers.ancestral import AncestralSampler
+from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
+from core.tests.networks import TINY32
 
 
 def configuration(*overrides):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        return compose(
-            config_name="config",
-            overrides=[
-                "model.hidden_size=32",
-                "model.n_heads=4",
-                "model.n_blocks=1",
-                "model.cond_dim=16",
-                "model.dropout=0",
-                "task.length=8",
-                *overrides,
-            ],
-        )
+    return compose(overrides=[*TINY32, "task.length=8", *overrides])
 
 
 def open_output(model):

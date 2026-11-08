@@ -8,6 +8,38 @@ from core.models import modular
 from core.modifiers.hybrid.views import ViewPoint
 from core.noise_schedules.gaussian_path import GaussianPath
 
+# Hydra overrides that shrink a composed recipe's network to test size. List
+# forms set integer dropout 0; the mapping forms (for
+# core.sweeps.configuration.compose) mirror call sites that pass 0.0 or keep
+# the recipe's dropout.
+TINY16 = [
+    "model.hidden_size=16",
+    "model.n_heads=2",
+    "model.n_blocks=1",
+    "model.cond_dim=8",
+    "model.dropout=0",
+]
+TINY32 = [
+    "model.hidden_size=32",
+    "model.n_heads=4",
+    "model.n_blocks=1",
+    "model.cond_dim=16",
+    "model.dropout=0",
+]
+TINY32_2BLOCKS = [  # Keeps the recipe's cond_dim.
+    "model.hidden_size=32",
+    "model.n_heads=4",
+    "model.n_blocks=2",
+    "model.dropout=0",
+]
+TINY16_SIZES = {  # Keeps the recipe's dropout.
+    "model.hidden_size": 16,
+    "model.n_heads": 2,
+    "model.n_blocks": 1,
+    "model.cond_dim": 8,
+}
+TINY16_MAP = {**TINY16_SIZES, "model.dropout": 0.0}
+
 
 def _self_conditioning(enabled, source, **options):
     if callable(enabled):  # An explicit slot (e.g. one listed with enabled=False).

@@ -1,9 +1,7 @@
 """Copied legacy simplex regression tests, adapted to isolated core interfaces."""
 
-from pathlib import Path
 import pytest
 import torch
-from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from core.noise_schedules.simplex import concentration, SimplexSchedule
 from core.processes.simplex_math import (
@@ -15,25 +13,18 @@ from core.processes.dirichlet import DirichletProcess
 from core.samplers.simplex import SimplexBridgeSampler
 from core.samplers.simplex_utils import guided_log_probs
 from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
+from core.sweeps.configuration import compose
+from core.tests.networks import TINY16
 
 
 def tiny_config(sc=False, **overrides):
     entries = [
-        "+experiment=sudoku_simplex",
-        "model.hidden_size=16",
-        "model.n_heads=2",
-        "model.n_blocks=1",
-        "model.cond_dim=8",
-        "model.dropout=0",
+        *TINY16,
         "algorithm.length=6",
         f"self_conditioning.enabled={str(sc).lower()}",
     ]
     entries.extend(f"{key}={value}" for key, value in overrides.items())
-    with initialize_config_dir(
-        config_dir=str(Path(__file__).resolve().parents[2] / "configs"),
-        version_base=None,
-    ):
-        return compose(config_name="config", overrides=entries)
+    return compose("sudoku_simplex", entries)
 
 
 @pytest.mark.parametrize("churn", [0.0, 0.2, 1.0])
@@ -250,19 +241,9 @@ def test_training_bootstrap_shares_state_time_and_detaches_feedback():
     ],
 )
 def test_presets_compose(preset):
-    with initialize_config_dir(
-        config_dir=str(Path(__file__).resolve().parents[2] / "configs"),
-        version_base=None,
-    ):
-        config = compose(
-            config_name="config",
-            overrides=[
-                f"+experiment={preset}",
-                "model.hidden_size=16",
-                "model.n_blocks=1",
-                "model.n_heads=2",
-            ],
-        )
+    config = compose(
+        preset, ["model.hidden_size=16", "model.n_blocks=1", "model.n_heads=2"]
+    )
     assert instantiate(config.algorithm).model.vocab_size == 12
 
 

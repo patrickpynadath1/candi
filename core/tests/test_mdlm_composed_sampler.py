@@ -8,6 +8,7 @@ from hydra.utils import instantiate
 from core.modifiers.block_diffusion import BlockDiffusion, BlockSampler
 from core.samplers.forward_resampling import ForwardResamplingSampler
 from core.tests.test_block_diffusion import configuration, open_output
+from core.tests.networks import TINY32
 
 
 @pytest.mark.parametrize("source", ["none", "hidden", "posterior_mean"])
@@ -50,8 +51,7 @@ def test_encoder_decoder_renoising(encoder_layers, greedy):
     from core.sweeps.configuration import compose
     from core.training.module import TrainingModule
     config = compose("e2d2", [
-        "model.hidden_size=32", "model.n_heads=4", "model.n_blocks=1",
-        "model.cond_dim=16", "model.dropout=0", "task.length=8",
+        *TINY32, "task.length=8",
         "block_diffusion.block_size=3",
         f"encoder_decoder.encoder_layers={encoder_layers}",
     ])
