@@ -15,3 +15,24 @@ class AbsorbingScoreParameterization:
         )
         scores = logits - log_scale[:, None, None] - math.log(logits.shape[-1] - 1)
         return scores.scatter(-1, state[..., None], torch.zeros_like(scores[..., :1]))
+
+    # Score pathway endpoints (``<use>_score``). Scores have no sampling
+    # transform, so every use computes the same log scores.
+    def training_score(self, logits, state, sigma):
+        return self(logits, state, sigma)
+
+    sampling_score = greedy_score = training_score
+
+    def at_noise(self, sigma):
+        """The score endpoints with ``sigma`` bound, called as ``(logits, state)``."""
+        return _ScoresAtNoise(self, sigma)
+
+
+class _ScoresAtNoise:
+    def __init__(self, parameterization, sigma):
+        self.parameterization, self.sigma = parameterization, sigma
+
+    def training_score(self, logits, state):
+        return self.parameterization.training_score(logits, state, self.sigma)
+
+    sampling_score = greedy_score = training_score

@@ -12,12 +12,12 @@ from core.samplers.continuous import FixedStepSampler
 from core.samplers.integration import HeunUpdate
 from core.samplers.ancestral import AncestralSampler
 from core.samplers.uniform_ancestral import UniformAncestralSampler
-from core.samplers.analytic import AnalyticSampler
 from core.tests.reference_samplers.ancestral import AncestralSampler as OldAncestral
 from core.tests.reference_samplers.uniform_ancestral import (
     UniformAncestralSampler as OldUniform,
 )
 from core.tests.reference_samplers.analytic import AnalyticSampler as OldAnalytic
+from core.tests.reference_samplers.analytic_sedd import AnalyticSampler as RuleAnalytic
 
 
 @pytest.mark.parametrize(
@@ -25,7 +25,7 @@ from core.tests.reference_samplers.analytic import AnalyticSampler as OldAnalyti
     [
         ("sudoku_hard", AncestralSampler, OldAncestral),
         ("uniform_diffusion", UniformAncestralSampler, OldUniform),
-        ("sedd_absorb", AnalyticSampler, OldAnalytic),
+        ("sedd_absorb", RuleAnalytic, OldAnalytic),
     ],
 )
 @pytest.mark.parametrize("final", ["none", "ancestral"])
@@ -52,6 +52,13 @@ def test_frozen_discrete_loop_equivalence(method, current, old, final):
         from omegaconf import OmegaConf
 
         OmegaConf.update(cfg, "algorithm._target_", "core.tests.reference_algorithms.mdlm.MDLM")
+    if method == "sedd_absorb":
+        # Likewise for SEDD: the frozen rule-based analytic loop and class.
+        from omegaconf import OmegaConf
+
+        OmegaConf.update(
+            cfg, "algorithm._target_", "core.tests.reference_algorithms.sedd_absorb.SeddAbsorb"
+        )
     torch.manual_seed(31)
     algo = instantiate(cfg.algorithm).eval()
     # Nontrivial fixed tokens and an all-fixed sequence exercise prompt handling.
