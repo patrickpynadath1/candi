@@ -1,0 +1,117 @@
+# @package _global_
+# Worked example experiments/continuous-schedules: how CDCD learned schedules
+# spend training, and what self-conditioning does to continuous methods.
+# 4 continuous paths x {no SC, SC} x 3 tasks = 24 cases, all with the CDCD
+# learned clock, the 8-layer / 512-wide backbone and 20k training steps.
+defaults:
+- /experiment: corruption_factorial
+- common
+- /ablation_path: gaussian
+- /feedback: none
+- override /path_schedule: cdcd
+- override /task: battery/sudoku_hard
+- _self_
+preparation:
+  name: continuous-schedules
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/continuous-schedules
+  family: continuous_schedules
+  recipe_name: ${preparation.path_name}-${preparation.feedback_name}
+  evaluation_file: experiments/continuous-schedules/evaluation/${preparation.task_name}.json
+  wandb:
+    project: continuous-schedules
+  # The three samplers of common.yaml plus the two renoising samplers: each
+  # step redraws the state from the forward kernel at the next time.
+  inference:
+  - name: native
+    space:
+      algorithm.predictor.temperature:
+        type: float
+        low: 0.5
+        high: 1.5
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+    trials: 16
+    budget_parameter: steps
+  - name: native_greedy
+    space:
+      sampler.final_denoise:
+      - greedy
+      - sample
+    trials: 2
+    budget_parameter: steps
+    sampler_overrides:
+      greedy_clean_estimate: true
+  - name: eb_greedy
+    sampler:
+      _target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
+      steps: 127
+      freeze: true
+      greedy_clean_estimate: true
+      entropy_bound: 0.1
+    space:
+      algorithm.predictor.temperature:
+        type: float
+        low: 0.5
+        high: 1.5
+      sampler.entropy_bound:
+        type: float
+        low: 0.02
+        high: 0.5
+        log: true
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+      sampler.entropy_bound: 0.1
+    trials: 16
+    budget_parameter: steps
+  - name: renoise_sample
+    sampler:
+      _target_: core.samplers.composed.ComposedSampler
+      steps: 127
+      epsilon: 1.0e-05
+      tokens:
+        _target_: core.samplers.policies.TokenSelection
+        mode: sample
+      positions:
+        _target_: core.samplers.policies.AllPositions
+      transition:
+        _target_: core.samplers.policies.ForwardCorruption
+      commitment: none
+      final_denoise: greedy
+    space:
+      algorithm.predictor.temperature:
+        type: float
+        low: 0.5
+        high: 1.5
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+    trials: 16
+    budget_parameter: steps
+  - name: renoise_greedy
+    sampler:
+      _target_: core.samplers.composed.ComposedSampler
+      steps: 127
+      epsilon: 1.0e-05
+      tokens:
+        _target_: core.samplers.policies.TokenSelection
+        mode: greedy
+      positions:
+        _target_: core.samplers.policies.AllPositions
+      transition:
+        _target_: core.samplers.policies.ForwardCorruption
+      commitment: none
+      final_denoise: greedy
+    space:
+      sampler.final_denoise:
+      - greedy
+      - sample
+    initial_points:
+    - sampler.final_denoise: greedy
+    - sampler.final_denoise: sample
+    trials: 2
+    budget_parameter: steps
+hydra:
+  sweeper:
+    params:
+      task: battery/sudoku_hard,battery/text8,battery/tinystories_bpe
+      ablation_path: gaussian,simplex,spherical,spherical_vmf
+      feedback: none,expected_embedding

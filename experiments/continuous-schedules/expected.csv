@@ -1,0 +1,74 @@
+quantity,task,method,arm,value,seed_1041,seed_1042,validation,policy,renoise_tried,case,note
+score,sudoku_hard,gaussian,none,0.5195,0.5273,0.5117,0.4844,renoise_greedy,true,sudoku_hard-gaussian_embedding-none-seed-1,Sudoku models overfit their training puzzles; the post says not to read these; renoise samplers were tuned in a second run on the same checkpoint and merged by validation
+score,sudoku_hard,gaussian,sc,0.9277,0.9336,0.9219,0.9414,renoise_sample,true,sudoku_hard-gaussian_embedding-expected_embedding-seed-1,Sudoku models overfit their training puzzles; the post says not to read these; renoise samplers were tuned in a second run on the same checkpoint and merged by validation
+score,text8,gaussian,none,12.8379,12.7109,12.9648,12.9531,renoise_sample,true,text8-gaussian_embedding-none-seed-1,renoise samplers were tuned in a second run on the same checkpoint and merged by validation
+score,text8,gaussian,sc,14.3906,14.4609,14.3203,14.7891,native,true,text8-gaussian_embedding-expected_embedding-seed-1,renoise samplers were tuned in a second run on the same checkpoint and merged by validation
+score,sudoku_hard,simplex,none,0.2637,0.2422,0.2852,0.3086,native,true,sudoku_hard-simplex-none-seed-1,Sudoku models overfit their training puzzles; the post says not to read these; renoise samplers were tuned in a second run on the same checkpoint and merged by validation
+score,sudoku_hard,simplex,sc,0.916,0.918,0.9141,0.8711,native_greedy,true,sudoku_hard-simplex-expected_embedding-seed-1,Sudoku models overfit their training puzzles; the post says not to read these; renoise samplers were tuned in a second run on the same checkpoint and merged by validation; validation tie: native_greedy/renoise_sample/renoise_greedy (first listed is selected)
+score,text8,simplex,none,11.0371,10.8867,11.1875,11.6016,native,false,text8-simplex-none-seed-1,"published run did not try the renoise samplers; this example does, so the selected sampler may differ"
+score,text8,simplex,sc,11.9707,12.2656,11.6758,11.8008,native,false,text8-simplex-expected_embedding-seed-1,"published run did not try the renoise samplers; this example does, so the selected sampler may differ"
+score,sudoku_hard,spherical,none,0.5957,0.6094,0.582,0.5898,eb_greedy,true,sudoku_hard-spherical-none-seed-1,Sudoku models overfit their training puzzles; the post says not to read these; renoise samplers were tuned in a second run on the same checkpoint and merged by validation
+score,sudoku_hard,spherical,sc,0.9258,0.9297,0.9219,0.9062,native,true,sudoku_hard-spherical-expected_embedding-seed-1,Sudoku models overfit their training puzzles; the post says not to read these; renoise samplers were tuned in a second run on the same checkpoint and merged by validation
+score,text8,spherical,none,9.6133,9.6133,9.6133,9.4922,native,false,text8-spherical-none-seed-1,"published run did not try the renoise samplers; this example does, so the selected sampler may differ"
+score,text8,spherical,sc,13.1055,13.7109,12.5,12.9453,native,false,text8-spherical-expected_embedding-seed-1,"published run did not try the renoise samplers; this example does, so the selected sampler may differ"
+score,sudoku_hard,vmf,none,0.5508,0.5469,0.5547,0.5312,renoise_sample,true,sudoku_hard-spherical_vmf-none-seed-1,Sudoku models overfit their training puzzles; the post says not to read these; renoise samplers were tuned in a second run on the same checkpoint and merged by validation
+score,sudoku_hard,vmf,sc,0.957,0.9609,0.9531,0.9492,native,true,sudoku_hard-spherical_vmf-expected_embedding-seed-1,Sudoku models overfit their training puzzles; the post says not to read these; renoise samplers were tuned in a second run on the same checkpoint and merged by validation; validation tie: native/native_greedy (first listed is selected)
+score,text8,vmf,none,9.9766,10.0312,9.9219,9.8711,native,false,text8-spherical_vmf-none-seed-1,"published run did not try the renoise samplers; this example does, so the selected sampler may differ"
+score,text8,vmf,sc,13.1562,13.1367,13.1758,13.3164,native,false,text8-spherical_vmf-expected_embedding-seed-1,"published run did not try the renoise samplers; this example does, so the selected sampler may differ"
+score,tinystories,gaussian,none,6.8119,6.8149,6.809,6.876,renoise_sample,true,tinystories-bpe-10000-gaussian_embedding-none-seed-1,"different protocol: AMD MI210 run (portable-v2-mi210) with another source commit, torch build and data partition (allowed-ids filter); renoising there was ForwardResamplingSampler; BLEU without brevity penalty 6.8119 (bp 1.0, length ratio 1.0272)"
+score,tinystories,gaussian,sc,7.8644,8.1138,7.615,7.0553,native,true,tinystories-bpe-10000-gaussian_embedding-expected_embedding-seed-1,"different protocol: AMD MI210 run (portable-v2-mi210) with another source commit, torch build and data partition (allowed-ids filter); renoising there was ForwardResamplingSampler; BLEU without brevity penalty 7.9335 (bp 0.9911, length ratio 0.9943)"
+score,tinystories,simplex,none,6.3277,6.3418,6.3135,6.2151,native,true,tinystories-bpe-10000-simplex-none-seed-1,"different protocol: AMD MI210 run (portable-v2-mi210) with another source commit, torch build and data partition (allowed-ids filter); renoising there was ForwardResamplingSampler; BLEU without brevity penalty 8.0798 (bp 0.7832, length ratio 0.8036); validation tie: native/renoise_sample (first listed is selected)"
+score,tinystories,simplex,sc,8.5016,8.4661,8.5371,8.2766,native,true,tinystories-bpe-10000-simplex-expected_embedding-seed-1,"different protocol: AMD MI210 run (portable-v2-mi210) with another source commit, torch build and data partition (allowed-ids filter); renoising there was ForwardResamplingSampler; BLEU without brevity penalty 8.5016 (bp 1.0, length ratio 1.0197); validation tie: native/renoise_sample (first listed is selected)"
+score,tinystories,spherical,none,7.5526,7.4882,7.6169,7.1798,renoise_sample,true,tinystories-bpe-10000-spherical-none-seed-1,"different protocol: AMD MI210 run (portable-v2-mi210) with another source commit, torch build and data partition (allowed-ids filter); renoising there was ForwardResamplingSampler; BLEU without brevity penalty 7.7345 (bp 0.9765, length ratio 0.9768)"
+score,tinystories,spherical,sc,8.2699,8.2692,8.2706,7.8517,eb_greedy,true,tinystories-bpe-10000-spherical-expected_embedding-seed-1,"different protocol: AMD MI210 run (portable-v2-mi210) with another source commit, torch build and data partition (allowed-ids filter); renoising there was ForwardResamplingSampler; BLEU without brevity penalty 8.4735 (bp 0.976, length ratio 0.9763)"
+score,tinystories,vmf,none,7.0596,6.9688,7.1503,6.8184,renoise_sample,true,tinystories-bpe-10000-spherical_vmf-none-seed-1,"different protocol: AMD MI210 run (portable-v2-mi210) with another source commit, torch build and data partition (allowed-ids filter); renoising there was ForwardResamplingSampler; BLEU without brevity penalty 7.3557 (bp 0.96, length ratio 0.9608)"
+score,tinystories,vmf,sc,7.667,7.9296,7.4045,7.481,native,true,tinystories-bpe-10000-spherical_vmf-expected_embedding-seed-1,"different protocol: AMD MI210 run (portable-v2-mi210) with another source commit, torch build and data partition (allowed-ids filter); renoising there was ForwardResamplingSampler; BLEU without brevity penalty 7.667 (bp 1.0, length ratio 1.0403)"
+linearity_r2_validation,sudoku_hard,gaussian,none,0.26665,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_validation,sudoku_hard,gaussian,sc,0.61119,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_validation,sudoku_hard,simplex,none,0.3236,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_validation,sudoku_hard,simplex,sc,0.9032,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_validation,sudoku_hard,spherical,none,0.26085,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_validation,sudoku_hard,spherical,sc,0.87619,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_validation,sudoku_hard,vmf,none,0.30504,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_validation,sudoku_hard,vmf,sc,0.86017,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_validation,text8,gaussian,none,0.99979,,,,,,,
+linearity_r2_validation,text8,gaussian,sc,0.99986,,,,,,,
+linearity_r2_validation,text8,simplex,none,0.99977,,,,,,,
+linearity_r2_validation,text8,simplex,sc,0.99976,,,,,,,
+linearity_r2_validation,text8,spherical,none,0.9998,,,,,,,
+linearity_r2_validation,text8,spherical,sc,0.9997,,,,,,,
+linearity_r2_validation,text8,vmf,none,0.99981,,,,,,,
+linearity_r2_validation,text8,vmf,sc,0.99981,,,,,,,
+linearity_r2_validation,tinystories,gaussian,none,0.99841,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_validation,tinystories,gaussian,sc,0.99857,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_validation,tinystories,simplex,none,0.99902,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_validation,tinystories,simplex,sc,0.99879,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_validation,tinystories,spherical,none,0.99861,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_validation,tinystories,spherical,sc,0.99807,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_validation,tinystories,vmf,none,0.99886,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_validation,tinystories,vmf,sc,0.99805,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_training,sudoku_hard,gaussian,none,0.12897,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_training,sudoku_hard,gaussian,sc,0.71586,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_training,sudoku_hard,simplex,none,0.40342,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_training,sudoku_hard,simplex,sc,0.7183,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_training,sudoku_hard,spherical,none,0.24084,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_training,sudoku_hard,spherical,sc,0.52292,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_training,sudoku_hard,vmf,none,0.26979,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_training,sudoku_hard,vmf,sc,0.62944,,,,,,,Sudoku overfits; its clock does not describe held-out loss (the post hides it behind a toggle)
+linearity_r2_training,text8,gaussian,none,0.99964,,,,,,,
+linearity_r2_training,text8,gaussian,sc,0.99954,,,,,,,
+linearity_r2_training,text8,simplex,none,0.99962,,,,,,,
+linearity_r2_training,text8,simplex,sc,0.99952,,,,,,,
+linearity_r2_training,text8,spherical,none,0.99948,,,,,,,
+linearity_r2_training,text8,spherical,sc,0.99955,,,,,,,
+linearity_r2_training,text8,vmf,none,0.9994,,,,,,,
+linearity_r2_training,text8,vmf,sc,0.99932,,,,,,,
+linearity_r2_training,tinystories,gaussian,none,0.99972,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_training,tinystories,gaussian,sc,0.99966,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_training,tinystories,simplex,none,0.99977,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_training,tinystories,simplex,sc,0.99969,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_training,tinystories,spherical,none,0.99972,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_training,tinystories,spherical,sc,0.99977,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_training,tinystories,vmf,none,0.99966,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_training,tinystories,vmf,sc,0.99982,,,,,,,"published from byte-level TinyStories checkpoints (vocab 260); this example trains BPE-10k, so expect a different value"
+linearity_r2_min,text8+tinystories,all,all,0.99805,,,,,,,"the post: a straight line explains at least 99.8% of the variation in measured loss on both text tasks, training and held-out data, every method (R^2 of the least-squares line over 20 u bins)"
