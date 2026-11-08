@@ -66,11 +66,9 @@ blocks. The wrapper also supports the existing continuous input adapters; in tha
 case zero depth means the adapter's clean input representation, not necessarily a
 vocabulary embedding lookup.
 
-`+sweep=e2d2_raw_context` adds text8 and TinyStories controls to the depth study:
-20k updates, decoder8/encoder0, block32, same MDLM ELBO loss, optimizer, batch,
-precision and validation-only sampler tuning. W&B uses the existing
-`e2d2-depth-scaling-20k-20261101` project. The separate plan/output is named
-`e2d2-raw-context-20k-20261101` so the running16-case manifest is unchanged.
+The [block-encoder-decoder](../../experiments/block-encoder-decoder/README.md) example
+trains it (`block=raw_context`) next to the E2D2 depth arms, with the same training
+and validation-only sampler tuning.
 
 ### Query-dependent mixtures of actual encoder K/V
 

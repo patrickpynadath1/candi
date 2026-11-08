@@ -1,7 +1,0 @@
-# @package _global_
-model:
-  n_blocks: 8
-encoder_decoder:
-  encoder_layers: ${scaling.depth}
-preparation:
-  arm: encoder

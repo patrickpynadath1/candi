@@ -1,0 +1,9 @@
+# @package _global_
+# E2D2: 1 encoder layer reads the clean context once per block; 8 decoder
+# layers denoise the current block at every step.
+model:
+  n_blocks: 8
+encoder_decoder:
+  encoder_layers: 1
+preparation:
+  recipe_name: e2d2-encoder-1-decoder-8

@@ -1,0 +1,28 @@
+task,kind,enc,dec,name,policy,score,validation,seed_1041,seed_1042,nfe,train_hours,eval_seconds,score_nobp,bp,len_ratio,note
+sudoku_hard,e2d2,1,8,sudoku_hard-e2d2-encoder-1-seed-1,native_greedy,0.025390625,0.03125,0.01953125,0.03125,84.0,7.36,21.126,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget
+sudoku_hard,e2d2,2,8,sudoku_hard-e2d2-encoder-2-seed-1,native,0.021484375,0.05078125,0.01171875,0.03125,84.0,7.74,21.305,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget
+sudoku_hard,e2d2,4,8,sudoku_hard-e2d2-encoder-4-seed-1,native,0.033203125,0.05078125,0.0390625,0.02734375,84.0,8.56,21.617,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget
+sudoku_hard,e2d2,8,1,sudoku_hard-e2d2-decoder-1-seed-1,native,0.001953125,0.01171875,0.0,0.00390625,84.0,5.74,8.768,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget
+sudoku_hard,e2d2,8,2,sudoku_hard-e2d2-decoder-2-seed-1,native,0.01171875,0.0234375,0.01171875,0.01171875,84.0,6.5,10.787,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget
+sudoku_hard,e2d2,8,4,sudoku_hard-e2d2-decoder-4-seed-1,native,0.029296875,0.0703125,0.03125,0.02734375,84.0,7.74,14.817,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget
+sudoku_hard,e2d2,8,8,sudoku_hard-e2d2-encoder-8-seed-1,native,0.048828125,0.046875,0.0546875,0.04296875,84.0,10.21,21.956,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget; one 8/8 model serves both arms
+sudoku_hard,raw,0,8,sudoku_hard-raw-context-decoder-8-seed-1,native,0.021484375,0.03125,0.015625,0.02734375,84.0,6.78,21.088,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget
+sudoku_hard,shared,,8,sudoku_hard-block-shared-8-seed-1,native_greedy,0.03515625,0.06640625,0.02734375,0.04296875,84.0,6.15,22.68,,,,Sudoku block models barely learned the task (the post makes no claim from them); measured NFE 84 of the 128 budget
+text8,e2d2,1,8,text8-e2d2-encoder-1-seed-1,native,10.52734375,10.1484375,10.68359375,10.37109375,128.0,7.54,42.815,,,,text8 from the Hugging Face afmck/text8 parquet copy
+text8,e2d2,2,8,text8-e2d2-encoder-2-seed-1,native,10.2734375,10.1875,10.62109375,9.92578125,128.0,7.95,42.438,,,,text8 from the Hugging Face afmck/text8 parquet copy
+text8,e2d2,4,8,text8-e2d2-encoder-4-seed-1,native,10.11328125,10.01953125,10.046875,10.1796875,128.0,8.75,41.998,,,,text8 from the Hugging Face afmck/text8 parquet copy
+text8,e2d2,8,1,text8-e2d2-decoder-1-seed-1,native,5.552734375,5.6171875,5.52734375,5.578125,128.0,6.02,24.58,,,,text8 from the Hugging Face afmck/text8 parquet copy
+text8,e2d2,8,2,text8-e2d2-decoder-2-seed-1,native,7.826171875,7.9140625,7.921875,7.73046875,128.0,6.74,28.49,,,,text8 from the Hugging Face afmck/text8 parquet copy
+text8,e2d2,8,4,text8-e2d2-decoder-4-seed-1,native,9.072265625,9.48828125,9.31640625,8.828125,128.0,8.03,33.664,,,,text8 from the Hugging Face afmck/text8 parquet copy
+text8,e2d2,8,8,text8-e2d2-encoder-8-seed-1,native,9.798828125,9.703125,10.171875,9.42578125,128.0,10.34,43.332,,,,text8 from the Hugging Face afmck/text8 parquet copy; one 8/8 model serves both arms
+text8,raw,0,8,text8-raw-context-decoder-8-seed-1,native,10.3046875,10.08203125,10.45703125,10.15234375,128.0,7.09,42.148,,,,text8 from the Hugging Face afmck/text8 parquet copy
+text8,shared,,8,text8-block-shared-8-seed-1,native,9.9296875,9.89453125,9.9765625,9.8828125,128.0,6.63,46.229,,,,text8 from the Hugging Face afmck/text8 parquet copy
+tinystories,e2d2,1,8,tinystories-bpe-10000-e2d2-encoder-1-seed-1,native_greedy,6.956481482414926,6.551403766153635,7.0875893796275165,6.8253735852023345,128.0,10.32,40.765,8.7298,0.7969,0.815,
+tinystories,e2d2,2,8,tinystories-bpe-10000-e2d2-encoder-2-seed-1,native_greedy,6.879806683564819,6.6897521129727195,6.834617332997883,6.9249960341317545,128.0,10.82,40.304,8.7883,0.7829,0.8034,
+tinystories,e2d2,4,8,tinystories-bpe-10000-e2d2-encoder-4-seed-1,native_greedy,6.983328560270154,6.596479607700578,7.0698287841485365,6.896828336391772,128.0,11.87,42.362,8.6424,0.808,0.8243,
+tinystories,e2d2,8,1,tinystories-bpe-10000-e2d2-decoder-1-seed-1,native_greedy,6.157361097949611,6.0404913120982275,6.259244721696585,6.055477474202636,128.0,8.22,18.241,7.7209,0.7974,0.8154,
+tinystories,e2d2,8,2,tinystories-bpe-10000-e2d2-decoder-2-seed-1,native_greedy,6.773647994510368,6.496052592448278,6.680616514511762,6.866679474508973,128.0,9.01,22.342,8.7731,0.7725,0.7948,
+tinystories,e2d2,8,4,tinystories-bpe-10000-e2d2-decoder-4-seed-1,native_greedy,6.900774268844447,6.721723839719115,7.112348127495279,6.689200410193616,128.0,10.62,28.984,8.633,0.7992,0.8169,
+tinystories,e2d2,8,8,tinystories-bpe-10000-e2d2-encoder-8-seed-1,native_greedy,6.9808220917505555,6.68302150989167,7.164506086638874,6.797138096862236,128.0,13.72,43.698,8.7844,0.7946,0.8131,one 8/8 model serves both arms
+tinystories,raw,0,8,tinystories-bpe-10000-raw-context-decoder-8-seed-1,native,6.533774895988856,6.61715792588218,6.673129448692168,6.394420343285544,128.0,9.9,39.634,7.7959,0.838,0.8498,
+tinystories,shared,,8,tinystories-bpe-10000-block-shared-8-seed-1,native,6.896348504637819,6.659178968803288,7.163389064063254,6.6293079452123855,128.0,12.95,44.495,7.8854,0.8743,0.8816,

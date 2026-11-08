@@ -1,0 +1,10 @@
+# @package _global_
+# Ordinary block diffusion (BD3-LM): one 8-layer transformer reads the clean
+# context and denoises the current block.
+model:
+  n_blocks: 8
+encoder_decoder: null
+preparation:
+  recipe_name: shared-transformer-8
+  # No encoder_decoder block to record.
+  recipe_fields: [model, block_diffusion, representation, algorithm, parameterization, objective, noise_schedule, time_sampler, prediction, self_conditioning, optimizer]
