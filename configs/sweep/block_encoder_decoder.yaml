@@ -22,7 +22,7 @@ self_conditioning:
   enabled: false
 data:
   # Read only by TinyStories: the story cohort the evaluation indices refer to.
-  # Build it with experiments/block-encoder-decoder/prepare_data.py.
+  # Build it with scripts/prepare_data.py.
   allowed_ids_path: ${data.cache_dir}/allowed_ids.json
 preparation:
   name: block-encoder-decoder

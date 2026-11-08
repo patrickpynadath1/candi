@@ -113,7 +113,8 @@ def validate_inference(spec):
         raise ValueError("Unsupported sampler budget parameter")
     for key in spec["space"]:
         if key in {"sampler.steps", "sampler.max_steps"} or not (
-            key.startswith("sampler.") or key == "algorithm.predictor.temperature"
+            key.startswith("sampler.")
+            or key in {"algorithm.predictor.temperature", "algorithm.predictor.commitment"}
         ):
             raise ValueError(f"Not a tunable inference parameter: {key}")
 

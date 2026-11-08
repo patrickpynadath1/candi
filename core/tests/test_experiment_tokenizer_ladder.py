@@ -140,16 +140,6 @@ def test_sweep_expands_to_the_published_35_case_grid(tmp_path):
          f"preparation.output={plan}"],
         cwd=ROOT, env=environment, capture_output=True, text=True, timeout=120,
     )
-    prepared = {path.name for path in (plan / "cases").iterdir()}
-    autoregressive = {name for name in expected if "-ar-8-" in name}
-    # Hydra runs every job; every diffusion case must prepare regardless.
-    assert expected - autoregressive <= prepared, result.stderr[-3000:]
-    if "Not a tunable inference parameter: algorithm.predictor.commitment" in result.stderr:
-        assert prepared == expected - autoregressive
-        pytest.xfail(
-            "AR policies tune algorithm.predictor.commitment, which "
-            "core.sweeps.nested_tuning.validate_inference does not accept yet"
-        )
     assert result.returncode == 0, result.stderr[-3000:]
     run("-m", "core.sweeps.prepare", "collect", str(plan))
     cases = {c["name"]: c for c in json.loads((plan / "manifest.json").read_text())}

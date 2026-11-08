@@ -9,7 +9,7 @@ give numbers close to ours. Most cells are a single training seed, so expect see
 | Example | Question | Sweep |
 | --- | --- | --- |
 | [sc-vs-depth](sc-vs-depth/) | Is self-conditioning just a deeper network? | `+sweep=sc_vs_depth` |
-| [sc-sampler-choice](sc-sampler-choice/) | Does self-conditioning change how the model should be sampled? | `+sweep=sc_sampler_choice` |
+| [sc-sampler-choice](sc-sampler-choice/) | Does self-conditioning change how the model should be sampled? | analysis of `sc_vs_depth`'s runs |
 | [tokenizer-ladder](tokenizer-ladder/) | Does the tokenizer change the picture? | `+sweep=tokenizer_ladder` |
 | [continuous-schedules](continuous-schedules/) | How do learned (CDCD) noise schedules spend training? | `+sweep=continuous_schedules` |
 | [block-encoder-decoder](block-encoder-decoder/) | Block diffusion: scale the encoder or the decoder? | `+sweep=block_encoder_decoder` |
@@ -33,8 +33,10 @@ uv run --locked --extra scoring python experiments/sc-vs-depth/analyze.py \
   $CANDI_STORAGE_ROOT/runs/sc-vs-depth
 ```
 
-Each README states the example's cost (GPU hours), its protocol, and how its numbers can
-differ from the post's.
+Each README states the example's cost (GPU hours), its protocol, any data preparation
+(`scripts/prepare_data.py` rebuilds the TinyStories cohort and the text8 copy some examples
+use), and how its numbers can differ from the post's. W&B tracking is off unless
+`WANDB_ENTITY` is set (with `--extra tracking`).
 
 ## What an example directory holds
 

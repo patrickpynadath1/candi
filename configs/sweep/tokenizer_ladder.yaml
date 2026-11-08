@@ -23,7 +23,7 @@ task:
   num_eval_samples: 100000000
 data:
   # The story cohort the evaluation indices refer to; build it with
-  # experiments/block-encoder-decoder/prepare_data.py tinystories (see the README).
+  # scripts/prepare_data.py tinystories (see the README).
   allowed_ids_path: ${data.cache_dir}/allowed_ids.json
 checkpoint:
   every_n_steps: 1000

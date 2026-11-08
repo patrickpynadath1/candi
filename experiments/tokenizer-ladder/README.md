@@ -68,7 +68,7 @@ huggingface-cli download roneneldan/TinyStories --repo-type dataset \
   --revision f54c09fd23315a6f9c86f9dc80f725de7d8f9c64 --include 'data/*' \
   --local-dir $CANDI_STORAGE_ROOT/tinystories
 export TINYSTORIES_DATA_DIR=$CANDI_STORAGE_ROOT/tinystories/data
-uv run --locked "${EXTRAS[@]}" python experiments/block-encoder-decoder/prepare_data.py tinystories \
+uv run --locked "${EXTRAS[@]}" python scripts/prepare_data.py tinystories \
   --parquet $TINYSTORIES_DATA_DIR \
   --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 

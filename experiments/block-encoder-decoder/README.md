@@ -53,16 +53,16 @@ trials). Renoising and entropy-bounded samplers were not run on these models.
 ## Running it
 
 The data first. The published runs used two inputs that are too big to commit, so
-`prepare_data.py` rebuilds them and checks their SHA-256 against the files those runs
+`scripts/prepare_data.py` rebuilds them and checks their SHA-256 against the files those runs
 used. Download the parquet files yourself
 (`huggingface-cli download --repo-type dataset NAME --revision REV`):
 
 ```bash
 # text8 from the afmck/text8 parquet copy (revision 58c74e96...), as the task's split files.
-uv run --locked python experiments/block-encoder-decoder/prepare_data.py text8 \
+uv run --locked python scripts/prepare_data.py text8 \
   --parquet PATH/afmck-text8/data --raw-dir $CANDI_STORAGE_ROOT/data_cache/text8/raw
 # The TinyStories story cohort the evaluation indices refer to (revision f54c09fd...).
-uv run --locked python experiments/block-encoder-decoder/prepare_data.py tinystories \
+uv run --locked python scripts/prepare_data.py tinystories \
   --parquet PATH/roneneldan-TinyStories/data \
   --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 export TINYSTORIES_DATA_DIR=PATH/roneneldan-TinyStories/data

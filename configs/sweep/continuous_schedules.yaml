@@ -8,6 +8,8 @@ defaults:
 - common
 - /ablation_path: gaussian
 - /feedback: none
+- /policy@preparation.policies.renoise_sample: renoise_sample
+- /policy@preparation.policies.renoise_greedy: renoise_greedy
 - override /path_schedule: cdcd
 - override /task: battery/sudoku_hard
 - _self_
@@ -63,52 +65,8 @@ preparation:
       sampler.entropy_bound: 0.1
     trials: 16
     budget_parameter: steps
-  - name: renoise_sample
-    sampler:
-      _target_: core.samplers.composed.ComposedSampler
-      steps: 127
-      epsilon: 1.0e-05
-      tokens:
-        _target_: core.samplers.policies.TokenSelection
-        mode: sample
-      positions:
-        _target_: core.samplers.policies.AllPositions
-      transition:
-        _target_: core.samplers.policies.ForwardCorruption
-      commitment: none
-      final_denoise: greedy
-    space:
-      algorithm.predictor.temperature:
-        type: float
-        low: 0.5
-        high: 1.5
-    initial_points:
-    - algorithm.predictor.temperature: 1.0
-    trials: 16
-    budget_parameter: steps
-  - name: renoise_greedy
-    sampler:
-      _target_: core.samplers.composed.ComposedSampler
-      steps: 127
-      epsilon: 1.0e-05
-      tokens:
-        _target_: core.samplers.policies.TokenSelection
-        mode: greedy
-      positions:
-        _target_: core.samplers.policies.AllPositions
-      transition:
-        _target_: core.samplers.policies.ForwardCorruption
-      commitment: none
-      final_denoise: greedy
-    space:
-      sampler.final_denoise:
-      - greedy
-      - sample
-    initial_points:
-    - sampler.final_denoise: greedy
-    - sampler.final_denoise: sample
-    trials: 2
-    budget_parameter: steps
+  - ${preparation.policies.renoise_sample}
+  - ${preparation.policies.renoise_greedy}
 hydra:
   sweeper:
     params:

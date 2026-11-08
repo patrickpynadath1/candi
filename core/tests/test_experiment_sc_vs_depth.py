@@ -101,16 +101,11 @@ def test_tiny_case_runs_through_nested_tuning_and_both_analyses(tmp_path):
     pytest.importorskip("optuna")
     from core.sweeps import nested_tuning
 
-    from omegaconf import OmegaConf
 
     (case,) = prepare(tmp_path / "plan", *tiny_overrides(tmp_path))
     assert case["name"] == "sudoku_hard-masked-expected_embedding-seed-1"
     assert [policy["name"] for policy in case["inference"]] == POLICIES
-    # prepare always attaches a W&B run; the test environment has no wandb.
-    config = OmegaConf.load(case["config"])
-    config.wandb = None
-    OmegaConf.save(config, case["config"])
-    case.pop("wandb")
+    assert case["wandb"] is None  # No W&B entity configured, so no tracking.
     ray.init(
         address="local",
         num_cpus=2,

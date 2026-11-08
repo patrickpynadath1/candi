@@ -64,7 +64,7 @@ def prepare_case(config):
             config, sampler, evaluation["nfe"]
         )
     recipe = {
-        key: OmegaConf.to_container(config[key], resolve=False)
+        key: None if config[key] is None else OmegaConf.to_container(config[key], resolve=False)
         for key in metadata["recipe_fields"]
     }
     config.algorithm_definition = recipe
@@ -77,12 +77,12 @@ def prepare_case(config):
         task_id=metadata["task_name"],
         training_seed=config.seed,
     )
-    config.wandb = {
-        **metadata["wandb"],
-        "group": metadata["name"],
-        "name": name,
-        "job_type": "train",
-    }
+    # Tracking only when a W&B entity is configured (WANDB_ENTITY).
+    config.wandb = (
+        None
+        if metadata["wandb"].get("entity") is None
+        else {**metadata["wandb"], "group": metadata["name"], "name": name, "job_type": "train"}
+    )
     config.output_dir = str(output / "runs" / name)
     # Fail at export, not on a worker, if anything is unresolved.
     OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
@@ -99,7 +99,7 @@ def prepare_case(config):
         training=metadata["training"],
         evaluation=evaluation,
         inference=policies,
-        wandb=OmegaConf.to_container(config.wandb),
+        wandb=None if config.wandb is None else OmegaConf.to_container(config.wandb),
         resources=metadata["local"]["resources_per_job"],
     )
     validate(case)

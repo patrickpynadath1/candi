@@ -1,14 +1,14 @@
 """Rebuild the two data inputs of the published runs that are too large to commit.
 
     # text8: the Hugging Face afmck/text8 copy, written as the task's split files.
-    python experiments/block-encoder-decoder/prepare_data.py text8 \
+    python scripts/prepare_data.py text8 \
         --parquet PATH/afmck-text8/data --raw-dir $CANDI_STORAGE_ROOT/data_cache/text8/raw
     # Only check split files you already have (e.g. derived from text8.zip):
-    python experiments/block-encoder-decoder/prepare_data.py text8 \
+    python scripts/prepare_data.py text8 \
         --raw-dir $CANDI_STORAGE_ROOT/data_cache/text8/raw
 
     # TinyStories: the story cohort that the evaluation indices refer to.
-    python experiments/block-encoder-decoder/prepare_data.py tinystories \
+    python scripts/prepare_data.py tinystories \
         --parquet PATH/roneneldan-TinyStories/data \
         --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 
@@ -22,7 +22,7 @@ import hashlib
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 TEXT8_REVISION = "58c74e966ccc66eab2de6b52fad5b14ddb259fa4"  # afmck/text8
 TEXT8_SHA256 = {
     "train": "af83e65b7d7aa95dfe2c571da8f3e2d1b0c385f177140a21f3db07520a3ac6f4",

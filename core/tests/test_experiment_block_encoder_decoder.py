@@ -23,8 +23,8 @@ SHAPES = {
 TASKS = ["sudoku_hard", "text8", "tinystories-bpe-10000"]
 
 
-def load(name):
-    spec = importlib.util.spec_from_file_location(name, EXAMPLE / f"{name}.py")
+def load(name, directory=None):
+    spec = importlib.util.spec_from_file_location(name, (directory or EXAMPLE) / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -121,7 +121,7 @@ def test_data_preparation_rebuilds_the_cohort_rule(tmp_path):
     pa = pytest.importorskip("pyarrow")
     pq = pytest.importorskip("pyarrow.parquet")
     pytest.importorskip("tokenizers")
-    data = load("prepare_data")
+    data = load("prepare_data", ROOT / "scripts")
     story = "Once upon a time, there was a little girl named Lily who loved to play outside. "
     shared, long = story + "She smiled.", story * 40
     texts = {"train": [shared, story + "The end.", long, "Too short."],
