@@ -48,7 +48,7 @@ def tiny_overrides(tmp_path):
     return [
         "task=battery/sudoku_hard",
         "ablation_path=masked_elbo",
-        "feedback=expected_embedding",
+        "modifiers/feedback=expected_embedding",
         f"data.cache_dir={tmp_path / 'data'}",
         "data.num_train=8",
         "data.num_valid=8",

@@ -42,7 +42,7 @@ FAMILIES = {
     "Autoregressive": "ar",
     "Permuted AR": "permuted_autoregressive",
 }
-SAMPLERS = sorted(path.stem for path in (ROOT / "configs/sampler").glob("*.yaml"))
+SAMPLERS = sorted(path.stem for path in (ROOT / "configs/inference/sampler").glob("*.yaml"))
 MODIFIERS = {
     "self-conditioning": {"self_conditioning.enabled": True, "self_conditioning.probability": 1.0},
     "block diffusion": {"block_diffusion.enabled": True, "block_diffusion.block_size": 4},
@@ -73,7 +73,7 @@ def build(experiment, sampler=None, overrides=None):
     for name in names:
         _set(cfg, f"model.views.{name}.representation.hidden_size", TINY["model.hidden_size"])
     if sampler is not None:
-        cfg.sampler = compose(overrides={"sampler": sampler}).sampler
+        cfg.sampler = compose(overrides={"inference/sampler": sampler}).sampler
     length = int(OmegaConf.select(cfg, "task.length"))
     # Entropy-bounded samplers must be able to finish the whole sequence.
     bounded = "EntropyBounded" in str(OmegaConf.select(cfg, "sampler._target_", default=""))

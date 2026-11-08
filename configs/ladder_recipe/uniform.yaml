@@ -4,8 +4,8 @@ defaults:
 - /experiment: corruption_factorial
 - /sweep/common
 - /ablation_path: uniform
-- /feedback: none
-- /inference_policies: hybrid_renoising
+- /modifiers/feedback: none
+- /inference/inference_policies: hybrid_renoising
 - _self_
 preparation:
   recipe_name: ${preparation.path_name}-${preparation.feedback_name}

@@ -1,0 +1,5 @@
+# @package datamodule
+_target_: core.data.module.TaskDataModule
+loader_config: ${loader}
+accumulation_steps: ${trainer.accumulate_grad_batches}
+seed: ${seed}

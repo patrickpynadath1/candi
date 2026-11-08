@@ -1,21 +1,21 @@
 defaults:
-- algorithm: mdlm
-- model: dit
-- parameterization: posterior
-- prediction: posterior
-- representation: one_hot
-- process: absorbing
-- objective: weighted_ce
-- time_sampler: antithetic
-- noise_schedule: log_linear
+- denoising_task/algorithm: mdlm
+- denoising_task/model: dit
+- denoising_task/parameterization: posterior
+- denoising_task/prediction: posterior
+- information_path/representation: one_hot
+- information_path/process: absorbing
+- denoising_task/objective: weighted_ce
+- denoising_task/time_sampler: antithetic
+- information_path/noise_schedule: log_linear
 - task: sudoku
-- datamodule: task
-- evaluator: generation
-- callback: task
-- sampler: entropy_bounded
-- lr_scheduler: constant_warmup
-- strategy: null
-- variable_length: null
+- training/datamodule: task
+- inference/evaluator: generation
+- training/callback: task
+- inference/sampler: entropy_bounded
+- training/lr_scheduler: constant_warmup
+- training/strategy: null
+- modifiers/variable_length: null
 - _self_
 self_conditioning:
   gradient_mode: detached

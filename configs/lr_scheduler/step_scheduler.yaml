@@ -1,3 +1,0 @@
-_target_: core.training.schedules.step_scheduler
-warmup_steps: 500
-n_halve_steps: 10000

@@ -96,7 +96,7 @@ def test_nqueens_task_runs_loss_and_generation(tmp_path):
     cfg = config(
         "task=nqueens",
         f"data.cache_dir={tmp_path}",
-        "sampler=ancestral",
+        "inference/sampler=ancestral",
         "sampler.steps=2",
     )
     task = instantiate(cfg.task)

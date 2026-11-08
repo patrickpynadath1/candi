@@ -6,14 +6,14 @@
 # whereas upstream switches masked validation to the ELBO.
 defaults:
 - tinygsm_blockgen_common
-- override /algorithm: mdlm
-- override /model: dit
-- override /parameterization: posterior
-- override /process: absorbing
-- override /objective: cross_entropy
-- override /noise_schedule: log_linear
-- override /time_sampler: antithetic
-- override /sampler: ancestral
+- override /denoising_task/algorithm: mdlm
+- override /denoising_task/model: dit
+- override /denoising_task/parameterization: posterior
+- override /information_path/process: absorbing
+- override /denoising_task/objective: cross_entropy
+- override /information_path/noise_schedule: log_linear
+- override /denoising_task/time_sampler: antithetic
+- override /inference/sampler: ancestral
 - _self_
 algorithm:
   time_conditioning: false

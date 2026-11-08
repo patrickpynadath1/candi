@@ -1,2 +1,0 @@
-model_vocab_size: ${task.vocab_size}
-mask_index: null

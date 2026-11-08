@@ -1,10 +1,10 @@
 # @package _global_
 defaults:
-- override /algorithm: hybrid_diffusion
-- override /model: hybrid_candi
-- override /sampler: hybrid_entropy_bounded
-- override /parameterization: posterior
-- override /objective: cross_entropy
+- override /denoising_task/algorithm: hybrid_diffusion
+- override /denoising_task/model: hybrid_candi
+- override /inference/sampler: hybrid_entropy_bounded
+- override /denoising_task/parameterization: posterior
+- override /denoising_task/objective: cross_entropy
 parameterization:
   mask_index: null
 algorithm:

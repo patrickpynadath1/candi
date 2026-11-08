@@ -4,10 +4,10 @@ from hydra.utils import instantiate
 from core.sweeps.configuration import compose
 
 
-ADAPTIVE = ['time_sampler=cdcd', 'time_sampler.adaptive=true']
+ADAPTIVE = ['denoising_task/time_sampler=cdcd', 'time_sampler.adaptive=true']
 RECIPES = {
     'blurring': ('blurring_diffusion', ADAPTIVE),
-    'gaussian': ('gaussian_base', [*ADAPTIVE, 'representation=embedding', 'noise_schedule=embedding_sphere_rank']),
+    'gaussian': ('gaussian_base', [*ADAPTIVE, 'information_path/representation=embedding', 'information_path/noise_schedule=embedding_sphere_rank']),
 }
 
 

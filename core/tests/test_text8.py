@@ -128,7 +128,7 @@ def test_text8_trains_and_evaluates_both_samplers(tmp_path):
     settings.mode = "evaluate"
     settings.evaluation.checkpoint = str(tmp_path / "train/checkpoints/last.ckpt")
     for sampler in ("entropy_bounded", "ancestral"):
-        settings.sampler = config(f"sampler={sampler}").sampler
+        settings.sampler = config(f"inference/sampler={sampler}").sampler
         if sampler == "ancestral":
             settings.sampler.steps = 2
         settings.output_dir = str(tmp_path / sampler)

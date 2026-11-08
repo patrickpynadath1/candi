@@ -4,10 +4,10 @@
 # instead of frequency-dependent blurring.
 defaults:
 - gaussian_base
-- override /model/input: linear
-- override /representation: centered_embedding
-- override /noise_schedule: embedding_sphere_rank
-- override /sampler: gaussian_ddpm
+- override /denoising_task/model/input@model.input: linear
+- override /information_path/representation: centered_embedding
+- override /information_path/noise_schedule: embedding_sphere_rank
+- override /inference/sampler: gaussian_ddpm
 - _self_
 model:
   input:

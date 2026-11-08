@@ -8,7 +8,7 @@ processes on three tasks. It is the first question of the post's section
 [sc-sampler-choice](../sc-sampler-choice/), reads the same runs.
 
 "SC" means the model receives the expected embedding under its previous prediction
-(`feedback=expected_embedding`, `self_conditioning.source=posterior_mean`).
+(`modifiers/feedback=expected_embedding`, `self_conditioning.source=posterior_mean`).
 
 ## Protocol
 
@@ -35,7 +35,7 @@ The five policies (the post's "Inference Pipeline"):
 | `renoise_sample` | sample a clean sequence, re-corrupt it with the forward process to the next level (`ForwardResamplingSampler`) | temperature, 16 trials |
 | `renoise_greedy` | the same with the argmax clean estimate | final denoise greedy/sample, 2 trials |
 
-The policies are [configs/inference_policies/hybrid_renoising.yaml](../../configs/inference_policies/hybrid_renoising.yaml),
+The policies are [configs/inference/inference_policies/hybrid_renoising.yaml](../../configs/inference/inference_policies/hybrid_renoising.yaml),
 where the two renoise policies are named `renoising` and `renoising_greedy`; `analyze.py`
 reports them as `renoise_sample` and `renoise_greedy`, the post's names. The sweep is
 [configs/sweep/sc_vs_depth.yaml](../../configs/sweep/sc_vs_depth.yaml); the evaluation splits are in [evaluation/](evaluation/) (`preparation.evaluation_file`).

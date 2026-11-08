@@ -1,0 +1,5 @@
+# @package model.output
+# Projection, then a dot product with a learned output embedding plus bias.
+_target_: core.models.modular.EmbeddingHead
+_partial_: true
+output_dim: null

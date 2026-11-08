@@ -323,7 +323,7 @@ def test_hidden_source_does_not_request_embedding_table():
 
 def test_time_conditioned_mdlm_uses_same_bootstrap_coordinate():
     algo = algorithm(
-        "posterior_mean", "model=dit_conditioned", "algorithm.time_conditioning=true"
+        "posterior_mean", "denoising_task/model=dit_conditioned", "algorithm.time_conditioning=true"
     )
     state, keep = inputs(algo)
     calls, handle = recorder(algo.model)

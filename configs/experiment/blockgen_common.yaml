@@ -7,9 +7,9 @@
 # Mixture likelihood evaluation and ARPC/EIPC are not implemented.
 # Task, tokenizer, budget and batching remain independently configurable.
 defaults:
-- override /model: dit_conditioned
-- override /noise_schedule: log_linear
-- override /time_sampler: antithetic
+- override /denoising_task/model: dit_conditioned
+- override /information_path/noise_schedule: log_linear
+- override /denoising_task/time_sampler: antithetic
 - _self_
 algorithm:
   time_conditioning: false

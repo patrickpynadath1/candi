@@ -24,15 +24,15 @@ recipe, not a new algorithm provided by this repository:
 ```yaml
 # @package _global_
 defaults:
-  - override /algorithm: gaussian_diffusion
-  - override /model: continuous_dit
-  - override /representation: one_hot
-  - override /process: gaussian
-  - override /parameterization: gaussian_posterior
-  - override /objective: cross_entropy
-  - override /noise_schedule: one_hot_rank
-  - override /sampler: euler
-  - override /token_space@token_space: data_only
+  - override /denoising_task/algorithm: gaussian_diffusion
+  - override /denoising_task/model: continuous_dit
+  - override /information_path/representation: one_hot
+  - override /information_path/process: gaussian
+  - override /denoising_task/parameterization: gaussian_posterior
+  - override /denoising_task/objective: cross_entropy
+  - override /information_path/noise_schedule: one_hot_rank
+  - override /inference/sampler: euler
+  - override /information_path/token_space@token_space: data_only
 ```
 
 A complete recipe must also select a compatible schedule and time sampler and

@@ -61,7 +61,7 @@ def test_random_positions_are_reproducible_and_only_choose_active_positions():
 
 
 def test_composed_config_instantiates_and_runs():
-    config = OmegaConf.load("configs/sampler/composed.yaml")
+    config = OmegaConf.load("configs/inference/sampler/composed.yaml")
     config.steps = 2
     sampler = instantiate(config)
     algo = build_algorithm("masked", None, "none")

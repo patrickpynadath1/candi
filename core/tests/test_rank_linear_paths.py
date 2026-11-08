@@ -94,7 +94,7 @@ def test_rank_schedule_hybrid_train_and_generate(family, discrete, sc):
     config = compose(
         "corruption_factorial",
         {
-            "hybrid_view@model.views.content": family + "_rank",
+            "information_path/hybrid_view@model.views.content": family + "_rank",
             "model.hidden_size": 16,
             "model.n_heads": 2,
             "model.n_blocks": 1,
@@ -104,7 +104,7 @@ def test_rank_schedule_hybrid_train_and_generate(family, discrete, sc):
             "sampler.steps": 3,
         },
     )
-    config.model.views.discrete = OmegaConf.load(f"configs/hybrid_view/{discrete}.yaml")
+    config.model.views.discrete = OmegaConf.load(f"configs/information_path/hybrid_view/{discrete}.yaml")
     algorithm = TrainingModule(config).algorithm
     tokens = torch.randint(0, 12, (2, 8))
     mask = torch.ones_like(tokens, dtype=torch.bool)

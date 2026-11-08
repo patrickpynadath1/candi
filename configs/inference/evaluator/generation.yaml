@@ -1,0 +1,3 @@
+# @package evaluator
+_target_: core.evaluation.generation.evaluate
+_partial_: true

@@ -4,7 +4,7 @@
 # is not the original time-warp implementation; shared backbone/budgets differ.
 defaults:
 - gaussian_base
-- override /representation: embedding
-- override /noise_schedule: cdcd_gaussian_adaptive
-- override /noise_schedule@noise_schedule.base: exponential_ve
+- override /information_path/representation: embedding
+- override /information_path/noise_schedule: cdcd_gaussian_adaptive
+- override /information_path/noise_schedule@noise_schedule.base: exponential_ve
 - _self_

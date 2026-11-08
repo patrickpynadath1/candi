@@ -1,13 +1,13 @@
 # @package _global_
 defaults:
-- override /algorithm: sedd_absorb
-- override /model: dit_conditioned
-- override /parameterization: score
-- override /process: absorbing
-- override /objective: score_entropy
-- override /noise_schedule: log_linear
-- override /time_sampler: antithetic
-- override /sampler: analytic
+- override /denoising_task/algorithm: sedd_absorb
+- override /denoising_task/model: dit_conditioned
+- override /denoising_task/parameterization: score
+- override /information_path/process: absorbing
+- override /denoising_task/objective: score_entropy
+- override /information_path/noise_schedule: log_linear
+- override /denoising_task/time_sampler: antithetic
+- override /inference/sampler: analytic
 loader:
   global_batch_size: 512
   eval_batch_size: 128

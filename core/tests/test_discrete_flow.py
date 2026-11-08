@@ -88,7 +88,7 @@ def test_invalid_paths_fail_before_sampling():
 @pytest.mark.parametrize("mode", ["sample", "greedy"])
 def test_dfm_config_uses_shared_loop_with_prompts_sc_and_fixed_nfe(family, sc, mode):
     algo = build_algorithm(family, None, sc)
-    config = OmegaConf.load("configs/sampler/dfm.yaml")
+    config = OmegaConf.load("configs/inference/sampler/dfm.yaml")
     config.steps = 3
     config.tokens.mode = mode
     sampler = instantiate(config)
@@ -105,7 +105,7 @@ def test_dfm_config_uses_shared_loop_with_prompts_sc_and_fixed_nfe(family, sc, m
 
 def test_dfm_composes_over_multiple_discrete_views():
     algo = build_algorithm("masked", "uniform", "none")
-    config = OmegaConf.load("configs/sampler/dfm.yaml")
+    config = OmegaConf.load("configs/inference/sampler/dfm.yaml")
     config.steps = 2
     output, info = algo.generate(
         instantiate(config),

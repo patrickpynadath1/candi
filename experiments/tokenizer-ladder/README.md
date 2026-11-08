@@ -30,7 +30,7 @@ same size is the reference. It is the post's "Does the tokenizer change the pict
   width for AR.
 - **Recipes.** Gaussian diffusion on learned unit-norm 128-d token embeddings, with a
   CDCD-fitted time sampler and plain cross-entropy. Masked (absorbing) diffusion trained
-  on the ELBO (`objective=masked_elbo`, the keep-rate hazard weighting). Uniform-noise
+  on the ELBO (`denoising_task/objective=masked_elbo`, the keep-rate hazard weighting). Uniform-noise
   diffusion with a posterior cross-entropy. SC is posterior-mean self-conditioning (the
   expected embedding of the previous prediction), used in 90% of training steps.
 - **Training.** 20,000 steps, batch 256 (4 accumulation steps), learning rate 3e-4
@@ -53,8 +53,8 @@ same size is the reference. It is the post's "Does the tokenizer change the pict
 | AR `native_greedy` | cached sequential decoding, greedy | none | 1 |
 
 The configs: [`configs/sweep/tokenizer_ladder.yaml`](../../configs/sweep/tokenizer_ladder.yaml),
-`configs/ladder_recipe/*.yaml`, `configs/inference_policies/{hybrid_renoising,autoregressive}.yaml`
-and `configs/objective/masked_elbo.yaml`.
+`configs/ladder_recipe/*.yaml`, `configs/inference/inference_policies/{hybrid_renoising,autoregressive}.yaml`
+and `configs/denoising_task/objective/masked_elbo.yaml`.
 
 ## Running it
 
@@ -195,7 +195,7 @@ a study needs.
 - **One seed per cell.** Gaps between methods are often within half a BLEU point.
 - **Two launches, one protocol.** The no-SC cases at 260 to 5000 were launched after
   the others (see `expected.csv` notes). They use the same source, environment, data,
-  budget and policies; only `feedback=none` differs.
+  budget and policies; only `modifiers/feedback=none` differs.
 - **Sampler collapses.** Some EB and re-noising policies score near zero on some
   checkpoints. For example, EB greedy stays below 2.2 validation BLEU on every Gaussian
   model and below 0.5 without SC. Selection is on validation, so a collapsed policy is

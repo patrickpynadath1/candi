@@ -1,6 +1,6 @@
 defaults:
 - /data@_global_.data: tinystories
-- /token_space@_global_.token_space: tinystories
+- /information_path/token_space@_global_.token_space: tinystories
 - _self_
 _target_: core.tasks.tinystories.TinyStoriesTask
 data: ${data}

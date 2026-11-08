@@ -213,12 +213,12 @@ def test_compatible_predictors_enforced(table_path):
     with pytest.raises(InstantiationException, match="PlugInParameterization"):
         instantiate(
             config(
-                "uniform_diffusion", table_path, "parameterization=posterior"
+                "uniform_diffusion", table_path, "denoising_task/parameterization=posterior"
             ).algorithm
         )
     with pytest.raises(InstantiationException, match="AbsorbingScoreParameterization"):
         instantiate(
-            config("sedd_absorb", table_path, "parameterization=plug_in").algorithm
+            config("sedd_absorb", table_path, "denoising_task/parameterization=plug_in").algorithm
         )
     a = instantiate(config("sedd_absorb", table_path).algorithm)
     tokens = torch.zeros((1, a.length), dtype=torch.long)

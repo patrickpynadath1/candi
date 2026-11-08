@@ -26,10 +26,10 @@ layers in [`layers.py`](../../core/models/layers.py).
 | `single_view`, `hybrid`, `hybrid_candi`, `hybrid_uniform_simplex` | one or several corrupted views, fused | AdaLN head | view-based (hybrid) recipes |
 | `causal_dit` | token ids, causal | AdaLN head | autoregressive, permuted AR |
 
-The presets are in [`configs/model/`](../../configs/model/). The slot groups are
-`configs/model/input/` (`token`, `simplex`, `linear`, `embedded_projection`) and
-`configs/model/output/` (`adaln`, `embedding`); a recipe swaps one with
-`override /model/input: linear`, for example.
+The presets are in [`configs/denoising_task/model/`](../../configs/denoising_task/model/). The slot groups are
+`configs/denoising_task/model/input/` (`token`, `simplex`, `linear`, `embedded_projection`) and
+`configs/denoising_task/model/output/` (`adaln`, `embedding`); a recipe swaps one with
+`override /denoising_task/model/input@model.input: linear`, for example.
 
 ## Size
 
@@ -46,7 +46,7 @@ _target_: core.models.modular.ModularDiT
 vocab_size: ${token_space.model_vocab_size}
 hidden_size: 512
 n_blocks: 8
-input:                       # configs/model/input/token.yaml
+input:                       # configs/denoising_task/model/input/token.yaml
   _target_: core.models.modular.TokenInput
   _partial_: true
 time:
@@ -54,7 +54,7 @@ time:
   _partial_: true
   coordinate: time
   adaLN: true
-output:                      # configs/model/output/adaln.yaml
+output:                      # configs/denoising_task/model/output/adaln.yaml
   _target_: core.models.modular.AdaLNHead
   _partial_: true
 self_conditioning:
@@ -108,7 +108,7 @@ then projects it; `LinearInput` projects the state directly. Both take
   `D` (RePlaid; linear input only);
 - `none`.
 
-RePlaid combines `override /model/input: linear`, the AdaLN head,
+RePlaid combines `override /denoising_task/model/input@model.input: linear`, the AdaLN head,
 `model.time.input_projection=true` and `unit_embedding` preconditioning, with
 self-conditioning `scale: unit_embedding` (`sqrt(D)`). Changing a slot changes the
 checkpoint's keys and shapes; changing a time coordinate does not.

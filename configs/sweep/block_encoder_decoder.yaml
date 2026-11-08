@@ -8,7 +8,7 @@ defaults:
 - common
 - _self_
 # After _self_: a block model sets its depths, recipe name and recipe fields.
-- /block: encoder8_decoder8
+- /denoising_task/block: encoder8_decoder8
 - override /task: battery/text8
 algorithm:
   time_conditioning: true
@@ -61,5 +61,5 @@ hydra:
   sweeper:
     params:
       task: battery/sudoku_hard,battery/text8,battery/tinystories_bpe
-      block: encoder1_decoder8,encoder2_decoder8,encoder4_decoder8,encoder8_decoder8,encoder8_decoder1,encoder8_decoder2,encoder8_decoder4,raw_context,shared_transformer
+      denoising_task/block: encoder1_decoder8,encoder2_decoder8,encoder4_decoder8,encoder8_decoder8,encoder8_decoder1,encoder8_decoder2,encoder8_decoder4,raw_context,shared_transformer
       ++training.performance.activation_checkpointing: 'true'

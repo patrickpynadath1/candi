@@ -1,6 +1,6 @@
 defaults:
 - /data@_global_.data: tinygsm
-- /token_space@_global_.token_space: tinygsm
+- /information_path/token_space@_global_.token_space: tinygsm
 - _self_
 _target_: core.tasks.tinygsm.TinyGSMTask
 data: ${data}

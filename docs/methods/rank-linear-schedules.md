@@ -44,13 +44,13 @@ original spherical path.
 
 ## Configuration and endpoints
 
-Use `hybrid_view@model.views.content=simplex_rank` or
-`hybrid_view@model.views.content=spherical_rank` in the corruption-factorial recipe.
+Use `information_path/hybrid_view@model.views.content=simplex_rank` or
+`information_path/hybrid_view@model.views.content=spherical_rank` in the corruption-factorial recipe.
 Both support the existing self-conditioning and multi-view machinery.
 
 ```bash
 uv run --locked python main.py +experiment=corruption_factorial \
-  hybrid_view@model.views.content=spherical_rank --cfg job
+  information_path/hybrid_view@model.views.content=spherical_rank --cfg job
 ```
 
 Defaults match the Gaussian embedding rank convention: `rank_min=0.01`,

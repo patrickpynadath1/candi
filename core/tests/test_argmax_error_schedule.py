@@ -83,7 +83,7 @@ def test_invalid_targets_reject_silent_miscalibration():
 
 
 def test_hydra_training_sampling_and_adaptive_base():
-    cfg = config("gaussian_diffusion_sudoku", None, "noise_schedule=argmax_error")
+    cfg = config("gaussian_diffusion_sudoku", None, "information_path/noise_schedule=argmax_error")
     algorithm = instantiate(cfg.algorithm)
     tokens = torch.randint(0, 9, (2, 10))
     mask = torch.ones_like(tokens)
@@ -101,7 +101,7 @@ def test_hydra_training_sampling_and_adaptive_base():
     adaptive = config(
         "gaussian_diffusion_sudoku",
         None,
-        "noise_schedule=cdcd_gaussian_adaptive",
-        "noise_schedule@noise_schedule.base=argmax_error",
+        "information_path/noise_schedule=cdcd_gaussian_adaptive",
+        "information_path/noise_schedule@noise_schedule.base=argmax_error",
     )
     instantiate(adaptive.algorithm)

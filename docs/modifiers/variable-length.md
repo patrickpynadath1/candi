@@ -57,11 +57,11 @@ uv run python main.py +experiment=insertion_hybrid task=text8
 
 # The same modifier and sampler, with a spherical content process.
 uv run python main.py +experiment=insertion_continuous task=text8 \
-  hybrid_view@model.views.content=spherical
+  information_path/hybrid_view@model.views.content=spherical
 ```
 
 The presets reuse `HybridDiffusion` for the content assembly and install
-`VariableLengthDiffusion` through the `variable_length=insertion` config group in
+`VariableLengthDiffusion` through the `modifiers/variable_length=insertion` config group in
 `TrainingModule`. Model, EMA, optimizer and checkpoint construction include the
 gap head and any trainable insertion laws. The inner assembly can have one or
 many views. Existing native single-process algorithms are not automatically
@@ -362,7 +362,7 @@ peaked at step 4,000 rather than improving monotonically.
 
 ## Adaptive training-time feedback
 
-Set `time_sampler=loss_derivative time_sampler.adaptive=true
+Set `denoising_task/time_sampler=loss_derivative time_sampler.adaptive=true
 variable_length.time_sampling_include_aux=true` to fit the training-time sampler
 to the combined token and insertion objective. The default is `false`, preserving
 surviving-token-only feedback. With the option enabled, each example contributes

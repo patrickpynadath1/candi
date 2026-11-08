@@ -1,4 +1,4 @@
-"""Small ModularDiT networks for tests, matching the configs/model presets."""
+"""Small ModularDiT networks for tests, matching the configs/denoising_task/model presets."""
 
 from functools import partial
 
@@ -33,7 +33,7 @@ def token(
     coordinate="time",
     **options,
 ):
-    """configs/model/dit.yaml: token (or views) input, AdaLN head."""
+    """configs/denoising_task/model/dit.yaml: token (or views) input, AdaLN head."""
     return modular.ModularDiT(
         vocab_size=vocab_size,
         hidden_size=hidden_size,
@@ -72,7 +72,7 @@ def continuous(
     self_conditioning=False,
     source="posterior_mean",
 ):
-    """configs/model/continuous_dit.yaml with its slot options."""
+    """configs/denoising_task/model/continuous_dit.yaml with its slot options."""
     state_dim = vocab_size if state_dim is None else state_dim
     input_slot = (
         partial(modular.LinearInput, bias=bias, preconditioning=preconditioning)
@@ -118,7 +118,7 @@ def sphere(
     self_conditioning=False,
     source="posterior_mean",
 ):
-    """configs/model/sphere_dit.yaml: linear input, AdaLN head (optional temperature)."""
+    """configs/denoising_task/model/sphere_dit.yaml: linear input, AdaLN head (optional temperature)."""
     return modular.ModularDiT(
         vocab_size=vocab_size,
         state_dim=state_dim,

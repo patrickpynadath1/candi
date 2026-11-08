@@ -1,5 +1,0 @@
-# @package _global_
-defaults:
-- /hybrid_view@model.views.discrete: uniform
-preparation:
-  discrete_name: uniform

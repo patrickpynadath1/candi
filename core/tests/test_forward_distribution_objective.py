@@ -30,7 +30,7 @@ def test_terms_match_reference_and_composition_gradients():
     expected_kl = torch.nn.functional.kl_div(p.log(), q, reduction="none").sum(-1)
     ratio = (q / p).gather(-1, observed[..., None]).squeeze(-1)
     expected_is = ratio - ratio.log() - 1
-    config = compose("gidd_corruption", {"objective": "forward_kl_is"})
+    config = compose("gidd_corruption", {"denoising_task/objective": "forward_kl_is"})
     objective = instantiate(config.objective)
     objective.terms[0].coefficient = 0.3
     objective.terms[1].coefficient = 0.7
@@ -72,7 +72,7 @@ def test_configured_objective_trains(objective, sc):
     config = compose(
         "gidd_corruption",
         {
-            "objective": objective,
+            "denoising_task/objective": objective,
             "model.hidden_size": 16,
             "model.n_heads": 2,
             "model.n_blocks": 1,
@@ -94,7 +94,7 @@ def test_configured_objective_trains(objective, sc):
 
 def test_missing_context_is_explicit():
     objective = instantiate(
-        compose("gidd_corruption", {"objective": "forward_kl"}).objective
+        compose("gidd_corruption", {"denoising_task/objective": "forward_kl"}).objective
     )
     with pytest.raises(ValueError, match="view context"):
         objective(torch.zeros(1, 2, 3), torch.zeros(1, 2, dtype=torch.long))
@@ -173,8 +173,8 @@ def test_gaussian_objective_training_uses_same_composition():
     config = compose(
         "gidd_corruption",
         {
-            "hybrid_view@model.views.content": "gaussian",
-            "objective": "gaussian_forward_kl",
+            "information_path/hybrid_view@model.views.content": "gaussian",
+            "denoising_task/objective": "gaussian_forward_kl",
             "model.hidden_size": 16,
             "model.n_heads": 2,
             "model.n_blocks": 1,

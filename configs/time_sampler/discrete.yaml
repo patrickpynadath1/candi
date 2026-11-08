@@ -1,5 +1,0 @@
-defaults:
-- /time_sampler@base: antithetic
-- _self_
-_target_: core.time_sampling.discrete.DiscreteTimeSampler
-steps: 1000

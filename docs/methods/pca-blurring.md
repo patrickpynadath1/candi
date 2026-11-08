@@ -1,7 +1,7 @@
 # Sequence-adaptive feature PCA blurring
 
 Implemented as `core.processes.pca_blurring.PCABlurringProcess`, composed through
-`configs/hybrid_view/pca_blurring.yaml` and the existing forward-renoising sampler.
+`configs/information_path/hybrid_view/pca_blurring.yaml` and the existing forward-renoising sampler.
 The initial runnable task recipe is `+experiment=sudoku_pca_blurring`.
 This is feature-space corruption, with no positional DCT mixing.
 

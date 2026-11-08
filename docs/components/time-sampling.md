@@ -55,7 +55,7 @@ a sampler returning only a tensor. Its EMA statistics are checkpointed buffers.
 
 [Variable-length diffusion](../modifiers/variable-length.md) preserves the
 loss-derivative sampler's observation hook. Select it with
-`time_sampler=loss_derivative time_sampler.adaptive=true`.
+`denoising_task/time_sampler=loss_derivative time_sampler.adaptive=true`.
 
 By default, the sampler observes loss averaged over surviving target tokens;
 fully deleted examples do not contribute token-only observations. Set
@@ -87,4 +87,4 @@ Keep sampling, observation updates, and corruption mapping separate. Document
 whether the output is times alone or an allocation object and whether an objective
 needs correction weights. Register fitted state, suppress observations during
 validation/generation, and test distributed partitioning and checkpoint resume.
-See [configs](../../configs/time_sampler/) and [objectives](objectives.md).
+See [configs](../../configs/denoising_task/time_sampler/) and [objectives](objectives.md).

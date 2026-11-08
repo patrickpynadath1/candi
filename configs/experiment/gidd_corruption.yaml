@@ -3,5 +3,5 @@
 # This is not the paper's GIDD ELBO or its reweighted GIDD+ objective.
 defaults:
 - corruption_factorial
-- override /hybrid_view@model.views.content: gidd
+- override /information_path/hybrid_view@model.views.content: gidd
 - _self_

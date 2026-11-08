@@ -121,8 +121,8 @@ def test_schedule_composes_trains_and_generates(hybrid):
     overrides = (
         [
             "+experiment=corruption_factorial",
-            "hybrid_view@model.views.content=gaussian_one_hot",
-            "noise_schedule=gumbel",
+            "information_path/hybrid_view@model.views.content=gaussian_one_hot",
+            "information_path/noise_schedule=gumbel",
             "model.views.content.schedule=${noise_schedule}",
             "model.hidden_size=16",
             "model.n_blocks=1",
@@ -132,7 +132,7 @@ def test_schedule_composes_trains_and_generates(hybrid):
         if hybrid
         else [
             "+experiment=gaussian_base",
-            "noise_schedule=gumbel",
+            "information_path/noise_schedule=gumbel",
             "model.hidden_size=16",
             "model.n_blocks=1",
             "model.n_heads=2",

@@ -22,12 +22,12 @@ been rewritten; configs that omit this field now use the corrected default.
 
 ## Independent sampling choices
 
-`sampler=insertion` retains native content transitions. Its `tokens.mode` is
+`inference/sampler=insertion` retains native content transitions. Its `tokens.mode` is
 `posterior` by default; setting it to `greedy` or `sample` supplies a selected
 one-hot clean estimate to those transitions. `final_denoise` controls only the
 terminal readout and is intentionally independent.
 
-`sampler=insertion_entropy_bounded` uses the same `TokenSelection` and
+`inference/sampler=insertion_entropy_bounded` uses the same `TokenSelection` and
 `EntropyPositions` components as the fixed-length composed sampler, with greedy
 clean tokens and frozen commitments. Accepted tokens, prompt protection, and
 self-conditioning feedback are transported together through sequence edits.

@@ -45,7 +45,7 @@ def test_gaussian_control_uses_real_gaussian_and_identical_model():
 
 
 def test_gaussian_control_learns_the_codebook_and_samples():
-    cfg = compose("gaussian_matched_blurring", ["time_sampler=cdcd", "time_sampler.adaptive=true"])
+    cfg = compose("gaussian_matched_blurring", ["denoising_task/time_sampler=cdcd", "time_sampler.adaptive=true"])
     cfg.task.vocab_size = 11
     cfg.task.length = 7
     cfg.model.hidden_size = 16

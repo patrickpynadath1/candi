@@ -54,7 +54,7 @@ Geometry requirements are checked against the [representation](representations.m
 
 ## LangFlow Gumbel schedule
 
-`noise_schedule=gumbel` selects a VP Gaussian path whose log noise-to-signal
+`information_path/noise_schedule=gumbel` selects a VP Gaussian path whose log noise-to-signal
 variance ratio is a clipped Gumbel quantile:
 
 `gamma(t) = loc - scale * log(-log(t))`,
@@ -67,10 +67,10 @@ the quantile derivative. The finite endpoint cutoffs follow the
 (including its upper-tail approximation); they are not exact clean/noise limits.
 
 ```bash
-uv run python main.py +experiment=gaussian_base noise_schedule=gumbel
+uv run python main.py +experiment=gaussian_base information_path/noise_schedule=gumbel
 # For the shared single-view/hybrid assembly:
 uv run python main.py +experiment=corruption_factorial \
-  hybrid_view@model.views.content=gaussian noise_schedule=gumbel \
+  information_path/hybrid_view@model.views.content=gaussian information_path/noise_schedule=gumbel \
   'model.views.content.schedule=${noise_schedule}'
 ```
 
@@ -109,8 +109,8 @@ silently substituting epsilon. Linear normalization need not be linear in time.
 
 ```bash
 uv run python main.py +experiment=gaussian_diffusion_sudoku \
-  noise_schedule=rescaled_gaussian \
-  noise_schedule@noise_schedule.base=exponential_ve \
+  information_path/noise_schedule=rescaled_gaussian \
+  information_path/noise_schedule@noise_schedule.base=exponential_ve \
   noise_schedule.path_type=vp
 ```
 
@@ -153,5 +153,5 @@ each other.
 
 For extension, supply coefficients and derivatives in the stated coordinate,
 declare geometry requirements, register persistent state, and test finite-difference
-derivatives and endpoint behavior. See [all configs](../../configs/noise_schedule/)
+derivatives and endpoint behavior. See [all configs](../../configs/information_path/noise_schedule/)
 and [implementation helpers](../../core/noise_schedules/utils.py).

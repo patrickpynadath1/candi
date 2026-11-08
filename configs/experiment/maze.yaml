@@ -1,12 +1,12 @@
 # @package _global_
 defaults:
-- override /algorithm: hybrid_diffusion
-- override /model: single_view
-- override /sampler: hybrid
-- override /parameterization: unconstrained_posterior
-- override /objective: cross_entropy
+- override /denoising_task/algorithm: hybrid_diffusion
+- override /denoising_task/model: single_view
+- override /inference/sampler: hybrid
+- override /denoising_task/parameterization: unconstrained_posterior
+- override /denoising_task/objective: cross_entropy
 - override /task: maze
-- override /hybrid_view@model.views.content: masked
+- override /information_path/hybrid_view@model.views.content: masked
 model:
   hidden_size: 256
   cond_dim: 64

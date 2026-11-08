@@ -5,9 +5,9 @@ defaults:
 - /experiment: corruption_factorial
 - /sweep/common
 - /ablation_path: gaussian
-- /feedback: none
-- /inference_policies: hybrid_renoising
-- override /path_schedule: cdcd
+- /modifiers/feedback: none
+- /inference/inference_policies: hybrid_renoising
+- override /information_path/path_schedule: cdcd
 - _self_
 preparation:
   recipe_name: ${preparation.path_name}-${preparation.feedback_name}

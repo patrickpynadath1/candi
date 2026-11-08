@@ -1,0 +1,12 @@
+# @package _global_
+# Learn the continuous view's quantile map with the CDCD loss-CDF fitter.
+# The shared/discrete clock remains uniform; no legacy AdaptiveTimeMap is used.
+defaults:
+- override /denoising_task/time_sampler: cdcd
+algorithm:
+  adaptive_time_views: [0]
+time_sampler:
+  adaptive: true
+  epsilon: 0.001
+preparation:
+  schedule_name: cdcd

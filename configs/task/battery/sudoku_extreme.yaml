@@ -1,7 +1,7 @@
 # @package _global_
 # HRM/TRM corpus and augmentation family; our DLM representation/budget, not TRM.
 defaults:
-- /token_space@token_space: append_mask
+- /information_path/token_space@token_space: append_mask
 - _self_
 task:
   _target_: core.tasks.sudoku_extreme.SudokuExtremeTask

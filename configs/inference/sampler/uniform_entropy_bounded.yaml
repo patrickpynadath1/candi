@@ -1,0 +1,7 @@
+# @package sampler
+_target_: core.samplers.uniform_entropy_bounded.UniformEntropyBoundedSampler
+steps: 1024
+epsilon: 0.001
+entropy_bound: 0.0
+use_float64: true
+freeze: false

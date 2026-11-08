@@ -2,10 +2,10 @@
 # Feature PCA only; positional DCT blur is deliberately not composed here.
 defaults:
 - corruption_factorial
-- override /hybrid_view@model.views.content: pca_blurring
+- override /information_path/hybrid_view@model.views.content: pca_blurring
 - override /task: sudoku
-- override /sampler: forward_resampling
-- override /time_sampler: cdcd
+- override /inference/sampler: forward_resampling
+- override /denoising_task/time_sampler: cdcd
 - _self_
 algorithm:
   adaptive_time_views: [0]

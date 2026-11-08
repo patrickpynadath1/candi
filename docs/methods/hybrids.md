@@ -20,14 +20,14 @@ uv run python main.py +experiment=hybrid
 
 # Spherical + uniform
 uv run python main.py +experiment=hybrid \
-  hybrid_view@model.views.first=spherical \
-  hybrid_view@model.views.second=uniform \
+  information_path/hybrid_view@model.views.first=spherical \
+  information_path/hybrid_view@model.views.second=uniform \
   model.time.coordinate=negative_log_keep
 
 # Simplex + Gaussian
 uv run python main.py +experiment=hybrid \
-  hybrid_view@model.views.first=simplex \
-  hybrid_view@model.views.second=gaussian
+  information_path/hybrid_view@model.views.first=simplex \
+  information_path/hybrid_view@model.views.second=gaussian
 ```
 
 Available view presets: `masked`, `uniform`, `gaussian`, `simplex`, `spherical`, and `blurring`. These are composable component recipes, not claims of paper-equivalent training results. Change a view's schedule, representation, time map, or update directly in configuration. The default fusion sums model embeddings; each representation has a configurable scale. All views must agree on token vocabulary, sequence layout, and transformer hidden size.
@@ -112,11 +112,11 @@ The imported 20,000-step Sudoku Hard CANDI checkpoint solved 1,566/2,000 puzzles
 
 A separate fresh 2,000-step standard-masking run solved 746/2,000 (37.3%), with 89.74% token accuracy and mean 9.1495 NFE. A fresh 2,000-step uniform-plus-simplex run solved 237/2,000 (11.85%) with 82.87% token accuracy and 181 NFE. These short checks demonstrate trainability and generation; they are not converged benchmarks. See [recorded results](../validation/reproduction-results.md).
 
-Sources: [modifier](../../core/modifiers/hybrid/), [representations](../../core/representations/noisy_inputs.py), [updates](../../core/samplers/hybrid_updates.py), [view configurations](../../configs/hybrid_view/).
+Sources: [modifier](../../core/modifiers/hybrid/), [representations](../../core/representations/noisy_inputs.py), [updates](../../core/samplers/hybrid_updates.py), [view configurations](../../configs/information_path/hybrid_view/).
 
 ## EB for masked hybrids
 
-Use `sampler=masked_hybrid_entropy_bounded` for a hybrid with an absorbing view,
+Use `inference/sampler=masked_hybrid_entropy_bounded` for a hybrid with an absorbing view,
 including Gaussian embedding + masked corruption. This sampler uses the shared
 global time grid and each view's configured schedule and update, independently of
 view order. EB selects tokens using cumulative entropy excluding the largest

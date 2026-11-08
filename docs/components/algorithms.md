@@ -18,7 +18,7 @@ belongs in processes, not in this method.
 
 ## Implementations and selection
 
-The [algorithm configs](../../configs/algorithm/) declare the components to
+The [algorithm configs](../../configs/denoising_task/algorithm/) declare the components to
 instantiate recursively. Prefer a matching [experiment](../../configs/experiment/)
 when changing method families: changing `algorithm` alone does not change the
 process, predictor, model, or objective.

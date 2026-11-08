@@ -87,8 +87,8 @@ def test_exponential_ve_gaussian_training_and_sampling(representation):
     cfg = config(
         "gaussian_diffusion_sudoku",
         None,
-        "noise_schedule=exponential_ve",
-        f"representation={representation}",
+        "information_path/noise_schedule=exponential_ve",
+        f"information_path/representation={representation}",
     )
     algorithm = instantiate(cfg.algorithm)
     tokens = torch.randint(0, 9, (2, 10))

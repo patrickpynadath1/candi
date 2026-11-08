@@ -200,7 +200,7 @@ is the number of inference candidates per case. Ray reserves a GPU only for an
 actual training or evaluation worker, never for the case coordinator.
 
 To learn base-path progress for continuous views (Gaussian, blurring, simplex,
-spherical), apply [`configs/time_map/cdcd.yaml`](../../configs/time_map/cdcd.yaml)
+spherical), apply [`configs/information_path/time_map/cdcd.yaml`](../../configs/information_path/time_map/cdcd.yaml)
 to them in the sweep config. The learned clock is a registered module saved with
 the model and reused during inference; validation and generation do not update
 it. Each case trains once from scratch, then tunes inference, then evaluates only

@@ -6,7 +6,7 @@ Sections 3–4 and Appendix C. It does not replace the geodesic `spherical` view
 
 ## Information path
 
-Select `hybrid_view@model.views.content=vmf` in a composed recipe. The view uses
+Select `information_path/hybrid_view@model.views.content=vmf` in a composed recipe. The view uses
 learnable unit-normalized token embeddings and
 
 ```
@@ -49,7 +49,7 @@ the flux integral in log space from either boundary to avoid tail cancellation.
 
 The existing `hybrid` sampler therefore runs the ODE predictor directly. To add
 the paper's fresh-prediction Langevin correctors, select
-`sampler=vmf_predictor_corrector`. This is the same `ComposedSampler` loop with
+`inference/sampler=vmf_predictor_corrector`. This is the same `ComposedSampler` loop with
 an optional `SphericalLangevinCorrector`, not a separate execution engine.
 The corrector projects `epsilon * score + sqrt(2*epsilon) * normal_noise` into
 the tangent space and normalizes the result. Its step size is configurable;

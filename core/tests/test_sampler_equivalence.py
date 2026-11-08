@@ -48,7 +48,7 @@ def build_algorithm(family, discrete, sc):
             config_name="config",
             overrides=[
                 "+experiment=corruption_factorial",
-                f"hybrid_view@model.views.content={family}",
+                f"information_path/hybrid_view@model.views.content={family}",
                 "model.hidden_size=16",
                 "model.n_heads=2",
                 "model.n_blocks=1",
@@ -62,7 +62,7 @@ def build_algorithm(family, discrete, sc):
         OmegaConf.update(
             cfg,
             "model.views.discrete",
-            OmegaConf.load(f"configs/hybrid_view/{discrete}.yaml"),
+            OmegaConf.load(f"configs/information_path/hybrid_view/{discrete}.yaml"),
             force_add=True,
         )
     if family == "simplex":

@@ -23,7 +23,7 @@ validation loss must also use unshaped predictions.
 | `score` | Absorbing log scores, **not** a normalized token distribution |
 | `gaussian_prior` | Posterior with an explicit Gaussian output-prior correction |
 
-The [configs](../../configs/parameterization/) specify the actual constraint
+The [configs](../../configs/denoising_task/parameterization/) specify the actual constraint
 objects. [constraints.py](../../core/parameterizations/constraints.py) separates
 support exclusion from observed-token conditioning. A Gaussian noisy state is
 not an observed discrete token and must not receive absorbing constraints.

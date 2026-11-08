@@ -232,14 +232,14 @@ def test_real_dit_backward_and_native_checkpoint_roundtrip(tmp_path):
 
 def test_all_sampler_configs_construct():
     for name in ("ancestral", "entropy_bounded"):
-        settings = config(f"sampler={name}")
+        settings = config(f"inference/sampler={name}")
         assert instantiate(settings.sampler)
         assert instantiate(settings.algorithm)
 
 
 def test_recursive_config_construction_tracks_overrides_and_serializes():
     settings = config(
-        "algorithm=mdlm",
+        "denoising_task/algorithm=mdlm",
         "task.vocab_size=17",
         "task.length=20",
         "parameterization.temperature=0.7",
@@ -335,7 +335,7 @@ def test_training_resume_and_both_evaluators(tmp_path):
     assert resumed["global_step"] == 4 and resumed["ema"]["num_updates"] == 4
     assert resumed["lr_schedulers"][0]["last_epoch"] == 4
     for name in ("ancestral", "entropy_bounded"):
-        evaluation = config(f"sampler={name}")
+        evaluation = config(f"inference/sampler={name}")
         evaluation.mode = "evaluate"
         evaluation.output_dir = str(tmp_path / name)
         evaluation.data.cache_dir = settings.data.cache_dir

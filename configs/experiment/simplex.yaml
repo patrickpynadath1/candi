@@ -1,14 +1,14 @@
 # @package _global_
 defaults:
-- override /algorithm: simplex_diffusion
-- override /model: simplex_dit
-- override /parameterization: gaussian_posterior
-- override /process: dirichlet
-- override /noise_schedule: simplex
-- override /time_sampler: loss_derivative
-- override /objective: cross_entropy
-- override /sampler: simplex
-- override /token_space@token_space: data_only
+- override /denoising_task/algorithm: simplex_diffusion
+- override /denoising_task/model: simplex_dit
+- override /denoising_task/parameterization: gaussian_posterior
+- override /information_path/process: dirichlet
+- override /information_path/noise_schedule: simplex
+- override /denoising_task/time_sampler: loss_derivative
+- override /denoising_task/objective: cross_entropy
+- override /inference/sampler: simplex
+- override /information_path/token_space@token_space: data_only
 self_conditioning:
   source: hidden
 trainer:

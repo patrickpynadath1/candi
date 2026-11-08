@@ -15,12 +15,12 @@ FAMILIES = ("blurring", "gaussian", "spherical", "simplex", "masked", "uniform")
 def factorial_config(family):
     cfg = compose(
         "corruption_factorial",
-        {"hybrid_view@model.views.content": family, "data.difficulty": "hard"},
+        {"information_path/hybrid_view@model.views.content": family, "data.difficulty": "hard"},
     )
     view = cfg.model.views.content
     if family == "gaussian":
-        schedule = compose(overrides={"noise_schedule": "cdcd_gaussian_adaptive"})
-        base = compose(overrides={"noise_schedule": "one_hot_rank"}).noise_schedule
+        schedule = compose(overrides={"information_path/noise_schedule": "cdcd_gaussian_adaptive"})
+        base = compose(overrides={"information_path/noise_schedule": "one_hot_rank"}).noise_schedule
         base.inversion = "analytic"
         base.coupling = "linear"
         schedule.noise_schedule.base = base
@@ -78,7 +78,7 @@ def samplers(entropy_bound=0.1):
         ),
     ]
     for group, overrides in choices:
-        sampler = compose(overrides={"sampler": group}).sampler
+        sampler = compose(overrides={"inference/sampler": group}).sampler
         for key, value in overrides.items():
             OmegaConf.update(sampler, key, value)
         yield group, sampler

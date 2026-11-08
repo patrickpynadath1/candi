@@ -1,0 +1,2 @@
+# @package parameterization
+_target_: core.parameterizations.score.AbsorbingScoreParameterization

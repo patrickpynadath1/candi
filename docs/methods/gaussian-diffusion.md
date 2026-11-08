@@ -41,9 +41,9 @@ FLM's error target spans the error interval achievable by the finite lookup tabl
 ## Solvers and objectives
 
 ```bash
-uv run python main.py +experiment=gaussian_diffusion_sudoku sampler=heun
-uv run python main.py +experiment=gaussian_diffusion_sudoku sampler=ode
-uv run python main.py +experiment=flm_gaussian parameterization.softcap=30 objective=cross_entropy_learned
+uv run python main.py +experiment=gaussian_diffusion_sudoku inference/sampler=heun
+uv run python main.py +experiment=gaussian_diffusion_sudoku inference/sampler=ode
+uv run python main.py +experiment=flm_gaussian parameterization.softcap=30 denoising_task/objective=cross_entropy_learned
 ```
 
 Fixed Gaussian presets default to Euler. Euler and Heun integrate posterior-derived velocity; the adaptive ODE solver counts rejected stages against its budget. Solvers preserve prompts at every internal stage and include final posterior decoding in NFE. They support both tokenwise representations. The Gaussian DDPM sampler is also available for suitable monotone-SNR paths; its prior policy must match the intended terminal distribution.
@@ -53,11 +53,11 @@ Fixed Gaussian presets default to Euler. Euler and Heun integrate posterior-deri
 The stochastic reverse bridge originally used by RePlaid is shared by every
 Gaussian method; it needs only the schedule's alpha/sigma coefficients and the
 representation's posterior mean. It does not depend on RePlaid's objective or
-learned schedule. Select it for an existing checkpoint with `sampler=gaussian_ddpm`.
+learned schedule. Select it for an existing checkpoint with `inference/sampler=gaussian_ddpm`.
 
 ```bash
-uv run python main.py +experiment=gaussian_diffusion_embedding_sudoku sampler=gaussian_ddpm
-uv run python main.py +experiment=onehot_gaussian sampler=gaussian_ddpm
+uv run python main.py +experiment=gaussian_diffusion_embedding_sudoku inference/sampler=gaussian_ddpm
+uv run python main.py +experiment=onehot_gaussian inference/sampler=gaussian_ddpm
 ```
 
 For a hybrid, keep its shared sampling loop and select the update on its Gaussian

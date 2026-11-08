@@ -1,0 +1,5 @@
+# @package sampler
+_target_: core.samplers.hybrid_entropy_bounded.CANDIEntropyBoundedSampler
+entropy_bound: 0.1
+steps: 180
+greedy_clean_estimate: true

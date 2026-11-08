@@ -127,7 +127,7 @@ def test_default_adaptation_uses_sampled_time():
             config_name="config",
             overrides=[
                 "+experiment=spherical_flow_matching",
-                "noise_schedule=spherical_adaptive",
+                "information_path/noise_schedule=spherical_adaptive",
             ],
         )
     assert instantiate(cfg.noise_schedule).coordinate == "legacy_time"

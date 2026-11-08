@@ -1,0 +1,71 @@
+# @package model
+_target_: core.models.modular.ModularDiT
+vocab_size: ${task.vocab_size}
+hidden_size: 512
+cond_dim: 128
+n_blocks: 8
+n_heads: 8
+dropout: 0.1
+tie_word_embeddings: false
+block_adaLN: true
+time:
+  _target_: core.models.modular.TimeConditioning
+  _partial_: true
+  coordinate: time
+  adaLN: true
+output:
+  _target_: core.models.modular.AdaLNHead
+  _partial_: true
+  adaLN: true
+self_conditioning:
+  _target_: core.models.modular.SelfConditioning
+  _partial_: true
+  enabled: ${self_conditioning.enabled}
+  source: ${self_conditioning.source}
+  initialization: zero
+fusion: null
+output_vocab_size: null
+views:
+- _target_: core.modifiers.hybrid.views.DiffusionView
+  update:
+    _target_: core.samplers.hybrid_updates.DiscretePosteriorUpdate
+  name: uniform
+  process:
+    _target_: core.processes.uniform_posterior.PosteriorUniformProcess
+    vocab_size: ${task.vocab_size}
+  schedule:
+    _target_: core.noise_schedules.log_linear.LogLinear
+    epsilon: 0.0
+  representation:
+    _target_: core.representations.noisy_inputs.TokenRepresentation
+    vocab_size: ${task.vocab_size}
+    hidden_size: ${model.hidden_size}
+    scale: 0.5
+    normalize: true
+- _target_: core.modifiers.hybrid.views.DiffusionView
+  update:
+    _target_: core.samplers.hybrid_updates.SimplexPosteriorUpdate
+  name: simplex
+  process:
+    _target_: core.processes.dirichlet.DirichletProcess
+    vocab_size: ${task.vocab_size}
+    reference: null
+    precision: fp64
+    sampler_backend: torch
+    chunk_size: 0
+  schedule:
+    _target_: core.noise_schedules.simplex.SimplexSchedule
+    kind: constant_linear
+    nu0: 0.4
+    nu1: 0.75
+    pivot: 0.8
+    epsilon: 1.0
+  representation:
+    _target_: core.representations.noisy_inputs.SimplexRepresentation
+    state_precision: ${..process.precision}
+    projection_precision: legacy
+    projection_chunk_size: 0
+    vocab_size: ${task.vocab_size}
+    hidden_size: ${model.hidden_size}
+    scale: 0.5
+    normalize: true

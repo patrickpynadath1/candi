@@ -1,6 +1,6 @@
 # @package _global_
 defaults:
-- /gaussian_state: embedding
-- /path_schedule: adaptive
+- /information_path/gaussian_state: embedding
+- /information_path/path_schedule: adaptive
 preparation:
   path_name: gaussian_embedding

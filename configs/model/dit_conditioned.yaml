@@ -1,9 +1,0 @@
-# Larger time-conditioned token DiT (uniform, DUO, SEDD, D3PM, BlockGen recipes).
-defaults:
-- dit
-- _self_
-hidden_size: 768
-n_blocks: 12
-n_heads: 12
-time:
-  adaLN: true

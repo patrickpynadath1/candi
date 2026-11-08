@@ -1,3 +1,0 @@
-_target_: core.objectives.cross_entropy.CrossEntropy
-label_smoothing: 0.0
-weighting: null

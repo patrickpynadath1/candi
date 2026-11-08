@@ -1,15 +1,15 @@
 # @package _global_
 defaults:
-- override /algorithm: blurring_diffusion
-- override /model: continuous_dit
-- override /model/input: linear
-- override /parameterization: gaussian_posterior
-- override /process: blurring
-- override /noise_schedule: blurring
-- override /representation: centered_embedding
-- override /objective: cross_entropy
-- override /sampler: blur_ancestral
-- override /token_space@token_space: data_only
+- override /denoising_task/algorithm: blurring_diffusion
+- override /denoising_task/model: continuous_dit
+- override /denoising_task/model/input@model.input: linear
+- override /denoising_task/parameterization: gaussian_posterior
+- override /information_path/process: blurring
+- override /information_path/noise_schedule: blurring
+- override /information_path/representation: centered_embedding
+- override /denoising_task/objective: cross_entropy
+- override /inference/sampler: blur_ancestral
+- override /information_path/token_space@token_space: data_only
 - _self_
 model:
   input:

@@ -2,7 +2,7 @@
 # TinyStories with a saved byte-level BPE tokenizer (artifacts/tokenizers/tinystories-bpe).
 defaults:
 - /task/battery/tinystories
-- override /token_space@token_space: tinystories
+- override /information_path/token_space@token_space: tinystories
 - _self_
 bpe:
   vocabulary_size: 10000

@@ -177,7 +177,7 @@ def test_generic_config_and_reference_replaid_policies():
     ):
         generic = compose(
             config_name="config",
-            overrides=["+experiment=onehot_gaussian", "sampler=gaussian_ddpm"],
+            overrides=["+experiment=onehot_gaussian", "inference/sampler=gaussian_ddpm"],
         )
         plaid = compose(config_name="config", overrides=["+experiment=replaid"])
         sudoku = compose(

@@ -1,2 +1,0 @@
-_target_: core.processes.absorbing.AbsorbingProcess
-mask_index: ${token_space.mask_index}

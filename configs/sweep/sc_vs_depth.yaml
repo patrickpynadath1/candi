@@ -7,8 +7,8 @@ defaults:
 - /experiment: corruption_factorial
 - common
 - /ablation_path: gaussian_cdcd
-- /feedback: none
-- /inference_policies: hybrid_renoising
+- /modifiers/feedback: none
+- /inference/inference_policies: hybrid_renoising
 - override /task: battery/sudoku_hard
 - _self_
 checkpoint:
@@ -30,4 +30,4 @@ hydra:
     params:
       task: battery/sudoku_hard,battery/text8,battery/tinystories_bpe
       ablation_path: gaussian_cdcd,masked_elbo,uniform
-      feedback: none,expected_embedding,double_depth
+      modifiers/feedback: none,expected_embedding,double_depth

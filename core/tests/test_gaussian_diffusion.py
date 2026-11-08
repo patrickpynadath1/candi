@@ -127,7 +127,7 @@ def test_gaussian_hydra_single_example_loss_and_sampling(schedule):
                 "model.n_heads=4",
                 "model.n_blocks=1",
                 "model.cond_dim=16",
-                f"noise_schedule={schedule}",
+                f"information_path/noise_schedule={schedule}",
             ],
         )
     algo = instantiate(cfg.algorithm)

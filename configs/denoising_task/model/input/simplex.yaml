@@ -1,0 +1,7 @@
+# @package model.input
+# Simplex log-states -> expected embedding (or the argmax token's embedding).
+_target_: core.models.modular.SimplexInput
+_partial_: true
+mode: expectation
+precision: legacy
+chunk_size: 0

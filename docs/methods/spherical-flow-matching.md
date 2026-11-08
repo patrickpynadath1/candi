@@ -13,7 +13,7 @@ uv run python main.py +experiment=sudoku_spherical_truncated_adaptive
 
 Time increases toward noise. The schedule returns a keep coordinate and corruption uses interpolation fraction `1 - keep`. Dimension-aware truncation replaces the maximum keep with the vocabulary/dimension bound; the lowest-time endpoint therefore remains partially corrupted. It is not remapped to a fully clean endpoint.
 
-The generic `noise_schedule=spherical_adaptive` defaults to `coordinate: legacy_time`, matching original S-FLM sampled-time adaptation. The named Sudoku adaptive presets explicitly choose `physical`, matching this repository's original Sudoku recipes. These coordinates are intentionally distinct; see [noise schedules](../components/noise-schedules.md).
+The generic `information_path/noise_schedule=spherical_adaptive` defaults to `coordinate: legacy_time`, matching original S-FLM sampled-time adaptation. The named Sudoku adaptive presets explicitly choose `physical`, matching this repository's original Sudoku recipes. These coordinates are intentionally distinct; see [noise schedules](../components/noise-schedules.md).
 
 The truncated Sudoku recipe uses a 12,800-observation buffer, refits every 50 steps after step 1,000, EMA 0.9, and uniform mixture 0.001. Its model is width/dimension 512 with eight blocks and eight heads; batch 256, learning rate 0.0003, warmup 2,500, EMA 0.9999, and a 20,000-step budget. Accumulation is one.
 

@@ -70,7 +70,7 @@ def test_cosine_group_rates_and_resume():
     "name", ["constant", "constant_warmup", "step_scheduler", "cosine_decay_warmup"]
 )
 def test_scheduler_config_construction(name):
-    settings = config(f"lr_scheduler={name}")
+    settings = config(f"training/lr_scheduler={name}")
     result = TrainingModule(settings).configure_optimizers()
     assert result["lr_scheduler"]["interval"] == "step"
     assert isinstance(result["optimizer"], torch.optim.AdamW)
@@ -87,9 +87,9 @@ def test_strategy_presets_do_not_replace_legacy_override():
     settings = config("trainer.strategy=ddp")
     assert settings.get("strategy") is None
     assert settings.trainer.strategy == "ddp"
-    settings = config("strategy=ddp")
+    settings = config("training/strategy=ddp")
     assert instantiate(settings.strategy)._ddp_kwargs["find_unused_parameters"]
-    settings = config("strategy=single_cpu")
+    settings = config("training/strategy=single_cpu")
     assert instantiate(settings.strategy).root_device == torch.device("cpu")
     assert (
         OmegaConf.to_container(settings.lr_scheduler)["warmup_steps"]
@@ -100,7 +100,7 @@ def test_strategy_presets_do_not_replace_legacy_override():
 def test_fsdp_rejects_unsupported_lifecycle():
     from core.training.strategies import build_strategy
 
-    settings = config("strategy=fsdp")
+    settings = config("training/strategy=fsdp")
     algorithm = torch.nn.Linear(2, 2)
     with pytest.raises(ValueError, match="training.ema=0"):
         build_strategy(settings, algorithm)

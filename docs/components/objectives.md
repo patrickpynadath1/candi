@@ -24,7 +24,7 @@ track them.
 | `d3pm` | Absorbing discrete variational term plus clean reconstruction CE |
 | `replaid` | Prior, reconstruction, and continuous diffusion bound terms |
 
-[Implementations](../../core/objectives/) and [configs](../../configs/objective/)
+[Implementations](../../core/objectives/) and [configs](../../configs/denoising_task/objective/)
 define the call signatures. A normalized plug-in estimate is not a posterior
 merely because CE could be computed on it. The chosen process/objective pair must
 share the predictor's interpretation.
@@ -52,7 +52,7 @@ parameters should receive gradients. Detached adaptive fitting is a separate pat
 
 ```bash
 uv run python main.py +experiment=gaussian_diffusion_sudoku \
-  objective=cross_entropy_power \
+  denoising_task/objective=cross_entropy_power \
   objective.weighting.coordinate=sigma objective.weighting.exponent=-2
 ```
 
@@ -114,8 +114,8 @@ importance/Jacobian correction. The dynamic GIDD+ weighting is not included.
 Using these divergence terms with another kernel does not establish an ELBO.
 
 ```bash
-uv run --locked python main.py +experiment=gidd_corruption objective=gidd_elbo
-uv run --locked python main.py +experiment=gidd_corruption objective=forward_kl_is \
+uv run --locked python main.py +experiment=gidd_corruption denoising_task/objective=gidd_elbo
+uv run --locked python main.py +experiment=gidd_corruption denoising_task/objective=forward_kl_is \
   objective.terms.1.coefficient=0.5
 ```
 

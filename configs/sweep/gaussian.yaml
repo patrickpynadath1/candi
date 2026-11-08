@@ -2,9 +2,9 @@
 defaults:
 - /experiment: corruption_factorial
 - common
-- /gaussian_state: one_hot
-- /path_schedule: adaptive
-- /sc: 'on'
+- /information_path/gaussian_state: one_hot
+- /information_path/path_schedule: adaptive
+- /modifiers/sc: 'on'
 - override /task: battery/sudoku_hard
 - _self_
 model:
@@ -19,4 +19,4 @@ preparation:
 hydra:
   sweeper:
     params:
-      gaussian_state: one_hot,embedding
+      information_path/gaussian_state: one_hot,embedding

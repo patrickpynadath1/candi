@@ -40,9 +40,9 @@ def run_prepare(output, reference, *overrides):
             "--multirun",
             "+sweep=hybrids",
             "task=battery/text8",
-            "gaussian_state=one_hot",
-            "path_schedule=adaptive",
-            "sc=off",
+            "information_path/gaussian_state=one_hot",
+            "information_path/path_schedule=adaptive",
+            "modifiers/sc=off",
             f"preparation.output={output}",
             f"preparation.evaluation_file={reference}",
             *overrides,
@@ -114,7 +114,7 @@ def test_collect_rejects_incomplete_export(tmp_path):
 
 
 def test_blurring_defaults_are_composed_before_export():
-    config = compose(overrides=["+sweep=continuous", "content_view=blurring"])
+    config = compose(overrides=["+sweep=continuous", "information_path/content_view=blurring"])
     view = config.model.views.content
     assert "defaults" not in view
     assert view.schedule._target_ == "core.noise_schedules.blurring.BlurringSchedule"

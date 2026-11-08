@@ -1,6 +1,6 @@
 defaults:
 - /data@_global_.data: text8
-- /token_space@_global_.token_space: text8
+- /information_path/token_space@_global_.token_space: text8
 - _self_
 _target_: core.tasks.text8.Text8Task
 data: ${data}

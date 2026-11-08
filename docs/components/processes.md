@@ -23,7 +23,7 @@ with respect to the same coordinate used by its schedule and sampler.
 | `dirichlet` | Simplex-valued state with Dirichlet bridge mathematics |
 | `blurring` | Spectral sequence/feature corruption respecting sequence boundaries |
 
-See [implementations](../../core/processes/) and [configs](../../configs/process/).
+See [implementations](../../core/processes/) and [configs](../../configs/information_path/process/).
 Hybrid presets additionally compose `CANDIMaskingProcess` and
 `CANDIGaussianProcess`; they retain CANDI-specific transition conventions while
 standard masking replaces the old accidental token-retention behavior.

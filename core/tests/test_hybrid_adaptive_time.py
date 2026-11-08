@@ -61,8 +61,8 @@ def test_simplex_hybrid_local_time_training_and_generation(kind, monkeypatch):
     from core.sweeps.configuration import compose
     from core.training.module import TrainingModule
     cfg = compose('hybrid', [
-        'time_sampler=cdcd', 'time_sampler.adaptive=true',
-        'hybrid_view@model.views.first=simplex', f'hybrid_view@model.views.second={kind}',
+        'denoising_task/time_sampler=cdcd', 'time_sampler.adaptive=true',
+        'information_path/hybrid_view@model.views.first=simplex', f'information_path/hybrid_view@model.views.second={kind}',
         '+algorithm.adaptive_time_views=[0]', 'self_conditioning.enabled=true',
         'self_conditioning.source=hidden', 'self_conditioning.probability=0.9',
     ])

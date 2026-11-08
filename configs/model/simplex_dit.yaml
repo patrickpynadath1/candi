@@ -1,7 +1,0 @@
-# DiT over simplex log-states (expected token embedding input).
-defaults:
-- dit
-- override input: simplex
-- _self_
-time:
-  adaLN: true

@@ -44,9 +44,9 @@ def test_frontier_presets_compose(preset):
     with initialize_config_dir(
         version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
-        overrides = [f"frontier={preset}", "output_dir=/tmp/frontier_test"]
+        overrides = [f"inference/frontier={preset}", "output_dir=/tmp/frontier_test"]
         if preset != "sudoku":
-            overrides += [f"+experiment={preset}", "sampler=ancestral"]
+            overrides += [f"+experiment={preset}", "inference/sampler=ancestral"]
         settings = compose(config_name="frontier", overrides=overrides)
     assert settings.mode == "evaluate"
     for axis in settings.frontier.axes:

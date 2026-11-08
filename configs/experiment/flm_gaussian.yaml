@@ -1,8 +1,8 @@
 # @package _global_
 defaults:
 - gaussian_base
-- override /noise_schedule: rescaled_gaussian
-- override /noise_schedule@noise_schedule.base: argmax_error
+- override /information_path/noise_schedule: rescaled_gaussian
+- override /information_path/noise_schedule@noise_schedule.base: argmax_error
 - _self_
 noise_schedule:
   path_type: linear

@@ -12,7 +12,7 @@ For an original MDLM checkpoint trained with the small 768-wide, 12-layer DiT:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 uv run python frontier.py \
-  +experiment=openwebtext frontier=openwebtext sampler=ancestral \
+  +experiment=openwebtext inference/frontier=openwebtext inference/sampler=ancestral \
   model.adaLN=true \
   evaluation.checkpoint=/absolute/path/to/pretrained.ckpt \
   evaluation.legacy=true noise_schedule.epsilon=0 \
@@ -39,13 +39,13 @@ remain unchanged. This boundary correction can change historical perplexities.
 
 ## Text8 and Sudoku
 
-Select `+experiment=text8 frontier=text8 sampler=ancestral` for Text8. Its
+Select `+experiment=text8 inference/frontier=text8 inference/sampler=ancestral` for Text8. Its
 objectives are `generated/words/counts/unique` and
 `generated/words/counts/valid`, both maximized. Length-filtered objectives are
 also available, e.g. `generated/by_min_length/4/aggregate/counts/valid`.
 Metric paths follow `core.evaluation.reporting.scalar_metrics` and use slashes.
 
-The default `frontier=sudoku` varies posterior temperature and EB entropy bound,
+The default `inference/frontier=sudoku` varies posterior temperature and EB entropy bound,
 maximizing accuracy and minimizing actual mean NFE. It requires an EB sampler
 exposing `entropy_bound`. Choose axes appropriate to the selected sampler.
 
@@ -97,4 +97,4 @@ and cached result reuse. A one-point real-model check does not establish a
 quality/diversity frontier.
 
 Implementation: [frontier runner](../../core/sweeps/frontier.py) and
-[frontier presets](../../configs/frontier/).
+[frontier presets](../../configs/inference/frontier/).

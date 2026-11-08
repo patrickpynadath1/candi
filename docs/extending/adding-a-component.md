@@ -50,7 +50,7 @@ Place a YAML option in the corresponding root `configs/` group. This is an
 illustrative schedule registration, not an existing selectable implementation:
 
 ```yaml
-# configs/noise_schedule/my_schedule.yaml
+# configs/information_path/noise_schedule/my_schedule.yaml
 _target_: core.noise_schedules.my_schedule.MySchedule
 scale: 1.0
 ```

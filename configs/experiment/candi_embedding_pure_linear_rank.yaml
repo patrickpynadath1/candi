@@ -1,7 +1,7 @@
 # @package _global_
 defaults:
 - embedding_flow_matching
-- override /noise_schedule: embedding_sphere_rank
+- override /information_path/noise_schedule: embedding_sphere_rank
 - _self_
 noise_schedule:
   coupling: linear

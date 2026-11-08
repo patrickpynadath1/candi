@@ -2,7 +2,7 @@
 defaults:
 - /experiment: uniform_diffusion
 - common
-- /sc: 'off'
+- /modifiers/sc: 'off'
 - override /task: battery/sudoku_hard
 - _self_
 model:
@@ -31,4 +31,4 @@ preparation:
 hydra:
   sweeper:
     params:
-      sc: off,on
+      modifiers/sc: off,on

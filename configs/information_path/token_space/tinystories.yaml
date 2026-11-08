@@ -1,0 +1,3 @@
+# @package token_space
+model_vocab_size: ${task.vocab_size}
+mask_index: 3

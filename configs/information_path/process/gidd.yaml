@@ -1,0 +1,3 @@
+# @package process
+_target_: core.processes.gidd.GIDDProcess
+vocab_size: ${task.vocab_size}

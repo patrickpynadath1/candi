@@ -1,0 +1,2 @@
+# @package lr_scheduler
+_target_: core.training.schedules.constant

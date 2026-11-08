@@ -43,7 +43,7 @@ def test_all_presets_resolve(method, tmp_path):
 
 
 def test_editable_config_and_run_isolation(tmp_path):
-    cfg = compose("gaussian_diffusion_sudoku", {"sampler": "heun"})
+    cfg = compose("gaussian_diffusion_sudoku", {"inference/sampler": "heun"})
     assert cfg.sampler._target_.endswith("HeunSampler")
     cfg.model.hidden_size = 96
     spec = {"config": OmegaConf.to_container(cfg, resolve=False)}

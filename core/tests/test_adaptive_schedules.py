@@ -157,7 +157,7 @@ def test_hydra_schedule_configs(name):
     with initialize_config_dir(
         version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
     ):
-        config = compose(config_name="config", overrides=[f"noise_schedule={name}"])
+        config = compose(config_name="config", overrides=[f"information_path/noise_schedule={name}"])
         schedule = instantiate(config.noise_schedule)
     assert schedule.loss_signal == (
         "cross_entropy" if name.startswith("cdcd") else "objective"
@@ -213,8 +213,8 @@ def test_gaussian_base_is_a_replaceable_hydra_group():
         config = compose(
             config_name="config",
             overrides=[
-                "noise_schedule=sflm_gaussian_adaptive",
-                "noise_schedule@noise_schedule.base=linear_interpolation",
+                "information_path/noise_schedule=sflm_gaussian_adaptive",
+                "information_path/noise_schedule@noise_schedule.base=linear_interpolation",
             ],
         )
     schedule = instantiate(config.noise_schedule)

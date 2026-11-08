@@ -1,5 +1,0 @@
-# @package _global_
-defaults:
-- override /hybrid_view@model.views.content: masked
-preparation:
-  content_name: masked

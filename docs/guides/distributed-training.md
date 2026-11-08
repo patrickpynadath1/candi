@@ -6,7 +6,7 @@ Training-time samplers receive rank and accumulation context. Adaptive schedules
 with distributed feedback gather observations in their own implementations.
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1 uv run python main.py strategy=ddp \
+CUDA_VISIBLE_DEVICES=0,1 uv run python main.py training/strategy=ddp \
   trainer.devices=2 loader.global_batch_size=256 trainer.accumulate_grad_batches=4
 ```
 
@@ -20,10 +20,10 @@ including the unused time embedder retained by some baseline architectures.
 | Selection | Behavior |
 | --- | --- |
 | No strategy group | Uses `trainer.strategy`, which defaults to `auto`. |
-| `strategy=ddp` | Explicit Lightning DDP with `find_unused_parameters=true`. |
-| `strategy=single_cpu` | Single-device CPU strategy; also select `trainer.accelerator=cpu`. |
-| `strategy=single_gpu` | Single-device `cuda:0`, relative to visible devices. |
-| `strategy=fsdp` | Restricted FSDP path described below. |
+| `training/strategy=ddp` | Explicit Lightning DDP with `find_unused_parameters=true`. |
+| `training/strategy=single_cpu` | Single-device CPU strategy; also select `trainer.accelerator=cpu`. |
+| `training/strategy=single_gpu` | Single-device `cuda:0`, relative to visible devices. |
+| `training/strategy=fsdp` | Restricted FSDP path described below. |
 
 An explicitly selected `strategy` group takes precedence over `trainer.strategy`.
 The older `trainer.strategy=ddp` override remains supported. Match the accelerator,
@@ -39,7 +39,7 @@ not distributed generation. Standalone evaluation also uses one
 ## Restricted FSDP
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1 uv run python main.py strategy=fsdp \
+CUDA_VISIBLE_DEVICES=0,1 uv run python main.py training/strategy=fsdp \
   trainer.devices=2 training.ema=0 callback.every_n_steps=0 \
   trainer.gradient_clip_val=0
 ```

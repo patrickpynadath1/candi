@@ -4,6 +4,6 @@
 # damping heuristics are not reproduced. This is distinct from geodesic S-FLM.
 defaults:
 - corruption_factorial
-- override /hybrid_view@model.views.content: vmf
-- override /sampler: vmf_predictor_corrector
+- override /information_path/hybrid_view@model.views.content: vmf
+- override /inference/sampler: vmf_predictor_corrector
 - _self_

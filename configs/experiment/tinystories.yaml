@@ -1,7 +1,7 @@
 # @package _global_
 defaults:
 - override /task: tinystories
-- override /sampler: ancestral
+- override /inference/sampler: ancestral
 model:
   hidden_size: 256
   cond_dim: 128

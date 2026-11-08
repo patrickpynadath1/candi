@@ -10,7 +10,7 @@ as training; a checkpoint does not automatically reconstruct its recipe for you.
 ```bash
 uv run python main.py mode=evaluate \
   evaluation.checkpoint=/absolute/path/to/mdlm_sudoku.ckpt \
-  sampler=entropy_bounded sampler.entropy_bound=0.1 \
+  inference/sampler=entropy_bounded sampler.entropy_bound=0.1 \
   hydra.run.dir=core/outputs/evaluation
 ```
 
@@ -38,7 +38,7 @@ have task-specific evaluation sample-count settings.
 ```bash
 uv run python main.py mode=evaluate \
   evaluation.checkpoint=/absolute/path/to/mdlm_sudoku.ckpt \
-  sampler=ancestral sampler.steps=180 parameterization.temperature=0.9
+  inference/sampler=ancestral sampler.steps=180 parameterization.temperature=0.9
 ```
 
 Sampler choices must match the method's process and predictor. Posterior inference

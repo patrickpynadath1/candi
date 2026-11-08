@@ -75,7 +75,7 @@ def test_one_tiny_case_runs_through_nested_tuning_and_analysis(tmp_path):
                                 "score": {"kind": "metric", "metric": "accuracy"}, "direction": "maximize"}))
     plan = tmp_path / "plan"
     assert prepare(
-        plan, "task=battery/sudoku_hard", "block=encoder1_decoder8",
+        plan, "task=battery/sudoku_hard", "denoising_task/block=encoder1_decoder8",
         f"preparation.evaluation_file={spec}", "preparation.evaluation.nfe=12",
         "preparation.local.resources_per_job={cpu:1,gpu:0}",
         f"data.cache_dir={tmp_path / 'data'}", "data.num_train=4", "data.num_valid=2",

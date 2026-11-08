@@ -139,8 +139,8 @@ def test_representation_requirements_and_hydra_base():
         config = compose(
             config_name="config",
             overrides=[
-                "noise_schedule=rescaled_gaussian",
-                "noise_schedule@noise_schedule.base=exponential_ve",
+                "information_path/noise_schedule=rescaled_gaussian",
+                "information_path/noise_schedule@noise_schedule.base=exponential_ve",
                 "noise_schedule.path_type=linear",
             ],
         )

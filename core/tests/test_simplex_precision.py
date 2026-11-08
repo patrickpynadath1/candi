@@ -224,9 +224,9 @@ def test_hybrid_config_preserves_fp32_prompt_clamping(preset):
 
     root = Path(__file__).resolve().parents[2]
     view = (
-        OmegaConf.load(root / "configs/hybrid_view/simplex.yaml")
+        OmegaConf.load(root / "configs/information_path/hybrid_view/simplex.yaml")
         if preset == "view"
-        else OmegaConf.load(root / "configs/model/hybrid_uniform_simplex.yaml").views[1]
+        else OmegaConf.load(root / "configs/denoising_task/model/hybrid_uniform_simplex.yaml").views[1]
     )
     config = OmegaConf.create(
         {

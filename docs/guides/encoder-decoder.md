@@ -67,7 +67,7 @@ case zero depth means the adapter's clean input representation, not necessarily 
 vocabulary embedding lookup.
 
 The [block-encoder-decoder](../../experiments/block-encoder-decoder/README.md) example
-trains it (`block=raw_context`) next to the E2D2 depth arms, with the same training
+trains it (`denoising_task/block=raw_context`) next to the E2D2 depth arms, with the same training
 and validation-only sampler tuning.
 
 ### Query-dependent mixtures of actual encoder K/V

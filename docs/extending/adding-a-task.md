@@ -57,7 +57,7 @@ that own data and token-space selections can use this pattern:
 ```yaml
 defaults:
   - /data@_global_.data: my_data
-  - /token_space@_global_.token_space: append_mask
+  - /information_path/token_space@_global_.token_space: append_mask
   - _self_
 _target_: core.tasks.my_task.MyTask
 data: ${data}
@@ -68,7 +68,7 @@ length: 128
 This is an illustrative new task, not a shipped config. Create the referenced
 `data` option and choose the actual vocabulary/token-space policy. A native mask
 or no-mask method may require a different token-space config. Keep the generic
-`datamodule=task`, `evaluator=generation`, and `callback=task` when applicable.
+`training/datamodule=task`, `inference/evaluator=generation`, and `training/callback=task` when applicable.
 
 ## Test the boundaries
 

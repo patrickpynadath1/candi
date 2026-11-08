@@ -15,7 +15,7 @@ def views(algo, sampler):
     require(
         hasattr(algo, "views") and hasattr(algo, "points"),
         f"{sampler} samples diffusion recipes on the view path; "
-        "autoregressive models use sampler=autoregressive",
+        "autoregressive models use inference/sampler=autoregressive",
     )
 
 

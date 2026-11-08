@@ -104,7 +104,7 @@ def test_runner_train_evaluate(tmp_path, insertion, use_bpe):
                 "task.prompt_bytes=4",
                 "output_dir=/tmp/stories_smoke",
                 "data.cache_dir=/tmp/stories_smoke_cache",
-                *([] if insertion else ["sampler=ancestral"]),
+                *([] if insertion else ["inference/sampler=ancestral"]),
             ],
         )
     if use_bpe:

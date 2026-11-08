@@ -19,7 +19,7 @@ A time warp changes how quickly a base path is traversed. In a hybrid view,
 `time_map` maps the global clock to the local schedule's clock. A fixed analytical
 warp and a loss-adaptive clock are different choices.
 
-[`configs/time_map/cdcd.yaml`](../../configs/time_map/cdcd.yaml) configures a
+[`configs/information_path/time_map/cdcd.yaml`](../../configs/information_path/time_map/cdcd.yaml) configures a
 loss-adaptive view clock for Gaussian, simplex, spherical, and blurring recipes.
 It observes detached, masked per-example training cross-entropy, fits a monotone
 mapping, and saves its state in the model checkpoint. Validation does not refit

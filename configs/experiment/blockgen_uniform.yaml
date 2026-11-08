@@ -5,10 +5,10 @@
 # remaining limitations and per-block NFE accounting.
 defaults:
 - blockgen_common
-- override /algorithm: uniform_diffusion
-- override /parameterization: plug_in
-- override /process: uniform
-- override /objective: uniform
-- override /sampler: uniform_ancestral
-- override /token_space@token_space: data_only
+- override /denoising_task/algorithm: uniform_diffusion
+- override /denoising_task/parameterization: plug_in
+- override /information_path/process: uniform
+- override /denoising_task/objective: uniform
+- override /inference/sampler: uniform_ancestral
+- override /information_path/token_space@token_space: data_only
 - _self_

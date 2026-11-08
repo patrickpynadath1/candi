@@ -12,7 +12,7 @@ the question is which one is worth making deeper.
 
 One protocol for all 27 cases: the one the published (AMD MI210) runs used.
 
-**Models** (`configs/block/`, one option per model), each at width 512, 8 heads:
+**Models** (`configs/denoising_task/block/`, one option per model), each at width 512, 8 heads:
 
 | `block=` | Model | Encoder layers | Decoder layers |
 | --- | --- | ---: | ---: |
@@ -83,7 +83,7 @@ uv run --locked --extra scoring python experiments/block-encoder-decoder/analyze
   $SDDC_STORAGE_ROOT/runs/block-encoder-decoder --output results/
 ```
 
-One model on one task: add `task=battery/text8 block=encoder1_decoder8` to the prepare
+One model on one task: add `task=battery/text8 denoising_task/block=encoder1_decoder8` to the prepare
 command.
 
 ## Cost

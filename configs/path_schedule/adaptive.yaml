@@ -1,5 +1,0 @@
-# @package _global_
-defaults:
-- /time_map@model.views.content.time_map: cdcd
-preparation:
-  schedule_name: adaptive

@@ -5,8 +5,8 @@
 # Confidence sampling reuses our global entropy policy; no windowed decoding.
 defaults:
 - insertion_continuous
-- override /hybrid_view@model.views.content: masked
-- override /sampler: insertion_entropy_bounded
+- override /information_path/hybrid_view@model.views.content: masked
+- override /inference/sampler: insertion_entropy_bounded
 - _self_
 
 model:

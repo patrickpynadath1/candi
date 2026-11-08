@@ -29,20 +29,20 @@ A prompt mask fixes tokens regardless of whether they appear in a training loss.
 | `hybrid`, `hybrid_entropy_bounded` | Shared posterior feeding multiple branch updates |
 | `autoregressive`, `permuted_autoregressive` | Incremental causal decoding with KV cache |
 
-See [configs](../../configs/sampler/) and [implementations](../../core/samplers/).
+See [configs](../../configs/inference/sampler/) and [implementations](../../core/samplers/).
 Choose a matching experiment first: an arbitrary sampler switch is not a proof of
 mathematical compatibility.
 
 ## Discrete Flow Matching
 
-`sampler=dfm` configures `ComposedSampler` with ordinary token selection and a
+`inference/sampler=dfm` configures `ComposedSampler` with ordinary token selection and a
 `DiscreteFlowTransition`; it adds no sampling loop or training objective.
 Use the shared single-view/parallel-view assembly with a masked or posterior-CE
 uniform process:
 
 ```bash
 uv run python main.py +experiment=corruption_factorial \
-  hybrid_view@model.views.content=masked sampler=dfm \
+  information_path/hybrid_view@model.views.content=masked inference/sampler=dfm \
   sampler.steps=127 sampler.final_denoise=sample
 # Replace masked with uniform for the posterior-CE uniform path.
 ```
@@ -155,7 +155,7 @@ interchangeability between those processes.
 
 ### Forward resampling
 
-`sampler=forward_resampling` uses one update rule for all fixed-length recipes
+`inference/sampler=forward_resampling` uses one update rule for all fixed-length recipes
 built with the single-view/parallel-view algorithm interface. At each time step
 it samples a clean token sequence from the model's predicted posterior and draws
 fresh noise from each view's forward kernel at the destination time. Hybrid
@@ -218,7 +218,7 @@ absorbing states masked until acceptance, and forward-corrupting released
 continuous commitments are explicit transition options. This distinction
 preserves EB's behavior even when clean token selection is greedy.
 
-For example, `sampler=composed` selects forward resampling:
+For example, `inference/sampler=composed` selects forward resampling:
 
 ```yaml
 sampler:
@@ -235,7 +235,7 @@ sampler:
   final_denoise: greedy
 ```
 
-`sampler=random_commitment` uses EB-style reverse updates but accepts one
+`inference/sampler=random_commitment` uses EB-style reverse updates but accepts one
 uniformly sampled active position per example per step. Change
 `sampler.positions.count` to accept more, `sampler.tokens.mode` to switch between
 sampling and greedy, or `sampler.commitment` to change persistence. Random
@@ -258,5 +258,5 @@ pre-refactor seeded outputs, noisy-state traces, RNG states, and metadata across
 The alternative [vMF spherical path](../methods/vmf-spherical-flows.md) uses a
 posterior-weighted tangent Euler update in the shared sampler. Optional
 `SphericalLangevinCorrector` steps run fresh predictions after each predictor
-and contribute to reported NFE. Select `sampler=vmf_predictor_corrector` for the
+and contribute to reported NFE. Select `inference/sampler=vmf_predictor_corrector` for the
 predictor-corrector preset; the ordinary `hybrid` sampler uses only the predictor.

@@ -7,7 +7,7 @@ algorithm. Config composition is described in [configuration](../concepts/config
 ```bash
 uv run python main.py
 uv run python main.py +experiment=smoke
-uv run python main.py +experiment=openwebtext lr_scheduler=cosine_decay_warmup
+uv run python main.py +experiment=openwebtext training/lr_scheduler=cosine_decay_warmup
 ```
 
 The default is MDLM on Sudoku hard: 200,000 training puzzles, 10,000 validation
@@ -44,13 +44,13 @@ Learning-rate scheduling is independent of diffusion noise scheduling:
 
 | Selection | Behavior |
 | --- | --- |
-| `lr_scheduler=constant_warmup` | Default: linear warmup from zero, then constant. Uses `training.warmup_steps`. |
-| `lr_scheduler=constant` | Fixed LR from the first optimizer step. |
-| `lr_scheduler=step_scheduler` | Warmup then halving every `lr_scheduler.n_halve_steps`; defaults 500/10,000 steps. |
-| `lr_scheduler=cosine_decay_warmup` | Linear warmup then one cosine decay to an absolute floor. |
+| `training/lr_scheduler=constant_warmup` | Default: linear warmup from zero, then constant. Uses `training.warmup_steps`. |
+| `training/lr_scheduler=constant` | Fixed LR from the first optimizer step. |
+| `training/lr_scheduler=step_scheduler` | Warmup then halving every `lr_scheduler.n_halve_steps`; defaults 500/10,000 steps. |
+| `training/lr_scheduler=cosine_decay_warmup` | Linear warmup then one cosine decay to an absolute floor. |
 
 ```bash
-uv run python main.py lr_scheduler=cosine_decay_warmup \
+uv run python main.py training/lr_scheduler=cosine_decay_warmup \
   trainer.max_steps=20000 lr_scheduler.warmup_steps=2000
 ```
 

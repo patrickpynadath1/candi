@@ -1,0 +1,28 @@
+# @package model
+# Token DiT. Time conditioning (AdaLN) is off by default; model.time.adaLN=true turns
+# it on in the time embedding, every block and the output head together.
+defaults:
+- input: token
+- output: adaln
+- _self_
+_target_: core.models.modular.ModularDiT
+vocab_size: ${token_space.model_vocab_size}
+hidden_size: 512
+cond_dim: 128
+n_blocks: 8
+n_heads: 8
+dropout: 0.1
+tie_word_embeddings: false
+block_adaLN: ${.time.adaLN}
+time:
+  _target_: core.models.modular.TimeConditioning
+  _partial_: true
+  coordinate: time
+  adaLN: false
+output:
+  adaLN: ${..time.adaLN}
+self_conditioning:
+  _target_: core.models.modular.SelfConditioning
+  _partial_: true
+  enabled: ${self_conditioning.enabled}
+  source: ${self_conditioning.source}

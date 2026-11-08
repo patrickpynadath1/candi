@@ -23,7 +23,7 @@ def test_plugin_bootstrap_and_sampling_feedback(source, sampler):
             "self_conditioning.enabled": True,
             "self_conditioning.source": source,
             "self_conditioning.probability": 1.0,
-            "sampler": sampler,
+            "inference/sampler": sampler,
             "parameterization.temperature": 0.1,
             "parameterization.top_k": 1,
         },

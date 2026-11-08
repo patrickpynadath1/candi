@@ -3,5 +3,5 @@
 # ELBO components and marginal reverse update; not dynamic GIDD+ weighting.
 defaults:
 - gidd_corruption
-- override /objective: gidd_elbo
+- override /denoising_task/objective: gidd_elbo
 - _self_

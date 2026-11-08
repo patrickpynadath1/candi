@@ -1,7 +1,7 @@
 # @package _global_
 # Geodesic spherical flow (S-FLM), with learned unit-normalized embeddings.
 defaults:
-- /path_schedule: adaptive
-- override /hybrid_view@model.views.content: spherical
+- /information_path/path_schedule: adaptive
+- override /information_path/hybrid_view@model.views.content: spherical
 preparation:
   path_name: spherical

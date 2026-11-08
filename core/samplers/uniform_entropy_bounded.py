@@ -44,7 +44,7 @@ class UniformEntropyBoundedSampler:
         if views and len(algo.views) != 1:
             raise TypeError(
                 "UniformEntropyBoundedSampler drives one-view uniform algorithms; "
-                "for parallel views use sampler=parallel_entropy_bounded"
+                "for parallel views use inference/sampler=parallel_entropy_bounded"
             )
         algo = prediction_session(algo)
         state = initialize_uniform(algo, prompt_tokens, prompt_mask)

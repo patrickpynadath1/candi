@@ -63,7 +63,7 @@ class SeddAbsorb(OneViewAlgorithm, HybridDiffusion):
         if getattr(rule, "prediction_pathway", "posterior") != self.prediction_pathway:
             raise TypeError(
                 f"{type(sampler).__name__} requires PosteriorParameterization; "
-                "SEDD log scores need a score sampler (sampler=analytic)"
+                "SEDD log scores need a score sampler (inference/sampler=analytic)"
             )
         return super().generate(sampler, prompt_tokens, prompt_mask)
 

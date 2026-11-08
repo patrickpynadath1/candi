@@ -2,7 +2,7 @@
 # MDLM core recipe: https://arxiv.org/abs/2406.07524
 # Uses the shared masked model and weighted CE; budgets/backbone are local defaults.
 defaults:
-- override /sampler: ancestral
+- override /inference/sampler: ancestral
 - _self_
 # Keep DiT's learned modulation/gates even when MDLM receives constant time.
 model:

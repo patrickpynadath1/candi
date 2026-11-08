@@ -1,0 +1,7 @@
+# @package sampler
+_target_: core.samplers.simplex.SimplexBridgeSampler
+steps: 180
+churn: 1.0
+time_grid: linear
+guidance_scale: null
+confidence_power: null

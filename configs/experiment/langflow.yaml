@@ -5,8 +5,8 @@
 # reference training details. Gumbel fitting uses our detached SGD update.
 defaults:
 - gaussian_base
-- override /representation: embedding
-- override /noise_schedule: gumbel
+- override /information_path/representation: embedding
+- override /information_path/noise_schedule: gumbel
 - _self_
 self_conditioning:
   enabled: true

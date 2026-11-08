@@ -1,8 +1,8 @@
 # @package _global_
 defaults:
-- /generation_order: random
-- override /algorithm: permuted_autoregressive
-- override /model: causal_dit
-- override /parameterization: autoregressive
-- override /objective: cross_entropy
-- override /sampler: permuted_autoregressive
+- /inference/generation_order: random
+- override /denoising_task/algorithm: permuted_autoregressive
+- override /denoising_task/model: causal_dit
+- override /denoising_task/parameterization: autoregressive
+- override /denoising_task/objective: cross_entropy
+- override /inference/sampler: permuted_autoregressive

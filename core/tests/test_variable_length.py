@@ -245,7 +245,7 @@ def test_other_view_processes_use_same_structural_sampler(kind):
             config_name="config",
             overrides=[
                 "+experiment=insertion_continuous",
-                f"hybrid_view@model.views.content={kind}",
+                f"information_path/hybrid_view@model.views.content={kind}",
                 "model.hidden_size=16",
                 "model.n_heads=2",
                 "model.n_blocks=1",

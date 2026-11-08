@@ -1,0 +1,3 @@
+# @package noise_schedule
+_target_: core.noise_schedules.log_linear.LogLinear
+epsilon: 0.001

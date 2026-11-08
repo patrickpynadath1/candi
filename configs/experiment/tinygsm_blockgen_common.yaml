@@ -3,7 +3,7 @@
 # Shared by tinygsm_blockgen_masked and tinygsm_blockgen_uniform.
 defaults:
 - tinygsm
-- override /lr_scheduler: constant_warmup
+- override /training/lr_scheduler: constant_warmup
 - _self_
 seed: 1
 data:

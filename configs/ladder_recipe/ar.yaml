@@ -4,7 +4,7 @@
 defaults:
 - /experiment: autoregressive
 - /sweep/common
-- /inference_policies: autoregressive
+- /inference/inference_policies: autoregressive
 - _self_
 model:
   n_blocks: 8

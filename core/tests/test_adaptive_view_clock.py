@@ -24,7 +24,7 @@ def test_adaptive_clock_training_sampling_and_checkpoint(family):
     view = config.model.views.content
     if family == "gaussian":
         view.schedule = view.schedule.base
-    view.time_map = OmegaConf.load(ROOT / "configs/time_map/cdcd.yaml")
+    view.time_map = OmegaConf.load(ROOT / "configs/information_path/time_map/cdcd.yaml")
     view.time_map.clock.buffer_size = 64
     view.time_map.clock.warmup_steps = 0
     view.time_map.clock.refit_every = 1

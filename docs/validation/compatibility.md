@@ -70,7 +70,7 @@ training step and samples three steps on CPU from a one-token prompt.
 18. continuous sampling requires PosteriorParameterization
 19. Gaussian DDPM requires a Gaussian process; UniformProcess has no reverse_posterior
 20. simplex bridge sampling requires a Dirichlet process; UniformProcess has no drop_condition
-21. this sampler requires PosteriorParameterization; SEDD log scores need a score sampler (sampler=analytic)
+21. this sampler requires PosteriorParameterization; SEDD log scores need a score sampler (inference/sampler=analytic)
 22. entropy-bounded sampling needs a posterior that excludes the mask token (parameterization.mask_index); this recipe's posterior can choose it
 23. continuous sampling requires a Gaussian process; this recipe (no single process) has no reverse_vector_field
 24. Gaussian DDPM requires a Gaussian process; this recipe (no single process) has no reverse_posterior
@@ -90,15 +90,15 @@ training step and samples three steps on CPU from a one-token prompt.
 38. Gaussian DDPM requires a Gaussian process; BlurringProcess has no reverse_posterior
 39. a sequence-aware schedule requires a corruption mask
 40. simplex bridge sampling requires a Dirichlet process; BlurringProcess has no drop_condition
-41. UniformEntropyBoundedSampler drives one-view uniform algorithms; for parallel views use sampler=parallel_entropy_bounded
+41. UniformEntropyBoundedSampler drives one-view uniform algorithms; for parallel views use inference/sampler=parallel_entropy_bounded
 42. ancestral sampling requires a discrete process; this recipe (no single process) has no reverse
-43. ComposedSampler samples diffusion recipes on the view path; autoregressive models use sampler=autoregressive
+43. ComposedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
 44. entropy-bounded sampling requires a absorbing process; this recipe (no single process) has no reverse
-45. ForwardResamplingSampler samples diffusion recipes on the view path; autoregressive models use sampler=autoregressive
-46. HybridSampler samples diffusion recipes on the view path; autoregressive models use sampler=autoregressive
-47. CANDIEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use sampler=autoregressive
-48. MaskedHybridEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use sampler=autoregressive
-49. ParallelEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use sampler=autoregressive
+45. ForwardResamplingSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+46. HybridSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+47. CANDIEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+48. MaskedHybridEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+49. ParallelEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
 50. uniform ancestral sampling requires a uniform process; this recipe (no single process) has no reverse
 51. uniform entropy-bounded sampling requires a uniform process; this recipe (no single process) has no reverse
 52. PermutedAutoregressive.sampling_prediction() missing 2 required keyword-only arguments: 'key_position_ids' and 'query_position_ids'

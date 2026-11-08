@@ -21,7 +21,7 @@ def configuration():
             config_name="config",
             overrides=[
                 "+experiment=gaussian_diffusion_embedding_sudoku",
-                "noise_schedule=linear_interpolation",
+                "information_path/noise_schedule=linear_interpolation",
                 "model.hidden_size=16",
                 "model.n_heads=2",
                 "model.n_blocks=1",
@@ -32,7 +32,7 @@ def configuration():
                 "representation.dimension=8",
                 "representation.trainable=true",
                 "parameterization.softcap=2",
-                "objective=cross_entropy_learned",
+                "denoising_task/objective=cross_entropy_learned",
                 "objective.label_smoothing=0.1",
                 "objective.weighting.cond_dim=8",
                 "objective.weighting.hidden_dim=8",

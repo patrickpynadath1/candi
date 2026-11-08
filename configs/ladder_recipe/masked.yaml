@@ -4,9 +4,9 @@ defaults:
 - /experiment: corruption_factorial
 - /sweep/common
 - /ablation_path: masked
-- /feedback: none
-- /inference_policies: hybrid_renoising
-- override /objective: masked_elbo
+- /modifiers/feedback: none
+- /inference/inference_policies: hybrid_renoising
+- override /denoising_task/objective: masked_elbo
 - _self_
 preparation:
   recipe_name: ${preparation.path_name}-${preparation.feedback_name}

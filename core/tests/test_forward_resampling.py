@@ -35,8 +35,8 @@ def test_pure_and_hybrid_forward_resampling(family, source, device):
             config_name="config",
             overrides=[
                 "+experiment=corruption_factorial",
-                f"hybrid_view@model.views.content={family}",
-                "sampler=forward_resampling",
+                f"information_path/hybrid_view@model.views.content={family}",
+                "inference/sampler=forward_resampling",
                 "sampler.steps=3",
                 "model.hidden_size=16",
                 "model.n_heads=2",
@@ -57,7 +57,7 @@ def test_pure_and_hybrid_forward_resampling(family, source, device):
             OmegaConf.update(
                 cfg,
                 "model.views.discrete",
-                OmegaConf.load("configs/hybrid_view/uniform.yaml"),
+                OmegaConf.load("configs/information_path/hybrid_view/uniform.yaml"),
                 force_add=True,
             )
         algo = instantiate(cfg.algorithm).to(device).eval()

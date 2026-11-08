@@ -1,0 +1,21 @@
+# @package hybrid_view
+defaults:
+- /information_path/noise_schedule@schedule: linear_interpolation
+_target_: core.modifiers.hybrid.views.DiffusionView
+process:
+  _target_: core.processes.pca_blurring.PCABlurringProcess
+  strength: 3.0
+  ridge: 1.0e-6
+representation:
+  _target_: core.representations.noisy_inputs.ProjectedRepresentation
+  state_dim: 128
+  hidden_size: ${model.hidden_size}
+  precondition: false
+  state_representation:
+    _target_: core.representations.embedding.EmbeddingRepresentation
+    vocab_size: ${task.vocab_size}
+    dimension: 128
+    trainable: true
+    unit_normalized: true
+# Only forward-renoising inference is supported; no plug-in Gaussian reverse rule.
+update: null

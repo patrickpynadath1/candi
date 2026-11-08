@@ -1,17 +1,17 @@
 # @package _global_
 defaults:
-- override /algorithm: replaid
-- override /representation: embedding
-- override /model: continuous_dit
-- override /model/input: linear
-- override /model/output: adaln
-- override /parameterization: gaussian_prior
-- override /process: gaussian
-- override /noise_schedule: plaid_log_snr
-- override /time_sampler: adaptive_allocation
-- override /objective: replaid
-- override /sampler: gaussian_ddpm
-- override /token_space@token_space: data_only
+- override /denoising_task/algorithm: replaid
+- override /information_path/representation: embedding
+- override /denoising_task/model: continuous_dit
+- override /denoising_task/model/input@model.input: linear
+- override /denoising_task/model/output@model.output: adaln
+- override /denoising_task/parameterization: gaussian_prior
+- override /information_path/process: gaussian
+- override /information_path/noise_schedule: plaid_log_snr
+- override /denoising_task/time_sampler: adaptive_allocation
+- override /denoising_task/objective: replaid
+- override /inference/sampler: gaussian_ddpm
+- override /information_path/token_space@token_space: data_only
 representation:
   dimension: 16
   trainable: true

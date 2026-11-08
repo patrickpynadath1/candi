@@ -101,7 +101,7 @@ see [remote execution](docs/guides/remote-execution.md).
 | Path | Contents |
 | --- | --- |
 | `core/` | the library: algorithms, models, processes, schedules, samplers, modifiers, tasks, training, sweeps, analysis, tests |
-| `configs/` | Hydra groups for every component, recipe presets (`experiment/`) and sweeps (`sweep/`) |
+| `configs/` | Hydra groups under `information_path/`, `denoising_task/`, `inference/`, `modifiers/` and `training/`, recipe presets (`experiment/`) and sweeps (`sweep/`); see [configs/README.md](configs/README.md) |
 | `experiments/` | the worked examples |
 | `docs/` | concepts, component references, guides; start at [docs/index.md](docs/index.md) |
 | `main.py`, `frontier.py` | train/evaluate/sample, and pretrained sampling grids |

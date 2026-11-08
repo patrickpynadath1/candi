@@ -1,0 +1,5 @@
+# @package sampler
+_target_: core.samplers.ancestral.AncestralSampler
+steps: 180
+epsilon: 1.0e-05
+final_denoise: greedy

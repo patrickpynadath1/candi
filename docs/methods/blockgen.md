@@ -14,7 +14,7 @@ added. Reference code: [jdeschena/blockgen at 6f52b0d](https://github.com/jdesch
 The uniform preset is deliberately **not** posterior CE. The masked preset uses
 CE during both training and validation; the reference switches validation to the
 masked ELBO. Consequently, do not report its `val/nll` as a paper-matched ELBO.
-Changing `objective=weighted_ce` changes both training and validation rather than
+Changing `denoising_task/objective=weighted_ce` changes both training and validation rather than
 reproducing that switch.
 
 Both use block size 16 by default, token-causal clean-stream attention

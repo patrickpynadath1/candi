@@ -3,8 +3,8 @@
 # Base CTMC probability-velocity update; no divergence-free corrector.
 defaults:
 - corruption_factorial
-- override /hybrid_view@model.views.content: uniform
-- override /sampler: dfm
+- override /information_path/hybrid_view@model.views.content: uniform
+- override /inference/sampler: dfm
 - _self_
 sampler:
   final_denoise: sample

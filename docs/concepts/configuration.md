@@ -14,11 +14,11 @@ root with uv.
 
 ```bash
 uv run python main.py --cfg job
-uv run python main.py sampler=ancestral sampler.steps=180 --cfg job
+uv run python main.py inference/sampler=ancestral sampler.steps=180 --cfg job
 uv run python main.py +experiment=gaussian_diffusion_sudoku --cfg job
 ```
 
-A config group such as `sampler=ancestral` selects `configs/sampler/ancestral.yaml`.
+A config group such as `inference/sampler=ancestral` selects `configs/inference/sampler/ancestral.yaml`.
 Scalar overrides change fields of the selected config. `+experiment=...` appends
 an experiment to the defaults list; experiment files use the global package to
 select compatible components and override training/model settings.
@@ -30,7 +30,7 @@ configuration. The runner shares one instantiated Task with the data module and
 periodic task-evaluation callback.
 
 Prefer a complete experiment recipe when switching mathematical families.
-`algorithm=gaussian_diffusion` alone does not automatically replace an absorbing
+`denoising_task/algorithm=gaussian_diffusion` alone does not automatically replace an absorbing
 process, discrete model, or incompatible sampler. Independently selecting a task
 also requires checking vocabulary, sequence length, and model memory needs.
 

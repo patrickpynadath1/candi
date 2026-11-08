@@ -17,7 +17,7 @@ An absorbing process keeps a clean token with probability $a(t)$ and otherwise r
 
 ```bash
 uv run python main.py +experiment=sudoku_hard
-uv run python main.py +experiment=sudoku_hard sampler=ancestral
+uv run python main.py +experiment=sudoku_hard inference/sampler=ancestral
 ```
 
 Sampling temperature, top-k, top-p, and commitment belong to the [predictor](../components/predictors.md); they are excluded from the training pathway. MDLM defaults to no model time conditioning. The entropy-bounded sampler evaluates entropy before greedy commitment.
@@ -39,7 +39,7 @@ The posterior implementation evaluates this in O(V), handles the uniform-noise e
 
 ```bash
 uv run python main.py +experiment=uniform_posterior
-uv run python main.py +experiment=uniform_posterior sampler=uniform_entropy_bounded
+uv run python main.py +experiment=uniform_posterior inference/sampler=uniform_entropy_bounded
 uv run python main.py +experiment=uniform_diffusion
 ```
 

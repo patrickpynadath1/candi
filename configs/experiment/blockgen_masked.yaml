@@ -6,9 +6,9 @@
 # See blockgen_common.yaml for missing mixture/ARPC components and NFE accounting.
 defaults:
 - blockgen_common
-- override /algorithm: mdlm
-- override /parameterization: posterior
-- override /process: absorbing
-- override /objective: cross_entropy
-- override /sampler: ancestral
+- override /denoising_task/algorithm: mdlm
+- override /denoising_task/parameterization: posterior
+- override /information_path/process: absorbing
+- override /denoising_task/objective: cross_entropy
+- override /inference/sampler: ancestral
 - _self_

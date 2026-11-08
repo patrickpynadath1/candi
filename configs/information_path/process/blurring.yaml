@@ -1,0 +1,2 @@
+# @package process
+_target_: core.processes.blurring.BlurringProcess

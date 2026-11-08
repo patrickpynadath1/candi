@@ -1,8 +1,8 @@
 # @package _global_
 defaults:
 - maze
-- override /variable_length: insertion
-- override /sampler: insertion
+- override /modifiers/variable_length: insertion
+- override /inference/sampler: insertion
 - _self_
 task:
   variable_length: true

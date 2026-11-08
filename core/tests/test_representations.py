@@ -67,20 +67,20 @@ def test_representation_operations_and_trainable_geometry():
 @pytest.mark.parametrize(
     "overrides,message",
     [
-        (["representation=embedding"], "representation kind"),
-        (["noise_schedule=embedding_sphere_rank"], "representation kind"),
+        (["information_path/representation=embedding"], "representation kind"),
+        (["information_path/noise_schedule=embedding_sphere_rank"], "representation kind"),
         (
             [
-                "representation=embedding",
-                "noise_schedule=embedding_sphere_rank",
+                "information_path/representation=embedding",
+                "information_path/noise_schedule=embedding_sphere_rank",
                 "noise_schedule.dimension=8",
             ],
             "continuous dimension",
         ),
         (
             [
-                "representation=embedding",
-                "noise_schedule=embedding_sphere_rank",
+                "information_path/representation=embedding",
+                "information_path/noise_schedule=embedding_sphere_rank",
                 "representation.unit_normalized=false",
             ],
             "unit-normalized",
@@ -105,7 +105,7 @@ def test_incompatible_combinations_fail_at_construction(overrides, message):
 )
 @pytest.mark.parametrize("sampler_class", [EulerSampler, HeunSampler, ODESampler])
 def test_real_model_loss_and_all_samplers(representation, schedule, sampler_class):
-    options = [f"representation={representation}", f"noise_schedule={schedule}"]
+    options = [f"information_path/representation={representation}", f"information_path/noise_schedule={schedule}"]
     if representation == "embedding":
         options += ["representation.dimension=7", "representation.trainable=true"]
     algo = instantiate(configuration(*options).algorithm)

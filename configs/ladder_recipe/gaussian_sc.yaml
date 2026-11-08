@@ -2,5 +2,5 @@
 # Gaussian embedding diffusion (CDCD time sampler) with posterior-mean self-conditioning.
 defaults:
 - gaussian
-- override /feedback: expected_embedding
+- override /modifiers/feedback: expected_embedding
 - _self_

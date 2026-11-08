@@ -24,7 +24,7 @@ share of the loss. On the final checkpoints the example measures:
 | | |
 | --- | --- |
 | Grid | {Gaussian embeddings, simplex, spherical, vMF} x {no SC, SC} x {Sudoku-hard, text8, TinyStories BPE-10k} = 24 cases, one training seed |
-| Schedule | CDCD learned clock (`path_schedule=cdcd`) on the continuous view, with the inverse-CDF clamp fix in `core/time_sampling/cdcd.py` |
+| Schedule | CDCD learned clock (`information_path/path_schedule=cdcd`) on the continuous view, with the inverse-CDF clamp fix in `core/time_sampling/cdcd.py` |
 | Backbone | 8 blocks, width 512, 8 heads, AdaLN (the `corruption_factorial` recipe) |
 | Training | 20k steps, batch 256, lr 3e-4 with 2.5k warmup, EMA 0.9999, bf16 |
 | SC | `posterior_mean` (expected embedding of the previous prediction), probability 0.9 |
@@ -36,7 +36,7 @@ share of the loss. On the final checkpoints the example measures:
 
 The splits, scores and task overrides are in `evaluation/<task>.json`. The sweep is
 [`configs/sweep/continuous_schedules.yaml`](../../configs/sweep/continuous_schedules.yaml).
-The samplers are [`configs/inference_policies/hybrid_renoising.yaml`](../../configs/inference_policies/hybrid_renoising.yaml).
+The samplers are [`configs/inference/inference_policies/hybrid_renoising.yaml`](../../configs/inference/inference_policies/hybrid_renoising.yaml).
 The renoising samplers redraw the whole state from the forward kernel at the next time
 after each prediction (`ForwardResamplingSampler`); they are named `renoising` and
 `renoising_greedy` there, and `analyze.py` reports them as `renoise_sample` and

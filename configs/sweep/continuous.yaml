@@ -2,9 +2,9 @@
 defaults:
 - /experiment: corruption_factorial
 - common
-- /content_view: simplex
-- /path_schedule: adaptive
-- /sc: 'off'
+- /information_path/content_view: simplex
+- /information_path/path_schedule: adaptive
+- /modifiers/sc: 'off'
 - override /task: battery/sudoku_hard
 - _self_
 model:
@@ -19,5 +19,5 @@ preparation:
 hydra:
   sweeper:
     params:
-      sc: off,on
-      content_view: simplex,spherical,vmf,blurring
+      modifiers/sc: off,on
+      information_path/content_view: simplex,spherical,vmf,blurring

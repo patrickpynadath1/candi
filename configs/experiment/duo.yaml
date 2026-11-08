@@ -1,17 +1,17 @@
 # @package _global_
 defaults:
-- /calibration@_global_.calibration: duo
-- /curriculum@_global_.curriculum: duo
-- override /algorithm: duo
-- override /model: dit_conditioned
-- override /parameterization: plug_in
-- override /process: uniform
-- override /objective: uniform
-- override /noise_schedule: log_linear
-- override /time_sampler: antithetic
-- override /sampler: uniform_ancestral
-- override /token_space@token_space: data_only
-- override /representation: one_hot
+- /denoising_task/calibration@_global_.calibration: duo
+- /denoising_task/curriculum@_global_.curriculum: duo
+- override /denoising_task/algorithm: duo
+- override /denoising_task/model: dit_conditioned
+- override /denoising_task/parameterization: plug_in
+- override /information_path/process: uniform
+- override /denoising_task/objective: uniform
+- override /information_path/noise_schedule: log_linear
+- override /denoising_task/time_sampler: antithetic
+- override /inference/sampler: uniform_ancestral
+- override /information_path/token_space@token_space: data_only
+- override /information_path/representation: one_hot
 loader:
   global_batch_size: 512
   eval_batch_size: 128

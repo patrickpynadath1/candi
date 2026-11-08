@@ -1,0 +1,2 @@
+# @package noise_schedule
+_target_: core.noise_schedules.linear_interpolation.LinearInterpolationSchedule

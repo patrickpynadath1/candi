@@ -132,7 +132,7 @@ def test_hydra_adaptive_training_sampling_and_resume(family, continuous):
     cfg = config(
         method,
         None,
-        f"noise_schedule={name}",
+        f"information_path/noise_schedule={name}",
         "noise_schedule.buffer_size=4",
         "noise_schedule.refit_every=1",
         "noise_schedule.warmup_steps=0",
@@ -177,7 +177,7 @@ def test_hydra_adaptive_training_sampling_and_resume(family, continuous):
 def test_hydra_score_adaptation_requires_objective_signal():
     from hydra.errors import InstantiationException
 
-    cfg = config("sedd_absorb", None, "noise_schedule=cdcd_adaptive")
+    cfg = config("sedd_absorb", None, "information_path/noise_schedule=cdcd_adaptive")
     with pytest.raises(InstantiationException, match="normalized token predictions"):
         instantiate(cfg.algorithm)
     cfg.noise_schedule.loss_signal = "objective"

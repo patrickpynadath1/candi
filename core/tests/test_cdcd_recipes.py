@@ -59,7 +59,7 @@ def test_geometry_cdcd_training_and_sampling(path, feedback):
         overrides=[
             "+sweep=continuous_schedules",
             f"ablation_path={path}",
-            f"feedback={feedback}",
+            f"modifiers/feedback={feedback}",
         ]
     )
     cfg.model.hidden_size = 32

@@ -3,5 +3,5 @@
 # MDLM training with EB inference; not a new corruption or loss.
 defaults:
 - mdlm
-- override /sampler: entropy_bounded
+- override /inference/sampler: entropy_bounded
 - _self_

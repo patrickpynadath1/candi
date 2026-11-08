@@ -1,0 +1,3 @@
+# @package time_sampler
+_target_: core.time_sampling.adaptive_allocation.AdaptiveTimeAllocation
+momentum: 0.99

@@ -1,7 +1,7 @@
 # @package _global_
 defaults:
 - gaussian_base
-- override /noise_schedule: linear_interpolation
+- override /information_path/noise_schedule: linear_interpolation
 - _self_
 model:
   input:

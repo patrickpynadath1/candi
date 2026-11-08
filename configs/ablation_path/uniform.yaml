@@ -1,5 +1,5 @@
 # @package _global_
 defaults:
-- /content_view: uniform
+- /information_path/content_view: uniform
 preparation:
   path_name: uniform_posterior_ce

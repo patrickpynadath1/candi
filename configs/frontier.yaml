@@ -1,6 +1,6 @@
 defaults:
 - config
-- frontier: sudoku
+- inference/frontier: sudoku
 - _self_
 mode: evaluate
 hydra:

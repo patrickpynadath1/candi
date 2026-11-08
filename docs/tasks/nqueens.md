@@ -98,12 +98,12 @@ made by these aggregate diversity scores; records enable that additional analysi
 OMP_NUM_THREADS=1 python main.py +experiment=smoke task=nqueens \
   data.cache_dir=/tmp/nqueens-smoke-cache output_dir=/tmp/nqueens-smoke \
   callback.every_n_steps=1 callback.subset_size=2 \
-  sampler=ancestral sampler.steps=2
+  inference/sampler=ancestral sampler.steps=2
 
 OMP_NUM_THREADS=1 python main.py +experiment=smoke task=nqueens mode=evaluate \
   data.cache_dir=/tmp/nqueens-smoke-cache output_dir=/tmp/nqueens-smoke-eval \
   evaluation.checkpoint=/tmp/nqueens-smoke/checkpoints/last.ckpt \
-  task.evaluation_mode=unconditional sampler=ancestral sampler.steps=2
+  task.evaluation_mode=unconditional inference/sampler=ancestral sampler.steps=2
 ```
 
 This checks the actual trainer, checkpoint loader and evaluator. It does not test

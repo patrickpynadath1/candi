@@ -1,0 +1,6 @@
+# @package model.output
+# Final AdaLN layer; temperature adds a learned per-token temperature column.
+_target_: core.models.modular.AdaLNHead
+_partial_: true
+adaLN: true
+temperature: false

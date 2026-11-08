@@ -42,7 +42,7 @@ uv run --locked --extra tuning --extra scoring --extra tracking \
 Run several multiruns into the same `preparation.output`, then `collect` once
 after every grid succeeds; it validates the exported cases but cannot know which
 grids you intended to include. CLI overrides can narrow or extend a sweep, for
-example `task=battery/text8 seed=1,2 sc=on`. On the GPU server, prepare through a
+example `task=battery/text8 seed=1,2 modifiers/sc=on`. On the GPU server, prepare through a
 submitted job so manifests contain server paths (see
 [remote execution](remote-execution.md)).
 

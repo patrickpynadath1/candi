@@ -1,0 +1,30 @@
+# @package model
+# DiT over continuous states (Gaussian, blurring, RePlaid): embedded-projection input
+# with Gaussian preconditioning, log(1 - t) time, embedding output head.
+defaults:
+- input: embedded_projection
+- output: embedding
+- _self_
+_target_: core.models.modular.ModularDiT
+vocab_size: ${task.vocab_size}
+state_dim: ${representation.dimension}
+hidden_size: 512
+cond_dim: 128
+n_blocks: 8
+n_heads: 8
+dropout: 0.1
+autocast_cache: false
+time:
+  _target_: core.models.modular.TimeConditioning
+  _partial_: true
+  coordinate: log_one_minus_time
+  epsilon: 1.0e-06
+  input_projection: false
+self_conditioning:
+  _target_: core.models.modular.SelfConditioning
+  _partial_: true
+  enabled: ${self_conditioning.enabled}
+  source: ${self_conditioning.source}
+  space: state
+  initialization: zero
+  scale: 1.0

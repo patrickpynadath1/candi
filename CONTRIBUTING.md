@@ -36,8 +36,8 @@ that recorded them and run only with `SDDC_BYTE_SNAPSHOTS=1`. `docs/validation/c
   **not** swap the matching process, model, schedule or sampler. Copy a verified recipe
   and check it with `--cfg job`. Paper presets are listed in `docs/guides/paper-recipes.md`.
 - Experiment-level groups: `configs/sweep/` (Hydra multirun case expansion for
-  `core.sweeps.prepare`), `configs/ablation_path/`, `configs/feedback/`,
-  `configs/inference_policies/`, `configs/time_map/`. `configs/task/battery/` and the
+  `core.sweeps.prepare`), `configs/ablation_path/`, `configs/modifiers/feedback/`,
+  `configs/inference/inference_policies/`, `configs/information_path/time_map/`. `configs/task/battery/` and the
   `algorithm_definition` block of prepared configs are older names for "task suite" and
   "recipe definition".
 - Shared modifiers are toggled by top-level blocks in `config.yaml`:

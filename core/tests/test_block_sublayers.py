@@ -65,7 +65,7 @@ def test_second_attention_block_gradients_and_cache_guard(adaln):
 @pytest.mark.parametrize("choice", ["mlp", "expanded_attention", "centered_mlp"])
 def test_masked_recipe_second_sublayer_training_and_generation(choice):
     cfg = compose(
-        overrides=["+sweep=sc_vs_depth", "ablation_path=masked_elbo", f"+block_sublayer={choice}"]
+        overrides=["+sweep=sc_vs_depth", "ablation_path=masked_elbo", f"+denoising_task/block_sublayer={choice}"]
     )
     cfg.model.hidden_size = 32
     cfg.model.cond_dim = 16
