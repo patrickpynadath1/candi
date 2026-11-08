@@ -9,8 +9,8 @@ defaults:
 - _self_
 bpe:
   vocabulary_size: 10000
-  # Sequence capacity per vocabulary: every story of the shared cohort fits at
-  # every vocabulary (experiments/tokenizer-ladder/cohort.py).
+  # Sequence capacity per vocabulary: every story of the shared cohort
+  # (data.allowed_ids_path) fits at every vocabulary.
   capacity:
     '260': 1024
     '500': 768
@@ -22,7 +22,9 @@ task:
   calculate_bleu: true
   num_eval_samples: 100000000
 data:
-  allowed_ids_path: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/data_cache/tinystories_bpe/tokenizer-ladder-cohort.json
+  # The story cohort the evaluation indices refer to; build it with
+  # experiments/block-encoder-decoder/prepare_data.py tinystories (see the README).
+  allowed_ids_path: ${data.cache_dir}/allowed_ids.json
 checkpoint:
   every_n_steps: 1000
 preparation:

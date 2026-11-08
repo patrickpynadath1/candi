@@ -19,9 +19,10 @@ same size is the reference. It is the post's "Does the tokenizer change the pict
 
 - **Data.** TinyStories at revision `f54c09fd`. The tokenizers are in
   `artifacts/tokenizers/tinystories-bpe/`. Each story is split into a 64-byte prompt
-  and the continuation the model has to write. Every vocabulary uses the same stories:
-  [`cohort.py`](cohort.py) keeps a story only if it fits the sequence capacity of all
-  five tokenizers, and drops validation stories that also appear in training
+  and the continuation the model has to write. Every vocabulary uses the same stories.
+  The shared TinyStories cohort (`data.allowed_ids_path`, the same file as in
+  [block-encoder-decoder](../block-encoder-decoder/)) keeps a story only if it fits the
+  sequence capacity of all five tokenizers. It also drops validation stories that appear in training
   (1,444,319 training and 13,092 validation stories). The sequence capacity is 1024 tokens
   at 260, 768 at 500 and 512 above (`bpe.capacity` in the sweep).
 - **Models.** An 8-block DiT (hidden size 512, 8 heads, conditioning size 128, AdaLN,
@@ -61,13 +62,15 @@ and `configs/objective/masked_elbo.yaml`.
 export CANDI_STORAGE_ROOT=~/.cache/candi   # or your storage volume
 EXTRAS=(--extra tuning --extra scoring --extra tracking)
 
-# 0. TinyStories parquet shards, then the shared story cohort (prints its sha256;
-#    it must match f16da32a..., or the committed indices point at other stories).
+# 0. TinyStories parquet shards, then the shared story cohort. The script exits
+#    non-zero unless its sha256 is f16da32a..., the cohort the committed indices use.
 huggingface-cli download roneneldan/TinyStories --repo-type dataset \
   --revision f54c09fd23315a6f9c86f9dc80f725de7d8f9c64 --include 'data/*' \
   --local-dir $CANDI_STORAGE_ROOT/tinystories
 export TINYSTORIES_DATA_DIR=$CANDI_STORAGE_ROOT/tinystories/data
-uv run --locked "${EXTRAS[@]}" python experiments/tokenizer-ladder/cohort.py $TINYSTORIES_DATA_DIR
+uv run --locked "${EXTRAS[@]}" python experiments/block-encoder-decoder/prepare_data.py tinystories \
+  --parquet $TINYSTORIES_DATA_DIR \
+  --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 
 # 1. Expand the sweep into 35 cases (no training).
 uv run --locked "${EXTRAS[@]}" python -m core.sweeps.prepare -m \
@@ -185,11 +188,10 @@ a study needs.
   35 cases: training, capacities, objective weighting, SC, time sampler, samplers,
   search spaces, budgets, evaluation indices and seeds. The `data` and `model` blocks
   were compared for the seven recipes at vocabulary 260.
-- **Cohort.** The committed indices point into the cohort's validation split.
-  `cohort.py` reproduces the published rules, and the 256 stored test stories are all in
-  the published cohort and fit every capacity. Its sha256 against the full dataset was
-  not checked here, because the dataset was not downloaded. Check the printed hash
-  before training.
+- **Cohort.** The committed indices point into the cohort's validation split, so
+  `data.allowed_ids_path` (`${data.cache_dir}/allowed_ids.json`) must be the published
+  file. The cohort was not rebuilt here (the dataset was not downloaded); the 256
+  stored test stories are all in the published cohort and fit every capacity.
 - **One seed per cell.** Gaps between methods are often within half a BLEU point.
 - **Two launches, one protocol.** The no-SC cases at 260 to 5000 were launched after
   the others (see `expected.csv` notes). They use the same source, environment, data,

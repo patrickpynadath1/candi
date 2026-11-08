@@ -1,10 +1,11 @@
-"""Tokenizer-ladder example end to end on CPU: cohort, prepare, nested tuning, analysis.
+"""Tokenizer-ladder example end to end on CPU: prepare, nested tuning, analysis.
 
 One tiny case (vocabulary 260, masked ELBO, no self-conditioning) built from a few
 synthetic stories; a fresh local Ray cluster, never an existing one.
 """
 
 import csv
+import hashlib
 import importlib.util
 import json
 import os
@@ -59,10 +60,20 @@ def test_one_tiny_case_prepares_tunes_and_analyzes(tmp_path):
     pytest.importorskip("sacrebleu")
     pytest.importorskip("pyarrow")
     pytest.importorskip("ray")
+    import pyarrow.parquet as pq
+
     write_stories(tmp_path / "parquet")
-    cohort = load("cohort").main([str(tmp_path / "parquet"), "--output", str(tmp_path / "cohort.json")])
-    ids = json.loads(cohort.read_text())
-    assert sum(i.startswith("validation:") for i in ids) == 12
+    # The shared cohort's rule for stories that fit every capacity: all of them,
+    # minus validation stories that also occur in training.
+    keys = {
+        split: {hashlib.sha256(text.encode()).hexdigest() for text in pq.read_table(path).column(0).to_pylist()}
+        for split, path in ((s, tmp_path / "parquet" / f"{s}-00000.parquet") for s in ("train", "validation"))
+    }
+    ids = [f"train:{k}" for k in sorted(keys["train"])]
+    ids += [f"validation:{k}" for k in sorted(keys["validation"] - keys["train"])]
+    assert len(ids) == 24 + 12
+    (tmp_path / "cache").mkdir()
+    (tmp_path / "cache" / "allowed_ids.json").write_text(json.dumps(ids))
 
     # The committed spec, with indices into the tiny validation split.
     spec = json.loads((EXAMPLE / "evaluation" / "tinystories-bpe-260.json").read_text())
@@ -77,7 +88,7 @@ def test_one_tiny_case_prepares_tunes_and_analyzes(tmp_path):
         "preparation.evaluation.test_seeds=[1041]",
         *(f"preparation.inference.{i}.trials=1" for i in range(5)),
         "preparation.local.resources_per_job={cpu:1,gpu:0}",
-        f"data.parquet_dir={tmp_path / 'parquet'}", f"data.allowed_ids_path={cohort}",
+        f"data.parquet_dir={tmp_path / 'parquet'}",
         f"data.cache_dir={tmp_path / 'cache'}",
         "task.length=128", "model.hidden_size=16", "model.cond_dim=16", "model.n_heads=2",
         "model.n_blocks=1", "trainer.max_steps=2", "trainer.accumulate_grad_batches=1",
