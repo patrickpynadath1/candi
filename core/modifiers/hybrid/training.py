@@ -37,7 +37,7 @@ class HybridDiffusion(PosteriorDiffusion):
         views=None,
     ):
         """``views`` holds the views on the algorithm, for a network with a
-        single-state input slot (e.g. an adopted ContinuousDiT); otherwise the
+        single-state input slot (e.g. a continuous network); otherwise the
         network's own views input supplies them."""
         super().__init__(prediction)
         if views is None and not getattr(model, "supports_fused_streams", False):

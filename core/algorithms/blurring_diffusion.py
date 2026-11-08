@@ -1,13 +1,10 @@
 """Separable positional/feature blurring diffusion as a one-view recipe.
 
-Runs on the view path: one blurring view, held on the algorithm, over a
-ModularDiT adopted from the configured ContinuousDiT (see
-core/models/legacy.py:adopt). Training and sampling behave as the former
-standalone implementation, which core/tests/reference_algorithms keeps for
-comparison.
+One blurring view held by the algorithm over a continuous network that reads raw
+time with no input preconditioning; self-conditioning feeds back the expected
+codebook vector.
 """
 
-from core.models.legacy import adopt
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.modifiers.hybrid.views import DiffusionView
@@ -39,7 +36,6 @@ class BlurringDiffusion(OneViewAlgorithm, HybridDiffusion):
             raise ValueError("model state_dim must match blur representation dimension")
         if model.vocab_size != representation.spec.vocab_size:
             raise ValueError("model and representation vocabularies must match")
-        model = adopt(model)
         if model.input.preconditioning != "none" or model.time.coordinate != "time":
             raise ValueError(
                 "blurring diffusion requires raw time and no input preconditioning"

@@ -7,7 +7,6 @@ import torch
 from torch.nn import functional as F
 
 from core.modifiers.hybrid.fusion import GatedFusion
-from core.modifiers.hybrid.checkpoint import upgrade_config
 from core.representations.noisy_inputs import CANDIRepresentation, TokenRepresentation
 
 
@@ -119,57 +118,3 @@ def test_invalid_state_or_embedding_layout():
         )
     with pytest.raises(ValueError, match="per fusion weight"):
         fusion([], None, [], None)
-
-
-@pytest.mark.parametrize(
-    "target",
-    ["core.models.hybrid.CANDIFusion", "core.modifiers.hybrid.model.CANDIFusion"],
-)
-def test_saved_config_migration(target):
-    old = {
-        "_target_": "core.modifiers.hybrid.model.HybridModel",
-        "fusion": {"_target_": target, "mask_index": 5},
-        "views": [{"representation": {"scale": 0.25}}, {}],
-    }
-    new = upgrade_config(old)
-    assert new["fusion"]["_target_"] == "core.modifiers.hybrid.fusion.GatedFusion"
-    assert new["fusion"]["weights"] == [
-        {"masked": 1, "revealed": 4},
-        {"masked": 1, "revealed": 0},
-    ]
-    assert upgrade_config(new) == new
-    assert "weights" not in old["fusion"]
-
-
-def test_legacy_adapter_migration_preserves_scale_interpolation_and_normalization():
-    from hydra.utils import instantiate
-    from omegaconf import OmegaConf
-
-    old = {
-        "input_scale": 0.25,
-        "model": {
-            "_target_": "core.models.hybrid.HybridModel",
-            "branches": [
-                {
-                    "_target_": "core.hybrid.branches.DiscreteBranch",
-                    "representation": {"unused": True},
-                    "adapter": {
-                        "_target_": "core.models.hybrid.TokenEmbeddingAdapter",
-                        "scale": "${input_scale}",
-                        "normalize": False,
-                    },
-                },
-                {},
-            ],
-            "fusion": {
-                "_target_": "core.models.hybrid.CANDIFusion",
-                "discrete_branch": 0,
-                "mask_index": 5,
-            },
-        },
-    }
-    new = OmegaConf.create(upgrade_config(old))
-    fusion = instantiate(new.model.fusion)
-    assert fusion.weights == [(1.0, 4.0), (1.0, 0.0)]
-    assert new.model.views[0].representation.normalize
-    assert not old["model"]["branches"][0]["adapter"]["normalize"]

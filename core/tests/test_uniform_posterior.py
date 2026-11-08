@@ -110,9 +110,8 @@ def test_hybrid_branch_selects_posterior_reverse():
 
 def test_hybrid_uniform_posterior_training_sampling_and_plugin_rejection():
     from core.modifiers.hybrid.training import HybridDiffusion
-    from core.modifiers.hybrid.model import HybridModel
     from core.representations.noisy_inputs import TokenRepresentation
-    from core.models.dit import DiT
+    from core.tests import networks
     from core.noise_schedules.log_linear import LogLinear
     from core.objectives.cross_entropy import CrossEntropy
     from core.parameterizations.posterior import PosteriorParameterization
@@ -126,8 +125,7 @@ def test_hybrid_uniform_posterior_training_sampling_and_plugin_rejection():
             TokenRepresentation(4, 16),
             DiscretePosteriorUpdate(),
         )
-        backbone = DiT(4, 16, 8, 1, 2, dropout=0, adaLN=False)
-        model = HybridModel(backbone, [branch])
+        model = networks.token(4, 16, 8, 1, 2, views=[branch])
         return HybridDiffusion(
             model,
             PosteriorParameterization(),

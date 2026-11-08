@@ -1,13 +1,9 @@
 """Simplex diffusion: Dirichlet corruption trained as clean-token posterior prediction.
 
-Runs on the view path: one Dirichlet view held by the algorithm on a ModularDiT
-adopted from the configured SimplexDiT (see core/models/legacy.py:adopt). The
-process and sampler own the transition mathematics. Training, sampling and
-parameter order are bit-identical to the former standalone implementation,
-which core/tests/reference_algorithms/simplex_diffusion.py keeps for comparison.
+One Dirichlet view held by the algorithm; the network reads the raw sampler time.
+The process and sampler own the transition mathematics.
 """
 
-from core.models.legacy import adopt
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.modifiers.hybrid.views import DiffusionView
@@ -38,8 +34,8 @@ class SimplexDiffusion(OneViewAlgorithm, HybridDiffusion):
             raise ValueError("simplex process and model vocabulary must match")
         representation = SimplexStateRepresentation(process.vocab_size, process.state_dtype)
         view = DiffusionView(process, schedule, representation, SimplexPosteriorUpdate())
-        # The raw sampler time conditions the network, as SimplexDiT took it.
-        network = adopt(model, time_coordinate="time")
+        model.time.coordinate = "time"  # The raw sampler time conditions the network.
+        network = model
         super().__init__(
             network,
             predictor,

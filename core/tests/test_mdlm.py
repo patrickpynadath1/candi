@@ -7,7 +7,6 @@ import pytest
 import torch
 
 from core.tests.view_inputs import token_call, view_prediction
-from torch import nn
 from hydra import compose, initialize_config_dir
 
 from hydra.utils import instantiate
@@ -132,20 +131,28 @@ def test_schedule_derivative_and_loss_endpoints():
         )
 
 
-class Oracle(nn.Module):
-    def forward(self, tokens, conditioning):
-        values = torch.full((*tokens.shape, 4), -100.0, device=tokens.device)
-        values[..., 1] = 0
-        return values
+def oracle_logits(tokens):
+    values = torch.full((*tokens.shape, 4), -100.0, device=tokens.device)
+    values[..., 1] = 0
+    return values
 
 
-def oracle():
-    # Sampler orchestration on the standalone (state, keep) interface, which
-    # D3PM and the other standalone families still use.
-    from core.tests.reference_algorithms.mdlm import MDLM
+def uncertain_logits(tokens):
+    return torch.zeros(*tokens.shape, 4)
 
-    return MDLM(
-        Oracle(),
+
+def stub(algorithm, logits):
+    """Replace the network's computation, keeping its views, hooks and interface."""
+    algorithm.model.forward = lambda states, points, time, **options: logits(states[0])
+    return algorithm
+
+
+def oracle(logits=oracle_logits):
+    from core.algorithms.mdlm import MDLM
+    from core.tests import networks
+
+    algorithm = MDLM(
+        networks.token(4),
         PosteriorParameterization(3),
         AbsorbingProcess(3),
         LogLinear(),
@@ -153,6 +160,7 @@ def oracle():
         WeightedCrossEntropy(),
         length=5,
     )
+    return stub(algorithm, logits)
 
 
 @pytest.mark.parametrize(
@@ -172,12 +180,7 @@ def test_generation_preserves_prompt_and_counts_model_evaluations(sampler):
 
 
 def test_entropy_is_measured_before_greedy_commitment():
-    class Uncertain(nn.Module):
-        def forward(self, tokens, conditioning):
-            return torch.zeros(*tokens.shape, 4)
-
-    algorithm = oracle()
-    algorithm.model = Uncertain()
+    algorithm = oracle(uncertain_logits)
     prompt = torch.zeros(1, 5, dtype=torch.long)
     _, metadata = algorithm.generate(EntropyBoundedSampler(0, 5), prompt, prompt.bool())
     assert metadata["nfe"] == 5
@@ -191,12 +194,7 @@ def test_entropy_budget_and_exhaustion():
     ).tolist() == [[True, True, False]]
     sampler = EntropyBoundedSampler(0, 1)
 
-    class Uncertain(nn.Module):
-        def forward(self, tokens, conditioning):
-            return torch.zeros(*tokens.shape, 4)
-
-    algorithm = oracle()
-    algorithm.model = Uncertain()
+    algorithm = oracle(uncertain_logits)
     calls = []
     hook = algorithm.model.register_forward_hook(lambda *args: calls.append(1))
     prompt = torch.zeros(1, 5, dtype=torch.long)

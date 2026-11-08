@@ -1,15 +1,10 @@
 """Uniform corruption trained as clean-token posterior prediction with CE.
 
-Runs on the view path like MDLM: one uniform-posterior view on a ModularDiT
-adopted from the configured DiT (core/models/legacy.py:adopt). Training and
-sampling match the former standalone implementation, which
-core/tests/reference_algorithms keeps for comparison; its checkpoints load
-through core/models/legacy_checkpoints.py.
+One uniform-posterior view bound to the configured token network's embedding table;
+the network reads -log(keep).
 """
 
-import torch
 
-from core.models.legacy import adopt
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.objectives.cross_entropy import CrossEntropy
@@ -57,13 +52,11 @@ class PosteriorUniformDiffusion(OneViewAlgorithm, HybridDiffusion):
             )
         if process.vocab_size != model.output_layer.linear.out_features:
             raise ValueError("model and process vocabulary sizes must agree")
-        model = adopt(model)  # A configured ModularDiT passes through.
         table = model.token_table
-        with torch.random.fork_rng(devices=[]):  # The table is adopted below.
-            representation = TokenRepresentation(*table.shape)
+        representation = TokenRepresentation(*table.shape, embedding=table)
         view = DiffusionView(process, schedule, representation, DiscretePosteriorUpdate())
-        # -log(keep) exactly as the standalone class computed it.
-        network = adopt(model, views=[view], time_coordinate="negative_log_keep_exact")
+        model.time.coordinate = "negative_log_keep_exact"
+        network = model.bind_views([view])
         super().__init__(
             network,
             predictor,

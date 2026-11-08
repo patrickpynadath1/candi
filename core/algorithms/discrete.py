@@ -123,14 +123,13 @@ def validate_discrete_recipe(model, predictor, schedule, prediction):
 
 
 def absorbing_token_network(model, process, schedule, update):
-    """One absorbing token view on a ModularDiT adopted from ``model`` (a DiT),
-    conditioned on ``-log(keep)`` exactly as ``DiscreteDiffusion.model_logits``."""
-    from core.models.legacy import adopt
+    """One absorbing token view bound to ``model``'s embedding table, conditioned
+    on ``-log(keep)`` (keep clamped at the dtype's smallest normal)."""
     from core.modifiers.hybrid.views import DiffusionView
     from core.representations.noisy_inputs import TokenRepresentation
 
-    model = adopt(model)  # A configured ModularDiT passes through.
     table = model.token_table
     representation = TokenRepresentation(*table.shape, embedding=table)
     view = DiffusionView(process, schedule, representation, update)
-    return adopt(model, views=[view], time_coordinate="negative_log_keep_exact")
+    model.time.coordinate = "negative_log_keep_exact"
+    return model.bind_views([view])

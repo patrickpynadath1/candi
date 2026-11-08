@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from core.algorithms.blurring_diffusion import BlurringDiffusion
-from core.models.continuous_dit import ContinuousDiT
+from core.tests import networks
 from core.modifiers.block_diffusion import BlockDiffusion
 from core.modifiers.self_conditioning.prediction import PredictionCoordinator
 from core.noise_schedules.blurring import BlurringSchedule
@@ -17,21 +17,16 @@ from core.time_sampling.uniform import UniformTimeSampler
 
 def make_algorithm(*, length=7, self_conditioning=False, source="posterior_mean"):
     representation = CenteredEmbeddingRepresentation(11, 4)
-    model = ContinuousDiT(
+    model = networks.continuous(
         11,
-        hidden_size=16,
-        cond_dim=8,
-        n_blocks=1,
-        n_heads=2,
-        dropout=0,
         state_dim=4,
-        input_architecture="linear",
-        input_projection_bias=True,
-        input_preconditioning="none",
-        time_conditioning="time",
+        input="linear",
+        bias=True,
+        preconditioning="none",
+        coordinate="time",
         output_dim=12,
         self_conditioning=self_conditioning,
-        self_conditioning_source=source,
+        source=source,
     )
     return BlurringDiffusion(
         model,

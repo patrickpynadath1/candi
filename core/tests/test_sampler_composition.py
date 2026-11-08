@@ -1,93 +1,12 @@
 """Compare composed sampling against frozen pre-refactor loops and RNG streams."""
 
 from types import SimpleNamespace
-from pathlib import Path
-import pytest
 import torch
-from hydra import compose, initialize_config_dir
-from hydra.utils import instantiate
 from core.samplers.discrete import DiscreteSampler
 from core.samplers.loop import FixedGridLoop
 from core.samplers.continuous import FixedStepSampler
 from core.samplers.integration import HeunUpdate
-from core.samplers.ancestral import AncestralSampler
-from core.samplers.uniform_ancestral import UniformAncestralSampler
-from core.tests.reference_samplers.ancestral import AncestralSampler as OldAncestral
-from core.tests.reference_samplers.uniform_ancestral import (
-    UniformAncestralSampler as OldUniform,
-)
-from core.tests.reference_samplers.analytic import AnalyticSampler as OldAnalytic
-from core.tests.reference_samplers.analytic_sedd import AnalyticSampler as RuleAnalytic
 
-
-@pytest.mark.parametrize(
-    "method,current,old",
-    [
-        ("sudoku_hard", AncestralSampler, OldAncestral),
-        ("uniform_diffusion", UniformAncestralSampler, OldUniform),
-        ("sedd_absorb", RuleAnalytic, OldAnalytic),
-    ],
-)
-@pytest.mark.parametrize("final", ["none", "ancestral"])
-def test_frozen_discrete_loop_equivalence(method, current, old, final):
-    with initialize_config_dir(
-        version_base=None, config_dir=str(Path(__file__).parents[2] / "configs")
-    ):
-        cfg = compose(
-            config_name="config",
-            overrides=[
-                f"+experiment={method}",
-                "model.hidden_size=32",
-                "model.n_heads=4",
-                "model.n_blocks=1",
-                "model.cond_dim=16",
-                "model.dropout=0",
-                "algorithm.length=8",
-            ],
-        )
-    # The frozen loops use the standalone (state, keep) interface, so they run
-    # on the frozen classes; the view paths of MDLM, uniform and SEDD are covered
-    # in test_one_view_equivalence and test_view_equivalence_{uniform,d3pm_sedd}.
-    from omegaconf import OmegaConf
-
-    reference = {
-        "sudoku_hard": "core.tests.reference_algorithms.mdlm.MDLM",
-        "uniform_diffusion": "core.tests.reference_algorithms.uniform_diffusion.UniformDiffusion",
-        "sedd_absorb": "core.tests.reference_algorithms.sedd_absorb.SeddAbsorb",
-    }[method]
-    OmegaConf.update(cfg, "algorithm._target_", reference)
-    torch.manual_seed(31)
-    algo = instantiate(cfg.algorithm).eval()
-    # Nontrivial fixed tokens and an all-fixed sequence exercise prompt handling.
-    prompt = torch.arange(16).reshape(2, 8) % 9
-    mask = torch.tensor(
-        [[True, False, False, True, False, False, False, False], [True] * 8]
-    )
-    trace = []
-    prediction = algo.sampling_prediction
-
-    def record(state, time):
-        trace.append((state.clone(), time.clone()))
-        return prediction(state, time)
-
-    algo.sampling_prediction = record
-    torch.manual_seed(71)
-    expected, expected_stats = old(steps=5, final_denoise=final).sample(
-        algo, prompt, mask
-    )
-    expected_rng, expected_trace = torch.get_rng_state(), trace[:]
-    trace.clear()
-    torch.manual_seed(71)
-    actual, actual_stats = current(steps=5, final_denoise=final).sample(
-        algo, prompt, mask
-    )
-    assert torch.equal(actual, expected)
-    assert actual_stats == expected_stats
-    assert torch.equal(torch.get_rng_state(), expected_rng)
-    assert len(trace) == len(expected_trace)
-    for actual_args, expected_args in zip(trace, expected_trace):
-        for actual_arg, expected_arg in zip(actual_args, expected_args):
-            torch.testing.assert_close(actual_arg, expected_arg, rtol=0, atol=0)
 
 
 def test_composed_discrete_rule_reports_actual_evaluations_and_custom_grid():

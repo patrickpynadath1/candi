@@ -1,8 +1,7 @@
-"""Expose a one-view recipe's view components under their standalone names.
+"""Expose a one-view recipe's view components under their usual names.
 
-Standalone families run on the view path as one ``DiffusionView`` (see
-core/algorithms/mdlm.py). Their old checkpoints load through the explicit
-converter in core/models/legacy_checkpoints.py, not through load hooks.
+Single-process families (MDLM, Gaussian, simplex, ...) are one ``DiffusionView``
+on the shared view path (see core/algorithms/mdlm.py).
 """
 
 

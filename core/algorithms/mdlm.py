@@ -1,14 +1,11 @@
 """MDLM: absorbing (masked) diffusion trained as clean-token posterior prediction.
 
-Runs on the view path: one absorbing view on a ModularDiT adopted from the
-configured DiT (see core/models/legacy.py:adopt). Training, sampling and
-parameter order are bit-identical to the former standalone implementation,
-which core/tests/reference_algorithms/mdlm.py keeps for comparison.
+One absorbing view bound to the configured token network's embedding table. With
+``time_conditioning`` the network reads -log(keep) (keep clamped at the dtype's
+smallest normal); otherwise a zero time input, keeping any AdaLN modulation.
 """
 
-import torch
 
-from core.models.legacy import adopt
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.modifiers.hybrid.views import DiffusionView
@@ -29,18 +26,11 @@ class MDLM(OneViewAlgorithm, HybridDiffusion):
         time_conditioning=False,
         prediction=None,
     ):
-        model = adopt(model)  # A configured ModularDiT passes through.
         table = model.token_table
-        with torch.random.fork_rng(devices=[]):  # The table is adopted below.
-            representation = TokenRepresentation(*table.shape)
+        representation = TokenRepresentation(*table.shape, embedding=table)
         view = DiffusionView(process, schedule, representation, DiscretePosteriorUpdate())
-        network = adopt(
-            model,
-            views=[view],
-            # -log(keep) exactly as MDLM computed it, or zero time input.
-            time_coordinate="negative_log_keep_exact" if time_conditioning else "zero",
-            fp32_clean_embedding=True,
-        )
+        model.time.coordinate = "negative_log_keep_exact" if time_conditioning else "zero"
+        network = model.bind_views([view], fp32_clean_embedding=True)
         super().__init__(
             network, predictor, time_sampler, objective, length=length, prediction=prediction
         )

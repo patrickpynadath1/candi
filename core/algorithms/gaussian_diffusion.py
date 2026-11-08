@@ -1,17 +1,12 @@
 """Gaussian diffusion over discrete representations, as a one-view recipe.
 
-Runs on the view path: one Gaussian view held by the algorithm on a ModularDiT
-adopted from the configured ContinuousDiT (core/models/legacy.py:adopt). The
-schedule's training-time coordinate (``schedule.training_time``) feeds the
-network, the objective context and the time sampler's feedback, as in the
-former standalone class, which core/tests/reference_algorithms/gaussian_diffusion.py
-keeps for comparison.
+One Gaussian view held by the algorithm. The schedule's training-time coordinate
+(``schedule.training_time``) feeds the network, the objective context and the time
+sampler's feedback.
 """
 
 from dataclasses import replace
 
-from core.models.legacy import adopt
-from core.models.modular import ModularDiT
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.modifiers.hybrid.views import DiffusionView, ViewPoint
@@ -45,7 +40,7 @@ class GaussianDiffusion(OneViewAlgorithm, HybridDiffusion):
             raise ValueError("model vocabulary must match representation vocabulary")
         # The view validates the schedule's representation requirements.
         view = DiffusionView(process, schedule, representation, GaussianVelocityEulerUpdate())
-        network = model if isinstance(model, ModularDiT) else adopt(model)
+        network = model
         # The network reads the view's local time: in training, the schedule's
         # training-time coordinate, as the standalone class fed it.
         network.time.time_source = "point"

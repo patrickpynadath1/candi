@@ -150,7 +150,7 @@ def test_representation_schedule_contract_rejects_onehot_rank_on_embedding():
 def test_pre_modifier_checkpoint_weights_still_load(experiment):
     from core.sweeps import compose
 
-    from core.models.legacy import convert_hybrid_state_dict
+    from core.training.checkpoint_imports import convert_hybrid_state_dict
 
     config = compose(experiment, {"model.n_blocks": 1})
     source = instantiate(config.algorithm)
@@ -173,40 +173,11 @@ def test_pre_modifier_checkpoint_weights_still_load(experiment):
             continue  # Rebuilt from the representation, not stored separately.
         saved[key.replace(".representation.embedding", ".adapter.embedding")] = value.clone()
     target = instantiate(config.algorithm)
-    target.load_state_dict(convert_hybrid_state_dict(saved, prefix="model."), strict=True)
+    hybrid = {key.removeprefix("model."): value for key, value in saved.items()}
+    converted = {"model." + key: value for key, value in convert_hybrid_state_dict(hybrid).items()}
+    target.load_state_dict(converted, strict=True)
     for key, value in target.state_dict().items():
         torch.testing.assert_close(value, source.state_dict()[key])
-
-
-def test_saved_hybrid_config_upgrade_has_no_old_import_targets():
-    from core.modifiers.hybrid.checkpoint import upgrade_config
-
-    old = {
-        "_target_": "core.algorithms.hybrid_diffusion.HybridDiffusion",
-        "model": {
-            "_target_": "core.models.hybrid.HybridModel",
-            "branches": [
-                {
-                    "_target_": "core.hybrid.branches.GaussianBranch",
-                    "representation": {
-                        "_target_": "core.representations.one_hot.OneHotRepresentation",
-                        "vocab_size": 12,
-                    },
-                    "adapter": {
-                        "_target_": "core.models.hybrid.CANDIContinuousAdapter",
-                        "state_dim": 12,
-                    },
-                    "time_map": {"_target_": "core.hybrid.time_maps.IdentityTimeMap"},
-                }
-            ],
-        },
-    }
-    upgraded = upgrade_config(old)
-    view = upgraded["model"]["views"][0]
-    assert view["update"]["_target_"].endswith("GaussianPosteriorUpdate")
-    assert view["representation"]["_target_"].endswith("CANDIRepresentation")
-    assert "branches" in old["model"]  # Saved input isn't modified.
-    assert "core.hybrid." not in str(upgraded)
 
 
 @pytest.mark.parametrize("discrete", ["masked", "uniform"])
@@ -232,13 +203,3 @@ def test_gaussian_hybrid_default_updates_embedding_codebook(discrete):
     assert table.grad.abs().sum() > 0
     optimizer.step()
     assert not torch.equal(before, table.detach())
-
-
-def test_legacy_target_that_already_uses_views_upgrades():
-    from core.modifiers.hybrid.checkpoint import upgrade_config
-
-    upgraded = upgrade_config(
-        {"_target_": "core.models.hybrid.HybridModel", "views": [{"x": 1}]}
-    )
-    assert upgraded["_target_"] == "core.modifiers.hybrid.model.HybridModel"
-    assert upgraded["views"] == [{"x": 1}]

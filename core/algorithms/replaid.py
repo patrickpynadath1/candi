@@ -1,11 +1,9 @@
 """Likelihood training orchestration for continuous RePlaid.
 
-A GaussianDiffusion recipe (one Gaussian view on an adopted ModularDiT) with
-its own loss: adaptive time allocation, the learned gamma schedule, selected
-rows' gradient routing and the 9-input RePlaid objective. Every prediction
-adds the Gaussian prior's likelihood term to the logits
-(``GaussianPriorPosterior.corrected_logits``). The frozen standalone class is
-core/tests/reference_algorithms/replaid.py.
+A GaussianDiffusion recipe with its own loss: adaptive time allocation, the learned
+gamma schedule, selected rows' gradient routing and the 9-input RePlaid objective.
+Every prediction adds the Gaussian prior's likelihood term to the logits
+(``GaussianPriorPosterior.corrected_logits``).
 """
 
 from types import SimpleNamespace

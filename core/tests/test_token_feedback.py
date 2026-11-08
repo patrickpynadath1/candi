@@ -10,20 +10,13 @@ import torch
 
 from core.modifiers.block_diffusion import BlockDiffusion
 from core.modifiers.token_feedback import TokenFeedback
-from core.models.dit import DiT
+from core.tests import networks
+from core.tests.view_inputs import token_call
 
 
 def model(*, self_conditioning=False, source="posterior_mean"):
-    return DiT(
-        vocab_size=11,
-        hidden_size=16,
-        cond_dim=8,
-        n_blocks=3,
-        n_heads=2,
-        dropout=0,
-        adaLN=True,
-        self_conditioning=self_conditioning,
-        self_conditioning_source=source,
+    return networks.token(
+        11, 16, 8, 3, 2, adaLN=True, self_conditioning=self_conditioning, source=source
     )
 
 
@@ -52,8 +45,8 @@ def test_zero_projection_preserves_disabled_model_and_one_backbone_pass(return_f
     ]
     tokens = torch.randint(0, 11, (2, 7))
     time = torch.rand(2)
-    expected = baseline(tokens, time, return_features=return_features)
-    actual = enabled(tokens, time, return_features=return_features)
+    expected = token_call(baseline, tokens, time, return_features=return_features)
+    actual = token_call(enabled, tokens, time, return_features=return_features)
     for handle in handles:
         handle.remove()
     # Three backbone blocks run once; the auxiliary extractor is separate.
@@ -75,12 +68,12 @@ def test_projection_gradient_then_feedback_changes_output():
     net.block_execution = TokenFeedbackBlocks(net.blocks[1], 1, 16)
     torch.nn.init.normal_(net.output_layer.linear.weight, std=0.1)
     tokens, time = torch.randint(0, 11, (2, 7)), torch.rand(2)
-    baseline = net(tokens, time).detach()
-    net(tokens, time).square().mean().backward()
+    baseline = token_call(net, tokens, time).detach()
+    token_call(net, tokens, time).square().mean().backward()
     assert net.block_execution.conditioning.projection.weight.grad.abs().sum() > 0
     with torch.no_grad():
         net.block_execution.conditioning.projection.weight.copy_(0.5 * torch.eye(16))
-    assert not torch.equal(net(tokens, time), baseline)
+    assert not torch.equal(token_call(net, tokens, time), baseline)
 
 
 def test_auxiliary_ce_uses_loss_mask_and_trains_extractor_after_head_bootstrap():
@@ -156,7 +149,7 @@ def test_detach_blocks_main_loss_through_auxiliary_logits_only(detach):
     with torch.no_grad():
         net.block_execution.conditioning.projection.weight.copy_(0.5 * torch.eye(16))
     tokens, time = torch.randint(0, 11, (2, 7)), torch.rand(2)
-    output = net(tokens, time, return_features=True)
+    output = token_call(net, tokens, time, return_features=True)
     main_gradient = torch.autograd.grad(
         output.logits.square().mean(), output.auxiliary_logits,
         retain_graph=True, allow_unused=True,

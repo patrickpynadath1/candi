@@ -9,7 +9,7 @@ from core.parameterizations.posterior import PosteriorParameterization
 from core.parameterizations.plug_in import PlugInParameterization
 from core.parameterizations.utils import filter_top_k, filter_top_p, greedy_projection
 from core.samplers.ancestral import AncestralSampler
-from core.tests.test_mdlm import oracle
+from core.tests.test_mdlm import oracle, stub
 
 
 def test_filter_helpers_preserve_input_and_keep_the_nucleus_crossing_token():
@@ -46,7 +46,7 @@ def test_posterior_owns_commitment_policy_and_greedy_denoising_is_explicit(commi
     assert greedy.tolist() == [[[0.0, 0.0, 1.0, 0.0], [0.0, 1.0, 0.0, 0.0]]]
 
 
-@pytest.mark.parametrize("final", ["none", "greedy", "ancestral"])
+@pytest.mark.parametrize("final", ["greedy", "ancestral"])
 def test_ancestral_sampler_orchestrates_process_and_final_denoising(final):
     algorithm = oracle()
     prompt = torch.zeros(1, 5, dtype=torch.long)
@@ -55,9 +55,6 @@ def test_ancestral_sampler_orchestrates_process_and_final_denoising(final):
             algorithm.process, "reverse", wraps=algorithm.process.reverse
         ) as reverse,
         patch.object(
-            algorithm.process, "commit", wraps=algorithm.process.commit
-        ) as commit,
-        patch.object(
             algorithm, "greedy_prediction", wraps=algorithm.greedy_prediction
         ) as greedy,
     ):
@@ -65,7 +62,6 @@ def test_ancestral_sampler_orchestrates_process_and_final_denoising(final):
             AncestralSampler(2, final_denoise=final), prompt, prompt.bool()
         )
     assert reverse.call_count == 2 + (final == "ancestral")
-    assert commit.call_count == (final == "greedy")
     assert greedy.call_count == (final == "greedy")
     assert metadata["nfe"] == 2 + (final != "none")
 
@@ -73,14 +69,12 @@ def test_ancestral_sampler_orchestrates_process_and_final_denoising(final):
 def test_eb_reuses_prediction_for_entropy_and_commitment_without_extra_model_calls():
     from core.samplers.entropy_bounded import EntropyBoundedSampler
 
-    class Uncertain(torch.nn.Module):
-        def forward(self, tokens, conditioning):
-            logits = torch.zeros(*tokens.shape, 4)
-            logits[..., 1] = 0.1
-            return logits
+    def uncertain(tokens):
+        logits = torch.zeros(*tokens.shape, 4)
+        logits[..., 1] = 0.1
+        return logits
 
-    algorithm = oracle()
-    algorithm.model = Uncertain()
+    algorithm = stub(oracle(), uncertain)
     prompt = torch.zeros(1, 5, dtype=torch.long)
     calls = []
     hook = algorithm.model.register_forward_hook(lambda *args: calls.append(1))

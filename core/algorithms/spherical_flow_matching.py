@@ -1,13 +1,9 @@
 """Spherical flow matching: unit-sphere embeddings, slerp corruption, CE posterior.
 
-Runs on the view path: one spherical view held by the algorithm, on a ModularDiT
-adopted from the configured SphereDiT (see core/models/legacy.py:adopt). The
-network reads -log(keep) with keep clamped at 1e-12 from the view's point.
-Training and sampling match the former standalone implementation, which
-core/tests/reference_algorithms/spherical_flow_matching.py keeps for comparison.
+One spherical view held by the algorithm. The network reads -log(keep) with keep
+clamped at 1e-12 from the view's point.
 """
 
-from core.models.legacy import adopt
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.modifiers.hybrid.views import DiffusionView
@@ -43,8 +39,9 @@ class SphericalFlowMatching(OneViewAlgorithm, HybridDiffusion):
         if getattr(schedule, "output_kind", None) != "keep_rate":
             raise ValueError("spherical schedule must provide keep coordinates")
         view = DiffusionView(process, schedule, representation, SphericalPosteriorUpdate())
+        model.time.coordinate = "negative_log_keep_floor"
         super().__init__(
-            adopt(model, time_coordinate="negative_log_keep_floor"),
+            model,
             predictor,
             time_sampler,
             objective,

@@ -70,14 +70,12 @@ def build_algorithm(config):
 class TrainingModule(L.LightningModule):
     def __init__(self, config):
         super().__init__()
-        from core.modifiers.hybrid.checkpoint import upgrade_config
-
         raw = (
             OmegaConf.to_container(config, resolve=False)
             if OmegaConf.is_config(config)
             else config
         )
-        self.config = OmegaConf.create(upgrade_config(raw))
+        self.config = OmegaConf.create(raw)
         self.save_hyperparameters(
             {"config": OmegaConf.to_container(self.config, resolve=True)}
         )

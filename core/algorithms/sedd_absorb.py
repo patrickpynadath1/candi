@@ -1,9 +1,7 @@
 """SEDD absorbing: score-entropy training of absorbing log scores.
 
-Runs on the view path: one absorbing view on a ModularDiT adopted from the
-configured DiT, with the parameterization's score pathway. Training, sampling
-and parameter order are bit-identical to the former standalone implementation,
-which core/tests/reference_algorithms/sedd_absorb.py keeps for comparison.
+One absorbing view bound to the configured token network's embedding table, with
+the parameterization's score pathway.
 """
 
 import torch

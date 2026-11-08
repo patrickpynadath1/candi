@@ -5,9 +5,6 @@ from contextvars import ContextVar
 import torch
 from torch import nn
 
-from core.models.continuous_dit import ContinuousDiT
-from core.models.dit import DiT
-from core.modifiers.hybrid.model import HybridModel
 from core.models.modular import ModularDiT
 from core.models.components import DiffusionBlocks
 from core.models.prediction import ModelPrediction
@@ -17,22 +14,9 @@ from core.modifiers.encoder_decoder import EncoderDecoderModel
 
 
 def view_stream_inputs(model, states, points, time, self_condition, clean, clean_encoder=None):
-    """(noisy hidden, noisy condition, clean hidden, clean condition) for a
-    view-based model: ModularDiT, or the legacy HybridModel."""
-    if isinstance(model, ModularDiT):
-        noisy, noisy_condition = model.prepare(
-            states, points, time, self_condition=self_condition
-        )
-        clean_hidden, clean_condition = model.clean_token_hidden(clean, clean_encoder)
-        return noisy, noisy_condition, clean_hidden, clean_condition
-    else:
-        noisy, noisy_condition = model.prepare_fused(
-            states, points, time, self_condition=self_condition
-        )
-        width = model.output_vocab_size or model.output_layer.linear.out_features
-        clean_inputs = model.clean_state_hidden
-    probabilities = torch.nn.functional.one_hot(clean, width).float()
-    clean_hidden, clean_condition = clean_inputs(probabilities)
+    """(noisy hidden, noisy condition, clean hidden, clean condition) for a ModularDiT."""
+    noisy, noisy_condition = model.prepare(states, points, time, self_condition=self_condition)
+    clean_hidden, clean_condition = model.clean_token_hidden(clean, clean_encoder)
     return noisy, noisy_condition, clean_hidden, clean_condition
 
 
@@ -40,7 +24,7 @@ class BlockDiffusionModel(nn.Module):
     def __init__(self, model, block_size, clean_encoder=None, x0_causal=True):
         super().__init__()
         input_model = model.model if isinstance(model, EncoderDecoderModel) else model
-        if not isinstance(input_model, (DiT, ContinuousDiT, HybridModel, ModularDiT)):
+        if not isinstance(input_model, ModularDiT):
             raise TypeError(
                 "block diffusion requires a model with fused-stream hidden interfaces"
             )
@@ -385,39 +369,10 @@ class BlockDiffusionModel(nn.Module):
             if isinstance(self.model, EncoderDecoderModel)
             else self.model
         )
-        if isinstance(model, (HybridModel, ModularDiT)):
-            states, points, global_time = inputs
-            noisy_hidden, noisy_condition, clean_hidden, clean_condition = (
-                view_stream_inputs(
-                    model, states, points, global_time, self_condition, clean, self.clean_encoder
-                )
-            )
-        elif isinstance(model, ContinuousDiT):
-            state, time, sigma, alpha = inputs
-            noisy_hidden, noisy_condition = model.prepare_hidden(
-                state, time, sigma, alpha, self_condition=self_condition
-            )
-            clean_state = self.clean_encoder(clean) if self.clean_encoder else clean
-            clean_hidden, clean_condition = model.clean_state_hidden(clean_state)
-        else:
-            tokens, conditioning = inputs
-            with torch.autocast(tokens.device.type, enabled=False):
-                noisy_emb = (
-                    model.embed_state(tokens)
-                    if hasattr(model, "embed_state") and tokens.ndim == 3
-                    else model.vocab_embed(tokens)
-                )
-                clean_hidden = model.vocab_embed(clean)
-            noisy_hidden, noisy_condition = model.prepare_hidden(
-                noisy_emb, conditioning, self_condition=self_condition
-            )
-            clean_condition = (
-                torch.nn.functional.silu(
-                    model.sigma_map(torch.zeros(len(clean), device=clean.device))
-                )
-                if model.adaLN
-                else None
-            )
+        states, points, global_time = inputs
+        noisy_hidden, noisy_condition, clean_hidden, clean_condition = view_stream_inputs(
+            model, states, points, global_time, self_condition, clean, self.clean_encoder
+        )
         return clean_hidden, clean_condition, noisy_hidden, noisy_condition
 
     def _cached_forward(

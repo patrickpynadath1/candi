@@ -137,10 +137,15 @@ def test_uniform_confidence_policy_with_noise_births_and_feedback():
     from core.representations.noisy_inputs import TokenRepresentation
     from core.samplers.hybrid_updates import DiscretePosteriorUpdate
 
+    from core.tests import networks
+
     masked = masked_assembly(head=False, feedback=True)
-    masked.algorithm.model.views = torch.nn.ModuleList([DiffusionView(
-        PosteriorUniformProcess(5), LogLinear(0), TokenRepresentation(5, 16),
-        DiscretePosteriorUpdate())])
+    uniform = DiffusionView(
+        PosteriorUniformProcess(5), LogLinear(0), TokenRepresentation(5, 16), DiscretePosteriorUpdate()
+    )
+    masked.algorithm.model = networks.token(
+        5, 16, 8, 1, 4, views=[uniform], self_conditioning=True, source="hidden"
+    )
     algo = VariableLengthDiffusion(masked.algorithm, 5, predict_gap_tokens=False)
     prompt = torch.tensor([[1, 0], [2, 0]])
     fixed = torch.tensor([[True, False], [True, False]])

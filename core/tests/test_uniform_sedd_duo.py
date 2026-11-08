@@ -26,7 +26,7 @@ from core.noise_schedules.duo_calibration import (
 )
 from core.curricula.duo import DuoCurriculum
 from core.models.layers import EmbeddingLayer
-from core.models.continuous_dit import ContinuousDiT
+from core.tests import networks
 from core.samplers.uniform_ancestral import UniformAncestralSampler
 from core.samplers.uniform_entropy_bounded import UniformEntropyBoundedSampler
 from core.samplers.analytic import AnalyticSampler
@@ -88,17 +88,15 @@ def test_duo_input_softmax_and_gaussian_input_linear_projection():
     scores = torch.tensor([[[1.0, -1.0, 2.0]]])
     torch.testing.assert_close(layer(scores), scores.softmax(-1) @ layer.embedding)
     assert not torch.allclose(layer(scores), scores @ layer.embedding)
-    model = ContinuousDiT(
-        3, hidden_size=8, n_heads=2, n_blocks=1, cond_dim=8, dropout=0
-    )
+    model = networks.continuous(3, hidden_size=8, n_heads=2, n_blocks=1, cond_dim=8)
     captured = []
-    hook = model.input_projection.register_forward_pre_hook(
+    hook = model.input.projection.register_forward_pre_hook(
         lambda module, args: captured.append(args[0].detach())
     )
-    model(scores, torch.tensor([0.5]), torch.ones(1), torch.ones(1))
+    networks.path_call(model, scores, torch.tensor([0.5]), torch.ones(1), torch.ones(1))
     hook.remove()
     expected = (
-        scores @ torch.nn.functional.normalize(model.input_embedding, dim=-1) / 2**0.5
+        scores @ torch.nn.functional.normalize(model.input.embedding, dim=-1) / 2**0.5
     )
     torch.testing.assert_close(captured[0], expected)
 

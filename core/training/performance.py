@@ -1,10 +1,8 @@
 """Opt-in execution optimizations which preserve model/checkpoint parameter names."""
 
 from core.models.components import DiffusionBlocks
-from core.models.dit import DiT
 from core.modifiers.encoder_decoder import EncoderDecoderModel
 from core.modifiers.block_diffusion.model import BlockDiffusionModel
-from core.modifiers.hybrid.model import HybridModel
 from core.models.modular import ModularDiT
 from core.objectives.uniform import UniformDiffusionObjective
 import torch
@@ -26,7 +24,7 @@ def configure_performance(module):
     settings = module.config.training.get("performance", {})
     if settings.get("hidden_only_bootstrap", False):
         for model in module.algorithm.modules():
-            if isinstance(model, (DiT, HybridModel, ModularDiT)):
+            if isinstance(model, ModularDiT):
                 model.hidden_only_bootstrap = True
     checkpoint = settings.get("activation_checkpointing", False)
     if checkpoint:
@@ -62,11 +60,6 @@ def configure_performance(module):
         ]
         if not models:
             raise ValueError("backbone compilation requires a transformer backbone")
-        hybrid_backbones = {
-            id(m.backbone)
-            for m in module.algorithm.modules()
-            if isinstance(m, HybridModel)
-        }
         block_backbones = {
             id(m.model)
             for m in module.algorithm.modules()
@@ -85,9 +78,9 @@ def configure_performance(module):
                 model.forward_uncached = torch.compile(
                     model.forward_uncached, **options
                 )
-            elif id(model) in hybrid_backbones | block_backbones:
-                # Hybrid/insertion execution calls this method directly and
-                # bypasses backbone.__call__, including during generation.
+            elif id(model) in block_backbones:
+                # Block execution calls this method directly and bypasses
+                # the network's __call__, including during generation.
                 model.forward_hidden = torch.compile(model.forward_hidden, **options)
             else:
                 model.compile(**options)

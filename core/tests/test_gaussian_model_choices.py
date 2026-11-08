@@ -1,23 +1,15 @@
-"""Architectural Gaussian scaling and conditioning contracts."""
+"""Continuous-network input preconditioning and time-conditioning contracts."""
 
 import pytest
 import torch
 
-from core.models.continuous_dit import ContinuousDiT
 from core.models.gaussian_conditioning import TIME_CONDITIONING
+from core.tests import networks
+from core.tests.networks import path_call
 
 
 def make_model(**kwargs):
-    return ContinuousDiT(
-        vocab_size=7,
-        state_dim=5,
-        hidden_size=16,
-        n_heads=2,
-        n_blocks=1,
-        cond_dim=8,
-        dropout=0,
-        **kwargs,
-    )
+    return networks.continuous(7, state_dim=5, **kwargs)
 
 
 def test_default_preconditioning_and_time_match_original_path():
@@ -27,59 +19,60 @@ def test_default_preconditioning_and_time_match_original_path():
     alpha, sigma = torch.tensor([1.0, 0.5]), torch.tensor([2.0, 0.8])
     observed = {}
     handles = [
-        model.input_projection.register_forward_pre_hook(
+        model.input.projection.register_forward_pre_hook(
             lambda module, args: observed.update(projected=args[0].detach())
         ),
-        model.sigma_map.register_forward_pre_hook(
+        model.time.embedder.register_forward_pre_hook(
             lambda module, args: observed.update(condition=args[0].detach())
         ),
     ]
-    model(state, time, sigma, alpha)
+    path_call(model, state, time, sigma, alpha)
     for handle in handles:
         handle.remove()
-    expected = state @ torch.nn.functional.normalize(model.input_embedding, dim=-1)
+    expected = state @ torch.nn.functional.normalize(model.input.embedding, dim=-1)
     expected *= torch.rsqrt(alpha.square() + sigma.square())[:, None, None]
     torch.testing.assert_close(observed["projected"], expected, rtol=0, atol=0)
     torch.testing.assert_close(
         observed["condition"],
-        -torch.log1p(-time.clamp(0, 1 - model.epsilon)),
+        -torch.log1p(-time.clamp(0, 1 - model.time.epsilon)),
         rtol=0,
         atol=0,
     )
 
 
 def test_no_preconditioning_retains_projection_and_trainable_embedding():
-    model = make_model(input_preconditioning="none", time_conditioning="time")
+    model = make_model(preconditioning="none", coordinate="time")
     state = torch.randn(2, 3, 5)
     time = torch.tensor([0.2, 0.8])
     one = torch.ones(2)
-    original = model(state, time, one, one)
-    rescaled_coefficients = model(state, time, 3 * one, 5 * one)
+    original = path_call(model, state, time, one, one)
+    rescaled_coefficients = path_call(model, state, time, 3 * one, 5 * one)
     torch.testing.assert_close(original, rescaled_coefficients, rtol=0, atol=0)
     original.square().mean().backward()
-    for parameter in (model.input_embedding, model.input_projection.weight):
+    for parameter in (model.input.embedding, model.input.projection.weight):
         assert parameter.grad is not None
         assert parameter.grad.abs().sum() > 0
 
 
 @pytest.mark.parametrize("conditioning", ["log_effective_noise", "log_snr"])
 def test_effective_noise_conditioning_is_invariant_to_path_rescaling(conditioning):
-    model = make_model(time_conditioning=conditioning)
+    model = make_model(coordinate=conditioning)
     state = torch.randn(2, 3, 5)
     time = torch.tensor([0.2, 0.8])
     sigma, alpha = torch.tensor([0.4, 2.0]), torch.tensor([0.8, 0.3])
     scale = torch.tensor([0.5, 2.0])
     torch.testing.assert_close(
-        model(state, time, sigma, alpha),
-        model(state * scale[:, None, None], time, sigma * scale, alpha * scale),
+        path_call(model, state, time, sigma, alpha),
+        path_call(model, state * scale[:, None, None], time, sigma * scale, alpha * scale),
     )
 
 
 @pytest.mark.parametrize("name", TIME_CONDITIONING)
 def test_conditioning_endpoints_are_finite_and_checkpoint_layout_unchanged(name):
-    model = make_model(time_conditioning=name)
+    model = make_model(coordinate=name)
     model.load_state_dict(make_model().state_dict(), strict=True)
-    result = model(
+    result = path_call(
+        model,
         torch.randn(2, 3, 5),
         torch.tensor([0.0, 1.0]),
         torch.tensor([0.0, 1.0]),
@@ -104,8 +97,8 @@ def test_log_conditioning_coordinates():
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"input_preconditioning": "bad"},
-        {"time_conditioning": "bad"},
+        {"preconditioning": "bad"},
+        {"coordinate": "bad"},
         {"epsilon": 0},
     ],
 )

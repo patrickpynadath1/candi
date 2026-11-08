@@ -19,13 +19,10 @@ from core.tests.test_hybrid_diffusion import make_algorithm
 def assembly(feedback=False, *, continuous=False):
     inner = make_algorithm(self_conditioning=feedback)
     # Use one assembly contract for single-view and hybrid models.
-    from core.modifiers.hybrid.model import HybridModel
-    from core.models.dit import DiT
+    from core.tests import networks
 
     views = [inner.views[1]] if continuous else list(inner.views)
-    inner.model = HybridModel(
-        DiT(5, 16, 8, 1, 4, dropout=0, adaLN=True), views, self_conditioning=feedback
-    )
+    inner.model = networks.token(5, 16, 8, 1, 4, adaLN=True, views=views, self_conditioning=feedback)
     policies = (
         [ForwardInsertion("mean")]
         if continuous
@@ -271,8 +268,10 @@ def test_other_view_processes_use_same_structural_sampler(kind):
 
 
 def test_named_policies_survive_reversed_view_order():
+    from core.tests import networks
+
     inner = make_algorithm()
-    inner.model.views = torch.nn.ModuleList(reversed(inner.views))
+    inner.model = networks.token(5, 16, 8, 1, 4, views=list(reversed(inner.views)))
     policies = {
         "GaussianProcess": ForwardInsertion("mean"),
         "CANDIMaskingProcess": MaskInsertion(),
@@ -683,16 +682,12 @@ def test_parallel_block_features_and_gradients_match_isolated_contexts(continuou
 
 
 def masked_assembly(*, head, feedback):
-    from core.modifiers.hybrid.model import HybridModel
-    from core.models.dit import DiT
+    from core.tests import networks
     from core.modifiers.self_conditioning.prediction import PredictionCoordinator
 
     inner = make_algorithm()
-    inner.model = HybridModel(
-        DiT(5, 16, 8, 1, 4, dropout=0),
-        [inner.views[0]],
-        self_conditioning=feedback,
-        self_conditioning_source="hidden",
+    inner.model = networks.token(
+        5, 16, 8, 1, 4, views=[inner.views[0]], self_conditioning=feedback, source="hidden"
     )
     inner.prediction = PredictionCoordinator(
         enabled=feedback,
@@ -804,16 +799,14 @@ def test_uniform_optional_head_trains_and_samples(head, feedback):
     from core.representations.noisy_inputs import TokenRepresentation
     from core.samplers.hybrid_updates import DiscretePosteriorUpdate
 
+    from core.tests import networks
+
     masked = masked_assembly(head=head, feedback=feedback)
-    masked.algorithm.model.views = torch.nn.ModuleList(
-        [
-            DiffusionView(
-                PosteriorUniformProcess(5),
-                LogLinear(0),
-                TokenRepresentation(5, 16),
-                DiscretePosteriorUpdate(),
-            )
-        ]
+    uniform = DiffusionView(
+        PosteriorUniformProcess(5), LogLinear(0), TokenRepresentation(5, 16), DiscretePosteriorUpdate()
+    )
+    masked.algorithm.model = networks.token(
+        5, 16, 8, 1, 4, views=[uniform], self_conditioning=feedback, source="hidden"
     )
     algo = VariableLengthDiffusion(masked.algorithm, 5, predict_gap_tokens=head)
     assert isinstance(algo.insertion[0], UniformInsertion)

@@ -7,8 +7,7 @@ from core.samplers.hybrid_updates import (
     GaussianPosteriorUpdate,
 )
 from core.modifiers.hybrid.time_maps import IdentityTimeMap, PowerTimeMap
-from core.models.dit import DiT
-from core.modifiers.hybrid.model import HybridModel
+from core.tests import networks
 from core.representations.noisy_inputs import (
     TokenRepresentation,
     ProjectedRepresentation,
@@ -52,9 +51,8 @@ def make_algorithm(
         GaussianPosteriorUpdate(),
         time_map or IdentityTimeMap(),
     )
-    backbone = DiT(vocab, hidden, 8, 1, 4, dropout=0, adaLN=False)
-    model = HybridModel(
-        backbone, [discrete, gaussian], self_conditioning=self_conditioning
+    model = networks.token(
+        vocab, hidden, 8, 1, 4, views=[discrete, gaussian], self_conditioning=self_conditioning
     )
     prediction = PredictionCoordinator(
         enabled=self_conditioning, probability=1, evaluation_probability=1
@@ -76,7 +74,7 @@ def test_parallel_loss_corrupts_two_views_and_backpropagates():
     result = algo.loss(tokens, torch.ones_like(tokens, dtype=torch.bool))
     assert torch.isfinite(result["loss"])
     result["loss"].backward()
-    assert algo.model.backbone.output_layer.linear.weight.grad is not None
+    assert algo.model.output_layer.linear.weight.grad is not None
 
 
 def test_local_time_maps_are_applied_per_branch():
@@ -90,14 +88,14 @@ def test_local_time_maps_are_applied_per_branch():
 def test_joint_sampler_uses_one_shared_model_evaluation_per_step():
     algo = make_algorithm()
     calls = 0
-    original = algo.model.backbone.forward_hidden
+    original = algo.model.forward_hidden
 
     def counted(*args, **kwargs):
         nonlocal calls
         calls += 1
         return original(*args, **kwargs)
 
-    algo.model.backbone.forward_hidden = counted
+    algo.model.forward_hidden = counted
     prompt = torch.zeros(2, 7, dtype=torch.long)
     mask = torch.zeros_like(prompt, dtype=torch.bool)
     result, metadata = HybridSampler(steps=3).sample(algo, prompt, mask)

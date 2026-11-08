@@ -1,15 +1,11 @@
 """Uniform diffusion with normalized plug-in estimates of clean token weights.
 
-Runs on the view path: one uniform view on a ModularDiT adopted from the
-configured DiT (see core/models/legacy.py:adopt). The former standalone class
-is kept in core/tests/reference_algorithms/uniform_diffusion.py, and
-core/tests/test_view_equivalence_uniform.py proves both behave the same.
+One uniform view bound to the configured token network's embedding table, with the
+parameterization's plug-in pathway. The network reads -log(keep) (or zero time).
 """
 
-import torch
 
 from core.algorithms.adaptive import validate_adaptive_feedback
-from core.models.legacy import adopt
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.modifiers.hybrid.views import DiffusionView
@@ -63,18 +59,11 @@ class UniformDiffusion(OneViewAlgorithm, HybridDiffusion):
             raise ValueError(
                 "uniform model, process and objective vocabulary sizes must agree"
             )
-        model = adopt(model)  # A configured ModularDiT passes through.
         table = model.token_table
-        with torch.random.fork_rng(devices=[]):  # The table is adopted below.
-            representation = self.representation_type(*table.shape)
+        representation = self.representation_type(*table.shape, embedding=table)
         view = DiffusionView(process, schedule, representation, DiscretePosteriorUpdate())
-        network = adopt(
-            model,
-            views=[view],
-            # -log(keep), keep clamped at the dtype's smallest normal, or zero.
-            time_coordinate="negative_log_keep_exact" if time_conditioning else "zero",
-            fp32_clean_embedding=True,
-        )
+        model.time.coordinate = "negative_log_keep_exact" if time_conditioning else "zero"
+        network = model.bind_views([view], fp32_clean_embedding=True)
         super().__init__(
             network, predictor, time_sampler, objective, length=length, prediction=prediction
         )

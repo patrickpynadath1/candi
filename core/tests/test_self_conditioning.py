@@ -11,7 +11,8 @@ import torch
 
 from core.tests.view_inputs import view_prediction
 
-from core.models.dit import DiT
+from core.modifiers.hybrid.views import ViewPoint
+from core.tests import networks
 from core.noise_schedules.log_linear import LogLinear
 from core.samplers.ancestral import AncestralSampler
 from core.samplers.entropy_bounded import EntropyBoundedSampler
@@ -246,24 +247,22 @@ def test_checkpoint_optimizer_and_ema_include_adapter(source, tmp_path):
         torch.testing.assert_close(left, right, atol=0, rtol=0)
 
 
-def test_disabled_preserves_old_checkpoint_keys_rng_and_prediction():
+def test_disabled_slot_adds_no_parameters_random_draws_or_prediction_change():
+    from functools import partial
+
+    from core.models.modular import SelfConditioning
+
     torch.manual_seed(8)
-    old = DiT(13, hidden_size=32, cond_dim=16, n_blocks=1, n_heads=4, dropout=0)
-    old_rng = torch.get_rng_state().clone()
+    plain = networks.token(13, 32, 16, 1, 4)
+    plain_rng = torch.get_rng_state().clone()
     torch.manual_seed(8)
-    explicit = DiT(
-        13,
-        hidden_size=32,
-        cond_dim=16,
-        n_blocks=1,
-        n_heads=4,
-        dropout=0,
-        self_conditioning=False,
+    disabled = networks.token(
+        13, 32, 16, 1, 4, self_conditioning=partial(SelfConditioning, enabled=False)
     )
-    assert torch.equal(old_rng, torch.get_rng_state())
-    assert old.state_dict().keys() == explicit.state_dict().keys()
-    assert not any("conditioning_adapter" in key for key in explicit.state_dict())
-    explicit.load_state_dict(old.state_dict(), strict=True)
+    assert torch.equal(plain_rng, torch.get_rng_state())
+    assert plain.state_dict().keys() == disabled.state_dict().keys()
+    assert not any("self_conditioning" in key for key in disabled.state_dict())
+    disabled.load_state_dict(plain.state_dict(), strict=True)
     algo = algorithm(
         "posterior_mean", "self_conditioning.enabled=false", "model.dropout=0.2"
     )
@@ -536,24 +535,16 @@ def test_mean_requires_probability_capability_hidden_does_not():
         def training_posterior(self, logits, observed):
             return logits
 
-    model = DiT(
-        13,
-        hidden_size=32,
-        cond_dim=16,
-        n_blocks=1,
-        n_heads=4,
-        dropout=0,
-        self_conditioning=True,
-        self_conditioning_source="hidden",
-    )
+    model = networks.token(13, 32, 16, 1, 4, self_conditioning=True, source="hidden")
     predictor = RawPrediction()
     with pytest.raises(TypeError, match="posterior_mean.*RawPrediction.*source=hidden"):
         PredictionCoordinator(enabled=True).validate(model, predictor)
     hidden = PredictionCoordinator(enabled=True, source="hidden", probability=1)
     hidden.validate(model, predictor)
     state = torch.ones(2, 7, dtype=torch.long)
+    point = ViewPoint(torch.zeros(2), (torch.ones(2), torch.zeros(2)))
     output = hidden.predict(
-        model, predictor, (state, torch.zeros(2)), state, "training_posterior"
+        model, predictor, ((state,), (point,), torch.zeros(2)), state, "training_posterior"
     )
     assert output.shape == (2, 7, 13)
 

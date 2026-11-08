@@ -88,7 +88,7 @@ class LinearInput(nn.Module):
 
 
 class EmbeddedProjectionInput(LinearInput):
-    """ContinuousDiT's default: state @ normalized embedding -> projection."""
+    """State @ normalized learned embedding -> preconditioning -> projection."""
 
     def __init__(self, state_dim, hidden_size, input_dim=None, preconditioning="gaussian"):
         nn.Module.__init__(self)
@@ -112,7 +112,7 @@ class EmbeddedProjectionInput(LinearInput):
 class ViewsInput(nn.Module):
     """Several corrupted views of one sequence, embedded and fused (hybrid).
 
-    Reproduces HybridModel's wiring: the first view with a token table provides
+    The first view with a token table provides
     the network's token table; token feedback reads that table when its size
     matches the vocabulary, else the representation's clean embeddings.
     """
@@ -190,7 +190,7 @@ def _keep(point):
 TIME_COORDINATES = {
     "time": lambda time, point, epsilon: time.float(),
     "zero": lambda time, point, epsilon: torch.zeros_like(time.float()),
-    # -log(keep) for keep-rate schedules, as HybridModel computes it.
+    # -log(keep) for keep-rate schedules (keep clamped at 1e-6).
     "negative_log_keep": lambda time, point, epsilon: -torch.log(
         _keep(point).float().clamp_min(1e-6)
     ),
@@ -200,7 +200,7 @@ TIME_COORDINATES = {
     ).log(),
     # Standalone spherical flow matching's -log(keep): keep clamped at 1e-12.
     "negative_log_keep_floor": lambda time, point, epsilon: -_keep(point).clamp_min(1e-12).log(),
-    # HybridModel's log(1 - t).
+    # log(1 - t).
     "log1p_negative_time": lambda time, point, epsilon: torch.log1p(
         -time.float().clamp(max=1 - 1e-6)
     ),
@@ -227,6 +227,8 @@ class TimeConditioning(nn.Module):
             raise ValueError(f"time coordinate must be one of {sorted(TIME_COORDINATES)}")
         if time_source not in {"global", "point"}:
             raise ValueError("time_source must be global or point")
+        if not 0 < epsilon < 1:
+            raise ValueError("time epsilon must be between zero and one")
         self.coordinate, self.adaLN, self.epsilon = coordinate, bool(adaLN), epsilon
         # "point": the first view's local time (in training, after the
         # schedule's training_time map), not the global time.
@@ -313,7 +315,7 @@ class AdaLNHead(nn.Module):
 
 
 class EmbeddingHead(nn.Module):
-    """ContinuousDiT's head: projection, then dot with an output embedding."""
+    """Projection, then a dot product with a learned output embedding plus bias."""
 
     def __init__(self, hidden_size, vocab_size, output_dim=None):
         super().__init__()
@@ -452,6 +454,29 @@ class ModularDiT(TextDiT):
         width = layer.linear.out_features if layer is not None else len(self.output.embedding)
         return self.output_vocab_size or width
 
+    def bind_views(self, views, *, fusion=None, fp32_clean_embedding=False):
+        """Replace the token input with ``views`` that share its embedding table.
+
+        A one-view (or hybrid) token recipe built from a token network: the first
+        view's TokenRepresentation takes the input's table, so parameters, their
+        order and initialization are unchanged and no random numbers are drawn.
+        """
+        from core.representations.noisy_inputs import TokenRepresentation
+
+        if self.views is not None:
+            raise ValueError("this network already has views")
+        if type(self.input) is not TokenInput:
+            raise TypeError("only a token-input network binds views; pass views to HybridDiffusion")
+        if not isinstance(views[0].representation, TokenRepresentation):
+            raise TypeError("the network's token table needs a TokenRepresentation view")
+        table = self.input.table
+        with torch.random.fork_rng(devices=[]):
+            views_input = ViewsInput(views, self.vocab_size, table.shape[1], fusion=fusion)
+        views[0].representation.embedding = table
+        views[0].representation.fp32_clean_embedding = bool(fp32_clean_embedding)
+        self.input = views_input
+        return self
+
     def prepare(self, states, points, global_time, *, self_condition=None, apply_conditioning=True):
         """Noisy inputs -> (hidden, AdaLN condition), outside autocast."""
         with torch.autocast(states[0].device.type, enabled=False):
@@ -480,9 +505,9 @@ class ModularDiT(TextDiT):
     def clean_token_hidden(self, tokens, encode=None):
         """Clean-stream inputs from token ids for a single-state input slot.
 
-        Token tables embed the ids (the legacy DiT/SimplexDiT prefix); other
+        Token tables embed the ids; other
         slots run the encoded clean state at time 0, sigma 0, alpha 1 without
-        self-conditioning (the legacy ContinuousDiT prefix).
+        self-conditioning.
         """
         if self.views is not None:
             width = self.output_width

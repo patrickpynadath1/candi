@@ -54,11 +54,10 @@ ORIGINAL_NAMES = [
 
 def candi_module(seed, n_blocks=1):
     from core.sweeps import compose
-    from core.tests.view_equivalence import SMALL
     from core.training.module import TrainingModule
 
     config = compose("candi_hybrid", {
-        **SMALL, "model.n_blocks": n_blocks, "model.views.0.representation.hidden_size": 32,
+        "model.hidden_size": 32, "model.n_heads": 2, "model.cond_dim": 16, "model.dropout": 0, "model.n_blocks": n_blocks, "model.views.0.representation.hidden_size": 32,
         "training.ema": 0.9, "sampler.steps": 40,
     })
     torch.manual_seed(seed)

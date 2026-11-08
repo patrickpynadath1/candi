@@ -45,12 +45,12 @@ def map_legacy_candi_state(state_dict, algorithm):
     """Today's algorithm state from a ``legacy_candi_state`` result.
 
     The original backbone is a DiT whose keys are those of the pre-ModularDiT
-    ``HybridModel`` backbone; every view with a token table shares its input
+    original hybrid backbone; every view with a token table shares its input
     embedding. ``convert_hybrid_state_dict`` renames that layout for the view
     ModularDiT. Every trainable tensor must come from the checkpoint; buffers
     the original did not hold (fixed by the config) keep their built values.
     """
-    from core.models.legacy import convert_hybrid_state_dict
+    from .checkpoint_imports import convert_hybrid_state_dict
 
     target = OrderedDict(algorithm.state_dict())
     if not any(key.startswith("model.input.views.") for key in target):
