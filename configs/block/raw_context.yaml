@@ -1,0 +1,9 @@
+# @package _global_
+# No encoder: 8 decoder layers attend to the clean context's token embeddings
+# (EncoderDecoderModel at encoder depth 0; same visibility and K/V cache as E2D2).
+model:
+  n_blocks: 8
+encoder_decoder:
+  encoder_layers: 0
+preparation:
+  recipe_name: raw-context-decoder-8
