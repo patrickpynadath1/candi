@@ -37,7 +37,11 @@ class StoryBPETokenizer:
     def __init__(self, path):
         from tokenizers import Tokenizer
 
-        content = Path(path).read_bytes()
+        path = Path(path)
+        if not path.is_absolute() and not path.exists():
+            # Repository-relative (e.g. artifacts/tokenizers/...), from any working dir.
+            path = Path(__file__).resolve().parents[2] / path
+        content = path.read_bytes()
         self.cache_identity = hashlib.sha256(content).hexdigest()
         self.tokenizer = Tokenizer.from_str(content.decode("utf-8"))
         state = json.loads(content)

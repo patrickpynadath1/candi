@@ -16,10 +16,11 @@ FIXTURE = Path(__file__).with_name("fixtures") / "sampler_behavior.json"
 # defined on the CPU kernels that recorded them. Other platforms (e.g. ARM macOS)
 # round differently in the last bits; the samplers' math is covered elsewhere.
 REFERENCE_PLATFORM = ("Linux", "x86_64")
-pytestmark = pytest.mark.skipif(
+on_reference_platform = pytest.mark.skipif(
     (platform.system(), platform.machine()) != REFERENCE_PLATFORM,
     reason="byte-level sampler snapshots were recorded on Linux x86_64",
 )
+CASES = json.loads(FIXTURE.read_text()) if FIXTURE.exists() else []
 
 
 @pytest.fixture(autouse=True)
@@ -112,13 +113,22 @@ def behavior(case):
     )
 
 
-@pytest.mark.parametrize(
-    "case",
-    json.loads(FIXTURE.read_text()) if FIXTURE.exists() else [],
-    ids=lambda c: c["name"],
-)
+@on_reference_platform
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c["name"])
 def test_legacy_behavior(case):
     assert behavior(case) == case["expected"]
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c["name"])
+def test_portable_behavior(case):
+    """Any platform: repeatable, same NFE accounting and trace length, prompts kept."""
+    actual = behavior(case)
+    assert actual == behavior(case)
+    assert actual["info"] == case["expected"]["info"]
+    assert len(actual["states"]) == len(case["expected"]["states"])
+    assert actual["tokens"][0] == [1, 2, 3, 4, 5]
+    assert actual["tokens"][1][0] == 2
+    assert all(0 <= token < 12 for row in actual["tokens"] for token in row)
 
 
 if __name__ == "__main__":

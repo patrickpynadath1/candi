@@ -1,0 +1,57 @@
+{
+  "source": "huggingface:roneneldan/TinyStories@f54c09fd23315a6f9c86f9dc80f725de7d8f9c64/data",
+  "vocab_sizes": [
+    260,
+    500,
+    1000,
+    5000,
+    10000
+  ],
+  "special_tokens": [
+    "<pad>",
+    "<bos>",
+    "<eos>",
+    "<mask>"
+  ],
+  "preprocessing": "strip only; preserve case and Unicode",
+  "training_split": "train",
+  "method": "byte BPE; nested prefixes of one learned merge sequence",
+  "sequence_length_convention": "content tokens; BOS/EOS reported separately; no truncation or filtering",
+  "files": {
+    "train": [
+      {
+        "name": "train-00000-of-00004-2d5a1467fff1081b.parquet",
+        "rows": 529930,
+        "sha256": "77cf780cebe52b6e83e3a2ac84bc56d8059363113e41d17a023f1d8b2ed0fc0b"
+      },
+      {
+        "name": "train-00001-of-00004-5852b56a2bd28fd9.parquet",
+        "rows": 529930,
+        "sha256": "e2f173a6dcc2b5895183e8ad376e115bd5c06764eb0cfc01ce1add156b2d017f"
+      },
+      {
+        "name": "train-00002-of-00004-a26307300439e943.parquet",
+        "rows": 529930,
+        "sha256": "cac73cd1a0973a7fccde022a5a5c78f8ba58ea6849541835c58e7c5fc747f2ef"
+      },
+      {
+        "name": "train-00003-of-00004-d243063613e5a057.parquet",
+        "rows": 529929,
+        "sha256": "862514ae75723ddd339337f1ef7617b88f82290dcddd57445e1d38d257ca7891"
+      }
+    ],
+    "validation": [
+      {
+        "name": "validation-00000-of-00001-869c898b519ad725.parquet",
+        "rows": 21990,
+        "sha256": "33406a6206554cfc279c29c11f4df51528af487aa1a602b075566fc83c49dcab"
+      }
+    ]
+  },
+  "versions": {
+    "tokenizers": "0.22.2",
+    "pyarrow": "24.0.0"
+  },
+  "status": "complete",
+  "validation_roundtrip_verified": true
+}

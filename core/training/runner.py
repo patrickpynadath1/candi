@@ -89,7 +89,11 @@ def run(config):
         try:
             if tracking is not None and trainer.is_global_zero:
                 tracking_run = tracking.experiment
-            trainer.fit(module, datamodule=data, ckpt_path=config.checkpoint.resume)
+            # Full training checkpoints hold optimizer and NumPy RNG state, which
+            # torch>=2.6 refuses to unpickle under its weights_only default.
+            trainer.fit(
+                module, datamodule=data, ckpt_path=config.checkpoint.resume, weights_only=False
+            )
             final_checkpoint = output / "checkpoints" / "last.ckpt"
             trainer.save_checkpoint(final_checkpoint)
             exit_code = 0

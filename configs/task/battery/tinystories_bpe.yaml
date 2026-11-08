@@ -1,13 +1,13 @@
 # @package _global_
-# Saved BPE tokenizer; override vocabulary_size and tokenizer_path together.
-# Existing byte-only caches and model jobs remain unchanged.
+# TinyStories with a saved byte-level BPE tokenizer (artifacts/tokenizers/tinystories-bpe).
 defaults:
 - /task/battery/tinystories
 - override /token_space@token_space: tinystories
 - _self_
 bpe:
   vocabulary_size: 10000
-  tokenizer_path: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:DUO_CACHE,${oc.env:HOME}/.cache/duo}}/tokenizers/tinystories-bpe-20261102/bpe-${bpe.vocabulary_size}.json
+  # Relative paths resolve against the repository root (artifacts/ is versioned).
+  tokenizer_path: artifacts/tokenizers/tinystories-bpe/bpe-${bpe.vocabulary_size}.json
 task:
   vocab_size: ${bpe.vocabulary_size}
   length: 512
