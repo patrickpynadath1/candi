@@ -25,6 +25,7 @@ REFERENCE = {
     "core.algorithms.uniform_diffusion.UniformDiffusion": (
         "core.tests.reference_algorithms.uniform_diffusion.UniformDiffusion"
     ),
+    "core.algorithms.duo.Duo": "core.tests.reference_algorithms.duo.Duo",
 }
 
 # preset -> overrides; every option the uniform presets use.
@@ -43,6 +44,8 @@ VARIANTS = {
         {"task.length": 16, "block_diffusion.block_size": 4},
     ),
     "tinygsm_uniform_sc": ("tinygsm_uniform_sc", {"task.length": 16}),
+    "duo": ("duo", {}),
+    "duo_sc": ("duo", {"self_conditioning.enabled": True}),
 }
 
 
@@ -116,6 +119,12 @@ TRAINING = [
     ("blockgen_uniform", {}),
     ("tinygsm_blockgen_uniform", {}),
     ("tinygsm_uniform_sc", {}),
+    ("duo", {"step": 0}),  # Relaxation before the curriculum ramp.
+    ("duo", {"step": 2}),  # Inside the ramp.
+    ("duo", {"step": 3}),  # Inclusive final relaxation step.
+    ("duo", {"step": 4}),  # Plain uniform loss after end_step.
+    ("duo_sc", {"step": 2}),
+    ("duo_sc", {"step": 4}),
 ]
 
 
@@ -135,7 +144,7 @@ def test_block_mixture_training_is_identical(size, duo_table):
     )
 
 
-@pytest.mark.parametrize("variant", ["uniform_diffusion"])
+@pytest.mark.parametrize("variant", ["uniform_diffusion", "duo"])
 def test_evaluation_loss_is_identical(variant, duo_table):
     cfg, reference, current = pair(variant, duo_table)
     tokens, mask = batch(cfg)
@@ -183,6 +192,8 @@ SAMPLING_VARIANTS = [
     "blockgen_uniform",
     "tinygsm_blockgen_uniform",
     "tinygsm_uniform_sc",
+    "duo",
+    "duo_sc",
 ]
 
 

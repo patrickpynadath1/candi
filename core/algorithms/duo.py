@@ -1,13 +1,40 @@
-"""DUO curriculum orchestration over uniform diffusion and Gaussian relaxation."""
+"""DUO curriculum orchestration over uniform diffusion and Gaussian relaxation.
+
+Outside the curriculum (after ``end_step``, or when not training) DUO is the
+plain uniform recipe. Inside it, the network reads a softened Gaussian
+relaxation of the one-hot tokens instead of a uniform-corrupted token state.
+"""
+
+from torch.nn import functional as F
 
 from .uniform_diffusion import UniformDiffusion
-from .discrete import reduce_token_loss
 from .adaptive import observe_training_loss
-from core.representations.one_hot import OneHotRepresentation
+from .training_loss import reduce_token_loss
+from core.modifiers.hybrid.views import ViewPoint
 from core.processes.gaussian import GaussianProcess
+from core.representations.noisy_inputs import TokenRepresentation
+from core.representations.one_hot import OneHotRepresentation
+
+
+class SoftTokenRepresentation(TokenRepresentation):
+    """Token ids, or [B, L, V] scores embedded as their softmax expectation.
+
+    The scores branch is the DiT ``EmbeddingLayer``'s soft input: softmax and
+    the expected embedding in FP32, returned in the scores' dtype.
+    """
+
+    def to_model_embedding(self, state, point):
+        if state.ndim == 2:
+            return super().to_model_embedding(state, point)
+        if state.ndim != 3:
+            raise ValueError("soft token states must be [batch, length, vocab]")
+        expected = F.softmax(state, dim=-1).float() @ self._table().float()
+        return expected.to(state.dtype) * self.scale
 
 
 class Duo(UniformDiffusion):
+    representation_type = SoftTokenRepresentation
+
     def __init__(
         self,
         *args,
@@ -19,10 +46,10 @@ class Duo(UniformDiffusion):
     ):
         super().__init__(*args, **kwargs)
         self.calibration, self.curriculum = calibration, curriculum
-        self.relaxation_process, self.representation = (
-            relaxation_process,
-            representation,
-        )
+        # ``representation`` names the uniform view's token representation
+        # (OneViewAlgorithm); the one-hot relaxation encoding is separate.
+        self.relaxation_process = relaxation_process
+        self.relaxation_representation = representation
         if not isinstance(representation, OneHotRepresentation) or not isinstance(
             relaxation_process, GaussianProcess
         ):
@@ -45,6 +72,7 @@ class Duo(UniformDiffusion):
         *,
         step=0,
         training=False,
+        sequence_layout=None,
         **time_context,
     ):
         if not self.curriculum.use_relaxation(step, training):
@@ -54,37 +82,43 @@ class Duo(UniformDiffusion):
                 corruption_mask,
                 step=step,
                 training=training,
+                sequence_layout=sequence_layout,
                 **time_context,
             )
         if corruption_mask is None:
             corruption_mask = loss_mask
-        times = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
-        keep, derivative = self.schedule(times)
-        noise = self.calibration(keep, derivative)
-        clean = self.representation.encode(tokens)
+        time = self.time_sampler.sample(len(tokens), tokens.device, **time_context)
+        (local,) = self.points(
+            time,
+            training=True,
+            corruption_mask=corruption_mask,
+            sequence_layout=sequence_layout,
+        )
+        noise = self.calibration(*local.coefficients)
         relaxed = self.relaxation_process.corrupt(
-            clean, noise.alpha, noise.sigma, corruption_mask
+            self.relaxation_representation.encode(tokens),
+            noise.alpha,
+            noise.sigma,
+            corruption_mask,
         )
-        relaxed = relaxed * self.curriculum.inverse_temperature(step)
-        # The model's soft-input embedding applies softmax to these scaled
+        # The view's soft-input embedding applies softmax to these scaled
         # scores; the plug-in predictor separately normalizes output logits.
-        discrete_state = relaxed.argmax(-1)
-        prediction = self.training_prediction(relaxed, noise.keep)
-        losses = self.objective(
-            prediction,
-            discrete_state,
-            tokens,
-            noise.keep[:, None],
-            noise.derivative[:, None],
+        relaxed = relaxed * self.curriculum.inverse_temperature(step)
+        # Time conditioning and the objective use the calibrated keep rate.
+        calibrated = (ViewPoint(local.time, (noise.keep, noise.derivative)),)
+        prediction = self.training_prediction((relaxed,), calibrated, time)
+        per_token = self._objective(
+            self.objective, prediction, tokens, time, calibrated, (relaxed.argmax(-1),)
         )
+        # Only the schedule observes relaxed losses; the time sampler does not.
         observe_training_loss(
             self.schedule,
-            times,
+            time,
             prediction,
             tokens,
-            losses,
+            per_token,
             loss_mask,
             step=step,
             training=training,
         )
-        return reduce_token_loss(losses, loss_mask)
+        return reduce_token_loss(per_token, loss_mask)
