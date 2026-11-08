@@ -1,0 +1,59 @@
+# @package _global_
+# Sampler policies for single-view diffusion recipes: the native (ancestral) sampler,
+# its greedy variant, entropy-bounded greedy decoding and forward re-noising (sampled
+# and greedy). Each is tuned on validation; only the best one sees the test split.
+preparation:
+  inference:
+  - name: native
+    space:
+      algorithm.predictor.temperature: {type: float, low: 0.5, high: 1.5}
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+    trials: 16
+    budget_parameter: steps
+  - name: native_greedy
+    space:
+      sampler.final_denoise: [greedy, sample]
+    trials: 2
+    budget_parameter: steps
+    sampler_overrides:
+      greedy_clean_estimate: true
+  - name: eb_greedy
+    sampler:
+      _target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
+      steps: 127
+      freeze: true
+      greedy_clean_estimate: true
+      entropy_bound: 0.1
+    space:
+      algorithm.predictor.temperature: {type: float, low: 0.5, high: 1.5}
+      sampler.entropy_bound: {type: float, low: 0.02, high: 0.5, log: true}
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+      sampler.entropy_bound: 0.1
+    trials: 16
+    budget_parameter: steps
+  - name: renoising
+    sampler:
+      _target_: core.samplers.forward_resampling.ForwardResamplingSampler
+      steps: 127
+      epsilon: 1.0e-5
+      greedy_clean_estimate: false
+      final_denoise: greedy
+    space:
+      algorithm.predictor.temperature: {type: float, low: 0.5, high: 1.5}
+    initial_points:
+    - algorithm.predictor.temperature: 1.0
+    trials: 16
+    budget_parameter: steps
+  - name: renoising_greedy
+    sampler:
+      _target_: core.samplers.forward_resampling.ForwardResamplingSampler
+      steps: 127
+      epsilon: 1.0e-5
+      greedy_clean_estimate: true
+      final_denoise: greedy
+    space:
+      sampler.final_denoise: [greedy, sample]
+    trials: 2
+    budget_parameter: steps

@@ -1,0 +1,11 @@
+# @package _global_
+# Uniform-noise discrete diffusion with a posterior cross-entropy, no self-conditioning.
+defaults:
+- /experiment: corruption_factorial
+- /sweep/common
+- /ablation_path: uniform
+- /feedback: none
+- /inference_policies: hybrid_renoising
+- _self_
+preparation:
+  recipe_name: ${preparation.path_name}-${preparation.feedback_name}

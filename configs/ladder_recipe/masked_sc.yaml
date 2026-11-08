@@ -1,0 +1,6 @@
+# @package _global_
+# Masked diffusion (ELBO) with posterior-mean self-conditioning.
+defaults:
+- masked
+- override /feedback: expected_embedding
+- _self_
