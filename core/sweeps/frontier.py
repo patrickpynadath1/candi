@@ -1,5 +1,9 @@
 """Resumable evaluation grids and task-independent Pareto summaries.
 
+    uv run --locked python -m core.sweeps.frontier [overrides]   (from the repo root)
+
+The root config is configs/frontier.yaml; presets are in configs/inference/frontier/.
+
 Each point runs the normal root entrypoint in a fresh process, so model/scorer
 memory is released between points. Sampling, metrics and checkpoint loading
 remain owned by their existing components.
@@ -243,3 +247,21 @@ def run(config, *, evaluation_entrypoint):
         summarize(output, rows, objectives, options["group_by"])
     print(f"Completed {len(rows)} evaluations: {output / 'frontiers.csv'}", flush=True)
     return rows
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def main():
+    import hydra
+
+    @hydra.main(version_base=None, config_path=str(ROOT / "configs"), config_name="frontier")
+    def frontier(config):
+        run(config, evaluation_entrypoint=ROOT / "main.py")
+
+    frontier()
+
+
+if __name__ == "__main__":
+    main()
+

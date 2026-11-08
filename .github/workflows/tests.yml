@@ -17,7 +17,7 @@ jobs:
       - name: Install the locked environment
         run: uv sync --locked --python 3.10 --extra tuning --extra scoring --extra tracking --extra mazes
       - name: Lint
-        run: uv run --locked ruff check core main.py frontier.py scripts experiments
+        run: uv run --locked ruff check core main.py scripts experiments
       - name: Test (CPU; CUDA-only tests skip)
         env:
           OMP_NUM_THREADS: "2"

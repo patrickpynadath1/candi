@@ -9,12 +9,12 @@ on Linux x86_64. Always run through the lock, never system Python.
 uv sync --locked --extra tuning --extra scoring --extra tracking --extra mazes
 uv run --locked --extra tuning --extra scoring --extra tracking --extra mazes pytest -q core/tests
 uv run --locked pytest -q core/tests/test_mdlm.py::test_name      # one test
-uv run --locked ruff check core main.py frontier.py scripts experiments
+uv run --locked ruff check core main.py scripts experiments
 
 uv run --locked python main.py +experiment=smoke               # CPU smoke run: 2 steps of tiny MDLM on Sudoku
 uv run --locked python main.py +experiment=<name> --cfg job    # print the composed config without running
 uv run --locked python main.py mode=evaluate evaluation.checkpoint=/path/last.ckpt   # mode: train|evaluate|sample
-uv run --locked python frontier.py evaluation.checkpoint=/path/last.ckpt            # pretrained sampling grid
+uv run --locked python -m core.sweeps.frontier evaluation.checkpoint=/path/last.ckpt   # pretrained sampling grid
 ```
 
 `uv run --locked python scripts/doctor.py --smoke --tests` checks the environment, data
@@ -29,7 +29,7 @@ that recorded them and run only with `SDDC_BYTE_SNAPSHOTS=1`. `docs/validation/c
 ## Configuration model
 
 - `main.py` → `core/training/runner.py:run`, composed from `configs/config.yaml`;
-  `frontier.py` uses `configs/frontier.yaml`.
+  `python -m core.sweeps.frontier` uses `configs/frontier.yaml`.
 - Each component is a Hydra group with a `_target_`; algorithm configs reference
   `${model}`, `${process}`, `${parameterization}`, etc. Constructors receive explicit
   dependencies, never the whole root config.

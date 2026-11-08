@@ -114,7 +114,7 @@ see [remote execution](docs/guides/remote-execution.md).
 | `configs/` | Hydra groups under `information_path/`, `denoising_task/`, `inference/`, `modifiers/` and `training/`, recipe presets (`experiment/`) and sweeps (`sweep/`); see [configs/README.md](configs/README.md) |
 | `experiments/` | the worked examples |
 | `docs/` | concepts, component references, guides; start at [docs/index.md](docs/index.md) |
-| `main.py`, `frontier.py` | train/evaluate/sample, and pretrained sampling grids |
+| `main.py` | train, evaluate or sample (`python -m core.sweeps.frontier` runs pretrained sampling grids) |
 | `scripts/` | data preparation, remote execution, the compatibility-table generator |
 
 ## Development
@@ -122,7 +122,7 @@ see [remote execution](docs/guides/remote-execution.md).
 ```bash
 uv sync --locked --extra tuning --extra scoring --extra tracking --extra mazes
 uv run --locked pytest -q core/tests
-uv run --locked ruff check core main.py frontier.py scripts experiments
+uv run --locked ruff check core main.py scripts experiments
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the ownership boundaries and conventions,

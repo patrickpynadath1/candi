@@ -1,7 +1,8 @@
 # Configs
 
 Hydra configs, laid out like a recipe ([docs/concepts/recipe.md](../docs/concepts/recipe.md)).
-`config.yaml` is the root for `main.py`; `frontier.yaml` is the root for `frontier.py`.
+`config.yaml` is the root for `main.py`; `frontier.yaml` is the root for
+`python -m core.sweeps.frontier`.
 
 | Folder | What it holds | Groups |
 | --- | --- | --- |

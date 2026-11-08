@@ -80,7 +80,7 @@ Use [configuration](concepts/configuration.md) to understand overrides,
 
 ```bash
 uv run pytest -q core/tests
-uv run ruff check core main.py frontier.py
+uv run --locked ruff check core main.py scripts experiments
 ```
 
 CUDA-specific tests require visible GPUs. Core unit/integration tests use small

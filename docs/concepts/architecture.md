@@ -39,7 +39,7 @@ branch states; autoregressive generation has no diffusion schedule.
 | Location | Contents |
 | --- | --- |
 | `main.py` | Hydra entrypoint for training, evaluation, and sampling. |
-| `frontier.py` | Hydra entrypoint for pretrained evaluation grids. |
+| `python -m core.sweeps.frontier` | Hydra entrypoint for pretrained evaluation grids. |
 | `configs/` | Component groups and experiment recipes. |
 | `core/algorithms/` | Training and prediction coordination. |
 | `core/training/` | Lightning lifecycle, runners, checkpoint/EMA handling. |

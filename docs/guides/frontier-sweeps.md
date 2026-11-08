@@ -1,6 +1,6 @@
 # Frontier sweeps
 
-`uv run python frontier.py` evaluates a Cartesian grid using the
+`uv run --locked python -m core.sweeps.frontier` evaluates a Cartesian grid using the
 normal `main.py` entrypoint. It loads pretrained weights; it does not train.
 Each point runs in a fresh process and uses the same task metrics as standalone
 evaluation. GPU selection is inherited from `CUDA_VISIBLE_DEVICES`.
@@ -11,7 +11,7 @@ Use the same architecture, token space, schedule, and modifiers as the checkpoin
 For an original MDLM checkpoint trained with the small 768-wide, 12-layer DiT:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 uv run python frontier.py \
+CUDA_VISIBLE_DEVICES=0 uv run --locked python -m core.sweeps.frontier \
   +experiment=openwebtext inference/frontier=openwebtext inference/sampler=ancestral \
   model.time.adaLN=true \
   evaluation.checkpoint=/absolute/path/to/pretrained.ckpt \

@@ -46,7 +46,7 @@ before starting; each ends with the check that shows the work is done.
 uv sync --locked --extra tuning --extra scoring --extra tracking --extra mazes
 uv run --locked python scripts/doctor.py --smoke          # environment, data and a 2-step CPU run
 uv run --locked pytest -q core/tests                      # full suite
-uv run --locked ruff check core main.py frontier.py scripts experiments
+uv run --locked ruff check core main.py scripts experiments
 uv run --locked python main.py +experiment=<preset> --cfg job   # print a composed config
 ```
 
