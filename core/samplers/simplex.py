@@ -6,6 +6,7 @@ from .loop import FixedGridLoop
 from core.modifiers.self_conditioning.session import prediction_session
 from core.time_sampling.simplex_grid import SimplexInferenceGrid
 from .simplex_utils import guided_log_probs, confidence_commit
+from .view_calls import is_view_algorithm, predict
 
 
 class SimplexBridgeSampler:
@@ -64,15 +65,21 @@ class SimplexBridgeSampler:
                     "classifier-free guidance requires condition-dropout training"
                 )
         tokens = None
+        # A view recipe (SimplexDiffusion) takes one state per view and points.
+        call = (
+            predict
+            if is_view_algorithm(algo)
+            else lambda session, value, time: session.sampling_prediction(value, time)
+        )
 
         def update(state, time, next_time, index):
             nonlocal tokens
             state = torch.where(mask, prompt, state)
             t = time.expand(batch)
-            prediction = conditional.sampling_prediction(state, t.float())
+            prediction = call(conditional, state, t.float())
             if self.guidance is not None:
-                unconditioned = unconditional.sampling_prediction(
-                    state.masked_fill(mask, -torch.inf), t.float()
+                unconditioned = call(
+                    unconditional, state.masked_fill(mask, -torch.inf), t.float()
                 )
                 prediction = guided_log_probs(unconditioned, prediction, self.guidance)
             tokens = torch.distributions.Categorical(logits=prediction).sample()
