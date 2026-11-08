@@ -32,15 +32,15 @@ prediction:
 optimizer:
   groups:
   - patterns:
-    - representation.table
-    - schedule.input_weight
-    - schedule.bias
-    - schedule.output_weight
+    - own_views.0.representation.table
+    - own_views.0.schedule.input_weight
+    - own_views.0.schedule.bias
+    - own_views.0.schedule.output_weight
     lr: 0.01
     weight_decay: 0.0
   - patterns:
-    - schedule.gamma_min
-    - schedule.gamma_max
+    - own_views.0.schedule.gamma_min
+    - own_views.0.schedule.gamma_max
     lr: 0.01
     weight_decay: 0.1
 sampler:

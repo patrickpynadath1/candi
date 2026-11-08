@@ -202,7 +202,7 @@ def test_complete_loss_bootstrap_sampler_and_optimizer(source):
     seen = []
     handle = algorithm.model.register_forward_hook(
         lambda model, args, kwargs, output: seen.append(
-            (len(args[0]), torch.is_grad_enabled(), kwargs.get("self_condition"))
+            (len(args[0][0]), torch.is_grad_enabled(), kwargs.get("self_condition"))
         ),
         with_kwargs=True,
     )
@@ -325,7 +325,7 @@ def test_public_training_prediction_subsets_prior_context():
     algorithm = instantiate(config().algorithm)
     state = torch.randn(8, 5, 16)
     time = torch.linspace(0.1, 0.9, 8)
-    prediction = algorithm.training_prediction(state, time, algorithm.schedule(time))
+    prediction = algorithm.training_prediction((state,), algorithm.points(time), time)
     assert prediction.shape == (8, 5, 12)
     assert torch.isfinite(prediction).all()
     torch.testing.assert_close(prediction.exp().sum(-1), torch.ones(8, 5))
@@ -384,7 +384,7 @@ def test_corrected_sampler_bootstraps_same_state_clamps_prompts_and_noises_final
     calls, noises = [], []
 
     def record(model, args, kwargs, output):
-        calls.append((args[0].clone(), kwargs.get("self_condition")))
+        calls.append((args[0][0].clone(), kwargs.get("self_condition")))
 
     handle = algo.model.register_forward_hook(record, with_kwargs=True)
     original = algo.process.reverse_posterior
