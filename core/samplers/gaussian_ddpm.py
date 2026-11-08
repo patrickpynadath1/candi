@@ -22,6 +22,7 @@ class GaussianDDPMSampler:
         self_conditioning_mode="previous",
         prompt_mode="noisy",
         final_transition_noise=False,
+        self_conditioning=True,
     ):
         if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
             raise ValueError("steps must be a positive integer")
@@ -33,7 +34,8 @@ class GaussianDDPMSampler:
             raise ValueError("self_conditioning_mode must be previous or bootstrap")
         if prompt_mode not in {"clean", "noisy"}:
             raise ValueError("prompt_mode must be clean or noisy")
-        self.self_conditioning_mode = self_conditioning_mode
+        # Without self-conditioning there is nothing to bootstrap; one call per step.
+        self.self_conditioning_mode = self_conditioning_mode if self_conditioning else "previous"
         self.prompt_mode = prompt_mode
         self.final_transition_noise = final_transition_noise
         self.prior_mode = prior_mode

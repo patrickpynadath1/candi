@@ -236,17 +236,18 @@ def test_self_conditioning_selects_spans_not_batch_dimension():
 
 
 @pytest.mark.parametrize('length', [1, 2, 31, 32, 128, 494, 495, 512])
-def test_tinygsm_schedule_terminal_leakage(length):
+def test_bounded_schedule_terminal_leakage(length):
     from core.sweeps.configuration import compose
     from hydra.utils import instantiate
-    cfg = compose('tinygsm_blurring_sc_adaptive')
+    # terminal_mean=0.02 bounds terminal signal leakage for spans up to 512 tokens.
+    cfg = compose('blurring_diffusion', {'noise_schedule.terminal_mean': 0.02, 'representation.dimension': 128})
     schedule = instantiate(cfg.noise_schedule)
     schedule.validate_shape(length, cfg.representation.dimension)
     endpoint = schedule.coefficients(torch.tensor([1.0], dtype=torch.float64), length, cfg.representation.dimension)
     assert endpoint.attenuation.square().max().item() * length < 0.1
 
 
-def test_original_blur_endpoint_rejects_tinygsm_length():
+def test_original_blur_endpoint_rejects_length_512():
     with pytest.raises(ValueError, match='terminal local-span signal leakage'):
         BlurringSchedule().validate_shape(512, 4)
 

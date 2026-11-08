@@ -17,7 +17,11 @@ from . import requirements
 
 class BlurAncestralSampler:
     def __init__(
-        self, steps=64, greedy_clean_estimate=False, self_conditioning_mode="previous"
+        self,
+        steps=64,
+        greedy_clean_estimate=False,
+        self_conditioning_mode="previous",
+        self_conditioning=True,
     ):
         if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
             raise ValueError("steps must be a positive integer")
@@ -25,7 +29,8 @@ class BlurAncestralSampler:
             raise ValueError("self_conditioning_mode must be previous or bootstrap")
         self.steps = steps
         self.greedy_clean_estimate = bool(greedy_clean_estimate)
-        self.self_conditioning_mode = self_conditioning_mode
+        # Without self-conditioning there is nothing to bootstrap; one call per step.
+        self.self_conditioning_mode = self_conditioning_mode if self_conditioning else "previous"
 
     def steps_for_nfe(self, nfe):
         """Each of steps + 1 predictions costs one call, two with SC bootstrap."""

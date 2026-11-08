@@ -1,7 +1,0 @@
-# @package _global_
-self_conditioning:
-  enabled: false
-sampler:
-  self_conditioning_mode: previous
-preparation:
-  sc_name: 'off'

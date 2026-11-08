@@ -110,3 +110,15 @@ def test_correction_rejects_no_compatible_view():
     algo = build_algorithm("gaussian", "uniform", "none")
     with pytest.raises(ValueError, match="spherical view with a score"):
         SphericalLangevinCorrector().validate(algo.views)
+
+
+@pytest.mark.parametrize("name", ["GaussianDDPMSampler", "BlurAncestralSampler"])
+def test_bootstrap_without_self_conditioning_costs_one_call_per_step(name):
+    from core.samplers.blur_ancestral import BlurAncestralSampler
+    from core.samplers.gaussian_ddpm import GaussianDDPMSampler
+
+    cls = {"GaussianDDPMSampler": GaussianDDPMSampler, "BlurAncestralSampler": BlurAncestralSampler}[name]
+    assert cls(self_conditioning_mode="bootstrap").steps_for_nfe(128) == 63
+    plain = cls(self_conditioning_mode="bootstrap", self_conditioning=False)
+    assert plain.self_conditioning_mode == "previous"
+    assert plain.steps_for_nfe(128) == 127

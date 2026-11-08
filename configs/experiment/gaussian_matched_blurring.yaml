@@ -1,0 +1,30 @@
+# @package _global_
+# Gaussian control for blurring_diffusion: the same network, representation,
+# objective and parameterization; only the corruption is isotropic Gaussian
+# instead of frequency-dependent blurring.
+defaults:
+- gaussian_base
+- override /model/input: linear
+- override /representation: centered_embedding
+- override /noise_schedule: embedding_sphere_rank
+- override /sampler: gaussian_ddpm
+- _self_
+model:
+  input:
+    preconditioning: none
+    bias: true
+  time:
+    coordinate: time
+  output:
+    output_dim: 256
+# The blurring schedule sets these; the Gaussian schedule has no frequency axis.
+representation:
+  feature_lambda_min: 0.25
+  feature_lambda_max: 1000000000.0
+sampler:
+  steps: 64
+  epsilon: 0.0
+  prior_mode: standard_normal
+  prompt_mode: clean
+  self_conditioning_mode: previous
+  final_transition_noise: false

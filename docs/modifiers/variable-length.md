@@ -336,23 +336,15 @@ longer words, special tokens, lengths and truncation together. The composite
 insertion objective is not a reported likelihood/perplexity and should not be
 compared numerically with another method's token-only loss.
 
-Reproduce the experiment recipes with:
+The insertion recipes are presets:
 
 ```bash
-uv run python main.py +experiment=text8_insertion_gaussian_sc_22m
-uv run python main.py +experiment=text8_insertion_masked_sc_22m
-uv run python main.py +experiment=text8_insertion_simplex_sc_22m
-uv run python main.py +experiment=text8_insertion_spherical_sc_22m
-uv run python main.py +experiment=text8_block_insertion_masked_sc_22m
-uv run python main.py +experiment=text8_block_insertion_gaussian_sc_22m
+uv run python main.py +experiment=insertion_continuous task=battery/text8 task.variable_length=true  # one continuous view
+uv run python main.py +experiment=insertion_hybrid task=battery/text8 task.variable_length=true      # Gaussian + masked views
+uv run python main.py +experiment=tinystories_insertion
 ```
 
-The recipes specify 5,000 optimizer steps, not a claim of convergence. Gaussian
-uses adaptive token-only time feedback; simplex and spherical include insertion
-losses; masked uses uniform time sampling. Block Gaussian also uses adaptive
-token-only feedback. The adaptive samplers warm up for 1,000 steps. Callback
-sampling uses 64 examples for whole-sequence runs and 8 for block runs.
-Check `config.yaml` for the resolved settings of a particular checkpoint.
+Add `block_diffusion.enabled=true` for blockwise insertion. Check `config.yaml` for the resolved settings of a particular checkpoint.
 
 Local evidence is saved under `core/outputs/<experiment>/`: resolved config,
 `metrics/version_*/metrics.csv`, `checkpoints/`, and

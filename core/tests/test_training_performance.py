@@ -71,21 +71,25 @@ def test_compiled_uniform_objective_matches_values_and_gradients():
     torch.testing.assert_close(right.grad, left.grad)
 
 
+ADAPTIVE = ["time_sampler=cdcd", "time_sampler.adaptive=true", "+algorithm.adaptive_time_views=[0]"]
+
+
 @pytest.mark.parametrize(
-    "experiment",
+    "experiment, overrides",
     [
-        "tinygsm_simplex_sc",
-        "tinygsm_uniform_sc",
-        "tinygsm_masked_gaussian_sc_adaptive",
-        "tinygsm_uniform_gaussian_sc_adaptive",
+        ("simplex", ["time_sampler=cdcd", "time_sampler.adaptive=true"]),
+        ("uniform_diffusion", []),
+        ("hybrid", ADAPTIVE),
+        ("hybrid", [*ADAPTIVE, "hybrid_view@model.views.second=uniform"]),
     ],
+    ids=["simplex", "uniform", "gaussian-masked", "gaussian-uniform"],
 )
-def test_all_tinygsm_variants_compile_and_preserve_checkpoint_layout(experiment):
+def test_self_conditioned_variants_compile_and_preserve_checkpoint_layout(experiment, overrides):
     from core.sweeps.configuration import compose
     from core.training.module import TrainingModule
     from core.training.performance import configure_performance
 
-    cfg = compose(experiment)
+    cfg = compose(experiment, [*overrides, "self_conditioning.enabled=true", "self_conditioning.source=hidden"])
     cfg.task = {
         "_target_": "core.tests.test_entrypoint.TinyTask",
         "vocab_size": 32,

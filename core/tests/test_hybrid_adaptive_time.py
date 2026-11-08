@@ -44,15 +44,6 @@ def test_loss_draws_uniform_and_observes_continuous_time(monkeypatch):
     torch.testing.assert_close(seen[0], torch.tensor([0.2, 0.5, 0.8]))
 
 
-@pytest.mark.parametrize('kind', ['masked', 'uniform'])
-def test_corrected_presets_select_gaussian_only(kind):
-    from core.sweeps.configuration import compose
-    cfg = compose(f'tinygsm_{kind}_gaussian_sc_adaptive')
-    assert list(cfg.algorithm.adaptive_time_views) == [0]
-    assert cfg.model.views.first.process._target_.endswith('.GaussianProcess')
-    assert cfg.time_sampler.adaptive
-
-
 def test_generation_uses_same_clock_mapping():
     from core.samplers.hybrid import HybridSampler
     algo = algorithm().eval()
@@ -69,7 +60,12 @@ def test_simplex_hybrid_local_time_training_and_generation(kind, monkeypatch):
     from hydra.utils import instantiate
     from core.sweeps.configuration import compose
     from core.training.module import TrainingModule
-    cfg = compose(f'tinygsm_simplex_{kind}_sc')
+    cfg = compose('hybrid', [
+        'time_sampler=cdcd', 'time_sampler.adaptive=true',
+        'hybrid_view@model.views.first=simplex', f'hybrid_view@model.views.second={kind}',
+        '+algorithm.adaptive_time_views=[0]', 'self_conditioning.enabled=true',
+        'self_conditioning.source=hidden', 'self_conditioning.probability=0.9',
+    ])
     assert list(cfg.algorithm.adaptive_time_views) == [0]
     assert cfg.model.views.first.process._target_.endswith('.DirichletProcess')
     cfg.task = {'_target_': 'core.tests.test_entrypoint.TinyTask', 'vocab_size': 32, 'length': 8}

@@ -4,9 +4,16 @@ from hydra.utils import instantiate
 from core.sweeps.configuration import compose
 
 
-@pytest.mark.parametrize('family', ['blurring', 'gaussian'])
+ADAPTIVE = ['time_sampler=cdcd', 'time_sampler.adaptive=true']
+RECIPES = {
+    'blurring': ('blurring_diffusion', ADAPTIVE),
+    'gaussian': ('gaussian_base', [*ADAPTIVE, 'representation=embedding', 'noise_schedule=embedding_sphere_rank']),
+}
+
+
+@pytest.mark.parametrize('family', sorted(RECIPES))
 def test_loss_sampler_observes_training_but_not_validation(family):
-    cfg = compose(f'tinygsm_{family}_sc_adaptive')
+    cfg = compose(*RECIPES[family])
     cfg.task.vocab_size = 11
     cfg.task.length = 7
     cfg.model.hidden_size = 16

@@ -144,19 +144,6 @@ def test_legacy_proposal_state_is_rejected():
         sampler().load_state_dict(LossDerivativeTimeSampler(adaptive=True).state_dict())
 
 
-def test_tinygsm_configs_use_cdcd():
-    from core.sweeps.configuration import compose
-    from hydra.utils import instantiate
-
-    for name in [
-        "tinygsm_blurring_sc_adaptive",
-        "tinygsm_gaussian_matched_blurring_sc_adaptive",
-        "tinygsm_masked_gaussian_sc_adaptive",
-        "tinygsm_uniform_gaussian_sc_adaptive",
-    ]:
-        assert isinstance(instantiate(compose(name).time_sampler), CDCDTimeSampler)
-
-
 def test_reset_sampler_gets_warmup_even_on_late_model_checkpoint():
     s = CDCDTimeSampler(adaptive=True, bins=8, warmup=2)
     t = torch.tensor([0.1, 0.5, 0.9])

@@ -4,4 +4,5 @@ epsilon: 1.0e-05
 prior_mode: schedule
 prompt_mode: clean
 self_conditioning_mode: previous
+self_conditioning: ${self_conditioning.enabled}
 final_transition_noise: false

@@ -79,11 +79,10 @@ that is not currently implemented.
 
 The [insertion/deletion reference](variable-length.md) explains the structural
 hazard, per-process birth laws, adaptive-time feedback and Text8 pilot evidence.
-Use these self-conditioned Text8 recipes:
+To combine the two, add `block_diffusion.enabled=true` to an insertion recipe:
 
 ```bash
-uv run python main.py +experiment=text8_block_insertion_masked_sc_22m
-uv run python main.py +experiment=text8_block_insertion_gaussian_sc_22m
+uv run python main.py +experiment=insertion_hybrid task=battery/text8 task.variable_length=true block_diffusion.enabled=true
 ```
 
 With clean-prefix caching, the model materializes clean-stream keys and values

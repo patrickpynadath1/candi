@@ -9,8 +9,8 @@ from core.noise_schedules.gaussian_path import GaussianPath
 
 
 def test_gaussian_control_uses_real_gaussian_and_identical_model():
-    blur = compose("tinygsm_blurring_sc_adaptive")
-    gaussian = compose("tinygsm_gaussian_matched_blurring_sc_adaptive")
+    blur = compose("blurring_diffusion")
+    gaussian = compose("gaussian_matched_blurring")
     for key in [
         "model",
         "representation",
@@ -37,7 +37,7 @@ def test_gaussian_control_uses_real_gaussian_and_identical_model():
     assert (
         gaussian.sampler._target_ == "core.samplers.gaussian_ddpm.GaussianDDPMSampler"
     )
-    assert gaussian.sampler.steps == blur.sampler.steps == 512
+    assert gaussian.sampler.steps == blur.sampler.steps
     assert gaussian.sampler.epsilon == 0 and gaussian.sampler.prompt_mode == "clean"
     assert (
         gaussian.sampler.self_conditioning_mode == blur.sampler.self_conditioning_mode
@@ -45,7 +45,7 @@ def test_gaussian_control_uses_real_gaussian_and_identical_model():
 
 
 def test_gaussian_control_learns_the_codebook_and_samples():
-    cfg = compose("tinygsm_gaussian_matched_blurring_sc_adaptive")
+    cfg = compose("gaussian_matched_blurring", ["time_sampler=cdcd", "time_sampler.adaptive=true"])
     cfg.task.vocab_size = 11
     cfg.task.length = 7
     cfg.model.hidden_size = 16

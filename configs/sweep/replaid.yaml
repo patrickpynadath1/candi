@@ -2,7 +2,7 @@
 defaults:
 - /experiment: replaid
 - common
-- /replaid_sc: 'off'
+- /sc: 'off'
 - override /task: battery/sudoku_hard
 - _self_
 model:
@@ -28,7 +28,7 @@ preparation:
 hydra:
   sweeper:
     params:
-      replaid_sc: off,on
+      sc: off,on
 self_conditioning:
   probability: 0.25
 algorithm:
