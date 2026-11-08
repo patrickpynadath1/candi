@@ -17,6 +17,9 @@ SKILLS = sorted((ROOT / ".claude" / "skills").glob("*/SKILL.md"))
 DOCS = [*SKILLS, ROOT / "AGENTS.md", ROOT / "configs" / "README.md"]
 TOP = ("core/", "configs/", "docs/", "scripts/", "experiments/", "artifacts/", ".claude/")
 PLACEHOLDER = re.compile(r"[<>*{}$]|\.\.\.")
+# Git-ignored runtime folders a skill may name (created on first run or by
+# scripts/cluster/entrypoint.sh); a fresh clone does not have them.
+RUNTIME = {"core/data_cache", "core/outputs"}
 
 
 def frontmatter(path):
@@ -69,7 +72,7 @@ def test_named_paths_presets_overrides_and_modules_exist(doc):
                 missing.append(f"link {value}")
             continue
         path = resolve_path(value)
-        if path is not None and not path.exists():
+        if path is not None and not path.exists() and str(path.relative_to(ROOT)) not in RUNTIME:
             missing.append(f"path {value}")
         for group, option in re.findall(r"^\+?(experiment|sweep)=([\w/]+)$", value):
             if not (ROOT / "configs" / group / f"{option}.yaml").exists():
