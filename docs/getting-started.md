@@ -4,7 +4,7 @@ Run commands from the repository root. The project uses Python 3.10+ and uv.
 
 ```bash
 uv sync --locked
-uv run python main.py --cfg job
+uv run --locked python main.py --cfg job
 ```
 
 The lockfile uses the PyTorch CUDA 12.1 index. A CUDA-capable environment is needed
@@ -34,7 +34,7 @@ sources and offline options.
 ## First training run
 
 ```bash
-uv run python main.py +experiment=smoke \
+uv run --locked python main.py +experiment=smoke \
   hydra.run.dir=core/outputs/getting_started
 ```
 
@@ -52,7 +52,7 @@ storage volume. Neither symlink target is part of the repository.
 Reuse the architecture settings from training:
 
 ```bash
-uv run python main.py +experiment=smoke mode=evaluate \
+uv run --locked python main.py +experiment=smoke mode=evaluate \
   evaluation.checkpoint=core/outputs/getting_started/checkpoints/last.ckpt \
   hydra.run.dir=core/outputs/getting_started_evaluation
 ```
@@ -63,13 +63,13 @@ not a separate metrics-free export path.
 
 ## Move to a real experiment
 
-The default `uv run python main.py` is the 20,000-step MDLM Sudoku-hard training
+The default `uv run --locked python main.py` is the 20,000-step MDLM Sudoku-hard training
 recipe on one GPU. Inspect settings before launching:
 
 ```bash
-uv run python main.py --cfg job
-uv run python main.py +experiment=openwebtext --cfg job
-uv run python main.py +experiment=gaussian_diffusion_sudoku --cfg job
+uv run --locked python main.py --cfg job
+uv run --locked python main.py +experiment=openwebtext --cfg job
+uv run --locked python main.py +experiment=gaussian_diffusion_sudoku --cfg job
 ```
 
 Use [configuration](concepts/configuration.md) to understand overrides,

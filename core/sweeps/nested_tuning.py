@@ -620,20 +620,31 @@ def run_case(spec, root, concurrency=4, retry_skipped=False):
         return _run_case(spec, root, concurrency, retry_skipped)
 
 
+def case_protocol(spec):
+    """What protocol.json records for a case: its spec and pinned config contents."""
+    config = OmegaConf.to_container(OmegaConf.load(spec["config"]), resolve=False)
+    if "wandb" in spec:
+        config["wandb"] = spec["wandb"]
+    return {"spec": spec, "config": config}
+
+
+def protocol_conflict(protocol, path):
+    """True when ``path`` holds a stored protocol a resume would refuse."""
+    return path.exists() and selection_protocol(
+        json.loads(path.read_text())
+    ) != selection_protocol(protocol)
+
+
 def _run_case(spec, root, concurrency, retry_skipped=False):
     validate(spec)
     spec = copy.deepcopy(spec)
     root = Path(root).resolve() / spec["name"]
     root.mkdir(parents=True, exist_ok=True)
     # Pin the configuration contents, not just its mutable filename.
-    config = OmegaConf.to_container(OmegaConf.load(spec["config"]), resolve=False)
-    if "wandb" in spec:
-        config["wandb"] = spec["wandb"]
-    protocol = {"spec": spec, "config": config}
+    protocol = case_protocol(spec)
+    config = protocol["config"]
     path = root / "protocol.json"
-    if path.exists() and selection_protocol(
-        json.loads(path.read_text())
-    ) != selection_protocol(protocol):
+    if protocol_conflict(protocol, path):
         raise ValueError("Protocol changed; use a new case name")
     save(path, protocol)
     pinned_config = root / "config.yaml"
@@ -752,10 +763,66 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
 run_study = run_case
 
 
+def check_manifest(specs, output=None):
+    """Validate every case without Ray or training; return (rows, errors).
+
+    With ``output``, also flag cases whose stored protocol.json a resume would
+    refuse. Each row is (case, training trials, policies, inference trials, NFE,
+    state) for a one-line summary per case.
+    """
+    rows, errors, names = [], [], set()
+    for spec in specs:
+        name = spec.get("name", "?")
+        try:
+            if name in names:
+                raise ValueError("Duplicate case name")
+            names.add(name)
+            validate(spec)
+            if not Path(spec["config"]).exists():
+                raise FileNotFoundError(f"config {spec['config']} is missing")
+            state = "new"
+            if output is not None:
+                stored = Path(output) / name / "protocol.json"
+                if protocol_conflict(case_protocol(spec), stored):
+                    raise ValueError(f"{stored} differs; a resume would refuse it")
+                state = "resumes" if stored.exists() else "new"
+        except Exception as error:  # report every bad case, not only the first
+            errors.append(f"{name}: {error}")
+            continue
+        policies = spec["inference"]
+        rows.append((
+            name,
+            spec["training"]["trials"],
+            len(policies),
+            sum(policy["trials"] for policy in policies),
+            policies[0].get("nfe", spec["evaluation"].get("nfe")),
+            state,
+        ))
+    return rows, errors
+
+
+def print_check(rows, errors):
+    header = ("case", "train", "policies", "inference", "nfe", "state")
+    width = max([len(header[0])] + [len(row[0]) for row in rows])
+    print(f"{header[0]:{width}}  " + "  ".join(f"{h:>9}" for h in header[1:]))
+    for row in rows:
+        print(f"{row[0]:{width}}  " + "  ".join(f"{str(v):>9}" for v in row[1:]))
+    trained = sum(row[1] for row in rows)
+    print(f"{len(rows)} cases, {trained} training runs, "
+          f"{sum(row[1] * row[3] for row in rows)} inference trials")
+    for error in errors:
+        print("ERROR", error)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Validate the manifest (and, with --output, stored protocols); run nothing",
+    )
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--address", default="auto")
     parser.add_argument(
@@ -775,6 +842,12 @@ def main():
         help="Retry candidates skipped after a failure (on_failure=skip) once more",
     )
     args = parser.parse_args()
+    if args.check:
+        rows, errors = check_manifest(json.loads(args.manifest.read_text()), args.output)
+        print_check(rows, errors)
+        raise SystemExit(1 if errors else 0)
+    if args.output is None:
+        parser.error("--output is required")
     if args.concurrency < 1 or args.case_concurrency < 1:
         parser.error("Concurrency must be positive")
     import ray

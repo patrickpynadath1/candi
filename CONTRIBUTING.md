@@ -17,7 +17,9 @@ uv run --locked python main.py mode=evaluate evaluation.checkpoint=/path/last.ck
 uv run --locked python frontier.py evaluation.checkpoint=/path/last.ckpt            # pretrained sampling grid
 ```
 
-The default `main.py` (no overrides) is a full GPU MDLM Sudoku-hard training run.
+`uv run --locked python scripts/doctor.py --smoke --tests` checks the environment, data
+caches and tokenizers, trains and evaluates the 2-step smoke model and runs a quick test
+subset. The default `main.py` (no overrides) is a full GPU MDLM Sudoku-hard training run.
 Outputs go to `core/outputs/` and dataset caches to `core/data_cache/`; both are
 Git-ignored. Tests start their own local Ray clusters. Some sampler tests compare
 against snapshots in `core/tests/fixtures/`; the byte-level ones hold only on the CPU
@@ -32,7 +34,7 @@ that recorded them and run only with `SDDC_BYTE_SNAPSHOTS=1`. `docs/validation/c
   `${model}`, `${process}`, `${parameterization}`, etc. Constructors receive explicit
   dependencies, never the whole root config.
 - Switching mathematical families needs a full recipe in `configs/experiment/`
-  (`# @package _global_`, `override /group: ...`). Changing only `algorithm=` does
+  (`# @package _global_`, `override /group: ...`). Changing only `denoising_task/algorithm=` does
   **not** swap the matching process, model, schedule or sampler. Copy a verified recipe
   and check it with `--cfg job`. Paper presets are listed in `docs/guides/paper-recipes.md`.
 - Experiment-level groups: `configs/sweep/` (Hydra multirun case expansion for

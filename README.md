@@ -50,9 +50,19 @@ git clone https://github.com/patrickpynadath1/sddc && cd sddc
 uv sync --locked --extra tuning --extra scoring
 ```
 
-Python 3.10. The lock pins PyTorch for CUDA 12.1 on Linux x86_64. Datasets are
-downloaded or prepared on first use; the TinyStories BPE tokenizers are in
+Python 3.10. The lock pins PyTorch for CUDA 12.1 on Linux x86_64, where it also runs on
+CPU. On macOS `uv sync --locked` cannot install torch; run GPU work on a server
+([remote execution](docs/guides/remote-execution.md)). Sudoku, N-Queens and mazes are
+generated on first use; text8 and TinyStories are prepared once with
+[`scripts/prepare_data.py`](scripts/prepare_data.py) ([text8](docs/tasks/text8.md),
+[TinyStories](docs/tasks/tinystories.md)). The TinyStories BPE tokenizers are in
 [`artifacts/tokenizers/`](artifacts/tokenizers/tinystories-bpe/).
+
+Check the install (environment, data caches, tokenizers and a 2-step CPU run):
+
+```bash
+uv run --locked --extra tuning --extra scoring python scripts/doctor.py --smoke
+```
 
 ## Quick start
 
@@ -81,7 +91,7 @@ cases.
 # 1. Expand a sweep into a plan of cases (no training).
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare -m \
   +sweep=sc_vs_depth preparation.output=$SDDC_STORAGE_ROOT/plans/sc-vs-depth
-uv run --locked --extra tuning python -m core.sweeps.prepare collect $SDDC_STORAGE_ROOT/plans/sc-vs-depth
+uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare collect $SDDC_STORAGE_ROOT/plans/sc-vs-depth
 # 2. Train and tune every case on Ray.
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.nested_tuning \
   $SDDC_STORAGE_ROOT/plans/sc-vs-depth/manifest.json \
@@ -116,7 +126,10 @@ uv run --locked ruff check core main.py frontier.py scripts experiments
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the ownership boundaries and conventions,
-and [adding a component](docs/extending/adding-a-component.md).
+and [adding a component](docs/extending/adding-a-component.md). Coding agents: start at
+[AGENTS.md](AGENTS.md); task playbooks (setup, sweeps, runs, analysis, archiving, and adding
+tasks, components, architectures, samplers and modifiers) are in
+[`.claude/skills/`](.claude/skills/).
 
 ## License
 

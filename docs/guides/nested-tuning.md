@@ -155,6 +155,27 @@ Parallel Optuna proposals can depend on completion order despite fixed seeds.
 Matching search budgets and checking winners across training seeds remain
 experimental-design decisions.
 
+## Checking, monitoring and archiving
+
+Before launching, validate a manifest without Ray or training:
+
+```bash
+uv run --locked --extra tuning --extra scoring python -m core.sweeps.nested_tuning \
+  MANIFEST --check [--output RUNS]
+```
+
+It runs the same validation a case run does, prints one row per case (training trials,
+policies, inference trials, NFE) and totals, and with `--output` says whether each case is
+new or resumes, refusing cases whose stored `protocol.json` changed.
+
+While running, `uv run --locked python -m core.analysis.status RUNS` reports each case as
+`done`, `running` (files changed recently), `failed`, `partial` or `not started`. It reads
+files only and never takes the driver lock.
+
+When cases finish, `scripts/archive_runs.py RUNS --output NAME.tar.gz --verify
+experiments/<example>/analyze.py` packs the run tree without checkpoints (mtimes, provenance
+and checksums kept) and checks that the analysis gives the same results from the archive.
+
 ## Persistence and resumption
 
 Each case saves a local configuration snapshot and full protocol. Workers use

@@ -18,10 +18,10 @@ For example, [hybrids.yaml](../../configs/sweep/hybrids.yaml) sweeps:
 hydra:
   sweeper:
     params:
-      gaussian_state: one_hot,embedding
-      discrete_view: masked,uniform
-      path_schedule: adaptive,rank_linear
-      sc: off,on
+      information_path/gaussian_state: one_hot,embedding
+      information_path/path_schedule: adaptive,rank_linear
+      modifiers/sc: off,on
+      information_path/discrete_view: masked,uniform
 ```
 
 The shared [common.yaml](../../configs/sweep/common.yaml) adds the tasks, seed,

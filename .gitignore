@@ -4,7 +4,9 @@
 .env.*
 .agents
 .codex
-.claude/
+.claude/*
+!.claude/skills/
+CLAUDE.local.md
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

@@ -46,9 +46,9 @@ after each prediction (`ForwardResamplingSampler`); they are named `renoising` a
 
 ```bash
 # 0. Data the published runs used that is too large to commit (see the caveats).
-python scripts/prepare_data.py text8 --parquet PATH/afmck-text8/data \
+uv run --locked python scripts/prepare_data.py text8 --parquet PATH/afmck-text8/data \
   --raw-dir $SDDC_STORAGE_ROOT/data_cache/text8/raw
-python scripts/prepare_data.py tinystories --parquet PATH/roneneldan-TinyStories/data \
+uv run --locked python scripts/prepare_data.py tinystories --parquet PATH/roneneldan-TinyStories/data \
   --output $SDDC_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 # 1. Prepare the 24 cases (no training).
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare -m \

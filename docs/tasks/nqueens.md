@@ -40,12 +40,12 @@ constraint/diversity benchmark, not evidence of broad reasoning generalization.
 
 ```bash
 # Default masked recipe, small model, 10k steps; solve-rate callback every 1k.
-python main.py +experiment=nqueens output_dir=core/outputs/nqueens8
+uv run --locked python main.py +experiment=nqueens output_dir=core/outputs/nqueens8
 
 # Ten queens uses the correct size, vocabulary and sequence length together.
-python main.py +experiment=nqueens10 output_dir=core/outputs/nqueens10
+uv run --locked python main.py +experiment=nqueens10 output_dir=core/outputs/nqueens10
 
-python main.py +experiment=nqueens mode=evaluate \
+uv run --locked python main.py +experiment=nqueens mode=evaluate \
   evaluation.checkpoint=core/outputs/nqueens8/checkpoints/last.ckpt \
   output_dir=core/outputs/nqueens8-eval
 ```
@@ -60,13 +60,13 @@ Metrics are namespaced `nqueens/`, including `nqueens/valid_solution_rate`.
 ## Clue-free generation and diversity
 
 ```bash
-python main.py +experiment=nqueens mode=evaluate \
+uv run --locked python main.py +experiment=nqueens mode=evaluate \
   evaluation.checkpoint=core/outputs/nqueens8/checkpoints/last.ckpt \
   task.evaluation_mode=unconditional task.samples_per_prompt=4 \
   output_dir=core/outputs/nqueens8-unconditional
 
 # Repeated conditional samples: keep the original clues for each prompt.
-python main.py +experiment=nqueens mode=evaluate \
+uv run --locked python main.py +experiment=nqueens mode=evaluate \
   evaluation.checkpoint=core/outputs/nqueens8/checkpoints/last.ckpt \
   task.samples_per_prompt=16 output_dir=core/outputs/nqueens8-diversity
 ```

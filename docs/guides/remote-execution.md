@@ -24,7 +24,7 @@ scheduler. Single-host only: the storage paths assume all workers share one disk
 | `data_cache/` | Datasets. Linked as `core/data_cache` in every snapshot; reused, never regenerated. |
 | `outputs/` | Default run outputs. Linked as `core/outputs`. |
 | `plans/<experiment>/` | Prepared manifests and case configs. |
-| `nested-tuning/<experiment>/` | Nested-tuning results, checkpoints, Optuna databases. |
+| `runs/<experiment>/` | Nested-tuning results, checkpoints, Optuna databases. |
 | `sources/<rev>-<content hash>/` | Persistent copy of each uploaded snapshot. Plans reference these paths. |
 | `envs/<uv.lock hash>/` | One locked environment per lockfile. |
 | `ray/rj/`, `ray/rj.token` | Temp dir and auth token of the persistent cluster. |
@@ -73,7 +73,7 @@ R=$SDDC_REMOTE_STORAGE_ROOT
 sddc-remote submit --name prep-X -- python -m core.sweeps.prepare -m +sweep=X preparation.output=$R/plans/X
 sddc-remote submit --name prep-X-collect -- python -m core.sweeps.prepare collect $R/plans/X
 sddc-remote submit --name run-X -- python -m core.sweeps.nested_tuning $R/plans/X/manifest.json \
-  --output $R/nested-tuning/X --address auto --case-concurrency 2 --concurrency 1
+  --output $R/runs/X --address auto --case-concurrency 2 --concurrency 1
 
 sddc-remote list | status JOB | logs [--follow] JOB | info JOB | stop JOB
 ```
