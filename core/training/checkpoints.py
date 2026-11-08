@@ -1,14 +1,32 @@
-"""Load core checkpoints or explicitly import legacy MDLM model and EMA weights."""
+"""Load core checkpoints, or explicitly convert older layouts first.
+
+``legacy`` selects the source format: ``False`` (a current core checkpoint),
+``"convert"`` (a core checkpoint saved before the view-path unification),
+``True`` (a published MDLM checkpoint, ``backbone.*`` DiT keys) or
+``"candi"`` (an original CANDI checkpoint). Every import goes through
+core/models/legacy_checkpoints.py; nothing renames keys at load time.
+"""
 
 import torch
 from . import legacy_pickle
 
 
+LEGACY_FORMATS = (False, True, "convert", "candi")
+
+
 def initialize_weights(module, path):
-    """Warm-start weights, not optimizer state; resume uses Lightning."""
+    """Warm-start weights, not optimizer state; resume uses Lightning.
+
+    ``training.initialize_convert=true`` converts a pre-unification core
+    checkpoint first (or convert it once with scripts/convert_checkpoint.py).
+    """
     checkpoint = torch.load(path, map_location="cpu", weights_only=False, mmap=True)
     if checkpoint.get("core_format_version") != 1:
         raise ValueError("weight initialization requires a core checkpoint")
+    if module.config.training.get("initialize_convert", False):
+        from core.models.legacy_checkpoints import convert_checkpoint
+
+        checkpoint = convert_checkpoint(checkpoint, module.config, algorithm=module.algorithm)
     state = {
         key.removeprefix("algorithm."): value
         for key, value in checkpoint["state_dict"].items()
@@ -86,36 +104,52 @@ def check_recipe(module, checkpoint, *, allow_mismatch=False):
     return mismatches
 
 
+def _published_mdlm(checkpoint):
+    """A published MDLM checkpoint as an old core one: its DiT is ``algorithm.model``."""
+    selected = {
+        "algorithm.model." + key.removeprefix("backbone.").replace("_orig_mod.", ""): value
+        for key, value in checkpoint["state_dict"].items()
+        if key.startswith("backbone.")
+    }
+    # This nonpersistent-in-practice rotary buffer was added after the
+    # published no-AdaLN baseline. It is not used by noncausal MDLM.
+    selected.pop("algorithm.model.position_rotary_emb.inv_freq", None)
+    return {**checkpoint, "state_dict": selected}
+
+
 def load_weights(module, path, *, legacy=False, allow_config_mismatch=False):
+    if legacy not in LEGACY_FORMATS:
+        raise ValueError(f"evaluation.legacy must be one of {LEGACY_FORMATS}")
     # Checkpoints are user-supplied trusted training artifacts, not remote input.
     checkpoint = torch.load(
         path,
         map_location="cpu",
         weights_only=False,
         mmap=True,
-        pickle_module=legacy_pickle if legacy else None,
+        pickle_module=legacy_pickle if legacy in (True, "candi") else None,
     )
     if legacy == "candi":
         from .candi_checkpoint import load_candi_training_module
 
         return load_candi_training_module(module, checkpoint)
-    state = checkpoint["state_dict"]
     if legacy:
-        selected = {
-            key.removeprefix("backbone.").replace("_orig_mod.", ""): value
-            for key, value in state.items()
-            if key.startswith("backbone.")
-        }
-        # This nonpersistent-in-practice rotary buffer was added after the
-        # published no-AdaLN baseline. It is not used by noncausal MDLM.
-        selected.pop("position_rotary_emb.inv_freq", None)
-        module.algorithm.model.load_state_dict(selected, strict=True)
+        from core.models.legacy_checkpoints import convert_checkpoint
+
+        published = legacy is True
+        if published:
+            checkpoint = _published_mdlm(checkpoint)
+        elif checkpoint.get("core_format_version") != 1:
+            raise ValueError("evaluation.legacy=convert requires a core checkpoint")
+        checkpoint = convert_checkpoint(checkpoint, module.config, algorithm=module.algorithm)
+        module.load_state_dict(checkpoint["state_dict"], strict=True)
+        if not published:
+            check_recipe(module, checkpoint, allow_mismatch=allow_config_mismatch)
     else:
         if checkpoint.get("core_format_version") != 1:
             raise ValueError(
                 "not a core checkpoint; use evaluation.legacy=true for an MDLM import"
             )
-        module.load_state_dict(state, strict=True)
+        module.load_state_dict(checkpoint["state_dict"], strict=True)
         check_recipe(module, checkpoint, allow_mismatch=allow_config_mismatch)
     if module.ema:
         if "ema" not in checkpoint:
