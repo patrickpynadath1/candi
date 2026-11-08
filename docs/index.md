@@ -20,6 +20,17 @@ self-conditioning, multiple views, insertion/deletion, and block diffusion affec
 these choices. Compatible component composition is the goal; arbitrary combinations
 are not guaranteed to be mathematically valid.
 
+## Worked examples
+
+The five [worked examples](../experiments/README.md) reproduce the results of the blog
+post [Some design choices in a diffusion language model](https://patrickpynadath1.github.io/blog/diffusion-lm-design-choices),
+one per question: [SC vs depth](../experiments/sc-vs-depth/README.md),
+[SC and sampler choice](../experiments/sc-sampler-choice/README.md),
+[the tokenizer ladder](../experiments/tokenizer-ladder/README.md),
+[continuous schedules](../experiments/continuous-schedules/README.md) and
+[block diffusion: encoder or decoder](../experiments/block-encoder-decoder/README.md).
+Each holds its sweep, evaluation splits, expected numbers and analysis.
+
 ## Start here
 
 - [Getting started](getting-started.md): install with uv and run a CPU smoke test.
@@ -34,8 +45,8 @@ Start with [experiments, cases, studies, and runs](guides/experiments.md).
 A manifest lists cases; each case can contain nested Optuna studies. Both training
 and inference choices are selected on validation before final evaluation.
 
-- [Nested training and inference tuning](guides/nested-tuning.md)
-- [Inference-only tuning as a fixed-checkpoint case](guides/inference-tuning.md)
+- [Nested training and inference tuning](guides/nested-tuning.md), including
+  inference-only tuning of a fixed checkpoint
 
 - [Training](guides/training.md)
 - [Sampling and evaluation](guides/sampling-and-evaluation.md)
@@ -44,7 +55,7 @@ and inference choices are selected on validation before final evaluation.
 - [Frontier sweeps](guides/frontier-sweeps.md)
 - [Checkpointing](guides/checkpointing.md)
 - [Distributed training](guides/distributed-training.md)
-- [Remote execution on the GPU server](guides/remote-execution.md)
+- [Remote execution on a GPU server](guides/remote-execution.md)
 
 ## Component reference
 
@@ -59,19 +70,14 @@ Architectural/sequence modifiers have dedicated references:
 [self-conditioning](modifiers/self-conditioning.md),
 [block diffusion](modifiers/block-diffusion.md), and
 [insertion/deletion and variable-length diffusion](modifiers/variable-length.md).
-The insertion reference explains per-process birth states, shared hybrid edits,
-block-local generation, adaptive-time feedback, and the current Text8 evidence.
 
-## Architecture and experiment setup
+## Architecture
 
+- [Models](components/models.md): ModularDiT slots, block sublayers and depth mixing.
 - [Encoder/decoder wrappers and caching](guides/encoder-decoder.md)
-- [E2D2 depth scaling](guides/e2d2-depth-scaling.md)
-- [Attention sublayer ablations](guides/attention-sublayer-ablation.md)
-- [Depth mixing ablations](guides/depth-mixing-ablation.md)
 
 ## Method recipes
 
-- [Feedback versus depth ablation](guides/feedback-depth-ablation.md): focused 14-method comparison.
 - [Runnable paper presets](guides/paper-recipes.md): configuration names, adaptations and limits.
 
 - [BlockGen fixed-block recipes](methods/blockgen.md): masked/uniform baselines and full-method limitations.
@@ -80,8 +86,11 @@ block-local generation, adaptive-time feedback, and the current Text8 evidence.
 - [Gaussian diffusion](methods/gaussian-diffusion.md): one-hot/embedding recipes.
 - [Spherical flow matching](methods/spherical-flow-matching.md)
 - [Rank-linear schedules](methods/rank-linear-schedules.md): simplex and spherical calibration.
+- [vMF spherical flows](methods/vmf-spherical-flows.md)
 - [Simplex diffusion](methods/simplex-diffusion.md)
-- [Blurring diffusion](methods/blurring-diffusion.md)
+- [Blurring diffusion](methods/blurring-diffusion.md) and
+  [sequence-adaptive PCA blurring](methods/pca-blurring.md)
+- [Insertion and deletion](methods/insertion.md)
 - [RePlaid](methods/replaid.md)
 - [Autoregressive and permuted autoregressive](methods/autoregressive.md)
 - [Hybrids](methods/hybrids.md): parallel noisy views of the same clean sequence.
@@ -100,7 +109,7 @@ See [task conventions](tasks/overview.md), then
 - [Add a task](extending/adding-a-task.md)
 - [Coverage and limitations](validation/coverage.md)
 - [Compatibility of families, samplers and modifiers](validation/compatibility.md) (generated)
-- [Reproduction results](validation/reproduction-results.md)
+- [Recorded results on earlier code](validation/reproduction-results.md)
 
 An available config does not establish benchmark parity. The validation pages
 separate execution checks from numerical comparisons and trained-model results.

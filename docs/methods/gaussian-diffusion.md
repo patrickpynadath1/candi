@@ -31,7 +31,7 @@ These configurations assemble available components; they do not imply legacy che
 | `candi_rank_pure_linear` | One-hot analytic inverse, competitor normalization | Rank 0.01–0.49; sigma intentionally clamped to 0.2–4 |
 | `candi_rank_pure_geometric` | Same, geometric rank progression | Same clamp |
 | `semicat_gaussian` | One-hot linear interpolation, optional label smoothing | Core clean-to-noise time conditioning, not legacy reversed conditioning |
-| `cfm_gaussian` | Semicat counterpart's objective/path | ContinuousDiT, not the original CFM backbone |
+| `cfm_gaussian` | Semicat counterpart's objective/path | `continuous_dit`, not the original CFM backbone |
 | `flm_gaussian` | Argmax-error calibration plus coefficient rescaling | Finite sigma 0.2–4, core backbone/global-time conditioning rather than FLMDIT |
 
 `gaussian_base` supplies the shared assembly. One-hot rank offers exact lookup and analytic approximation; embedding rank uses unit-sphere geometry, not the current learned table's pairwise geometry. Construction rejects incompatible representation/schedule combinations. Contextual or sequence-compressing encoders are not implemented.

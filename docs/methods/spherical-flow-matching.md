@@ -1,6 +1,6 @@
 # Spherical flow matching
 
-Spherical flow matching encodes tokens as trainable unit vectors and interpolates on the sphere toward independent uniform sphere noise. It uses SphereDiT, an unconstrained posterior, CE, and posterior-derived tangent velocities. The algorithm coordinates training and prediction; the process and sampler own geometry and integration.
+Spherical flow matching encodes tokens as trainable unit vectors and interpolates on the sphere toward independent uniform sphere noise. It uses the `sphere_dit` network preset, an unconstrained posterior, CE, and posterior-derived tangent velocities. The algorithm coordinates training and prediction; the process and sampler own geometry and integration.
 
 ```bash
 uv run python main.py +experiment=spherical_flow_matching

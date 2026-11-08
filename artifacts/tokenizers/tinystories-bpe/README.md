@@ -12,3 +12,6 @@ default.
 - PAD/BOS/EOS/MASK ids are 0/1/2/3; BOS/EOS are not inserted automatically.
 
 Verify the files with `shasum -a 256 -c SHA256SUMS` (or `sha256sum -c SHA256SUMS`).
+
+They were built with [`scripts/build_bpe_tokenizers.py`](../../../scripts/build_bpe_tokenizers.py), which also
+audits full-story lengths at each vocabulary size.

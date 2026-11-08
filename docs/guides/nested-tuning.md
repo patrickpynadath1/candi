@@ -128,7 +128,7 @@ candidate keeps its traceback in `failure.json`.
 ```bash
 uv run --locked --extra tuning --extra scoring --extra tracking \
   python -m core.sweeps.nested_tuning nested-manifest.json \
-  --output /home/patrick/.cache/duo/nested-tuning \
+  --output $SDDC_STORAGE_ROOT/runs/nested-tuning \
   --concurrency 4
 ```
 

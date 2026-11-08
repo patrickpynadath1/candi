@@ -112,9 +112,8 @@ self-conditioning vector. Adding a branch does not create a separate clean strea
 
 ## Current constraints and extension
 
-The [model wrapper](../../core/modifiers/block_diffusion/model.py) accepts DiT,
-ContinuousDiT, view-based ModularDiT (and the legacy HybridModel) implementations
-with the required fused-stream interfaces. Unsupported architectures fail during
+The [model wrapper](../../core/modifiers/block_diffusion/model.py) accepts `ModularDiT`
+networks (single-state or view-based) with the required fused-stream interfaces. Unsupported architectures fail during
 construction. This check is an integration boundary, not proof that every
 algorithm/model combination has been numerically validated.
 

@@ -1,15 +1,13 @@
 # Recorded reproduction and pilot results
 
-These are historical measurements, not newly rerun benchmarks. Unless noted,
+These are measurements recorded on earlier versions of this code, before the
+networks moved onto `ModularDiT`, not newly rerun benchmarks. The worked examples in
+[`experiments/`](../../experiments/README.md) are the current, rerunnable results. Unless noted,
 Sudoku evaluations use the 48,000/2,000 hard split (data seed 42), run/evaluation
 seed 1, and all 2,000 validation puzzles. Cell accuracy includes answer-format
 separators; digit accuracy does not. Different budgets, weight selection and
 sampling policies make rows unsuitable as a controlled method leaderboard.
 
-Generated artifacts and weights are ignored by Git and may live on a separate
-cache disk through `core/outputs`. Artifact directory names below identify the
-original evidence; they are not requirements for using the package. Historical
-`/dev/shm` run paths were relocated to durable cache storage.
 
 ## MDLM imported-checkpoint reproduction
 
@@ -30,17 +28,12 @@ were necessary precision boundaries.
 
 Fresh full-size training was separately exercised for 100 steps (final train
 loss 2.383145, validation objective 2.335216). Neither that smoke nor imported
-checkpoint parity establishes fresh 20,000-step training convergence. Compact
-machine-readable historical evidence is in
-[historical-summary.json](historical-summary.json); its older test
-counts and method names describe those stages, not current totals.
+checkpoint parity establishes fresh 20,000-step training convergence.
 
-Artifact directories: `baseline_eb_verified`, `baseline_ancestral_verified`,
-`sampler_orchestration_parity`, and `task_sudoku_parity` under `core/outputs`.
 
 ## Gaussian diffusion pilot and solvers
 
-A 29M-parameter one-hot ContinuousDiT (width 512, eight blocks/heads) trained
+A 29M-parameter one-hot continuous DiT (width 512, eight blocks/heads) trained
 2,000 steps at batch 256, LR 3e−4, warmup 250, BF16 and EMA .999. Final logged
 training loss was .2182. Rank lookup sigma bounds were .2–4, 1,000 points,
 percentiles .01–.4; the effective Sudoku sigma range was approximately .3083–4.
@@ -64,9 +57,7 @@ prompt restoration and final decoding intentionally replace legacy continuous
 sampling behavior. Adaptive step selection is batch-shared and counts rejected
 stages; NFE and results can depend on batch size. Recorded times on shared A6000
 hardware were 117.7s Euler, 117.7s Heun, and 52.3s ODE, not controlled speed
-benchmarks. Artifacts: `gaussian_sudoku_pilot`, `gaussian_heun_final`,
-`gaussian_ode_final`, `representation_onehot_parity` and
-`representation_embedding_smoke`.
+benchmarks.
 
 ## MDLM hidden self-conditioning pilots
 
@@ -91,11 +82,6 @@ The historical normalized-model 128-puzzle diagnostic solved 2 with reused
 feedback, 7 with feedback disabled, and 10 with a fresh bootstrap per prediction
 (versus 29 for the separate no-conditioning control). That experiment motivated
 further work; it did not establish a sole cause or change the production sampler.
-Artifacts: `mdlm_no_self_conditioning_sudoku_hard_control`,
-`mdlm_hidden_self_conditioning_sudoku_hard`,
-`mdlm_normalized_hidden_self_conditioning_sudoku_hard`, and
-`mdlm_layernorm_hidden_self_conditioning_sudoku_hard`. The latter contains
-`comparison.json` and durable model/EMA weights without optimizer state.
 
 ## Spherical flow matching and permuted autoregressive
 
@@ -106,7 +92,6 @@ refits by step 1,950, and trained for only 2,000 of the preset's 20,000 steps.
 With 180 model calls it solved **200/2,000 (10.0%)**, cell accuracy 84.338%, digit
 accuracy 82.791%, clue consistency 99.35%. The fixed 128-example check solved
 20 (15.625%); do not substitute that subset rate for full validation.
-Artifacts: `spherical_sudoku_hard_validation`.
 
 Permuted AR was checked on Text8, not Sudoku: 3.2M parameters, width 256/four
 blocks/eight heads, length 256, batch 128, LR .0003, 200-step warmup, EMA .999.
@@ -123,7 +108,7 @@ Over 128 EMA samples:
 
 Generated counts: 5,500 words, 3,751 valid, 2,995 distinct, 1,258 distinct valid.
 The 3,000-step valid rate was 61.69%. Samples were accepted as an initial port
-check, not a quality benchmark. Artifacts: `permuted_autoregressive_text8`.
+check, not a quality benchmark.
 
 ## RePlaid and simplex
 
@@ -138,7 +123,7 @@ handling, a fresh 2,000-step **final/raw-weight** evaluation solved
 Sampling used 180 Gaussian DDPM transitions, fresh self-conditioning bootstrap,
 final-transition noise and 362 NFE. A held-out objective diagnostic totaled
 .0908674 (prior .00998166, reconstruction 0, diffusion .0808857); it is not the
-last training loss. Artifacts: `replaid_comparison/corrected_2k`.
+last training loss.
 The successful reference trained 50,000 steps on 200k/10k data, so this short
 48k/2k run does not establish equivalent quality.
 
@@ -163,8 +148,7 @@ The imported result is close rather than bitwise parity. Fresh standard masking
 intentionally fixes legacy accidental retention and changes training corruption.
 Both fresh runs retained 2,500-step warmup. Uniform/simplex digit accuracy was
 81.1753%; its independently tracked branches used 180 joint reverse steps plus
-one final prediction. Artifacts: `hybrid_validation` and
-`uniform_simplex_hybrid_2k`.
+one final prediction.
 
 ## OpenWebText pretrained point
 
@@ -177,6 +161,3 @@ used the corrected initial BOS handling. Runtime was approximately 34 seconds
 on an A6000. This demonstrates a real pretrained evaluation through the
 frontier runner, not a multi-point or statistically stable frontier.
 
-Artifacts: `frontiers/openwebtext_mdlm_pretrained`, point
-`97030580c7d928f6`, including CSV/JSON reports, plot, config, logs and samples.
-See [coverage](coverage.md) for distributed-training and resume checks.

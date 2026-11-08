@@ -1,7 +1,7 @@
 # Worked examples
 
 Each directory answers one question from the blog post
-[A Few Design Choices for Diffusion Language Models](https://patrickpynadath1.github.io/blog/diffusion-lm-design-choices)
+[Some design choices in a diffusion language model](https://patrickpynadath1.github.io/blog/diffusion-lm-design-choices)
 with the codebase: the sweep that runs it, the evaluation protocol, the numbers we got, and
 the analysis that turns run outputs into the post's tables. Rerunning an example should
 give numbers close to ours. Most cells are a single training seed, so expect seed noise.

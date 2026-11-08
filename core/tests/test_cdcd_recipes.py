@@ -1,4 +1,4 @@
-"""The rerun uses one CDCD fitter and preserves the discrete clock."""
+"""The worked examples' CDCD recipes train, warp time once and sample."""
 
 import pytest
 import torch
@@ -9,8 +9,8 @@ from core.sweeps.configuration import compose
 from core.time_sampling.cdcd import CDCDTimeSampler
 
 
-def test_feedback_cdcd_training_and_sampling():
-    cfg = compose(overrides=["+sweep=feedback_cdcd"])
+def test_gaussian_cdcd_training_and_sampling():
+    cfg = compose(overrides=["+sweep=sc_vs_depth"])
     cfg.model.hidden_size = 32
     cfg.model.cond_dim = 16
     cfg.model.n_heads = 4
@@ -57,7 +57,7 @@ def test_feedback_cdcd_training_and_sampling():
 def test_geometry_cdcd_training_and_sampling(path, feedback):
     cfg = compose(
         overrides=[
-            "+sweep=feedback_geometry_cdcd",
+            "+sweep=continuous_schedules",
             f"ablation_path={path}",
             f"feedback={feedback}",
         ]

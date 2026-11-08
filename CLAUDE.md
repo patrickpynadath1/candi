@@ -31,7 +31,7 @@ On the server, always use `uv run --locked` (Python 3.10, lock pinned to the PyT
 uv sync --locked --extra tuning --extra scoring --extra tracking --extra mazes
 uv run --locked --extra tuning --extra scoring --extra tracking --extra mazes pytest -q core/tests
 uv run --locked pytest -q core/tests/test_mdlm.py::test_name      # single test
-uv run --locked ruff check core main.py frontier.py scripts/cluster
+uv run --locked ruff check core main.py frontier.py scripts experiments
 
 uv run --locked python main.py +experiment=smoke               # CPU smoke run: 2 steps of tiny MDLM on Sudoku
 uv run --locked python main.py +experiment=<name> --cfg job    # print composed config without running

@@ -1,4 +1,4 @@
-"""One DiT assembled from configurable slots (see docs/design/modular-dit.md).
+"""One DiT assembled from configurable slots (see docs/components/models.md).
 
 Slots own their learned weights. The network builds each slot with the
 dimensions it needs, in the legacy construction order (input, time embedder,

@@ -14,7 +14,7 @@ from scripts.cluster import sddc_remote as remote
         ("core/outputs/run/config.yaml", True),
         ("core/data_cache/sudoku/train.npy", True),
         ("core/models/modular.py", False),
-        ("configs/sweep/feedback.yaml", False),
+        ("configs/sweep/common.yaml", False),
         ("nested/model.ckpt", True),
         ("wandb/run-1/log.txt", True),
         (".env.local", True),

@@ -6,12 +6,10 @@ means that a specified fixture or integration ran. **Reproduced** means a
 comparison against a defined reference succeeded. A short pilot is evidence
 that a method can learn, not proof of convergence or paper-level performance.
 
-On 2026-11-07 the full suite passed **1665 tests** on Linux x86_64 with the
-locked CUDA 12.1 environment and one GPU (commit `2ba376f`), including CUDA
-checks and the byte-level sampler snapshots in `test_sampler_equivalence.py`.
-Those snapshots hash raw float bytes recorded on Linux x86_64 and skip on other
-platforms; on ARM macOS the remaining 1405 tests pass.
-That total is a snapshot, not a promise that every method,
+The suite runs in CI on Linux x86_64 (CPU) with the locked environment; CUDA
+checks run when a GPU is present. The byte-level sampler snapshots in
+`test_sampler_equivalence.py` hash raw float bytes recorded on Linux x86_64 and
+skip on other platforms. A passing suite is not a promise that every method,
 task, precision, sampler, modifier and distributed strategy combination has
 been tested. Run the current suite from the repository root:
 
@@ -47,13 +45,11 @@ part of the complete suite.
 
 Every experiment preset that runs on one GPU resolves through
 `core.sweeps.configuration.prepare_run` without launching training. Sweeps run
-through `core.sweeps.prepare` and `core.sweeps.nested_tuning` only; the earlier
-Ray Tune queue (`run_trial`, `TrainingInferenceSearch`, live submissions) was
-removed on 2026-11-07. Nested-tuning tests cover validation-only selection,
+through `core.sweeps.prepare` and `core.sweeps.nested_tuning` only. Nested-tuning tests cover validation-only selection,
 resume without retraining, protocol and checkpoint pinning, resumed-search
-seeding, failure handling and per-case Ray resources. A full nested case (GPU
-training worker, validation-only inference selection, final evaluation) ran on
-ruqi6000 on 2026-10-29 through Ray Jobs.
+seeding, failure handling and per-case Ray resources. Full nested cases (GPU
+training workers, validation-only inference selection, final evaluation) produced
+the worked examples' runs.
 
 ## Methods and tasks
 

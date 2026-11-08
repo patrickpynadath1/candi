@@ -42,8 +42,9 @@ self_conditioning:
   probability: 0.9
   evaluation_probability: 1.0
 preparation:
-  name: local-diffusion-20k-20261027
-  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/local-diffusion-20k-20261027-hydra
+  # Each sweep sets its own name and output; these are fallbacks.
+  name: sweep
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/${preparation.name}
   # A committed evaluation spec per task: {task, tuning/test indices, score, ...}.
   evaluation_file: null
   recipe_fields:
