@@ -1,0 +1,9 @@
+# @package _global_
+# Gaussian embedding diffusion whose continuous clock is learned with the CDCD
+# loss-CDF fitter: ablation_path=gaussian with path_schedule=cdcd, as one choice
+# so a sweep can cross it with the discrete paths.
+defaults:
+- /gaussian_state: embedding
+- /path_schedule: cdcd
+preparation:
+  path_name: gaussian_embedding

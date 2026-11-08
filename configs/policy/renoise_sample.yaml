@@ -1,0 +1,26 @@
+# Renoise, sampled: draw a full clean sequence from the softmax at a tuned
+# temperature, then corrupt it again with the forward process to the next level.
+# One nested-tuning inference policy (an entry of preparation.inference).
+name: renoise_sample
+sampler:
+  _target_: core.samplers.composed.ComposedSampler
+  steps: 127
+  epsilon: 1.0e-5
+  tokens:
+    _target_: core.samplers.policies.TokenSelection
+    mode: sample
+  positions:
+    _target_: core.samplers.policies.AllPositions
+  transition:
+    _target_: core.samplers.policies.ForwardCorruption
+  commitment: none
+  final_denoise: greedy
+space:
+  algorithm.predictor.temperature:
+    type: float
+    low: 0.5
+    high: 1.5
+initial_points:
+- algorithm.predictor.temperature: 1.0
+trials: 16
+budget_parameter: steps
