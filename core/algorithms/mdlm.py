@@ -29,7 +29,8 @@ class MDLM(OneViewAlgorithm, HybridDiffusion):
         time_conditioning=False,
         prediction=None,
     ):
-        table = model.vocab_embed.embedding
+        model = adopt(model)  # A configured ModularDiT passes through.
+        table = model.token_table
         with torch.random.fork_rng(devices=[]):  # The table is adopted below.
             representation = TokenRepresentation(*table.shape)
         view = DiffusionView(process, schedule, representation, DiscretePosteriorUpdate())

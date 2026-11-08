@@ -23,5 +23,6 @@ model:
   n_blocks: 12
   n_heads: 12
   dropout: 0.1
-  adaLN: true
+  time:
+    adaLN: true
   tie_word_embeddings: false

@@ -17,7 +17,7 @@ def test_blockgen_task_composition(recipe, task):
     OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     assert cfg.block_diffusion.enabled and cfg.block_diffusion.x0_causal
     assert cfg.block_diffusion.clean_loss == 'none'
-    assert cfg.model.adaLN and not cfg.algorithm.time_conditioning
+    assert cfg.model.time.adaLN and not cfg.algorithm.time_conditioning
     assert cfg.sampler.steps == 15
     assert cfg.model.n_blocks == 12 and cfg.model.hidden_size == 768
 

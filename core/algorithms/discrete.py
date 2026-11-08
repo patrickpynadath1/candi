@@ -129,7 +129,8 @@ def absorbing_token_network(model, process, schedule, update):
     from core.modifiers.hybrid.views import DiffusionView
     from core.representations.noisy_inputs import TokenRepresentation
 
-    table = model.vocab_embed.embedding
+    model = adopt(model)  # A configured ModularDiT passes through.
+    table = model.token_table
     representation = TokenRepresentation(*table.shape, embedding=table)
     view = DiffusionView(process, schedule, representation, update)
     return adopt(model, views=[view], time_coordinate="negative_log_keep_exact")

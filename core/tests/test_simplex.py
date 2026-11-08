@@ -145,7 +145,7 @@ def test_full_sampler_recovers_known_data_distribution(churn):
 @pytest.mark.parametrize("sc", [False, True])
 @pytest.mark.parametrize("input_mode", ["expectation", "argmax"])
 def test_real_loss_gradient_and_prompt_preservation(sc, input_mode):
-    config = tiny_config(sc, **{"model.input_mode": input_mode})
+    config = tiny_config(sc, **{"model.input.mode": input_mode})
     model = instantiate(config.algorithm)
     x = torch.randint(1, 10, (2, 6))
     mask = torch.ones_like(x, dtype=torch.bool)
@@ -209,7 +209,7 @@ def test_clean_endpoint_and_prompt_dropout(kind):
 
 def test_expected_and_argmax_input_and_dropped_prompt():
     for mode in ("expectation", "argmax"):
-        model = instantiate(tiny_config(**{"model.input_mode": mode}).algorithm).model
+        model = instantiate(tiny_config(**{"model.input.mode": mode}).algorithm).model
         logp = torch.tensor([[[0.2, 0.8] + [0.0] * 10]], dtype=torch.float64).log()
         embedded = model.input(logp, None)
         table = model.input.table
@@ -271,7 +271,7 @@ def test_presets_compose(preset):
 @pytest.mark.parametrize("input_mode", ["expectation", "argmax"])
 def test_cuda_loss_backward_and_sampling(sc, input_mode):
     model = instantiate(
-        tiny_config(sc, **{"model.input_mode": input_mode}).algorithm
+        tiny_config(sc, **{"model.input.mode": input_mode}).algorithm
     ).cuda()
     x = torch.randint(1, 10, (2, 6), device="cuda")
     mask = torch.ones_like(x, dtype=torch.bool)

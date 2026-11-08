@@ -1,11 +1,9 @@
-_target_: core.models.dit.DiT
-vocab_size: ${token_space.model_vocab_size}
+# Larger time-conditioned token DiT (uniform, DUO, SEDD, D3PM, BlockGen recipes).
+defaults:
+- dit
+- _self_
 hidden_size: 768
-cond_dim: 128
 n_blocks: 12
 n_heads: 12
-dropout: 0.1
-adaLN: true
-tie_word_embeddings: false
-self_conditioning: ${self_conditioning.enabled}
-self_conditioning_source: ${self_conditioning.source}
+time:
+  adaLN: true

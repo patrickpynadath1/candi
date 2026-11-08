@@ -324,7 +324,7 @@ def test_masked_recipes_retain_adaln_with_constant_time(recipe):
     cfg = compose(
         recipe, ["model.hidden_size=32", "model.n_heads=4", "model.n_blocks=2"]
     )
-    assert cfg.model.adaLN is True
+    assert cfg.model.time.adaLN is True
     assert cfg.algorithm.time_conditioning is False
     algorithm = TrainingModule(cfg).algorithm
     assert algorithm.model.adaLN is True

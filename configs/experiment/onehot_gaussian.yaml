@@ -4,4 +4,5 @@ defaults:
 - override /noise_schedule: linear_interpolation
 - _self_
 model:
-  input_preconditioning: none
+  input:
+    preconditioning: none

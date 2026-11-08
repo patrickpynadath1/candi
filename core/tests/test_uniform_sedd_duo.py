@@ -335,7 +335,7 @@ def test_composed_recipes_retain_reference_defaults():
                 c.model.hidden_size,
                 c.model.n_blocks,
                 c.model.n_heads,
-                c.model.adaLN,
+                c.model.time.adaLN,
             ) == (768, 12, 12, True)
             assert c.trainer.max_steps == 1000000 and c.loader.global_batch_size == 512
             assert c.sampler.steps == 1024 and c.sampler.epsilon == 0.001

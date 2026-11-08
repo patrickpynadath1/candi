@@ -39,13 +39,14 @@ class BlurringDiffusion(OneViewAlgorithm, HybridDiffusion):
             raise ValueError("model state_dim must match blur representation dimension")
         if model.vocab_size != representation.spec.vocab_size:
             raise ValueError("model and representation vocabularies must match")
-        if model.input_preconditioning != "none" or model.time_conditioning != "time":
+        model = adopt(model)
+        if model.input.preconditioning != "none" or model.time.coordinate != "time":
             raise ValueError(
                 "blurring diffusion requires raw time and no input preconditioning"
             )
         view = DiffusionView(process, schedule, representation, BlurringPosteriorUpdate())
         super().__init__(
-            adopt(model),
+            model,
             predictor,
             time_sampler,
             objective,

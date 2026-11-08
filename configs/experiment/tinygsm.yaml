@@ -7,7 +7,8 @@ model:
   n_blocks: 12
   n_heads: 12
   dropout: 0.1
-  adaLN: true
+  time:
+    adaLN: true
 loader:
   global_batch_size: 512
 trainer:

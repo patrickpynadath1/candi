@@ -2,6 +2,7 @@
 defaults:
 - override /algorithm: blurring_diffusion
 - override /model: continuous_dit
+- override /model/input: linear
 - override /parameterization: gaussian_posterior
 - override /process: blurring
 - override /noise_schedule: blurring
@@ -11,9 +12,10 @@ defaults:
 - override /token_space@token_space: data_only
 - _self_
 model:
-  input_preconditioning: none
-  time_conditioning: time
-  input_projection_bias: true
-  input_architecture: linear
-  output_architecture: embedding_projection
-  output_dim: 256
+  input:
+    preconditioning: none
+    bias: true
+  time:
+    coordinate: time
+  output:
+    output_dim: 256

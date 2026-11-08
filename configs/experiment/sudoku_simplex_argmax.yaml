@@ -2,4 +2,5 @@
 defaults:
 - sudoku_simplex
 model:
-  input_mode: argmax
+  input:
+    mode: argmax

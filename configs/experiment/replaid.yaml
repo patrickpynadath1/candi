@@ -3,6 +3,8 @@ defaults:
 - override /algorithm: replaid
 - override /representation: embedding
 - override /model: continuous_dit
+- override /model/input: linear
+- override /model/output: adaln
 - override /parameterization: gaussian_prior
 - override /process: gaussian
 - override /noise_schedule: plaid_log_snr
@@ -15,13 +17,16 @@ representation:
   trainable: true
   project_after_update: true
 model:
-  input_preconditioning: unit_embedding
-  conditioning_scale: unit_embedding
-  time_conditioning: negative_log_snr
-  input_architecture: linear
-  output_architecture: adaln
-  time_input: true
-  conditioning_initialization: default
+  input:
+    preconditioning: unit_embedding
+    bias: false
+  time:
+    coordinate: negative_log_snr
+    input_projection: true
+  self_conditioning:
+    initialization: default
+    # sqrt(state_dim): feedback on the unit-embedding scale.
+    scale: unit_embedding
 self_conditioning:
   enabled: true
   source: posterior_mean

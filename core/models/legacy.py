@@ -321,6 +321,34 @@ def _adopt_state_network(legacy_model, time_coordinate=None):
     return model
 
 
+def _bind_modular(model, views, fusion, time_coordinate, fp32_clean_embedding):
+    """A configured ModularDiT: optionally bind views in place of its token input."""
+    import torch
+
+    from . import modular
+    from core.representations.noisy_inputs import TokenRepresentation
+
+    if time_coordinate is not None:
+        model.time.coordinate = time_coordinate
+    if views is None:
+        if fusion is not None:
+            raise ValueError("fusion requires views")
+        return model
+    if model.views is not None:
+        raise ValueError("this network already has views")
+    if not isinstance(model.input, modular.TokenInput) or isinstance(model.input, modular.SimplexInput):
+        raise TypeError("only a token-input network binds views; pass views to HybridDiffusion")
+    table = model.input.table
+    if not isinstance(views[0].representation, TokenRepresentation):
+        raise TypeError("the network's token table needs a TokenRepresentation view")
+    with torch.random.fork_rng(devices=[]):
+        views_input = modular.ViewsInput(views, model.vocab_size, table.shape[1], fusion=fusion)
+    views[0].representation.embedding = table
+    views[0].representation.fp32_clean_embedding = bool(fp32_clean_embedding)
+    model.input = views_input
+    return model
+
+
 def adopt(legacy_model, *, views=None, fusion=None, time_coordinate=None, fp32_clean_embedding=False):
     """Move a constructed legacy network into an equivalent ModularDiT.
 
@@ -341,6 +369,8 @@ def adopt(legacy_model, *, views=None, fusion=None, time_coordinate=None, fp32_c
     from . import modular
     from core.representations.noisy_inputs import TokenRepresentation
 
+    if isinstance(legacy_model, modular.ModularDiT):
+        return _bind_modular(legacy_model, views, fusion, time_coordinate, fp32_clean_embedding)
     if type(legacy_model).__name__ != "DiT":
         if views is not None or fusion is not None:
             raise ValueError("only the token DiT binds views; pass them to HybridDiffusion")

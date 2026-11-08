@@ -272,7 +272,9 @@ class SelfConditioning(nn.Module):
             raise ValueError("self-conditioning space must be hidden or state")
         if space == "state" and state_dim is None:
             raise ValueError("state-space self-conditioning needs the state dimension")
-        self.space, self.scale = space, scale
+        if scale == "unit_embedding":  # sqrt(state_dim), the unit-embedding scale
+            scale = state_dim**0.5
+        self.space, self.scale = space, float(scale)
         self.adapter = make_conditioning(
             source, state_dim if space == "state" else hidden_size, hidden_size, initialization
         )

@@ -5,4 +5,5 @@ defaults:
 - mdlm
 - _self_
 model:
-  adaLN: false
+  time:
+    adaLN: false

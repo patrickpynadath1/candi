@@ -63,7 +63,8 @@ class UniformDiffusion(OneViewAlgorithm, HybridDiffusion):
             raise ValueError(
                 "uniform model, process and objective vocabulary sizes must agree"
             )
-        table = model.vocab_embed.embedding
+        model = adopt(model)  # A configured ModularDiT passes through.
+        table = model.token_table
         with torch.random.fork_rng(devices=[]):  # The table is adopted below.
             representation = self.representation_type(*table.shape)
         view = DiffusionView(process, schedule, representation, DiscretePosteriorUpdate())

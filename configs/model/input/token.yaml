@@ -1,0 +1,3 @@
+# Token ids -> embedding table (a [B, L, V] logit state is embedded via softmax).
+_target_: core.models.modular.TokenInput
+_partial_: true

@@ -57,7 +57,8 @@ class PosteriorUniformDiffusion(OneViewAlgorithm, HybridDiffusion):
             )
         if process.vocab_size != model.output_layer.linear.out_features:
             raise ValueError("model and process vocabulary sizes must agree")
-        table = model.vocab_embed.embedding
+        model = adopt(model)  # A configured ModularDiT passes through.
+        table = model.token_table
         with torch.random.fork_rng(devices=[]):  # The table is adopted below.
             representation = TokenRepresentation(*table.shape)
         view = DiffusionView(process, schedule, representation, DiscretePosteriorUpdate())

@@ -52,7 +52,7 @@ def test_gaussian_control_learns_the_codebook_and_samples():
     cfg.model.cond_dim = 8
     cfg.model.n_blocks = 1
     cfg.model.n_heads = 2
-    cfg.model.output_dim = 8
+    cfg.model.output.output_dim = 8
     cfg.representation.dimension = 8
     cfg.noise_schedule.grid_size = 65
     cfg.noise_schedule.quadrature_order = 16

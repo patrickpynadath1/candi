@@ -11,7 +11,9 @@ noise_schedule:
     sigma_max: 4.0
     coupling: linear
 model:
-  input_preconditioning: none
-  time_conditioning: time
+  input:
+    preconditioning: none
+  time:
+    coordinate: time
 parameterization:
   softcap: null

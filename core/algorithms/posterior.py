@@ -29,7 +29,7 @@ class PosteriorDiffusion(nn.Module):
         return self.model(*self.model_inputs(*state))
 
     def prediction_embedding_table(self):
-        return self.model.vocab_embed.embedding
+        return self.model.token_table
 
     def prediction_mean(self, probabilities):
         return posterior_mean(probabilities, self.prediction_embedding_table())

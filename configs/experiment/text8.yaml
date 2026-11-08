@@ -9,7 +9,8 @@ model:
   n_blocks: 8
   n_heads: 8
   dropout: 0.1
-  adaLN: true
+  time:
+    adaLN: true
 loader:
   global_batch_size: 512
   eval_batch_size: 128

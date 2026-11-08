@@ -1,11 +1,23 @@
-_target_: core.models.spherical.SphereDiT
+# DiT over points on a sphere of embeddings; self-conditioning feeds back in state space.
+defaults:
+- input: linear
+- output: adaln
+- _self_
+_target_: core.models.modular.ModularDiT
 vocab_size: ${task.vocab_size}
 state_dim: ${representation.dimension}
 hidden_size: 512
 cond_dim: 128
-n_heads: 8
 n_blocks: 8
+n_heads: 8
 dropout: 0.1
-learn_temperature_scaling: false
-self_conditioning: ${self_conditioning.enabled}
-self_conditioning_source: ${self_conditioning.source}
+time:
+  _target_: core.models.modular.TimeConditioning
+  _partial_: true
+  coordinate: time
+self_conditioning:
+  _target_: core.models.modular.SelfConditioning
+  _partial_: true
+  enabled: ${self_conditioning.enabled}
+  source: ${self_conditioning.source}
+  space: state

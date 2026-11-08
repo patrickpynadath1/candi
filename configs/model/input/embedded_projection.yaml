@@ -1,0 +1,5 @@
+# Continuous state @ normalized learned embedding -> preconditioning -> projection.
+_target_: core.models.modular.EmbeddedProjectionInput
+_partial_: true
+input_dim: null
+preconditioning: gaussian

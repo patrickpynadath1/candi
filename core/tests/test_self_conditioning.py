@@ -308,7 +308,7 @@ def test_cuda_mixed_precision_training_and_both_samplers(source):
 
 def test_mismatched_architecture_fails_at_construction():
     with pytest.raises(Exception, match="enable self-conditioning together"):
-        instantiate(config("posterior_mean", "model.self_conditioning=false").algorithm)
+        instantiate(config("posterior_mean", "model.self_conditioning.enabled=false").algorithm)
 
 
 def test_hidden_source_does_not_request_embedding_table():

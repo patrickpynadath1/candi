@@ -6,12 +6,13 @@ model:
   n_blocks: 12
   n_heads: 12
   dropout: 0.1
-  input_preconditioning: none
-  time_conditioning: time
-  input_projection_bias: true
-  input_architecture: linear
-  output_architecture: embedding_projection
-  output_dim: 768
+  input:
+    preconditioning: none
+    bias: true
+  time:
+    coordinate: time
+  output:
+    output_dim: 768
 representation:
   dimension: 128
   feature_lambda_min: 0.25

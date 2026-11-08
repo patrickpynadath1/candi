@@ -1,0 +1,5 @@
+# Continuous state -> optional path preconditioning -> linear projection.
+_target_: core.models.modular.LinearInput
+_partial_: true
+bias: true
+preconditioning: none

@@ -261,8 +261,8 @@ def test_recursive_config_construction_tracks_overrides_and_serializes():
     # Selection isn't hardcoded to MDLM in the caller.
     settings.algorithm._target_ = "types.SimpleNamespace"
     alternative = instantiate(settings.algorithm)
-    # MDLM adopts the configured DiT into its view network; the config is unchanged.
-    assert type(alternative.model).__name__ == "DiT"
+    # The configured network is a ModularDiT; MDLM binds its view to the token input.
+    assert type(alternative.model).__name__ == "ModularDiT"
     assert alternative.predictor.mask_index == 17
 
 
