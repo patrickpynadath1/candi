@@ -12,12 +12,12 @@ from core.samplers.continuous import FixedStepSampler
 from core.samplers.integration import HeunUpdate
 from core.samplers.ancestral import AncestralSampler
 from core.samplers.uniform_ancestral import UniformAncestralSampler
-from core.samplers.analytic import AnalyticSampler
 from core.tests.reference_samplers.ancestral import AncestralSampler as OldAncestral
 from core.tests.reference_samplers.uniform_ancestral import (
     UniformAncestralSampler as OldUniform,
 )
 from core.tests.reference_samplers.analytic import AnalyticSampler as OldAnalytic
+from core.tests.reference_samplers.analytic_sedd import AnalyticSampler as RuleAnalytic
 
 
 @pytest.mark.parametrize(
@@ -25,7 +25,7 @@ from core.tests.reference_samplers.analytic import AnalyticSampler as OldAnalyti
     [
         ("sudoku_hard", AncestralSampler, OldAncestral),
         ("uniform_diffusion", UniformAncestralSampler, OldUniform),
-        ("sedd_absorb", AnalyticSampler, OldAnalytic),
+        ("sedd_absorb", RuleAnalytic, OldAnalytic),
     ],
 )
 @pytest.mark.parametrize("final", ["none", "ancestral"])
@@ -45,18 +45,17 @@ def test_frozen_discrete_loop_equivalence(method, current, old, final):
                 "algorithm.length=8",
             ],
         )
-    if method in ("sudoku_hard", "uniform_diffusion"):
-        # The frozen loops use the standalone (state, keep) interface, which
-        # D3PM and the other standalone families keep; the MDLM and uniform
-        # view paths are covered in test_one_view_equivalence and
-        # test_view_equivalence_uniform.
-        from omegaconf import OmegaConf
+    # The frozen loops use the standalone (state, keep) interface, so they run
+    # on the frozen classes; the view paths of MDLM, uniform and SEDD are covered
+    # in test_one_view_equivalence and test_view_equivalence_{uniform,d3pm_sedd}.
+    from omegaconf import OmegaConf
 
-        reference = {
-            "sudoku_hard": "core.tests.reference_algorithms.mdlm.MDLM",
-            "uniform_diffusion": "core.tests.reference_algorithms.uniform_diffusion.UniformDiffusion",
-        }[method]
-        OmegaConf.update(cfg, "algorithm._target_", reference)
+    reference = {
+        "sudoku_hard": "core.tests.reference_algorithms.mdlm.MDLM",
+        "uniform_diffusion": "core.tests.reference_algorithms.uniform_diffusion.UniformDiffusion",
+        "sedd_absorb": "core.tests.reference_algorithms.sedd_absorb.SeddAbsorb",
+    }[method]
+    OmegaConf.update(cfg, "algorithm._target_", reference)
     torch.manual_seed(31)
     algo = instantiate(cfg.algorithm).eval()
     # Nontrivial fixed tokens and an all-fixed sequence exercise prompt handling.

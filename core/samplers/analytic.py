@@ -5,10 +5,22 @@ from .discrete import DiscreteSampler
 from core.parameterizations.score import AbsorbingScoreParameterization
 from core.processes.absorbing import AbsorbingProcess
 from .utils import initialize_state
+from .view_calls import points, predict
+
+
+class AbsorbingScoreUpdate:
+    """A SEDD absorbing view's reverse step: the analytic transition
+    from the score at ``source`` to the ``destination`` noise level."""
+
+    def __call__(self, process, representation, state, scores, source, destination, *, noise=None):
+        return process.analytic_reverse(
+            state, scores, destination.coefficients[0].log() - source.coefficients[0].log()
+        )
 
 
 class AbsorbingAnalyticUpdate:
     prediction_feedback = False
+    prediction_pathway = "score"  # Consumes log scores, not posteriors.
 
     def __init__(
         self, steps=1024, epsilon=1e-3, final_denoise="ancestral", use_float64=True
@@ -40,19 +52,21 @@ class AbsorbingAnalyticUpdate:
         )
 
     def update(self, algo, state, time, next_time, prompt_tokens, prompt_mask):
-        keep, _ = algo.schedule(time.expand(len(state)))
-        next_keep, _ = algo.schedule(next_time.expand(len(state)))
-        scores = self._scores(algo.sampling_prediction(state, keep))
-        state = algo.process.analytic_reverse(
-            state, scores, next_keep.log() - keep.log()
+        time, next_time = time.expand(len(state)), next_time.expand(len(state))
+        source, destination = points(algo, time), points(algo, next_time)
+        scores = self._scores(predict(algo, state, time))
+        view = algo.views[0]
+        state = view.update(
+            view.process, view.representation, state, scores, source[0], destination[0]
         )
         return torch.where(prompt_mask.bool(), prompt_tokens, state), 1
 
     def finalize(self, algo, state, time, prompt_tokens, prompt_mask):
         if self.final_denoise == "none":
             return state, 0
-        keep, _ = algo.schedule(time.expand(len(state)))
-        scores = self._scores(algo.sampling_prediction(state, keep))
+        time = time.expand(len(state))
+        keep = points(algo, time)[0].coefficients[0]
+        scores = self._scores(predict(algo, state, time))
         state = algo.process.analytic_reverse(state, scores, -keep.log(), denoise=True)
         return torch.where(prompt_mask.bool(), prompt_tokens, state), 1
 

@@ -105,3 +105,31 @@ class DiscreteDiffusion(nn.Module):
             return sampler.sample(self, prompt_tokens, prompt_mask)
         finally:
             self.train(was_training)
+
+
+def validate_discrete_recipe(model, predictor, schedule, prediction):
+    """``DiscreteDiffusion``'s constructor checks, for its view-path recipes."""
+    if prediction is None and getattr(model, "conditioning_adapter", None) is not None:
+        raise ValueError(
+            "self-conditioning prediction is not yet integrated for this algorithm"
+        )
+    validate_adaptive_feedback(schedule, predictor)
+    if getattr(schedule, "output_kind", None) != "keep_rate":
+        raise TypeError("discrete diffusion requires a keep-rate noise schedule")
+    if not model.adaLN:
+        raise ValueError(
+            "this discrete method requires a time-conditioned model (adaLN=true)"
+        )
+
+
+def absorbing_token_network(model, process, schedule, update):
+    """One absorbing token view on a ModularDiT adopted from ``model`` (a DiT),
+    conditioned on ``-log(keep)`` exactly as ``DiscreteDiffusion.model_logits``."""
+    from core.models.legacy import adopt
+    from core.modifiers.hybrid.views import DiffusionView
+    from core.representations.noisy_inputs import TokenRepresentation
+
+    table = model.vocab_embed.embedding
+    representation = TokenRepresentation(*table.shape, embedding=table)
+    view = DiffusionView(process, schedule, representation, update)
+    return adopt(model, views=[view], time_coordinate="negative_log_keep_exact")

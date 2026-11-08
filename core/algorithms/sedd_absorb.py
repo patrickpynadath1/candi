@@ -1,35 +1,97 @@
-"""SEDD absorbing training and model-to-score orchestration."""
+"""SEDD absorbing: score-entropy training of absorbing log scores.
+
+Runs on the view path: one absorbing view on a ModularDiT adopted from the
+configured DiT, with the parameterization's score pathway. Training, sampling
+and parameter order are bit-identical to the former standalone implementation,
+which core/tests/reference_algorithms/sedd_absorb.py keeps for comparison.
+"""
 
 import torch
 
-from .discrete import DiscreteDiffusion
+from .discrete import absorbing_token_network, validate_discrete_recipe
+from core.modifiers.hybrid.one_view import OneViewAlgorithm
+from core.modifiers.hybrid.training import HybridDiffusion
+from core.objectives.cross_entropy import CrossEntropy
+from core.objectives.weighting import ObjectiveContext
 from core.parameterizations.score import AbsorbingScoreParameterization
 from core.processes.absorbing import AbsorbingProcess
 from core.objectives.score_entropy import AbsorbingScoreEntropy
+from core.samplers.analytic import AbsorbingScoreUpdate
 
 
-class SeddAbsorb(DiscreteDiffusion):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not isinstance(self.predictor, AbsorbingScoreParameterization):
+class SeddAbsorb(OneViewAlgorithm, HybridDiffusion):
+    prediction_pathway = "score"
+    # The process kind check stays "posterior": AbsorbingProcess declares no
+    # prediction kind, and its view serves either a posterior or a score
+    # (the update rule decides which it consumes).
+    prediction_kind = "posterior"
+    # The parameterization scatters a zero log score at the observed token.
+    clamp_observed = False
+
+    def __init__(
+        self,
+        model,
+        predictor,
+        process,
+        schedule,
+        time_sampler,
+        objective,
+        length=180,
+        prediction=None,
+    ):
+        validate_discrete_recipe(model, predictor, schedule, prediction)
+        if not isinstance(predictor, AbsorbingScoreParameterization):
             raise TypeError("SeddAbsorb requires AbsorbingScoreParameterization")
-        if not isinstance(self.process, AbsorbingProcess) or not isinstance(
-            self.objective, AbsorbingScoreEntropy
+        if not isinstance(process, AbsorbingProcess) or not isinstance(
+            objective, AbsorbingScoreEntropy
         ):
             raise TypeError(
                 "SeddAbsorb requires an absorbing process and score-entropy objective"
             )
         if (
-            self.objective.mask_index != self.process.mask_index
-            or self.objective.vocab_size != self.model.output_layer.linear.out_features
+            objective.mask_index != process.mask_index
+            or objective.vocab_size != model.output_layer.linear.out_features
         ):
             raise ValueError(
                 "SEDD model, process and objective token spaces must agree"
             )
+        network = absorbing_token_network(model, process, schedule, AbsorbingScoreUpdate())
+        super().__init__(
+            network, predictor, time_sampler, objective, length=length, prediction=prediction
+        )
 
-    def training_prediction(self, state, keep):
+    def generate(self, sampler, prompt_tokens, prompt_mask):
+        rule = getattr(sampler, "update_rule", None)
+        if getattr(rule, "prediction_pathway", "posterior") != self.prediction_pathway:
+            raise TypeError(
+                f"{type(sampler).__name__} requires PosteriorParameterization; "
+                "SEDD log scores need a score sampler (sampler=analytic)"
+            )
+        return super().generate(sampler, prompt_tokens, prompt_mask)
+
+    def _prediction(self, pathway, states, points, global_time, trajectory=None):
+        # Scores are scaled by the noise level -log(keep) the network sees.
+        keep = points[0].coefficients[0]
         sigma = -keep.clamp_min(torch.finfo(keep.dtype).tiny).log()
-        return self.predictor(self.model_logits(state, keep), state, sigma)
+        return self.prediction.predict(
+            self.model,
+            self.predictor.at_noise(sigma),
+            self.model_inputs(states, points, global_time),
+            self._observed(states),
+            pathway,
+            logits_transform=self.prediction_logits,
+            trajectory=trajectory,
+            training_pathway=self._pathway("training"),
+        )
 
-    def sampling_prediction(self, state, keep):
-        return self.training_prediction(state, keep)
+    def _objective(self, objective, prediction, tokens, time, points, states):
+        keep, derivative = points[0].coefficients
+        if isinstance(objective, CrossEntropy):  # A per-call override.
+            return objective(
+                prediction,
+                tokens,
+                context=ObjectiveContext(
+                    time=time, alpha=keep, sigma=-keep.clamp_min(1e-30).log()
+                ),
+            )
+        return objective(prediction, states[0], tokens, keep[:, None], derivative[:, None])
