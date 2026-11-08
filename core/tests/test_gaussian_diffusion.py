@@ -115,6 +115,7 @@ def test_euler_preserves_prompts_and_matches_constant_mean_solution():
 
 @pytest.mark.parametrize("schedule", ["gaussian_rank", "linear_interpolation"])
 def test_gaussian_hydra_single_example_loss_and_sampling(schedule):
+    torch.manual_seed(0)
     cfg = compose(
         "gaussian_diffusion_sudoku",
         [
@@ -157,7 +158,8 @@ def test_gaussian_hydra_single_example_loss_and_sampling(schedule):
             .squeeze(-1)
         )
         expected = (ce * mask).sum() / mask.sum()
-        torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+        # Same value through two code paths; they may round differently by an ulp.
+        torch.testing.assert_close(actual, expected)
 
 
 def test_linear_path_forward_endpoints_and_velocity():
