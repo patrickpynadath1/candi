@@ -1,6 +1,7 @@
 """Finite-concentration vMF schedule; framework time runs from data to noise."""
 
 import torch
+from .utils import check_unit_time
 
 
 class VMFSchedule:
@@ -16,6 +17,5 @@ class VMFSchedule:
             raise ValueError("schedule exceeds vMF table concentration")
 
     def __call__(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("vMF time must be in [0, 1]")
+        check_unit_time(time, "vMF time must be in [0, 1]")
         return self.kappa_max * (1 - time), torch.full_like(time, -self.kappa_max)

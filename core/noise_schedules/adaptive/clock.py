@@ -3,6 +3,7 @@
 import numpy as np
 import torch
 from scipy.interpolate import PchipInterpolator
+from core.noise_schedules.utils import check_unit_time
 
 
 class BufferedAdaptiveSchedule(torch.nn.Module):
@@ -170,8 +171,7 @@ class BufferedAdaptiveSchedule(torch.nn.Module):
     output_kind = "keep_rate"
 
     def forward(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("schedule time must be finite and in [0, 1]")
+        check_unit_time(time, "schedule time must be finite and in [0, 1]")
         keep, derivative = self.alpha_t(time), self.alpha_prime_t(time)
         clean = self.base.alpha_t(torch.zeros_like(time))
         noisy = self.base.alpha_t(torch.ones_like(time))

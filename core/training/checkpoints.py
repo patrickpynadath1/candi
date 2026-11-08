@@ -12,17 +12,21 @@ from . import legacy_pickle
 LEGACY_FORMATS = (False, True, "candi")
 
 
+def algorithm_state(checkpoint):
+    """The algorithm's weights from a Lightning checkpoint, without the ``algorithm.`` prefix."""
+    return {
+        key.removeprefix("algorithm."): value
+        for key, value in checkpoint["state_dict"].items()
+        if key.startswith("algorithm.")
+    }
+
+
 def initialize_weights(module, path):
     """Warm-start weights, not optimizer state; resume uses Lightning."""
     checkpoint = torch.load(path, map_location="cpu", weights_only=False, mmap=True)
     if checkpoint.get("core_format_version") != 1:
         raise ValueError("weight initialization requires a core checkpoint")
-    state = {
-        key.removeprefix("algorithm."): value
-        for key, value in checkpoint["state_dict"].items()
-        if key.startswith("algorithm.")
-    }
-    module.algorithm.load_state_dict(state, strict=True)
+    module.algorithm.load_state_dict(algorithm_state(checkpoint), strict=True)
     if module.ema:
         if "ema" not in checkpoint:
             raise ValueError("EMA initialization requires saved EMA")

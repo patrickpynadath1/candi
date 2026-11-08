@@ -7,7 +7,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from core.representations.spec import RepresentationRequirements
-from .gaussian_path import GaussianPath
+from .gaussian_path import path_from_gamma
 from core.objectives.reductions import masked_example_mean
 
 
@@ -80,16 +80,7 @@ class LearnedLogSNRSchedule(nn.Module):
         delta = upper - lower
         return lower + delta * shape, delta * derivative, adaptation
 
-    @staticmethod
-    def coefficients(gamma, derivative):
-        alpha_sq, sigma_sq = torch.sigmoid(-gamma), torch.sigmoid(gamma)
-        alpha, sigma = alpha_sq.sqrt(), sigma_sq.sqrt()
-        return GaussianPath(
-            alpha,
-            sigma,
-            -0.5 * derivative * sigma_sq * alpha,
-            0.5 * derivative * alpha_sq * sigma,
-        )
+    coefficients = staticmethod(path_from_gamma)
 
     def forward(self, time):
         gamma, derivative, _ = self.gamma(time)

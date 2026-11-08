@@ -10,6 +10,25 @@ import tempfile
 from torch.utils.data import Dataset
 
 
+
+def split_story(text, prompt_bytes):
+    """(prompt, continuation, id) of a complete story, or None if it is too short.
+
+    The prompt is the first ``prompt_bytes`` bytes, backed up to a UTF-8 character
+    boundary; the id is the SHA-256 of the whole stripped story. The published
+    cohort (scripts/prepare_data.py) depends on this split staying the same.
+    """
+    raw = text.strip().encode("utf-8")
+    # Complete stories only: never convert a truncation into a fake ending.
+    if len(raw) <= prompt_bytes:
+        return None
+    cut = prompt_bytes
+    while cut and (raw[cut] & 0xC0) == 0x80:
+        cut -= 1
+    if cut == 0:
+        return None
+    return raw[:cut].decode("utf-8"), raw[cut:].decode("utf-8"), hashlib.sha256(raw).hexdigest()
+
 class StoryByteTokenizer:
     """UTF-8 bytes plus PAD/BOS/EOS/MASK; no external tokenizer download."""
 
@@ -185,18 +204,10 @@ def prepare_stories(data, split, length, prompt_bytes, tokenizer=None):
     considered = 0
     for example in _source(data, split):
         considered += 1
-        text = example["text"].strip()
-        raw = text.encode("utf-8")
-        # Complete stories only: never convert a truncation into a fake ending.
-        if len(raw) <= prompt_bytes:
+        parts = split_story(example["text"], prompt_bytes)
+        if parts is None:
             continue
-        # Back up to a valid UTF-8 boundary, never split a multibyte character.
-        cut = prompt_bytes
-        while cut and (raw[cut] & 0xC0) == 0x80:
-            cut -= 1
-        if cut == 0:
-            continue
-        prompt, reference = raw[:cut].decode("utf-8"), raw[cut:].decode("utf-8")
+        prompt, reference, key = parts
         # Encode separately so a merge can never straddle the prompt boundary.
         prompt_ids, reference_ids = (
             tokenizer.encode(prompt),
@@ -210,7 +221,6 @@ def prepare_stories(data, split, length, prompt_bytes, tokenizer=None):
         )
         if len(ids) > length:
             continue
-        key = hashlib.sha256(raw).hexdigest()
         if allowed is not None and f"{split}:{key}" not in allowed:
             continue
         if key in seen:

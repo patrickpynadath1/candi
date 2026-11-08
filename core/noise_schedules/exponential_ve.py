@@ -6,6 +6,7 @@ from torch import nn
 
 from core.representations.spec import RepresentationRequirements
 from .gaussian_path import GaussianPath
+from .utils import check_unit_time
 
 
 class ExponentialVESchedule(nn.Module):
@@ -27,8 +28,7 @@ class ExponentialVESchedule(nn.Module):
         return (1 - self.training_epsilon) * time
 
     def forward(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("schedule time must be finite and in [0, 1]")
+        check_unit_time(time, "schedule time must be finite and in [0, 1]")
         sigma = self.sigma_min * torch.exp(time * self.log_ratio)
         return GaussianPath(
             torch.ones_like(time), sigma, torch.zeros_like(time), sigma * self.log_ratio

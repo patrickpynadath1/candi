@@ -10,6 +10,18 @@ def require(condition, message):
         raise TypeError(message)
 
 
+def predictor(algo, kind, message):
+    """The recipe's predictor is a ``kind`` (e.g. PosteriorParameterization)."""
+    require(isinstance(getattr(algo, "predictor", None), kind), message)
+
+
+def integer_nfe(nfe):
+    """An NFE budget as an int; rejects bools and fractional budgets."""
+    if isinstance(nfe, bool) or int(nfe) != nfe:
+        raise ValueError("NFE budget must be an integer")
+    return int(nfe)
+
+
 def views(algo, sampler):
     """The view path: a diffusion recipe with ``views`` and ``points``."""
     require(

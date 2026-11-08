@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import math
 import torch
 from torch import nn
+from .utils import check_unit_time
 
 
 def concentration(t, kind="constant_linear", nu0=0.4, nu1=0.75, pivot=0.8, epsilon=1.0):
@@ -49,8 +50,7 @@ class SimplexSchedule(nn.Module):
 
     def forward(self, time):
         time = time.double()
-        if not torch.isfinite(time).all() or ((time < 0) | (time > 1)).any():
-            raise ValueError("simplex time must be finite and in [0,1]")
+        check_unit_time(time, "simplex time must be finite and in [0,1]")
         # epsilon/t has infinite concentration at t=0. The process handles
         # this exact clean endpoint without drawing an infinite-shape Gamma.
         c = concentration(time, self.kind, self.nu0, self.nu1, self.pivot, self.epsilon)

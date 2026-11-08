@@ -2,6 +2,7 @@
 
 import torch
 import math
+from .utils import check_unit_time
 
 
 def spherical_truncation_alpha_max(vocab_size, dimension, delta=0.1):
@@ -39,8 +40,7 @@ class SphericalSchedule:
         self.epsilon = epsilon
 
     def __call__(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("spherical time must be in [0, 1]")
+        check_unit_time(time, "spherical time must be in [0, 1]")
         return self.alpha_max + (self.epsilon - self.alpha_max) * time, torch.full_like(
             time, self.epsilon - self.alpha_max
         )

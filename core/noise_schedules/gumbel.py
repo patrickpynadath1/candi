@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from core.representations.spec import RepresentationRequirements
-from .gaussian_path import GaussianPath
+from .gaussian_path import path_from_gamma
 
 
 class GumbelSchedule(nn.Module):
@@ -100,15 +100,7 @@ class GumbelSchedule(nn.Module):
         return gamma.to(dtype), derivative.to(dtype)
 
     def forward(self, time):
-        gamma, derivative = self.gamma(time)
-        alpha_sq, sigma_sq = torch.sigmoid(-gamma), torch.sigmoid(gamma)
-        alpha, sigma = alpha_sq.sqrt(), sigma_sq.sqrt()
-        return GaussianPath(
-            alpha,
-            sigma,
-            -0.5 * derivative * sigma_sq * alpha,
-            0.5 * derivative * alpha_sq * sigma,
-        )
+        return path_from_gamma(*self.gamma(time))
 
     @torch.no_grad()
     def observe(self, time, loss, step, *, training=False):

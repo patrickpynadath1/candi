@@ -6,13 +6,12 @@ parameterization's plug-in pathway. The network reads -log(keep) (or zero time).
 
 
 from core.algorithms.adaptive import validate_adaptive_feedback
+from core.algorithms.discrete import keep_rate_objective
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.modifiers.hybrid.views import DiffusionView
 from core.modifiers.self_conditioning.prediction import PredictionCoordinator
-from core.objectives.cross_entropy import CrossEntropy
 from core.objectives.uniform import UniformDiffusionObjective
-from core.objectives.weighting import ObjectiveContext
 from core.parameterizations.plug_in import PlugInParameterization
 from core.processes.uniform import UniformProcess
 from core.representations.noisy_inputs import TokenRepresentation
@@ -70,14 +69,5 @@ class UniformDiffusion(OneViewAlgorithm, HybridDiffusion):
         self.time_conditioning = time_conditioning
 
     def _objective(self, objective, prediction, tokens, time, points, states):
-        keep, derivative = points[0].coefficients
-        if isinstance(objective, CrossEntropy):
-            # Per-call CE (block-size mixtures) sees the keep-rate path.
-            return objective(
-                prediction,
-                tokens,
-                context=ObjectiveContext(
-                    time=time, alpha=keep, sigma=-keep.clamp_min(1e-30).log()
-                ),
-            )
-        return objective(prediction, states[0], tokens, keep[:, None], derivative[:, None])
+        keep, derivative = points[0].coefficients  # per-call CE: block-size mixtures
+        return keep_rate_objective(objective, prediction, states[0], tokens, time, keep, derivative)

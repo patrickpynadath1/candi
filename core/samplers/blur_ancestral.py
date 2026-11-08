@@ -34,8 +34,7 @@ class BlurAncestralSampler:
 
     def steps_for_nfe(self, nfe):
         """Each of steps + 1 predictions costs one call, two with SC bootstrap."""
-        if isinstance(nfe, bool) or int(nfe) != nfe:
-            raise ValueError("NFE budget must be an integer")
+        nfe = requirements.integer_nfe(nfe)
         calls = 2 if self.self_conditioning_mode == "bootstrap" else 1
         return max(1, int(nfe) // calls - 1)
 
@@ -45,8 +44,9 @@ class BlurAncestralSampler:
             hasattr(getattr(algo, "schedule", None), "for_layout"),
             "blur ancestral sampling requires a blurring recipe (a sequence-layout schedule)",
         )
-        if not isinstance(algo.predictor, PosteriorParameterization):
-            raise TypeError("blur ancestral sampling requires a clean-token posterior")
+        requirements.predictor(
+            algo, PosteriorParameterization, "blur ancestral sampling requires a clean-token posterior"
+        )
         algo = prediction_session(algo)
         clean_prompt = algo.representation.encode(prompt_tokens)
         active = ~prompt_mask.bool()

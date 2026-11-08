@@ -27,19 +27,14 @@ def load_trained(trained, device="cpu"):
     from hydra.utils import instantiate
     from omegaconf import OmegaConf
 
+    from core.training.checkpoints import algorithm_state
+
     if not isinstance(trained, dict):
         trained = json.loads(Path(trained).read_text())
     config = OmegaConf.load(trained["config"])
     checkpoint = torch.load(trained["checkpoint"], map_location="cpu", weights_only=False)
     algorithm = instantiate(config.algorithm)
-    algorithm.load_state_dict(
-        {
-            key.removeprefix("algorithm."): value
-            for key, value in checkpoint["state_dict"].items()
-            if key.startswith("algorithm.")
-        },
-        strict=True,
-    )
+    algorithm.load_state_dict(algorithm_state(checkpoint), strict=True)
     return config, checkpoint, algorithm.to(device)
 
 

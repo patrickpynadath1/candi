@@ -200,10 +200,6 @@ TIME_COORDINATES = {
     ).log(),
     # Standalone spherical flow matching's -log(keep): keep clamped at 1e-12.
     "negative_log_keep_floor": lambda time, point, epsilon: -_keep(point).clamp_min(1e-12).log(),
-    # log(1 - t).
-    "log1p_negative_time": lambda time, point, epsilon: torch.log1p(
-        -time.float().clamp(max=1 - 1e-6)
-    ),
     **{
         name: (
             lambda function: lambda time, point, epsilon: function(
@@ -280,14 +276,6 @@ class SelfConditioning(nn.Module):
         self.adapter = make_conditioning(
             source, state_dim if space == "state" else hidden_size, hidden_size, initialization
         )
-
-    @classmethod
-    def wrap(cls, adapter, space="hidden", scale=1.0):
-        """Use an existing adapter module (no new parameters or random draws)."""
-        slot = cls.__new__(cls)
-        nn.Module.__init__(slot)
-        slot.space, slot.scale, slot.adapter = space, scale, adapter
-        return slot
 
     def forward(self, hidden, self_condition):
         if self_condition is not None and self.scale != 1.0:
@@ -442,10 +430,6 @@ class ModularDiT(TextDiT):
     def conditioning_adapter(self):
         """The self-conditioning slot, under the name the coordinator checks."""
         return self.self_conditioning
-
-    @property
-    def supports_fused_streams(self):
-        return self.views is not None
 
     @property
     def output_width(self):

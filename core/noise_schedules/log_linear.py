@@ -1,4 +1,5 @@
 import torch
+from .utils import check_unit_time
 
 
 class LogLinear:
@@ -10,8 +11,7 @@ class LogLinear:
         self.epsilon = epsilon
 
     def __call__(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("schedule time must be in [0, 1]")
+        check_unit_time(time, "schedule time must be in [0, 1]")
         keep = self.epsilon + (1 - self.epsilon) * (1 - time)
         derivative = torch.full_like(time, -(1 - self.epsilon))
         return keep, derivative

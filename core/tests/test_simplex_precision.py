@@ -122,7 +122,7 @@ def test_compile():
 
 @pytest.mark.parametrize("precision", ["fp32", "bf16"])
 def test_both_model_adapters_preserve_table_gradients(precision):
-    from core.models.components import SimplexExpectationInput
+    from core.models.simplex_projection import simplex_projection
     from core.representations.noisy_inputs import SimplexRepresentation
 
     torch.manual_seed(9)
@@ -143,10 +143,8 @@ def test_both_model_adapters_preserve_table_gradients(precision):
     ]
     assert (actual - expected).norm() / expected.norm() < 0.015
     assert (grads - ref_grads).norm() / ref_grads.norm() < 0.025
-    adapter = SimplexExpectationInput(precision, 3)
-    table = SimpleNamespace(embedding=representation.embedding)
-    out = adapter(state, table)
-    assert torch.isfinite(torch.autograd.grad(out.sum(), table.embedding)[0]).all()
+    out = simplex_projection(state, representation.embedding, precision, 3)
+    assert torch.isfinite(torch.autograd.grad(out.sum(), representation.embedding)[0]).all()
 
 
 @pytest.mark.parametrize("chunk", [0, 127])

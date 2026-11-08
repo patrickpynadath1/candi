@@ -12,6 +12,7 @@ from scipy.special import ndtr
 from scipy.linalg import eigh_tridiagonal
 from core.representations.spec import RepresentationRequirements
 from .gaussian_path import GaussianPath
+from .utils import check_unit_time
 
 
 def sphere_cosine_quadrature(dimension, order):
@@ -107,8 +108,7 @@ class EmbeddingSphereRankSchedule(nn.Module):
         return value.to(rank.dtype), slope.to(rank.dtype)
 
     def forward(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("time must be finite and in [0, 1]")
+        check_unit_time(time, "time must be finite and in [0, 1]")
         width = self.endpoint_width
         interior = ((time - width) / (1 - 2 * width)).clamp(0, 1)
         if self.coupling == "linear":

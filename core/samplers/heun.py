@@ -2,6 +2,7 @@
 
 from core.samplers.continuous import FixedStepSampler
 from core.samplers.integration import HeunUpdate
+from . import requirements
 
 
 class HeunSampler(FixedStepSampler):
@@ -11,6 +12,5 @@ class HeunSampler(FixedStepSampler):
 
     def steps_for_nfe(self, nfe):
         """Two field evaluations per step plus the terminal decoding call."""
-        if isinstance(nfe, bool) or int(nfe) != nfe:
-            raise ValueError("NFE budget must be an integer")
+        nfe = requirements.integer_nfe(nfe)
         return max(1, (int(nfe) - 1) // 2)

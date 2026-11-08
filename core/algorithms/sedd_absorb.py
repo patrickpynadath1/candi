@@ -6,11 +6,9 @@ the parameterization's score pathway.
 
 import torch
 
-from .discrete import absorbing_token_network, validate_discrete_recipe
+from .discrete import absorbing_token_network, keep_rate_objective, validate_discrete_recipe
 from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
-from core.objectives.cross_entropy import CrossEntropy
-from core.objectives.weighting import ObjectiveContext
 from core.parameterizations.score import AbsorbingScoreParameterization
 from core.processes.absorbing import AbsorbingProcess
 from core.objectives.score_entropy import AbsorbingScoreEntropy
@@ -83,13 +81,5 @@ class SeddAbsorb(OneViewAlgorithm, HybridDiffusion):
         )
 
     def _objective(self, objective, prediction, tokens, time, points, states):
-        keep, derivative = points[0].coefficients
-        if isinstance(objective, CrossEntropy):  # A per-call override.
-            return objective(
-                prediction,
-                tokens,
-                context=ObjectiveContext(
-                    time=time, alpha=keep, sigma=-keep.clamp_min(1e-30).log()
-                ),
-            )
-        return objective(prediction, states[0], tokens, keep[:, None], derivative[:, None])
+        keep, derivative = points[0].coefficients  # CE may come as a per-call override
+        return keep_rate_objective(objective, prediction, states[0], tokens, time, keep, derivative)

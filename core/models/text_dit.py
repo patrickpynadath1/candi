@@ -9,7 +9,6 @@ from .components import (
     BlockExecutionOutput,
     DiffusionBlocks,
     LayerOutput,
-    TimeConditioning,
 )
 from .prediction import ModelPrediction
 
@@ -28,14 +27,12 @@ class TextDiT(nn.Module):
         super().__init__()
         self.block_execution = DiffusionBlocks()
         self.output_adapter = LayerOutput()
-        self.time_adapter = TimeConditioning()
         self.autocast_cache = autocast_cache
 
     def configure_components(
         self,
         *,
         input_adapter=None,
-        time_adapter=None,
         output_adapter=None,
         block_execution=None,
     ):
@@ -46,7 +43,6 @@ class TextDiT(nn.Module):
         """
         for name, component in (
             ("input_adapter", input_adapter),
-            ("time_adapter", time_adapter),
             ("output_adapter", output_adapter),
             ("block_execution", block_execution),
         ):

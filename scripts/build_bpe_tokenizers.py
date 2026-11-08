@@ -6,26 +6,21 @@ same learned merge sequence. No validation text participates in BPE training.
 
 import argparse
 import csv
-import hashlib
 import json
 from importlib.metadata import version
 from pathlib import Path
+import sys
 import time
 
 import numpy as np
 import pyarrow.parquet as pq
 from tokenizers import Tokenizer, decoders, models, pre_tokenizers, trainers
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from core.data.cache import file_sha256  # noqa: E402
+
 SPECIAL = ["<pad>", "<bos>", "<eos>", "<mask>"]
 BASE_SIZE = 256 + len(SPECIAL)
-
-
-def checksum(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def batches(files):
@@ -105,7 +100,7 @@ def main():
                 {
                     "name": p.name,
                     "rows": pq.ParquetFile(p).metadata.num_rows,
-                    "sha256": checksum(p),
+                    "sha256": file_sha256(p),
                 }
                 for p in paths
             ]

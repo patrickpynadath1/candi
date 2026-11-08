@@ -27,6 +27,40 @@ def _positive_finite(value, name):
         raise ValueError(f"{name} must be positive and finite")
 
 
+COORDINATES = {"time", "alpha", "sigma", "effective_noise", "snr", "log_snr"}
+
+
+def loss_coordinate(context, name, epsilon):
+    """A weighting coordinate of shape (batch,), in float32, from an ObjectiveContext.
+
+    time, alpha and sigma are read directly; effective_noise (sigma/alpha), snr and
+    log_snr are formed from alpha and sigma clamped at ``epsilon``.
+    """
+    if context is None:
+        raise ValueError("loss weighting requires ObjectiveContext")
+    if name in {"time", "alpha", "sigma"}:
+        coordinate = getattr(context, name)
+        if coordinate is None:
+            raise ValueError(f"loss weighting requires context.{name}")
+        coordinate = coordinate.float()
+        if coordinate.ndim != 1:
+            raise ValueError("objective coordinate must have shape (batch,)")
+        return coordinate
+    if context.alpha is None or context.sigma is None:
+        raise ValueError(
+            f"loss weighting coordinate {name} requires context.alpha and context.sigma"
+        )
+    # Float32 avoids half-precision overflow when taking endpoint ratios.
+    alpha, sigma = context.alpha.float(), context.sigma.float()
+    if alpha.ndim != 1 or sigma.shape != alpha.shape:
+        raise ValueError("objective coordinates must have matching shape (batch,)")
+    alpha, sigma = alpha.clamp_min(epsilon), sigma.clamp_min(epsilon)
+    if name == "effective_noise":
+        return sigma / alpha
+    log_snr = 2 * (alpha.log() - sigma.log())
+    return log_snr if name == "log_snr" else log_snr.exp()
+
+
 class PowerLossWeighting(nn.Module):
     """Multiply CE by scale * max(coordinate, epsilon)**exponent.
 
@@ -38,14 +72,7 @@ class PowerLossWeighting(nn.Module):
 
     def __init__(self, coordinate="sigma", exponent=0.0, scale=1.0, epsilon=1e-6):
         super().__init__()
-        if coordinate not in {
-            "time",
-            "alpha",
-            "sigma",
-            "effective_noise",
-            "snr",
-            "log_snr",
-        }:
+        if coordinate not in COORDINATES:
             raise ValueError(f"unknown loss coordinate: {coordinate}")
         if coordinate == "log_snr":
             raise ValueError("power weighting requires a nonnegative coordinate")
@@ -57,34 +84,7 @@ class PowerLossWeighting(nn.Module):
         self.exponent, self.scale = float(exponent), float(scale)
 
     def forward(self, loss, context):
-        if context is None:
-            raise ValueError("loss weighting requires ObjectiveContext")
-        if self.coordinate in {"time", "alpha", "sigma"}:
-            coordinate = getattr(context, self.coordinate)
-            if coordinate is None:
-                raise ValueError(f"loss weighting requires context.{self.coordinate}")
-            coordinate = coordinate.float()
-            if coordinate.ndim != 1:
-                raise ValueError("objective coordinate must have shape (batch,)")
-        else:
-            if context.alpha is None or context.sigma is None:
-                raise ValueError(
-                    f"loss weighting coordinate {self.coordinate} requires "
-                    "context.alpha and context.sigma"
-                )
-            # Float32 avoids half-precision overflow when taking endpoint ratios.
-            alpha = context.alpha.float()
-            sigma = context.sigma.float()
-            if alpha.ndim != 1 or sigma.shape != alpha.shape:
-                raise ValueError(
-                    "objective coordinates must have matching shape (batch,)"
-                )
-            alpha = alpha.clamp_min(self.epsilon)
-            sigma = sigma.clamp_min(self.epsilon)
-            if self.coordinate == "effective_noise":
-                coordinate = sigma / alpha
-            else:
-                coordinate = (2 * (alpha.log() - sigma.log())).exp()
+        coordinate = loss_coordinate(context, self.coordinate, self.epsilon)
         coordinate = coordinate.clamp_min(self.epsilon)
         weight = self.scale * coordinate.pow(self.exponent)
         if weight.shape != loss.shape[:1]:
@@ -104,14 +104,7 @@ class LearnedLossWeighting(nn.Module):
 
     def __init__(self, coordinate="time", cond_dim=128, hidden_dim=128, epsilon=1e-6):
         super().__init__()
-        if coordinate not in {
-            "time",
-            "alpha",
-            "sigma",
-            "effective_noise",
-            "snr",
-            "log_snr",
-        }:
+        if coordinate not in COORDINATES:
             raise ValueError(f"unknown loss coordinate: {coordinate}")
         if cond_dim < 1 or hidden_dim < 1:
             raise ValueError("weighting network dimensions must be positive")
@@ -125,35 +118,7 @@ class LearnedLossWeighting(nn.Module):
         nn.init.zeros_(self.mlp[-1].bias)
 
     def log_weight(self, context):
-        if context is None:
-            raise ValueError("loss weighting requires ObjectiveContext")
-        if self.coordinate in {"time", "alpha", "sigma"}:
-            coordinate = getattr(context, self.coordinate)
-            if coordinate is None:
-                raise ValueError(f"loss weighting requires context.{self.coordinate}")
-            coordinate = coordinate.float()
-            if coordinate.ndim != 1:
-                raise ValueError("objective coordinate must have shape (batch,)")
-        else:
-            if context.alpha is None or context.sigma is None:
-                raise ValueError(
-                    f"loss weighting coordinate {self.coordinate} requires "
-                    "context.alpha and context.sigma"
-                )
-            # Float32 avoids half-precision overflow when taking endpoint ratios.
-            alpha = context.alpha.float()
-            sigma = context.sigma.float()
-            if alpha.ndim != 1 or sigma.shape != alpha.shape:
-                raise ValueError(
-                    "objective coordinates must have matching shape (batch,)"
-                )
-            alpha = alpha.clamp_min(self.epsilon)
-            sigma = sigma.clamp_min(self.epsilon)
-            if self.coordinate == "effective_noise":
-                coordinate = sigma / alpha
-            else:
-                log_snr = 2 * (alpha.log() - sigma.log())
-                coordinate = log_snr if self.coordinate == "log_snr" else log_snr.exp()
+        coordinate = loss_coordinate(context, self.coordinate, self.epsilon)
         return self.mlp(self.time(coordinate)).squeeze(-1).float()
 
     def forward(self, loss, context):

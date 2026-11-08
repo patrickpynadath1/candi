@@ -38,10 +38,7 @@ class VariableLengthDiffusion(nn.Module):
         time_sampling_include_aux=False,
     ):
         super().__init__()
-        if not hasattr(algorithm, "views") or not (
-            callable(getattr(algorithm.model, "prepare_fused", None))
-            or getattr(algorithm.model, "views", None) is not None
-        ):
+        if not hasattr(algorithm, "views") or getattr(algorithm.model, "views", None) is None:
             raise TypeError(
                 "variable length requires a DiffusionView assembly; use one view for a single process"
             )

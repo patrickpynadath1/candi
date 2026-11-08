@@ -7,7 +7,6 @@ modules explicitly; they never inspect a representation or predictor.
 
 import torch
 from torch import nn
-from torch.nn import functional as F
 from dataclasses import dataclass
 from contextlib import nullcontext
 
@@ -23,55 +22,9 @@ class TokenInput(nn.Module):
         return embedding(tokens)
 
 
-class SimplexExpectationInput(nn.Module):
-    def __init__(self, precision="legacy", chunk_size=0):
-        super().__init__()
-        self.precision, self.chunk_size = precision, chunk_size
-
-    def forward(self, state, embedding):
-        from .simplex_projection import simplex_projection
-
-        return simplex_projection(
-            state, embedding.embedding, self.precision, self.chunk_size
-        )
-
-
-class SimplexArgmaxInput(nn.Module):
-    def forward(self, state, embedding):
-        return embedding(state.argmax(-1)).masked_fill(
-            ~torch.isfinite(state).any(-1)[..., None], 0
-        )
-
-
-class LinearStateInput(nn.Module):
-    def forward(self, state, projection, *, embedding=None, precondition=None):
-        hidden = state.float()
-        if precondition is not None:
-            hidden = precondition(hidden)
-        return projection(hidden)
-
-
-class EmbeddedStateInput(nn.Module):
-    def forward(self, state, projection, *, embedding, precondition=None):
-        hidden = state.float() @ F.normalize(embedding.float(), dim=-1)
-        if precondition is not None:
-            hidden = precondition(hidden)
-        return projection(hidden)
-
-
-class TimeConditioning(nn.Module):
-    def forward(self, coordinate, embedder):
-        return F.silu(embedder(coordinate))
-
-
 class LayerOutput(nn.Module):
     def forward(self, hidden, condition, *, layer):
         return layer(hidden, condition)
-
-
-class EmbeddingOutput(nn.Module):
-    def forward(self, hidden, condition, *, projection, embedding, bias):
-        return projection(hidden) @ embedding.t() + bias
 
 
 class TemperatureOutput(LayerOutput):

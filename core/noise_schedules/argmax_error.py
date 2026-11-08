@@ -7,6 +7,7 @@ from torch import nn
 from core.representations.spec import RepresentationRequirements
 from .gaussian_path import GaussianPath
 from .utils import build_argmax_error_table
+from .utils import check_unit_time
 
 
 class OneHotArgmaxErrorSchedule(nn.Module):
@@ -71,8 +72,7 @@ class OneHotArgmaxErrorSchedule(nn.Module):
         return (1 - self.training_epsilon) * time
 
     def forward(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("schedule time must be finite and in [0, 1]")
+        check_unit_time(time, "schedule time must be finite and in [0, 1]")
         clock = time.double()
         if self.coupling == "linear":
             target = self.error_min + clock * (self.error_max - self.error_min)

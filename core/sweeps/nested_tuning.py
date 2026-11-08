@@ -202,12 +202,14 @@ def make_sampler(settings, completed_trials=0):
 def validate_search(settings):
     if settings.get("on_failure", "skip") not in FAILURE_POLICIES:
         raise ValueError(f"on_failure must be one of {FAILURE_POLICIES}")
+    algorithm = (settings.get("search") or {}).get("algorithm", "tpe")
+    if algorithm not in SEARCH_ALGORITHMS:
+        raise ValueError(
+            f"Unknown search algorithm {algorithm!r}; use one of {sorted(SEARCH_ALGORITHMS)}"
+        )
     try:
         import optuna  # noqa: F401
-    except ImportError:  # Validation without the tuning extra checks names only.
-        algorithm = (settings.get("search") or {}).get("algorithm", "tpe")
-        if algorithm not in SEARCH_ALGORITHMS:
-            raise ValueError(f"Unknown search algorithm {algorithm!r}")
+    except ImportError:  # Without the tuning extra, only the names are checked.
         return
     try:
         make_sampler(settings)
@@ -785,7 +787,8 @@ def check_manifest(specs, output=None):
                 stored = Path(output) / name / "protocol.json"
                 if protocol_conflict(case_protocol(spec), stored):
                     raise ValueError(f"{stored} differs; a resume would refuse it")
-                state = "resumes" if stored.exists() else "new"
+                if stored.exists():
+                    state = "resumes"
         except Exception as error:  # report every bad case, not only the first
             errors.append(f"{name}: {error}")
             continue

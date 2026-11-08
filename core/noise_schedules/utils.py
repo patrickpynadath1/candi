@@ -3,6 +3,12 @@
 import torch
 
 
+def check_unit_time(time, message="time must be finite and in [0, 1]"):
+    """Raise ``ValueError(message)`` unless every time is finite and in [0, 1]."""
+    if not torch.isfinite(time).all() or ((time < 0) | (time > 1)).any():
+        raise ValueError(message)
+
+
 def build_argmax_error_table(
     vocab_size, sigma_min, sigma_max, num_points, quadrature_order
 ):

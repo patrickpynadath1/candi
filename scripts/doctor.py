@@ -10,7 +10,6 @@ of the test suite.
 """
 
 import argparse
-import hashlib
 import importlib
 import importlib.util
 import os
@@ -104,12 +103,15 @@ def check_storage():
 
 
 def check_tokenizers():
+    sys.path.insert(0, str(REPO))
+    from core.data.cache import file_sha256
+
     folder = REPO / "artifacts" / "tokenizers" / "tinystories-bpe"
     bad = []
     for line in (folder / "SHA256SUMS").read_text().splitlines():
         digest, name = line.split()
         path = folder / name
-        if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        if not path.exists() or file_sha256(path) != digest:
             bad.append(name)
     report("fail" if bad else "ok", "tokenizers", f"checksum mismatch: {', '.join(bad)}" if bad else "SHA256SUMS match")
 

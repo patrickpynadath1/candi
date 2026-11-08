@@ -5,6 +5,7 @@ from .loop import FixedGridLoop
 from core.processes.spherical import log_map
 from core.modifiers.self_conditioning.session import prediction_session
 from .view_calls import predict
+from . import requirements
 
 
 def posterior_velocity(state, embeddings, probabilities, mode="exact", eps=1e-6):
@@ -32,8 +33,7 @@ class SphericalFlowSampler:
 
     def steps_for_nfe(self, nfe):
         """One model call per step; the last step decodes without another call."""
-        if isinstance(nfe, bool) or int(nfe) != nfe:
-            raise ValueError("NFE budget must be an integer")
+        nfe = requirements.integer_nfe(nfe)
         return max(1, int(nfe))
 
     def sample(self, algo, prompt_tokens, prompt_mask):

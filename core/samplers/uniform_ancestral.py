@@ -107,24 +107,7 @@ class UniformAncestralSampler(DiscreteSampler):
 
     def composed(self):
         """The shared-loop preset that is bit-identical to this sampler."""
-        from .composed import ComposedSampler
-        from .policies import ReverseTransition, TokenSelection
-
-        if self._custom or self.final_denoise == "none":
-            raise ValueError(
-                "one-view algorithms support the default rule and grid with "
-                "final_denoise=ancestral or greedy"
-            )
-        ancestral = self.final_denoise == "ancestral"
-        return ComposedSampler(
-            self.steps,
-            self.epsilon,
-            tokens=TokenSelection("posterior"),
-            transition=ReverseTransition(),
-            final_denoise="reverse" if ancestral else "greedy",
-            final_prediction="sampling" if ancestral else "greedy",
-            precision="float64" if self.use_float64 else "float32",
-        )
+        return self._composed("float64" if self.use_float64 else "float32")
 
     def sample(self, algo, prompt_tokens, prompt_mask):
         # Posterior uniform diffusion runs on the hybrid (view) path.

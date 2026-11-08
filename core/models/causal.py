@@ -179,16 +179,19 @@ class CausalDiT(TextDiT):
             )
 
             def make_rotary(position_ids):
-                if (
-                    position_ids.shape not in (tokens.shape, (1, tokens.shape[1]))
-                    or position_ids.device != tokens.device
-                ):
-                    raise ValueError("position IDs must match token shape and device")
-                if (
-                    position_ids.dtype not in (torch.int32, torch.int64)
-                    or (position_ids < 0).any()
-                ):
-                    raise ValueError("position IDs must be nonnegative integers")
+                # The default positions come from arange; only caller-supplied ones
+                # need checking (the check syncs the device).
+                if position_ids is not positions:
+                    if (
+                        position_ids.shape not in (tokens.shape, (1, tokens.shape[1]))
+                        or position_ids.device != tokens.device
+                    ):
+                        raise ValueError("position IDs must match token shape and device")
+                    if (
+                        position_ids.dtype not in (torch.int32, torch.int64)
+                        or (position_ids < 0).any()
+                    ):
+                        raise ValueError("position IDs must be nonnegative integers")
                 angles = position_ids.float()[..., None] * self.inv_freq.float()
                 angles = torch.cat((angles, angles), -1)[:, :, None, :]
                 return angles.cos(), angles.sin()

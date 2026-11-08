@@ -10,6 +10,7 @@ the driver lock, so it cannot disturb a live run.
 """
 
 import argparse
+from collections import Counter
 import json
 import time
 from pathlib import Path
@@ -83,9 +84,7 @@ def main(argv=None):
     for row in rows:
         print(f"{row['case']:{width}}  {row['state']:11}  {row['trained']:>7}  {row['policies']:>8}  "
               f"{row['skipped']:>7}  {row['idle_minutes']:>10}")
-    counts = {}
-    for row in rows:
-        counts[row["state"]] = counts.get(row["state"], 0) + 1
+    counts = Counter(row["state"] for row in rows)
     print(", ".join(f"{n} {state}" for state, n in sorted(counts.items())))
 
 

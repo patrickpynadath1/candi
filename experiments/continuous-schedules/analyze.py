@@ -27,13 +27,11 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1]))  # the repository root, for core
 sys.path.insert(0, str(HERE))
 
-from core.analysis import bleu_parts, load_cases, merge_cases  # noqa: E402
+from core.analysis import POLICY_ALIASES, bleu_summary, load_cases, merge_cases, short_parameters  # noqa: E402
 
 TASKS = {"sudoku_hard": "sudoku_hard", "text8": "text8", "tinystories-bpe-10000": "tinystories"}
 METHODS = {"gaussian_embedding": "gaussian", "simplex": "simplex", "spherical": "spherical", "spherical_vmf": "vmf"}
 ARMS = {"none": "none", "expected_embedding": "sc"}
-# The MI210 TinyStories runs named the renoising samplers differently.
-POLICY_NAMES = {"renoising": "renoise_sample", "renoising_greedy": "renoise_greedy"}
 ORDER = [
     (task, method, arm)
     for method in METHODS.values()
@@ -51,15 +49,7 @@ def cell(case):
 
 
 def policy_name(name):
-    return POLICY_NAMES.get(name, name)
-
-
-def short(parameters):
-    """Sampler parameters by their last key segment, floats to 3 decimals."""
-    return {
-        key.rsplit(".", 1)[-1]: round(value, 3) if isinstance(value, float) else value
-        for key, value in parameters.items()
-    }
+    return POLICY_ALIASES.get(name, name)
 
 
 def r4(values):
@@ -86,7 +76,7 @@ def performance_row(case):
                 "policy": policy_name(policy.name),
                 "validation": r4(policy.validation),
                 "seeds": r4(policy.seeds),
-                "params": short(policy.parameters),
+                "params": short_parameters(policy.parameters),
             }
             for policy in case.policies.values()
         ],
@@ -94,12 +84,9 @@ def performance_row(case):
     if len(tied) > 1:
         row["tie"] = [policy_name(name) for name in tied]
     if task == "tinystories":
-        parts = [bleu_parts(records) for records in case.records().values()]
-        if parts:
-            row["score_nobp"] = r4(sum(p["bleu_nobp"] for p in parts) / len(parts))
-            row["seeds_nobp"] = [r4(p["bleu_nobp"]) for p in parts]
-            row["bp"] = r4(sum(p["bp"] for p in parts) / len(parts))
-            row["len_ratio"] = r4(sum(p["len_ratio"] for p in parts) / len(parts))
+        records = case.records()
+        if records:
+            row.update(bleu_summary(records.values()))
     return row
 
 

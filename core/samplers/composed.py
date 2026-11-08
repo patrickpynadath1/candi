@@ -65,8 +65,7 @@ class ComposedSampler:
 
     def steps_for_nfe(self, nfe):
         """Largest complete predictor/corrector trajectory within a call budget."""
-        if isinstance(nfe, bool) or int(nfe) != nfe:
-            raise ValueError("NFE budget must be an integer")
+        nfe = requirements.integer_nfe(nfe)
         calls_per_step = 1 + (self.corrector.steps if self.corrector is not None else 0)
         steps = (int(nfe) - 1) // calls_per_step  # Reserve terminal decoding.
         if steps < 1:
@@ -121,6 +120,7 @@ class ComposedSampler:
         per_sample = torch.zeros(batch, dtype=torch.long, device=prompt_tokens.device)
         counts = []
         nfe = 0
+        source = points  # each step's destination is the next step's source
         for index in range(self.steps):
             active = (
                 generated & ~committed if self.commitment == "freeze" else generated
@@ -130,7 +130,6 @@ class ComposedSampler:
                 if not active.any():
                     break
             time, next_time = times[index].expand(batch), times[index + 1].expand(batch)
-            source = algo.points(time, corruption_mask=generated)
             destination = algo.points(next_time, corruption_mask=generated)
             logits = (
                 algo.greedy_prediction(states, source, time)
@@ -204,6 +203,7 @@ class ComposedSampler:
                 newly_complete = ~complete & committed.all(-1)
                 per_sample[newly_complete] = nfe
                 complete |= newly_complete
+            source = destination
         if self.commitment == "none" or not complete.all():
             if self.require_completion:
                 raise RuntimeError("masked hybrid EB exhausted steps before completion")

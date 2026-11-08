@@ -22,6 +22,7 @@ archive and fails unless both write the same results. Restore with
 """
 
 import argparse
+from collections import Counter
 import csv
 import hashlib
 import io
@@ -39,8 +40,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from core.analysis.results import load_case  # noqa: E402
-from core.analysis.status import case_status  # noqa: E402
+from core.analysis.results import load_cases  # noqa: E402
+from core.analysis.status import run_status  # noqa: E402
 
 DROP_SUFFIXES = {".ckpt", ".pt", ".pth", ".safetensors", ".bin", ".tmp", ".lock"}
 DROP_DIRS = {"wandb", "ray_results", "__pycache__", ".ray"}
@@ -51,8 +52,8 @@ def kept(path, limit):
     """Why ``path`` is dropped, or None when it is kept."""
     if set(path.parts) & DROP_DIRS:
         return "runtime directory"
-    if path.suffix in DROP_SUFFIXES or path.name == ".driver.lock":
-        return f"{path.suffix or path.name} file"
+    if path.suffix in DROP_SUFFIXES:
+        return f"{path.suffix} file"
     if path.stat().st_size > limit:
         return f"over {limit // 2**20} MiB"
     return None
@@ -104,13 +105,13 @@ def provenance(argv):
 def index(roots):
     entries = []
     for root in roots:
-        for protocol in sorted(root.rglob("protocol.json")):
-            case, status = load_case(protocol.parent), case_status(protocol.parent)
+        states = {status["path"]: status["state"] for status in run_status(root)}
+        for case in load_cases(root):
             entries.append({
                 "root": root.name,
                 "case": case.name,
-                "path": str(protocol.parent.relative_to(root)),
-                "state": status["state"],
+                "path": str(case.path.relative_to(root)),
+                "state": states[str(case.path)],
                 "task": case.task,
                 "recipe": case.recipe,
                 "selected": case.selected,
@@ -135,14 +136,29 @@ def add_bytes(tar, name, data, sums):
     sums[name] = hashlib.sha256(data).hexdigest()
 
 
+class HashingReader:
+    """A file reader that hashes what tarfile copies, so each file is read once."""
+
+    def __init__(self, handle):
+        self.handle, self.digest = handle, hashlib.sha256()
+
+    def read(self, size=-1):
+        data = self.handle.read(size)
+        self.digest.update(data)
+        return data
+
+
 def write(output, roots, keep, argv):
     sums = {}
     entries = index(roots)
     with tarfile.open(output, "w:gz") as tar:
         for root, path, _ in keep:
             name = f"runs/{root.name}/{path.relative_to(root).as_posix()}"
-            tar.add(path, arcname=name, recursive=False)  # keeps mtime and mode
-            sums[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            info = tar.gettarinfo(path, arcname=name)  # keeps mtime and mode
+            with path.open("rb") as handle:
+                reader = HashingReader(handle)
+                tar.addfile(info, reader)
+            sums[name] = reader.digest.hexdigest()
         add_bytes(tar, "index.json", json.dumps(entries, indent=2).encode(), sums)
         add_bytes(tar, "summary.csv", summary_csv(entries), sums)
         for name, data in provenance(argv).items():
@@ -203,10 +219,7 @@ def main(argv=None):
     keep, drop = collect(roots, int(args.max_file_mb * 2**20))
     size = lambda items: sum(path.stat().st_size for _, path, _ in items) / 2**20  # noqa: E731
     print(f"keep {len(keep)} files ({size(keep):.1f} MiB); drop {len(drop)} files ({size(drop):.1f} MiB)")
-    reasons = {}
-    for _, _, reason in drop:
-        reasons[reason] = reasons.get(reason, 0) + 1
-    for reason, count in sorted(reasons.items()):
+    for reason, count in sorted(Counter(reason for _, _, reason in drop).items()):
         print(f"  dropped {count}: {reason}")
     if args.dry_run:
         return
@@ -215,9 +228,7 @@ def main(argv=None):
         parser.error(f"{output} exists; pass --force to overwrite")
     output.parent.mkdir(parents=True, exist_ok=True)
     entries = write(output, roots, keep, sys.argv if argv is None else argv)
-    states = {}
-    for entry in entries:
-        states[entry["state"]] = states.get(entry["state"], 0) + 1
+    states = Counter(entry["state"] for entry in entries)
     print(f"wrote {output} ({output.stat().st_size / 2**20:.1f} MiB): {len(entries)} cases, "
           + ", ".join(f"{n} {s}" for s, n in sorted(states.items())))
     if args.verify:

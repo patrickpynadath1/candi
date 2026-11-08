@@ -1,8 +1,18 @@
 """Publish dataset caches atomically, so concurrent jobs never read a partial one."""
 
+import hashlib
 import os
 from pathlib import Path
 import shutil
+
+
+def file_sha256(path):
+    """Hex SHA-256 of a file, read in 1 MiB blocks."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def save_dataset(dataset, cache):

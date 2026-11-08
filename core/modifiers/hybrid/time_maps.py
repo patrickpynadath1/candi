@@ -1,6 +1,7 @@
 """Maps from the coordinator clock to a branch-local clock."""
 
 import torch
+from core.noise_schedules.utils import check_unit_time
 
 
 class IdentityTimeMap:
@@ -15,8 +16,7 @@ class PowerTimeMap:
         self.power = float(power)
 
     def __call__(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("global time must be finite and in [0, 1]")
+        check_unit_time(time, "global time must be finite and in [0, 1]")
         return time.pow(self.power)
 
 

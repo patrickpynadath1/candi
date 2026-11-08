@@ -40,7 +40,7 @@ class HybridDiffusion(PosteriorDiffusion):
         single-state input slot (e.g. a continuous network); otherwise the
         network's own views input supplies them."""
         super().__init__(prediction)
-        if views is None and not getattr(model, "supports_fused_streams", False):
+        if views is None and getattr(model, "views", None) is None:
             raise TypeError("HybridDiffusion requires a fused-stream hybrid model")
         if views is not None and getattr(model, "views", None) is not None:
             raise ValueError("give views either to the network or to the algorithm")

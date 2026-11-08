@@ -11,6 +11,18 @@ import torch
 from torch import nn
 
 
+def keep_rate_objective(objective, prediction, state, tokens, time, keep, derivative):
+    """Per-token loss on a keep-rate path.
+
+    Cross-entropy reads the path from an ObjectiveContext (sigma = -log keep);
+    every other discrete objective takes the state, keep rate and its derivative.
+    """
+    if isinstance(objective, CrossEntropy):
+        context = ObjectiveContext(time=time, alpha=keep, sigma=-keep.clamp_min(1e-30).log())
+        return objective(prediction, tokens, context=context)
+    return objective(prediction, state, tokens, keep[:, None], derivative[:, None])
+
+
 class DiscreteDiffusion(nn.Module):
     def __init__(
         self,
@@ -75,15 +87,7 @@ class DiscreteDiffusion(nn.Module):
             keep = torch.zeros_like(keep)
         state = self.process.corrupt(tokens, keep, corruption_mask)
         prediction = self.training_prediction(state, keep)
-        if isinstance(objective, CrossEntropy):
-            per_token = objective(
-                prediction, tokens,
-                context=ObjectiveContext(time=times, alpha=keep, sigma=-keep.clamp_min(1e-30).log()),
-            )
-        else:
-            per_token = objective(
-                prediction, state, tokens, keep[:, None], derivative[:, None]
-            )
+        per_token = keep_rate_objective(objective, prediction, state, tokens, times, keep, derivative)
         return finish_training_loss(
             per_token,
             loss_mask,

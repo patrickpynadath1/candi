@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import math
 
 import torch
+from .utils import check_unit_time
 
 
 @dataclass(frozen=True)
@@ -32,8 +33,7 @@ class GIDDSchedule:
         self.B = 2**gamma * p_uniform / (1 - p_uniform)
 
     def __call__(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("GIDD time must be finite and in [0, 1]")
+        check_unit_time(time, "GIDD time must be finite and in [0, 1]")
         time = time.double()
         c = self.B * (time * (1 - time)).pow(self.gamma / 2)
         # Derivatives are only used for interior-time loss weights. Keep endpoint

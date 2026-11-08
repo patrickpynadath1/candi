@@ -36,8 +36,7 @@ class SimplexBridgeSampler:
 
     def steps_for_nfe(self, nfe):
         """One model call per step (two with guidance); no terminal call."""
-        if isinstance(nfe, bool) or int(nfe) != nfe:
-            raise ValueError("NFE budget must be an integer")
+        nfe = requirements.integer_nfe(nfe)
         return max(1, int(nfe) // (2 if self.guidance is not None else 1))
 
     @torch.no_grad()

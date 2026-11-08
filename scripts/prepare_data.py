@@ -18,11 +18,14 @@ revisions below (``huggingface-cli download --repo-type dataset NAME --revision 
 """
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from core.data.cache import file_sha256  # noqa: E402
 TEXT8_REVISION = "58c74e966ccc66eab2de6b52fad5b14ddb259fa4"  # afmck/text8
 TEXT8_SHA256 = {
     "train": "af83e65b7d7aa95dfe2c571da8f3e2d1b0c385f177140a21f3db07520a3ac6f4",
@@ -38,14 +41,6 @@ PROMPT_BYTES = 64
 TOKENIZERS = ROOT / "artifacts/tokenizers/tinystories-bpe"
 
 
-def sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for block in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
 def write_text8(parquet, raw_dir):
     """text8.{train,validation,test}.txt from the parquet copy (one row per split)."""
     import pyarrow.parquet as pq
@@ -59,30 +54,19 @@ def write_text8(parquet, raw_dir):
 
 def check_text8(raw_dir):
     """Splits whose hash differs from the published runs' files."""
-    return [split for split, digest in TEXT8_SHA256.items() if sha256(raw_dir / f"text8.{split}.txt") != digest]
-
-
-def split_story(text):
-    """(prompt, continuation, id) as core.data.tinystories prepares a story; None if too short."""
-    raw = text.strip().encode("utf-8")
-    if len(raw) <= PROMPT_BYTES:
-        return None
-    cut = PROMPT_BYTES
-    while cut and (raw[cut] & 0xC0) == 0x80:
-        cut -= 1
-    if cut == 0:
-        return None
-    return raw[:cut].decode(), raw[cut:].decode(), hashlib.sha256(raw).hexdigest()
+    return [split for split, digest in TEXT8_SHA256.items() if file_sha256(raw_dir / f"text8.{split}.txt") != digest]
 
 
 def stories(parquet, split):
     import pyarrow.parquet as pq
 
+    from core.data.tinystories import split_story
+
     rows, seen = [], set()
     for file in sorted(Path(parquet).glob(f"{split}-*.parquet")):
         for batch in pq.ParquetFile(file).iter_batches(10000, columns=["text"]):
             for text in batch.column(0).to_pylist():
-                parts = split_story(text)
+                parts = split_story(text, PROMPT_BYTES)
                 if parts and parts[2] not in seen:
                     seen.add(parts[2])
                     rows.append(parts)
@@ -140,7 +124,7 @@ def main():
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(cohort(args.parquet)))
-        if sha256(args.output) != COHORT_SHA256:
+        if file_sha256(args.output) != COHORT_SHA256:
             raise SystemExit(f"{args.output} differs from the published runs' cohort")
         print(f"{args.output} matches the published runs' cohort")
 

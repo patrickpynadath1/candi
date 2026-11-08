@@ -19,7 +19,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core.analysis import bleu_parts, load_cases, merge_cases  # noqa: E402
+from core.analysis import POLICY_ALIASES, bleu_summary, load_cases, merge_cases, short_parameters  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 # Recipe name (benchmark.algorithm_name) -> (method, self-conditioning).
@@ -33,20 +33,6 @@ RECIPES = {
     "uniform_posterior_ce-expected_embedding": ("uniform", True),
 }
 METHODS = ["ar", "gaussian", "masked", "uniform"]
-# Policy names in the runs -> names on the website.
-POLICIES = {"renoising": "renoise_sample", "renoising_greedy": "renoise_greedy"}
-
-
-def mean(values):
-    return sum(values) / len(values)
-
-
-def short(parameters):
-    """{'algorithm.predictor.temperature': 0.8277} -> {'temperature': 0.828}."""
-    return {
-        key.rsplit(".", 1)[-1]: round(value, 3) if isinstance(value, float) else value
-        for key, value in parameters.items()
-    }
 
 
 def row(case):
@@ -60,26 +46,26 @@ def row(case):
         "vocab": int(case.task.rsplit("-", 1)[1]),
         "method": method,
         "sc": sc,
-        "chosen": POLICIES.get(case.selected, case.selected),
+        "chosen": POLICY_ALIASES.get(case.selected, case.selected),
         "test": None if case.test is None else round(case.test, 3),
         "test_seeds": [round(score, 3) for score in case.test_seeds],
         "samplers": {
-            POLICIES.get(name, name): {
+            POLICY_ALIASES.get(name, name): {
                 "val": round(policy.validation, 3),
                 "val_seeds": [round(score, 3) for score in policy.seeds],
-                "params": short(policy.parameters),
+                "params": short_parameters(policy.parameters),
             }
             for name, policy in case.policies.items()
         },
     }
     records = case.records()
     if records:
-        parts = [bleu_parts(records[seed]) for seed in sorted(records)]
+        summary = bleu_summary(records[seed] for seed in sorted(records))
         result.update(
-            test_nobp=round(mean([p["bleu_nobp"] for p in parts]), 4),
-            test_seeds_nobp=[round(p["bleu_nobp"], 4) for p in parts],
-            test_bp=round(mean([p["bp"] for p in parts]), 4),
-            test_len_ratio=round(mean([p["len_ratio"] for p in parts]), 4),
+            test_nobp=summary["score_nobp"],
+            test_seeds_nobp=summary["seeds_nobp"],
+            test_bp=summary["bp"],
+            test_len_ratio=summary["len_ratio"],
         )
     return result
 

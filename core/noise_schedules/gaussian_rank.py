@@ -7,6 +7,7 @@ import torch
 from torch import nn
 from .utils import expected_rank, sigma_from_time_vectorized
 from .gaussian_path import GaussianPath
+from .utils import check_unit_time
 
 
 class OneHotRankSchedule(nn.Module):
@@ -78,8 +79,7 @@ class OneHotRankSchedule(nn.Module):
         return (1 - self.training_epsilon) * time
 
     def forward(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("time must be finite and in [0, 1]")
+        check_unit_time(time, "time must be finite and in [0, 1]")
         if self.coupling == "linear":
             target = self.min_percentile + time * (
                 self.max_percentile - self.min_percentile

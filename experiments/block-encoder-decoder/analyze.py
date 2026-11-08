@@ -32,7 +32,7 @@ import sys
 from omegaconf import OmegaConf
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from core.analysis import bleu_parts, load_cases, merge_cases  # noqa: E402
+from core.analysis import bleu_summary, load_cases, merge_cases  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 TASKS = {"sudoku_hard": "sudoku_hard", "text8": "text8", "tinystories-bpe-10000": "tinystories"}
@@ -85,13 +85,7 @@ def row(case):
         nfe=statistics.mean(s["mean_nfe"] for s in seeds),
     )
     if out["task"] == "tinystories":
-        parts = [bleu_parts(s["records"]) for s in seeds]
-        out.update(
-            score_nobp=round(statistics.mean(p["bleu_nobp"] for p in parts), 4),
-            seeds_nobp=[round(p["bleu_nobp"], 4) for p in parts],
-            bp=round(statistics.mean(p["bp"] for p in parts), 4),
-            len_ratio=round(statistics.mean(p["len_ratio"] for p in parts), 4),
-        )
+        out.update(bleu_summary(s["records"] for s in seeds))
     return out
 
 

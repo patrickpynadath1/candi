@@ -5,6 +5,7 @@ from core.representations.spec import RepresentationRequirements
 import torch
 from torch import nn
 from .gaussian_path import GaussianPath
+from .utils import check_unit_time
 
 
 class LinearInterpolationSchedule(nn.Module):
@@ -14,8 +15,7 @@ class LinearInterpolationSchedule(nn.Module):
         return time
 
     def forward(self, time):
-        if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
-            raise ValueError("time must be finite and in [0, 1]")
+        check_unit_time(time, "time must be finite and in [0, 1]")
         return GaussianPath(
             1 - time, time, -torch.ones_like(time), torch.ones_like(time)
         )

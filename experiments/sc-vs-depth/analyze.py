@@ -20,14 +20,12 @@ import sys
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1]))
 
-from core.analysis import bleu_parts, load_cases, merge_cases  # noqa: E402
+from core.analysis import POLICY_ALIASES as ALIASES, bleu_summary, load_cases, merge_cases  # noqa: E402
 
 TASKS = {"sudoku_hard": "sudoku_hard", "text8": "text8", "tinystories-bpe-10000": "tinystories"}
 METHODS = {"gaussian_embedding": "gaussian", "masked": "masked", "uniform_posterior_ce": "uniform"}
 ARMS = {"none": "none", "expected_embedding": "sc", "double_depth": "depth"}
 POLICIES = ["native", "native_greedy", "eb_greedy", "renoise_sample", "renoise_greedy"]
-# Older runs named the renoise policies differently; same role, see the README.
-ALIASES = {"renoising": "renoise_sample", "renoising_greedy": "renoise_greedy"}
 
 
 def cell(case):
@@ -94,11 +92,7 @@ def row(key, case):
         out["tie"] = tied
     out["renoise_tried"] = any(name.startswith("renoise") for name in case.policies)
     if task == "tinystories" and case.final_path is not None:
-        parts = [bleu_parts(records) for _, records in sorted(case.records().items())]
-        out["score_nobp"] = r(sum(p["bleu_nobp"] for p in parts) / len(parts))
-        out["seeds_nobp"] = [r(p["bleu_nobp"]) for p in parts]
-        out["bp"] = r(sum(p["bp"] for p in parts) / len(parts))
-        out["len_ratio"] = r(sum(p["len_ratio"] for p in parts) / len(parts))
+        out.update(bleu_summary(records for _, records in sorted(case.records().items())))
     out["samplers"] = [
         {
             "policy": name,

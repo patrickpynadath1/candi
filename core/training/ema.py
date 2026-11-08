@@ -51,9 +51,9 @@ class ExponentialMovingAverage:
             decay = min(decay, (1 + self.num_updates) / (10 + self.num_updates))
         one_minus_decay = 1.0 - decay
         with torch.no_grad():
-            parameters = self._trainable_parameters(parameters)
-            for s_param, param in zip(self.shadow_params, parameters):
-                s_param.sub_(one_minus_decay * (s_param - param))
+            parameters = list(self._trainable_parameters(parameters))
+            # One fused update instead of two kernels per parameter.
+            torch._foreach_lerp_(self.shadow_params, parameters, one_minus_decay)
 
     def copy_to(self, parameters):
         """

@@ -129,7 +129,10 @@ def test_data_preparation_rebuilds_the_cohort_rule(tmp_path):
     for split, rows in texts.items():
         pq.write_table(pa.table({"text": rows}), tmp_path / f"{split}-00000-of-00001.parquet")
     ids = data.cohort(tmp_path)
-    key = data.split_story
+    from core.data.tinystories import split_story
+
+    def key(text):
+        return split_story(text, data.PROMPT_BYTES)
     # Short and over-long stories are dropped, duplicates collapse, and a
     # validation story also in train stays only in train.
     assert ids == sorted([f"train:{key(shared)[2]}", f"train:{key(story + 'The end.')[2]}",

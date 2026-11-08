@@ -11,6 +11,19 @@ import json
 from pathlib import Path
 
 
+# The MI210 runs named the renoising samplers renoising / renoising_greedy; the
+# post and the worked examples call them renoise_sample / renoise_greedy.
+POLICY_ALIASES = {"renoising": "renoise_sample", "renoising_greedy": "renoise_greedy"}
+
+
+def short_parameters(parameters):
+    """{'algorithm.predictor.temperature': 0.8277} -> {'temperature': 0.828}."""
+    return {
+        key.rsplit(".", 1)[-1]: round(value, 3) if isinstance(value, float) else value
+        for key, value in parameters.items()
+    }
+
+
 @dataclass
 class Policy:
     """One sampler policy's selected validation trial."""
@@ -129,4 +142,22 @@ def bleu_parts(records, *, continuation="continuation", reference="reference"):
         "bleu_nobp": score.score / score.bp if score.bp > 0 else 0.0,
         "bp": score.bp,
         "len_ratio": score.sys_len / score.ref_len if score.ref_len else 0.0,
+    }
+
+
+def bleu_summary(record_lists, digits=4):
+    """BLEU / BP over test seeds: mean, per seed, mean BP and mean length ratio, rounded.
+
+    ``record_lists`` holds one list of generated records per test seed, in seed order.
+    """
+    parts = [bleu_parts(records) for records in record_lists]
+
+    def mean(key):
+        return round(sum(part[key] for part in parts) / len(parts), digits)
+
+    return {
+        "score_nobp": mean("bleu_nobp"),
+        "seeds_nobp": [round(part["bleu_nobp"], digits) for part in parts],
+        "bp": mean("bp"),
+        "len_ratio": mean("len_ratio"),
     }

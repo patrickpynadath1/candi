@@ -3,6 +3,7 @@
 import numpy as np
 import torch
 from torch import nn
+from .utils import check_unit_time
 
 
 class RankLinearClock(nn.Module):
@@ -38,8 +39,7 @@ class RankLinearClock(nn.Module):
         return self.progress[index - 1] + (rank - self.ranks[index - 1]) * slope, slope
 
     def forward(self, time):
-        if not torch.isfinite(time).all() or ((time < 0) | (time > 1)).any():
-            raise ValueError("time must be finite and in [0,1]")
+        check_unit_time(time, "time must be finite and in [0,1]")
         time = time.double()
         width = self.endpoint_width
         fraction = ((time - width) / (1 - 2 * width)).clamp(0, 1)

@@ -2,6 +2,7 @@
 
 import math
 import torch
+from .utils import check_unit_time
 
 
 class PowerInsertionSchedule:
@@ -11,8 +12,7 @@ class PowerInsertionSchedule:
         self.power = float(power)
 
     def survival(self, time):
-        if not torch.isfinite(time).all() or ((time < 0) | (time > 1)).any():
-            raise ValueError("insertion time must be in [0, 1]")
+        check_unit_time(time, "insertion time must be in [0, 1]")
         return (1 - time).pow(self.power)
 
     def birth_times(self, shape, device):

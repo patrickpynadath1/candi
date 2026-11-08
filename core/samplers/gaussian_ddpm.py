@@ -43,8 +43,7 @@ class GaussianDDPMSampler:
 
     def steps_for_nfe(self, nfe):
         """Reserve terminal prediction and account for per-step SC bootstraps."""
-        if isinstance(nfe, bool) or int(nfe) != nfe:
-            raise ValueError("NFE budget must be an integer")
+        nfe = requirements.integer_nfe(nfe)
         calls = 2 if self.self_conditioning_mode == "bootstrap" else 1
         steps = int(nfe) // calls - 1
         if steps < 1:
@@ -54,8 +53,9 @@ class GaussianDDPMSampler:
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
         requirements.process_method(algo, "reverse_posterior", "Gaussian DDPM", "Gaussian")
-        if not isinstance(algo.predictor, PosteriorParameterization):
-            raise TypeError("Gaussian DDPM requires a clean-token posterior")
+        requirements.predictor(
+            algo, PosteriorParameterization, "Gaussian DDPM requires a clean-token posterior"
+        )
         algo = prediction_session(algo)
         clean = algo.representation.encode(prompt_tokens)
         initial_time = torch.ones(len(clean), device=clean.device)

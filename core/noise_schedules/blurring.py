@@ -102,9 +102,16 @@ class BlurringSchedule:
         self.crossing_max_decile_fraction = crossing_max_decile_fraction
         self._warp_cache = {}
         self._runtime_warp_cache = {}
+        self._constants_cache = {}
         self._validated_shapes = set()
 
     def _constants(self, length):
+        # Called several times per coefficients() call; the values depend only on length.
+        if length not in self._constants_cache:
+            self._constants_cache[length] = self._compute_constants(length)
+        return self._constants_cache[length]
+
+    def _compute_constants(self, length):
         # A singleton uses the length-two clock calibration and its zero spatial
         # mode. This is the finite scalar continuation of the source equations;
         # all lengths >=2 retain the exact source calibration.
