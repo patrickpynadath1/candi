@@ -138,7 +138,7 @@ def test_current_checkpoint_converts_as_identity():
 
 
 def test_unmigrated_family_maps_to_itself():
-    cfg = config("sedd_absorb", {})
+    cfg = config("ar", {})  # Autoregressive stays a standalone class.
     plan = conversion_plan(cfg)
     assert all(new == old for new, old in plan.names.items())
     assert plan.old_order == plan.parameter_names
