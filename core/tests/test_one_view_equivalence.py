@@ -72,9 +72,14 @@ def test_loss_and_gradients_are_identical(experiment, self_conditioning):
 def test_old_checkpoints_load_and_sample_identically(experiment, self_conditioning):
     cfg, reference, _ = pair(experiment, self_conditioning)
     # A differently seeded current model must take every tensor from the old
-    # standalone state dict (strict), as when evaluating an existing checkpoint.
-    _, current = build(experiment, None, self_conditioning, seed=123)
-    current.load_state_dict(reference.state_dict(), strict=True)
+    # standalone state dict, converted (core/models/legacy_checkpoints.py) and
+    # loaded strictly, as when evaluating an existing checkpoint.
+    from core.models.legacy_checkpoints import convert_checkpoint
+
+    current_cfg, current = build(experiment, None, self_conditioning, seed=123)
+    old = {"state_dict": {"algorithm." + k: v for k, v in reference.state_dict().items()}}
+    converted = convert_checkpoint(old, current_cfg, algorithm=current)["state_dict"]
+    current.load_state_dict({k.removeprefix("algorithm."): v for k, v in converted.items()}, strict=True)
     for a, b in zip(reference.parameters(), current.parameters()):
         assert torch.equal(a, b)
     tokens, _ = batch(cfg)

@@ -1,16 +1,24 @@
 """Uniform corruption trained as clean-token posterior prediction with CE.
 
-Runs on the hybrid path as one view (see core/modifiers/hybrid/one_view.py);
-training, sampling and checkpoints are bit-identical to the former standalone
-implementation, which core/tests/reference_algorithms keeps for comparison.
+Runs on the view path like MDLM: one uniform-posterior view on a ModularDiT
+adopted from the configured DiT (core/models/legacy.py:adopt). Training and
+sampling match the former standalone implementation, which
+core/tests/reference_algorithms keeps for comparison; its checkpoints load
+through core/models/legacy_checkpoints.py.
 """
 
-from core.modifiers.hybrid.one_view import OneViewAlgorithm, one_view_model
+import torch
+
+from core.models.legacy import adopt
+from core.modifiers.hybrid.one_view import OneViewAlgorithm
 from core.modifiers.hybrid.training import HybridDiffusion
 from core.objectives.cross_entropy import CrossEntropy
 from core.parameterizations.posterior import PosteriorParameterization
 from core.parameterizations.constraints import UnconstrainedPosterior
 from core.processes.uniform_posterior import PosteriorUniformProcess
+from core.modifiers.hybrid.views import DiffusionView
+from core.representations.noisy_inputs import TokenRepresentation
+from core.samplers.hybrid_updates import DiscretePosteriorUpdate
 
 
 class PosteriorUniformDiffusion(OneViewAlgorithm, HybridDiffusion):
@@ -49,8 +57,14 @@ class PosteriorUniformDiffusion(OneViewAlgorithm, HybridDiffusion):
             )
         if process.vocab_size != model.output_layer.linear.out_features:
             raise ValueError("model and process vocabulary sizes must agree")
+        table = model.vocab_embed.embedding
+        with torch.random.fork_rng(devices=[]):  # The table is adopted below.
+            representation = TokenRepresentation(*table.shape)
+        view = DiffusionView(process, schedule, representation, DiscretePosteriorUpdate())
+        # -log(keep) exactly as the standalone class computed it.
+        network = adopt(model, views=[view], time_coordinate="negative_log_keep_exact")
         super().__init__(
-            one_view_model(model, process, schedule),
+            network,
             predictor,
             time_sampler,
             objective,

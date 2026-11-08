@@ -6,7 +6,11 @@ with the current code into a fresh output directory, and compare every sample
 (index, generated text, NFE) and the final score with the stored results.
 Never trains, never writes into the case directory, never logs to W&B.
 
-  python scripts/analysis/regenerate_final.py OUTPUT CASE_DIR [CASE_DIR ...]
+  python scripts/analysis/regenerate_final.py OUTPUT CASE_DIR [CASE_DIR ...] [--convert]
+
+``--convert`` loads checkpoints saved before the view-path unification through
+the converter (evaluation.legacy=convert, core/models/legacy_checkpoints.py);
+the stored checkpoint files are only read.
 """
 
 import argparse
@@ -68,6 +72,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("cases", nargs="+", type=Path)
+    parser.add_argument(
+        "--convert",
+        action="store_true",
+        help="convert pre-unification checkpoints in memory before loading",
+    )
     args = parser.parse_args()
 
     import core.training.runner as runner
@@ -77,6 +86,8 @@ def main():
 
     def run_without_tracking(config):
         config.wandb = None
+        if args.convert:
+            config.evaluation.legacy = "convert"
         return original_run(config)
 
     runner.run = run_without_tracking
