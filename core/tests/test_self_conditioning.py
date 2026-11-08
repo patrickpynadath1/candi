@@ -391,6 +391,17 @@ def continuous_algorithm(experiment, source, device="cpu"):
     return algo
 
 
+def _plain(value):
+    """Model inputs with view points (dataclasses) as dicts, for assert_close."""
+    import dataclasses
+
+    if dataclasses.is_dataclass(value):
+        return {f.name: _plain(getattr(value, f.name)) for f in dataclasses.fields(value)}
+    if isinstance(value, (tuple, list)):
+        return [_plain(item) for item in value]
+    return value
+
+
 @pytest.mark.parametrize("source", ["posterior_mean", "hidden"])
 @pytest.mark.parametrize(
     "experiment",
@@ -412,15 +423,8 @@ def test_continuous_sources_train_and_sampler_feedback(experiment, source):
     calls, handle = recorder(algo.model)
     loss = algo.loss(tokens, ~prompt)["loss"]
     assert len(calls) == 2
-    if experiment == "spherical_flow_matching":
-        # View call (states, points, time): same state and keep in both calls.
-        (states, points, time), (main_states, main_points, main_time) = calls[0][0], calls[1][0]
-        torch.testing.assert_close(states, main_states)
-        torch.testing.assert_close(points[0].coefficients, main_points[0].coefficients)
-        torch.testing.assert_close(time, main_time)
-    else:
-        for bootstrap, main in zip(calls[0][0], calls[1][0]):
-            torch.testing.assert_close(bootstrap, main)
+    for bootstrap, main in zip(calls[0][0], calls[1][0]):
+        torch.testing.assert_close(_plain(bootstrap), _plain(main))
     feedback = calls[1][1]["self_condition"]
     expected_width = 32 if source == "hidden" else algo.representation.spec.dimension
     assert feedback.shape == (2, 7, expected_width)
@@ -469,17 +473,18 @@ def test_continuous_sources_train_and_sampler_feedback(experiment, source):
 
 def test_staged_session_rollback_and_adaptive_ode_guard():
     from core.samplers.ode import ODESampler
+    from core.samplers.view_calls import predict
 
     algo = continuous_algorithm("gaussian_diffusion_sudoku", "hidden").eval()
     session = prediction_session(algo)
     state = torch.randn(2, 7, 12)
     time = torch.tensor([0.5, 0.5])
     with torch.no_grad():
-        session.sampling_prediction(state, time, algo.schedule(time))
+        predict(session, state, time)
         previous = session.state.conditioning.clone()
         with pytest.raises(RuntimeError, match="rejected"):
             with session.step():
-                session.sampling_prediction(state + 1, time, algo.schedule(time))
+                predict(session, state + 1, time)
                 assert session.state.pending is not None
                 torch.testing.assert_close(session.state.conditioning, previous)
                 raise RuntimeError("rejected")

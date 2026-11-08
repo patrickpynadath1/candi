@@ -53,7 +53,7 @@ def test_composed_components_optimizer_ema_and_checkpoint(tmp_path):
     cfg = configuration()
     module = TrainingModule(cfg)
     algorithm = module.algorithm
-    assert algorithm.model.input_projection is not None
+    assert algorithm.model.input.projection is not None
     parameters = dict(algorithm.named_parameters())
     learned = {
         name: p for name, p in parameters.items() if name.startswith("objective.")
@@ -67,7 +67,7 @@ def test_composed_components_optimizer_ema_and_checkpoint(tmp_path):
     loss = algorithm.loss(tokens, mask, training=True)["loss"]
     loss.backward()
     assert all(torch.isfinite(p.grad).all() for p in learned.values())
-    assert algorithm.model.input_projection.weight.grad.abs().sum() > 0
+    assert algorithm.model.input.projection.weight.grad.abs().sum() > 0
     assert any(
         p.grad is not None and p.grad.abs().sum() > 0
         for p in algorithm.representation.parameters()
