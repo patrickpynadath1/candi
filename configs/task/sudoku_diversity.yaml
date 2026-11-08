@@ -1,0 +1,16 @@
+defaults:
+- /data@_global_.data: sudoku_hard
+- /information_path/token_space@_global_.token_space: append_mask
+- _self_
+# Sudoku with clues removed, scored on how many distinct valid solutions a sampler
+# finds per puzzle (docs/tasks/sudoku.md). Trains like task=sudoku; evaluate a
+# Sudoku checkpoint with task=sudoku_diversity mode=evaluate.
+_target_: core.tasks.sudoku_diversity.SudokuDiversityTask
+data: ${data}
+vocab_size: 12
+length: 180
+variable_length: false
+retained_fraction: 0.5   # share of each puzzle's clues kept
+repetitions: 8           # generations per weakened puzzle
+num_puzzles: 32          # first validation puzzles used
+seed: 0                  # clue-removal seed (puzzle i uses seed + i)

@@ -50,3 +50,38 @@ The imported 20,000-step MDLM checkpoint reproduced all 2,000 original sequences
 for both ancestral and entropy-bounded sampling. This is inference parity;
 fresh full-budget training reproduction has not been established. See
 [measured results](../validation/reproduction-results.md).
+
+## Solution diversity
+
+A puzzle with clues removed has more than one solution. `task=sudoku_diversity`
+([SudokuDiversityTask](../../core/tasks/sudoku_diversity.py)) asks whether a sampler
+finds many of them or keeps returning one. It takes the first `task.num_puzzles`
+validation puzzles (default 32), keeps a seeded `task.retained_fraction` of each one's
+clues (default 0.5; the subsets are nested, so a lower fraction removes a superset of
+clues), and generates `task.repetitions` times per weakened puzzle (default 8).
+
+Its `diversity` evaluation scores every generation as Sudoku against the weakened
+puzzle, then counts per puzzle:
+
+- `valid_rate`: generations that are valid solutions of the weakened puzzle;
+- `mean_unique_per_prompt` and `mean_valid_unique_per_prompt` (the primary metric,
+  maximize): distinct boards, and distinct valid boards, per puzzle;
+- `pooled_unique_boards` and `pooled_valid_unique_boards` across all puzzles, and one
+  `prompts` entry per puzzle with its clue counts.
+
+Training and the `validation` evaluation are plain Sudoku, so evaluate any Sudoku
+checkpoint with it:
+
+```bash
+uv run --locked python main.py +experiment=<recipe> task=sudoku_diversity mode=evaluate \
+  evaluation.checkpoint=/path/to/last.ckpt evaluation.max_examples=null \
+  task.retained_fraction=0.25 task.repetitions=16
+```
+
+Every generation of a scored puzzle is needed: leave `evaluation.max_examples` unset
+(`null`) or make it a multiple of `task.repetitions`. Diversity depends on the sampler's
+randomness, so compare samplers at the same seeds and NFE, and use a stochastic sampler
+(a greedy one returns one board per puzzle by construction). The repeated, grouped
+generations do not fit nested tuning's index-based validation splits; use it as a
+standalone evaluation.
+

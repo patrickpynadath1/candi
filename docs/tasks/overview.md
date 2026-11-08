@@ -9,6 +9,7 @@ likelihood across methods.
 | Task | Generation input | Primary metric | Config |
 | --- | --- | --- | --- |
 | [Sudoku](sudoku.md) | Puzzle prompt | Exact solution accuracy, maximize | `task=sudoku` (default) |
+| [Sudoku diversity](sudoku.md#solution-diversity) | Puzzle with clues removed, repeated | Distinct valid solutions per puzzle, maximize | `task=sudoku_diversity` |
 | [Text8](text8.md) | Unconditional | Training-vocabulary valid-word rate, maximize | `+experiment=text8` |
 | [OpenWebText](openwebtext.md) | Unconditional | External-reference generative perplexity, minimize | `+experiment=openwebtext` |
 | [TinyGSM](tinygsm.md) | GSM8K question | Numeric answer accuracy, maximize | `+experiment=tinygsm` |
