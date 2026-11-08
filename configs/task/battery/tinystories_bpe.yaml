@@ -22,7 +22,3 @@ data:
   cache_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/data_cache/tinystories_bpe
 preparation:
   task_name: tinystories-bpe-${bpe.vocabulary_size}
-  # Preparation must use a new partition; byte-cache row indices are not portable.
-  # No byte-cache reference case: preparation fails unless the sweep also
-  # sets preparation.reference_manifest=null.
-  reference_case: null

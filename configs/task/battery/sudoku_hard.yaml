@@ -17,4 +17,3 @@ data:
   sudoku_num_workers: 1
 preparation:
   task_name: sudoku_hard
-  reference_case: sudoku_hard-gaussian-rank-linear-cdcd-sc-off_20m

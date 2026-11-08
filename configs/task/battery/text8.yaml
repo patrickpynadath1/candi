@@ -24,4 +24,3 @@ data:
   limit_test: null
 preparation:
   task_name: text8
-  reference_case: text8-gaussian-rank-linear-cdcd-sc-off_20m

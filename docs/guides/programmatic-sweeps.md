@@ -56,10 +56,10 @@ Each case produces `configs/<name>.yaml` and `cases/<name>/case.json`; `collect`
 writes `manifest.json` for nested tuning. Hydra saves its configs and overrides
 under `hydra/<family>/`.
 
-Evaluation indices can be inherited from an explicit reference manifest to keep
-validation/test partitions unchanged; preparation refuses a reference case from
-a different task. A standalone plan instead supplies the complete
-`preparation.evaluation` and sets `preparation.reference_manifest=null`. Each
+A task's evaluation spec (tuning/test indices, score metric, direction, seeds and
+task overrides) comes from `preparation.evaluation_file`, a committed JSON
+(see `experiments/*/evaluation/`), plus any `preparation.evaluation` fields;
+preparation refuses a file drawn from a different task. Each
 inference policy inherits the composed sampler unless it supplies `sampler`;
 `sampler_overrides` changes sampler fields. Callback NFE allocation and
 algorithm identifiers are recorded at export. Recipe identity excludes the

@@ -19,6 +19,25 @@ from .configuration import capture_runtime_paths
 from .nested_tuning import validate
 
 
+def load_evaluation(path, task_name):
+    """A committed evaluation spec for ``task_name`` (repo-relative or absolute path).
+
+    The JSON holds ``task`` and the evaluation fields: tuning/test indices, score,
+    direction, seeds and task overrides; ``source`` records where it came from.
+    """
+    path = Path(path).expanduser()
+    if not path.is_absolute() and not path.exists():
+        path = Path(__file__).resolve().parents[2] / path
+    spec = json.loads(path.read_text())
+    # Indices only mean something for the task they were drawn from.
+    if spec.get("task") != task_name:
+        raise ValueError(
+            f"evaluation file {path} is for task {spec.get('task')!r}, "
+            f"not {task_name!r}; use that task's file"
+        )
+    return {key: value for key, value in spec.items() if key not in ("task", "source")}
+
+
 def prepare_case(config):
     """Serialize one already-composed Hydra job and its tuning specification."""
     metadata = OmegaConf.to_container(config.preparation, resolve=True)
@@ -33,30 +52,8 @@ def prepare_case(config):
     if path.exists():
         raise FileExistsError(path)
     evaluation = {}
-    if metadata.get("reference_manifest"):
-        references = json.loads(
-            Path(metadata["reference_manifest"]).expanduser().read_text()
-        )
-        reference = next(
-            (c for c in references if c["name"] == metadata.get("reference_case")),
-            None,
-        )
-        if reference is None:
-            raise ValueError(
-                f"reference case {metadata.get('reference_case')!r} not in manifest"
-            )
-        # Partition indices only mean something for the task they were drawn from.
-        reference_config = Path(reference.get("config", ""))
-        if reference.get("config") and reference_config.is_file():
-            reference_task = OmegaConf.select(
-                OmegaConf.load(reference_config), "benchmark.task_id"
-            )
-            if reference_task is not None and reference_task != metadata["task_name"]:
-                raise ValueError(
-                    f"reference case uses task {reference_task!r}, "
-                    f"not {metadata['task_name']!r}; prepare a new partition"
-                )
-        evaluation.update(reference["evaluation"])
+    if metadata.get("evaluation_file"):
+        evaluation.update(load_evaluation(metadata["evaluation_file"], metadata["task_name"]))
     evaluation.update(metadata["evaluation"])
     config = capture_runtime_paths(config)
     del config["preparation"]

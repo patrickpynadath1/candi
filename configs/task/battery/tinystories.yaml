@@ -23,4 +23,3 @@ data:
   max_validation_examples: 2000
 preparation:
   task_name: tinystories
-  reference_case: tinystories-gaussian-rank-linear-cdcd-sc-off_20m

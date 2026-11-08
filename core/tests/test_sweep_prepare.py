@@ -16,20 +16,16 @@ from core.sweeps.prepare import collect, prepare_case
 
 @pytest.fixture
 def reference(tmp_path):
-    path = tmp_path / "reference.json"
+    path = tmp_path / "text8.json"
     path.write_text(
         json.dumps(
-            [
-                {
-                    "name": "text8-gaussian-rank-linear-cdcd-sc-off_20m",
-                    "evaluation": {
-                        "tuning_indices": [0, 1],
-                        "test_indices": [2, 3],
-                        "score": {"kind": "metric", "name": "score"},
-                        "direction": "maximize",
-                    },
-                }
-            ]
+            {
+                "task": "text8",
+                "tuning_indices": [0, 1],
+                "test_indices": [2, 3],
+                "score": {"kind": "metric", "name": "score"},
+                "direction": "maximize",
+            }
         )
     )
     return path
@@ -48,7 +44,7 @@ def run_prepare(output, reference, *overrides):
             "path_schedule=adaptive",
             "sc=off",
             f"preparation.output={output}",
-            f"preparation.reference_manifest={reference}",
+            f"preparation.evaluation_file={reference}",
             *overrides,
         ],
         cwd=ROOT,
@@ -130,7 +126,7 @@ def test_ar_preparation_does_not_add_steps(tmp_path):
     config = compose(
         "autoregressive", overrides=["+sweep=common", "task=battery/text8"]
     )
-    config.preparation.reference_manifest = None
+    config.preparation.evaluation_file = None
     config.preparation.output = str(tmp_path)
     config.preparation.recipe_name = "ar"
     config.preparation.sampler_budget_parameter = None
@@ -157,35 +153,21 @@ def test_ar_preparation_does_not_add_steps(tmp_path):
     assert type(instantiate(result.sampler)).__name__ == "AutoregressiveSampler"
 
 
-def test_reference_partition_must_come_from_the_same_task(tmp_path):
-    reference_config = tmp_path / "reference.yaml"
-    OmegaConf.save(
-        OmegaConf.create({"benchmark": {"task_id": "tinystories"}}), reference_config
-    )
-    manifest = tmp_path / "manifest.json"
-    manifest.write_text(
-        json.dumps(
-            [
-                {
-                    "name": "text8-gaussian-rank-linear-cdcd-sc-off_20m",
-                    "config": str(reference_config),
-                    "evaluation": {"tuning_indices": [0], "test_indices": [1]},
-                }
-            ]
-        )
-    )
+def test_evaluation_file_must_come_from_the_same_task(tmp_path):
+    spec = tmp_path / "evaluation.json"
+    spec.write_text(json.dumps({"task": "tinystories", "tuning_indices": [0], "test_indices": [1]}))
     config = compose(
         "autoregressive", overrides=["+sweep=common", "task=battery/text8"]
     )
-    config.preparation.reference_manifest = str(manifest)
+    config.preparation.evaluation_file = str(spec)
     config.preparation.output = str(tmp_path / "plan")
     config.preparation.recipe_name = "ar"
-    with pytest.raises(ValueError, match="prepare a new partition"):
+    with pytest.raises(ValueError, match="use that task's file"):
         prepare_case(config)
 
 
-def test_bpe_preset_does_not_inherit_byte_partition():
+def test_bpe_preset_has_its_own_task_name():
     config = compose(
         "autoregressive", overrides=["+sweep=common", "task=battery/tinystories_bpe"]
     )
-    assert config.preparation.reference_case is None
+    assert config.preparation.task_name == "tinystories-bpe-10000"

@@ -44,7 +44,8 @@ self_conditioning:
 preparation:
   name: local-diffusion-20k-20261027
   output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/local-diffusion-20k-20261027-hydra
-  reference_manifest: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/nested-tuning/adaptive-three-tasks-20261014/manifest.json
+  # A committed evaluation spec per task: {task, tuning/test indices, score, ...}.
+  evaluation_file: null
   recipe_fields:
   - model
   - representation

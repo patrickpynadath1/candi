@@ -19,7 +19,6 @@ data:
   augmentations: 1000
 preparation:
   task_name: sudoku_extreme
-  reference_manifest: null
   evaluation:
     dataset: validation
     test_dataset: test
