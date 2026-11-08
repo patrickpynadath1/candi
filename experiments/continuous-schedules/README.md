@@ -100,8 +100,8 @@ puzzles.
 **Reproduction check.** On the stored runs (the ruqi6000 campaigns for Sudoku and text8, the
 MI210 campaign for TinyStories BPE-10k), `analyze.py` reproduces all 24 rows of the post's
 `cdcd_performance.json` exactly: score, per-seed scores, validation score, selected sampler,
-`renoise_tried`, the TinyStories per-sampler list, ties and the BLEU breakdown without the
-brevity penalty. The stored runs hold no checkpoints, so the schedule, linearity and
+`renoise_tried`, and for TinyStories the per-sampler lists, ties and the BLEU breakdown
+without the brevity penalty. The stored runs hold no checkpoints, so the schedule, linearity and
 corruption figures can only be rebuilt from new runs (see the caveats).
 
 ## Caveats
@@ -118,7 +118,7 @@ corruption figures can only be rebuilt from new runs (see the caveats).
   schedules, linearity and corruption curves will differ from the post's. The
   TinyStories linearity rows in `expected.csv` are the byte-level values, for reference.
 - **Renoising samplers everywhere.** In the published runs, renoising was tuned in a second run
-  on the same Sudoku and text8 Gaussian checkpoints and merged by validation. It was never tried
+  on the same checkpoints, for every Sudoku cell and for text8 Gaussian, and merged by validation. It was never tried
   for text8 simplex, spherical and vMF (`renoise_tried` is false there). This example tunes all
   five samplers in every case, so those three text8 cells may select a renoising sampler. For
   simplex, `native` already redraws the state from the forward kernel, so `native` and
