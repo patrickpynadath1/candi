@@ -47,22 +47,22 @@ after each prediction (`ForwardResamplingSampler`); they are named `renoising` a
 ```bash
 # 0. Data the published runs used that is too large to commit (see the caveats).
 python scripts/prepare_data.py text8 --parquet PATH/afmck-text8/data \
-  --raw-dir $CANDI_STORAGE_ROOT/data_cache/text8/raw
+  --raw-dir $SDDC_STORAGE_ROOT/data_cache/text8/raw
 python scripts/prepare_data.py tinystories --parquet PATH/roneneldan-TinyStories/data \
-  --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
+  --output $SDDC_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 # 1. Prepare the 24 cases (no training).
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare -m \
-  +sweep=continuous_schedules preparation.output=$CANDI_STORAGE_ROOT/plans/continuous-schedules
+  +sweep=continuous_schedules preparation.output=$SDDC_STORAGE_ROOT/plans/continuous-schedules
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare collect \
-  $CANDI_STORAGE_ROOT/plans/continuous-schedules
+  $SDDC_STORAGE_ROOT/plans/continuous-schedules
 # 2. Train and tune; only the validation winner sees the test split.
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.nested_tuning \
-  $CANDI_STORAGE_ROOT/plans/continuous-schedules/manifest.json \
-  --output $CANDI_STORAGE_ROOT/runs/continuous-schedules --address auto --case-concurrency 4
+  $SDDC_STORAGE_ROOT/plans/continuous-schedules/manifest.json \
+  --output $SDDC_STORAGE_ROOT/runs/continuous-schedules --address auto --case-concurrency 4
 # 3. Tables. With checkpoints present this also measures the schedules (one GPU: minutes;
 #    CPU works but is slow for TinyStories). --no-schedules skips that part.
 uv run --locked --extra scoring python experiments/continuous-schedules/analyze.py \
-  $CANDI_STORAGE_ROOT/runs/continuous-schedules --output $CANDI_STORAGE_ROOT/analysis/continuous-schedules
+  $SDDC_STORAGE_ROOT/runs/continuous-schedules --output $SDDC_STORAGE_ROOT/analysis/continuous-schedules
 ```
 
 TinyStories needs the BPE tokenizer in `artifacts/tokenizers/tinystories-bpe/` (in the repo),

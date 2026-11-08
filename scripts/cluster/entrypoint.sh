@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Server-side wrapper for every remote Ray Jobs submission (see scripts/cluster/candi_remote.py).
+# Server-side wrapper for every remote Ray Jobs submission (see scripts/cluster/sddc_remote.py).
 #
 # Ray unpacks each upload into a temporary directory that it may garbage-collect, but
 # `core.sweeps.prepare` writes absolute source paths into plans. The command therefore runs
-# from a persistent, content-addressed copy under $CANDI_STORAGE_ROOT/sources/. Datasets and
+# from a persistent, content-addressed copy under $SDDC_STORAGE_ROOT/sources/. Datasets and
 # outputs are symlinked to persistent storage so nothing is regenerated or written into the upload.
 set -euo pipefail
 
-root=${CANDI_STORAGE_ROOT:?CANDI_STORAGE_ROOT must name persistent storage}
-source_id=${CANDI_SOURCE_ID:?CANDI_SOURCE_ID is set by candi_remote submit}
+root=${SDDC_STORAGE_ROOT:?SDDC_STORAGE_ROOT must name persistent storage}
+source_id=${SDDC_SOURCE_ID:?SDDC_SOURCE_ID is set by sddc_remote submit}
 uv=$(command -v uv || echo "$HOME/.local/bin/uv")
 extras=(--extra tuning --extra scoring --extra tracking --extra mazes)
 
@@ -37,5 +37,5 @@ link_storage .
 
 cd "$source_dir"
 export UV_PROJECT_ENVIRONMENT=$env_dir
-echo "candi: source=$source_dir env=$env_dir host=$(hostname)" >&2
+echo "sddc: source=$source_dir env=$env_dir host=$(hostname)" >&2
 exec "$uv" run --locked --no-sync "${extras[@]}" "$@"

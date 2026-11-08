@@ -16,7 +16,7 @@ task:
   evaluation_seed: 23
   variable_length: false
 data:
-  cache_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/data_cache/text8
+  cache_dir: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/data_cache/text8
   raw_dir: ${data.cache_dir}/raw
   download: false
   limit_train: null

@@ -43,7 +43,7 @@ self_conditioning:
   evaluation_probability: 1.0
 preparation:
   name: local-diffusion-20k-20261027
-  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/local-diffusion-20k-20261027-hydra
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/local-diffusion-20k-20261027-hydra
   # A committed evaluation spec per task: {task, tuning/test indices, score, ...}.
   evaluation_file: null
   recipe_fields:
@@ -64,7 +64,7 @@ preparation:
   wandb:
     # W&B is optional; set WANDB_ENTITY (and log in) to enable tracking.
     entity: ${oc.env:WANDB_ENTITY,null}
-    project: candi
+    project: sddc
   training:
     space: {}
     trials: 1

@@ -449,7 +449,7 @@ css = [
 ]
 
 [[package]]
-name = "candi"
+name = "sddc"
 version = "2.1.0"
 source = { virtual = "." }
 dependencies = [

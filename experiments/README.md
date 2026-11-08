@@ -21,16 +21,16 @@ Every example uses the same three steps (see [nested tuning](../docs/guides/nest
 ```bash
 # 1. Expand the sweep into a plan of cases (no training).
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare -m \
-  +sweep=sc_vs_depth preparation.output=$CANDI_STORAGE_ROOT/plans/sc-vs-depth
+  +sweep=sc_vs_depth preparation.output=$SDDC_STORAGE_ROOT/plans/sc-vs-depth
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare collect \
-  $CANDI_STORAGE_ROOT/plans/sc-vs-depth
+  $SDDC_STORAGE_ROOT/plans/sc-vs-depth
 # 2. Train each case and tune its samplers on validation; only the winner sees the test split.
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.nested_tuning \
-  $CANDI_STORAGE_ROOT/plans/sc-vs-depth/manifest.json \
-  --output $CANDI_STORAGE_ROOT/runs/sc-vs-depth --address auto --case-concurrency 4
+  $SDDC_STORAGE_ROOT/plans/sc-vs-depth/manifest.json \
+  --output $SDDC_STORAGE_ROOT/runs/sc-vs-depth --address auto --case-concurrency 4
 # 3. Tables in the post's format, compared with the published numbers.
 uv run --locked --extra scoring python experiments/sc-vs-depth/analyze.py \
-  $CANDI_STORAGE_ROOT/runs/sc-vs-depth
+  $SDDC_STORAGE_ROOT/runs/sc-vs-depth
 ```
 
 Each README states the example's cost (GPU hours), its protocol, any data preparation

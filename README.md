@@ -1,4 +1,4 @@
-# CANDI v2.1
+# SDDC: Some DLM Design Choices
 
 A framework for testing what makes diffusion language models work. Compose recipes
 from an **information path**, a **denoising task**, and **inference settings**, then
@@ -79,5 +79,4 @@ See [experiment terminology](docs/guides/experiments.md),
 - [Coverage and limitations](docs/validation/coverage.md) and [recorded results](docs/validation/reproduction-results.md)
 
 For development, run `uv run pytest -q core/tests` and
-`uv run ruff check core main.py frontier.py`. Legacy implementations remain in Git
-history before the `candiv2.1` cleanup.
+`uv run ruff check core main.py frontier.py`.

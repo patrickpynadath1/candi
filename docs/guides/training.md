@@ -85,7 +85,7 @@ CSV logs live under the run's `metrics/` directory. Periodic task results live i
 
 ```bash
 uv sync --locked --extra tracking
-uv run --extra tracking python main.py '+wandb.project=candi' '+wandb.name=sudoku-hard'
+uv run --extra tracking python main.py '+wandb.project=sddc' '+wandb.name=sudoku-hard'
 ```
 
 Use `uv run --extra tracking` for W&B commands so uv keeps that optional dependency

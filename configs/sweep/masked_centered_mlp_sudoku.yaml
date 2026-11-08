@@ -6,7 +6,7 @@ defaults:
 - _self_
 preparation:
   name: masked-centered-mlp-sudoku-20k-20261030
-  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/masked-centered-mlp-sudoku-20k-20261030
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/masked-centered-mlp-sudoku-20k-20261030
   family: masked_centered_mlp
   recipe_name: ${preparation.path_name}-${preparation.feedback_name}-${preparation.sublayer_name}
   wandb:

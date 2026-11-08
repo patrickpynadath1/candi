@@ -20,7 +20,7 @@ data:
   allowed_ids_path: ${data.cache_dir}/allowed_ids.json
 preparation:
   name: continuous-schedules
-  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/continuous-schedules
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/continuous-schedules
   family: continuous_schedules
   recipe_name: ${preparation.path_name}-${preparation.feedback_name}
   evaluation_file: experiments/continuous-schedules/evaluation/${preparation.task_name}.json

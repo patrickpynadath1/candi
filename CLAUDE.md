@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-CANDI v2.1 is a framework for controlled diffusion-language-model experiments, not a single algorithm. Recipes compose an **information path** (representation, corruption process, noise schedule), a **denoising task** (backbone, output parameterization, objective, training time sampler) and **inference settings** (initialization, inference time/noise grid, update rule, terminal decoding); see `docs/concepts/recipe.md`. Library code lives in `core/`, Hydra configs in `configs/`, docs in `docs/` (start at `docs/index.md`). Legacy implementations exist only in Git history before the `candiv2.1` cleanup. PRs target `candiv2.1`, not `main`.
+SDDC (Some DLM Design Choices; formerly CANDI v2.1) is a framework for controlled diffusion-language-model experiments, not a single algorithm. Recipes compose an **information path** (representation, corruption process, noise schedule), a **denoising task** (backbone, output parameterization, objective, training time sampler) and **inference settings** (initialization, inference time/noise grid, update rule, terminal decoding); see `docs/concepts/recipe.md`. Library code lives in `core/`, Hydra configs in `configs/`, docs in `docs/` (start at `docs/index.md`). Legacy implementations exist only in Git history before the `candiv2.1` cleanup. PRs target `candiv2.1`, not `main`.
 
 ## Server rules
 
@@ -13,14 +13,14 @@ Never stop clusters / `ray stop` / kill jobs, delete caches or overwrite results
 This checkout is the laptop; it cannot run the CUDA environment. GPU work goes to the server `ssh ruqi6000` through Ray Jobs; see `docs/guides/remote-execution.md`.
 
 ```bash
-alias candi-remote="uv run -q --no-project --python 3.10 --with 'ray[default]==2.59.0' python scripts/cluster/candi_remote.py"
-candi-remote tunnel &                                   # SSH-forwards the Jobs API on port 8275
-candi-remote submit --name NAME [--follow] -- python main.py ...   # also: list/status/logs/stop/gpus
+alias sddc-remote="uv run -q --no-project --python 3.10 --with 'ray[default]==2.59.0' python scripts/cluster/sddc_remote.py"
+sddc-remote tunnel &                                   # SSH-forwards the Jobs API on port 8275
+sddc-remote submit --name NAME [--follow] -- python main.py ...   # also: list/status/logs/stop/gpus
 ```
 
-- **Server disk:** `/` (incl. `/home/patrick`, `/tmp`) is nearly full. Everything persistent (datasets, checkpoints, logs, plans, envs, Ray temp, source snapshots) goes under `CANDI_STORAGE_ROOT` = `~/.cache/duo` (on `/data`). Never write to `/tmp` or elsewhere on `/`.
+- **Server disk:** `/` (incl. `/home/patrick`, `/tmp`) is nearly full. Everything persistent (datasets, checkpoints, logs, plans, envs, Ray temp, source snapshots) goes under `SDDC_STORAGE_ROOT` = `~/.cache/duo` (on `/data`). Never write to `/tmp` or elsewhere on `/`.
 - `scripts/cluster/entrypoint.sh` runs every job from a persistent content-addressed snapshot (`sources/`) with a per-`uv.lock` env (`envs/`), and links `core/data_cache`/`core/outputs` to the storage root. Prepare plans on the server (via a submitted `core.sweeps.prepare` job) so manifests never contain laptop paths.
-- Configs refer to server storage as `${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/duo}`; don't hard-code `/home/patrick/...`.
+- Configs refer to server storage as `${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/duo}`; don't hard-code `/home/patrick/...`.
 - Read-only inspection over `ssh ruqi6000` is fine. Starting/stopping clusters, submitting jobs or deleting server files needs the user's go-ahead.
 
 ## Commands

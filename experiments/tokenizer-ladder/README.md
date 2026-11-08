@@ -59,31 +59,31 @@ and `configs/objective/masked_elbo.yaml`.
 ## Running it
 
 ```bash
-export CANDI_STORAGE_ROOT=~/.cache/candi   # or your storage volume
+export SDDC_STORAGE_ROOT=~/.cache/sddc   # or your storage volume
 EXTRAS=(--extra tuning --extra scoring --extra tracking)
 
 # 0. TinyStories parquet shards, then the shared story cohort. The script exits
 #    non-zero unless its sha256 is f16da32a..., the cohort the committed indices use.
 huggingface-cli download roneneldan/TinyStories --repo-type dataset \
   --revision f54c09fd23315a6f9c86f9dc80f725de7d8f9c64 --include 'data/*' \
-  --local-dir $CANDI_STORAGE_ROOT/tinystories
-export TINYSTORIES_DATA_DIR=$CANDI_STORAGE_ROOT/tinystories/data
+  --local-dir $SDDC_STORAGE_ROOT/tinystories
+export TINYSTORIES_DATA_DIR=$SDDC_STORAGE_ROOT/tinystories/data
 uv run --locked "${EXTRAS[@]}" python scripts/prepare_data.py tinystories \
   --parquet $TINYSTORIES_DATA_DIR \
-  --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
+  --output $SDDC_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 
 # 1. Expand the sweep into 35 cases (no training).
 uv run --locked "${EXTRAS[@]}" python -m core.sweeps.prepare -m \
-  +sweep=tokenizer_ladder preparation.output=$CANDI_STORAGE_ROOT/plans/tokenizer-ladder
+  +sweep=tokenizer_ladder preparation.output=$SDDC_STORAGE_ROOT/plans/tokenizer-ladder
 uv run --locked "${EXTRAS[@]}" python -m core.sweeps.prepare collect \
-  $CANDI_STORAGE_ROOT/plans/tokenizer-ladder
+  $SDDC_STORAGE_ROOT/plans/tokenizer-ladder
 # 2. Train each case, tune its samplers on validation, test the winner.
 uv run --locked "${EXTRAS[@]}" python -m core.sweeps.nested_tuning \
-  $CANDI_STORAGE_ROOT/plans/tokenizer-ladder/manifest.json \
-  --output $CANDI_STORAGE_ROOT/runs/tokenizer-ladder --address auto --case-concurrency 4
+  $SDDC_STORAGE_ROOT/plans/tokenizer-ladder/manifest.json \
+  --output $SDDC_STORAGE_ROOT/runs/tokenizer-ladder --address auto --case-concurrency 4
 # 3. The post's table (vocab_ladder.json) and a comparison with expected.csv.
 uv run --locked "${EXTRAS[@]}" python experiments/tokenizer-ladder/analyze.py \
-  $CANDI_STORAGE_ROOT/runs/tokenizer-ladder --output results/tokenizer-ladder
+  $SDDC_STORAGE_ROOT/runs/tokenizer-ladder --output results/tokenizer-ladder
 ```
 
 Prepared cases always configure a W&B logger, so install the `tracking` extra. Set

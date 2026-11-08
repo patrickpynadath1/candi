@@ -2,15 +2,15 @@
 
     # text8: the Hugging Face afmck/text8 copy, written as the task's split files.
     python scripts/prepare_data.py text8 \
-        --parquet PATH/afmck-text8/data --raw-dir $CANDI_STORAGE_ROOT/data_cache/text8/raw
+        --parquet PATH/afmck-text8/data --raw-dir $SDDC_STORAGE_ROOT/data_cache/text8/raw
     # Only check split files you already have (e.g. derived from text8.zip):
     python scripts/prepare_data.py text8 \
-        --raw-dir $CANDI_STORAGE_ROOT/data_cache/text8/raw
+        --raw-dir $SDDC_STORAGE_ROOT/data_cache/text8/raw
 
     # TinyStories: the story cohort that the evaluation indices refer to.
     python scripts/prepare_data.py tinystories \
         --parquet PATH/roneneldan-TinyStories/data \
-        --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
+        --output $SDDC_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 
 Both commands compare what they produce with the SHA-256 of the files the published
 runs used and exit non-zero on a mismatch. Download the parquet files yourself, at the

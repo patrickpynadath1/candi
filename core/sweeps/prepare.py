@@ -1,7 +1,7 @@
 """Export Hydra multiruns as a nested-tuning manifest; never launch training.
 
-python -m core.sweeps.prepare -m +sweep=gaussian preparation.output=$CANDI_STORAGE_ROOT/plans/X
-python -m core.sweeps.prepare collect $CANDI_STORAGE_ROOT/plans/X
+python -m core.sweeps.prepare -m +sweep=gaussian preparation.output=$SDDC_STORAGE_ROOT/plans/X
+python -m core.sweeps.prepare collect $SDDC_STORAGE_ROOT/plans/X
 """
 
 import argparse

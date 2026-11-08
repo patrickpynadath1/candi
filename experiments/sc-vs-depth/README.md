@@ -45,20 +45,20 @@ reports them as `renoise_sample` and `renoise_greedy`, the post's names. The swe
 ```bash
 # 0. Data the published runs used that is too large to commit (see "How a rerun can differ").
 python scripts/prepare_data.py text8 --parquet PATH/afmck-text8/data \
-  --raw-dir $CANDI_STORAGE_ROOT/data_cache/text8/raw
+  --raw-dir $SDDC_STORAGE_ROOT/data_cache/text8/raw
 python scripts/prepare_data.py tinystories --parquet PATH/roneneldan-TinyStories/data \
-  --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
+  --output $SDDC_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 # 1. Expand the 27 cases (no training).
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare -m \
-  +sweep=sc_vs_depth preparation.output=$CANDI_STORAGE_ROOT/plans/sc-vs-depth
-uv run --locked --extra tuning python -m core.sweeps.prepare collect $CANDI_STORAGE_ROOT/plans/sc-vs-depth
+  +sweep=sc_vs_depth preparation.output=$SDDC_STORAGE_ROOT/plans/sc-vs-depth
+uv run --locked --extra tuning python -m core.sweeps.prepare collect $SDDC_STORAGE_ROOT/plans/sc-vs-depth
 # 2. Train and tune every case on Ray; only each case's winner sees the test split.
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.nested_tuning \
-  $CANDI_STORAGE_ROOT/plans/sc-vs-depth/manifest.json \
-  --output $CANDI_STORAGE_ROOT/runs/sc-vs-depth --address auto --case-concurrency 4
+  $SDDC_STORAGE_ROOT/plans/sc-vs-depth/manifest.json \
+  --output $SDDC_STORAGE_ROOT/runs/sc-vs-depth --address auto --case-concurrency 4
 # 3. The post's table (writes sc_depth_results.json, compares with expected.csv).
 uv run --locked --extra scoring python experiments/sc-vs-depth/analyze.py \
-  $CANDI_STORAGE_ROOT/runs/sc-vs-depth --output $CANDI_STORAGE_ROOT/runs/sc-vs-depth/analysis
+  $SDDC_STORAGE_ROOT/runs/sc-vs-depth --output $SDDC_STORAGE_ROOT/runs/sc-vs-depth/analysis
 ```
 
 TinyStories reads its stories from `TINYSTORIES_DATA_DIR` (or a Hugging Face download)

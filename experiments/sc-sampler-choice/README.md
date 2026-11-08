@@ -17,7 +17,7 @@ only; the test split is touched once per case, by the winner, inside sc-vs-depth
 ```bash
 # After running sc-vs-depth (see its README):
 uv run --locked python experiments/sc-sampler-choice/analyze.py \
-  $CANDI_STORAGE_ROOT/runs/sc-vs-depth --output $CANDI_STORAGE_ROOT/runs/sc-vs-depth/analysis
+  $SDDC_STORAGE_ROOT/runs/sc-vs-depth --output $SDDC_STORAGE_ROOT/runs/sc-vs-depth/analysis
 ```
 
 `analyze.py` takes the same run roots as `experiments/sc-vs-depth/analyze.py` (and

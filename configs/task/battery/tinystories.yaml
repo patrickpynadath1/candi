@@ -13,7 +13,7 @@ task:
   variable_length: false
   calculate_bleu: true
 data:
-  cache_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/data_cache/tinystories
+  cache_dir: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/data_cache/tinystories
   dataset_name: roneneldan/TinyStories
   revision: f54c09fd23315a6f9c86f9dc80f725de7d8f9c64
   download: false

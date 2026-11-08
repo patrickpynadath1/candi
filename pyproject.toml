@@ -1,8 +1,9 @@
 [project]
-name = "candi"
+name = "sddc"
 version = "2.1.0"
 description = "Composable diffusion models for discrete data"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
     "datasets>=4.8.5",

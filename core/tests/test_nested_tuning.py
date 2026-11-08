@@ -489,7 +489,7 @@ def test_resumed_search_does_not_replay_seeded_proposals(tmp_path):
 def test_moving_queues_resumes_but_selection_changes_do_not(tmp_path, monkeypatch):
     settings = spec(tmp_path, fixed=True)
     monkeypatch.setattr(tuning, "execute", lambda stage, payload, output: {"score": 1.0})
-    monkeypatch.setenv("CANDI_SOURCE_ID", "abc123-def456")
+    monkeypatch.setenv("SDDC_SOURCE_ID", "abc123-def456")
     tuning.run_case(settings, tmp_path / "runs", concurrency=1)
     root = tmp_path / "runs/example"
     assert json.loads((root / "final/result.json").read_text())["source"]["id"] == (

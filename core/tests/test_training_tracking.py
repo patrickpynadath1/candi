@@ -32,7 +32,7 @@ def test_training_logs_periodic_generations_and_finishes_wandb(
         }
     namespace = "tiny/first" if multiple else "tiny"
     settings.trainer.enable_progress_bar = False
-    settings.wandb = {"project": "candi-test", "mode": "offline"}
+    settings.wandb = {"project": "sddc-test", "mode": "offline"}
     logged_metrics, tables, artifacts, runs, direct_logs = [], [], [], [], []
     original_metrics = WandbLogger.log_metrics
     original_table = WandbLogger.log_table

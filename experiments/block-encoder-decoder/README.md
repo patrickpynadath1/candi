@@ -60,11 +60,11 @@ used. Download the parquet files yourself
 ```bash
 # text8 from the afmck/text8 parquet copy (revision 58c74e96...), as the task's split files.
 uv run --locked python scripts/prepare_data.py text8 \
-  --parquet PATH/afmck-text8/data --raw-dir $CANDI_STORAGE_ROOT/data_cache/text8/raw
+  --parquet PATH/afmck-text8/data --raw-dir $SDDC_STORAGE_ROOT/data_cache/text8/raw
 # The TinyStories story cohort the evaluation indices refer to (revision f54c09fd...).
 uv run --locked python scripts/prepare_data.py tinystories \
   --parquet PATH/roneneldan-TinyStories/data \
-  --output $CANDI_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
+  --output $SDDC_STORAGE_ROOT/data_cache/tinystories_bpe/allowed_ids.json
 export TINYSTORIES_DATA_DIR=PATH/roneneldan-TinyStories/data
 ```
 
@@ -73,14 +73,14 @@ that up. Then the usual three steps:
 
 ```bash
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare -m \
-  +sweep=block_encoder_decoder preparation.output=$CANDI_STORAGE_ROOT/plans/block-encoder-decoder
+  +sweep=block_encoder_decoder preparation.output=$SDDC_STORAGE_ROOT/plans/block-encoder-decoder
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare collect \
-  $CANDI_STORAGE_ROOT/plans/block-encoder-decoder        # 27 cases
+  $SDDC_STORAGE_ROOT/plans/block-encoder-decoder        # 27 cases
 uv run --locked --extra tuning --extra scoring python -m core.sweeps.nested_tuning \
-  $CANDI_STORAGE_ROOT/plans/block-encoder-decoder/manifest.json \
-  --output $CANDI_STORAGE_ROOT/runs/block-encoder-decoder --address auto --case-concurrency 4
+  $SDDC_STORAGE_ROOT/plans/block-encoder-decoder/manifest.json \
+  --output $SDDC_STORAGE_ROOT/runs/block-encoder-decoder --address auto --case-concurrency 4
 uv run --locked --extra scoring python experiments/block-encoder-decoder/analyze.py \
-  $CANDI_STORAGE_ROOT/runs/block-encoder-decoder --output results/
+  $SDDC_STORAGE_ROOT/runs/block-encoder-decoder --output results/
 ```
 
 One model on one task: add `task=battery/text8 block=encoder1_decoder8` to the prepare

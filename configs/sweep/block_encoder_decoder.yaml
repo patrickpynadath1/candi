@@ -26,7 +26,7 @@ data:
   allowed_ids_path: ${data.cache_dir}/allowed_ids.json
 preparation:
   name: block-encoder-decoder
-  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/block-encoder-decoder
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/block-encoder-decoder
   family: block_encoder_decoder
   evaluation_file: experiments/block-encoder-decoder/evaluation/${preparation.task_name}.json
   recipe_fields: [model, encoder_decoder, block_diffusion, representation, algorithm, parameterization, objective, noise_schedule, time_sampler, prediction, self_conditioning, optimizer]

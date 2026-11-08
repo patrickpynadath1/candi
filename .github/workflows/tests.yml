@@ -2,7 +2,7 @@ name: tests
 
 on:
   push:
-    branches: [candiv2.1]
+    branches: [main]
   pull_request:
 
 jobs:

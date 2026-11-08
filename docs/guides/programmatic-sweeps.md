@@ -34,9 +34,9 @@ preserve readable run names.
 ```bash
 uv run --locked --extra tuning --extra scoring --extra tracking \
   python -m core.sweeps.prepare --multirun +sweep=hybrids \
-  preparation.output=$CANDI_STORAGE_ROOT/plans/my-experiment
+  preparation.output=$SDDC_STORAGE_ROOT/plans/my-experiment
 uv run --locked --extra tuning --extra scoring --extra tracking \
-  python -m core.sweeps.prepare collect $CANDI_STORAGE_ROOT/plans/my-experiment
+  python -m core.sweeps.prepare collect $SDDC_STORAGE_ROOT/plans/my-experiment
 ```
 
 Run several multiruns into the same `preparation.output`, then `collect` once

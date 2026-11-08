@@ -1,10 +1,9 @@
 # A diffusion language model recipe
 
-CANDI is a framework for testing claims about diffusion language models through
+SDDC is a framework for testing claims about diffusion language models through
 composable recipes. Its scope is controlled comparisons across affordable tasks,
 not large-scale pretraining or a claim that one particular diffusion algorithm is
-best. The name of the repository does not restrict the recipes to CANDI's original
-method.
+best. The CANDI hybrid method is one recipe among many.
 
 A recipe has three parts. This is a conceptual organization of the existing
 components, not a new wrapper class.

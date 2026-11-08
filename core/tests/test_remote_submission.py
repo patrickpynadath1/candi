@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-from scripts.cluster import candi_remote as remote
+from scripts.cluster import sddc_remote as remote
 
 
 @pytest.mark.parametrize(
@@ -65,9 +65,9 @@ def test_upload_size_is_bounded(repo, monkeypatch):
 
 
 def test_runtime_env_targets_persistent_storage():
-    env = remote.runtime_env("a" * 40, "b" * 12, "c" * 12, storage_root="/srv/candi")
-    assert env["py_executable"] == "/srv/candi/envs/cccccccccccc/bin/python"
-    assert env["env_vars"]["CANDI_STORAGE_ROOT"] == "/srv/candi"
-    assert env["env_vars"]["CANDI_SOURCE_ID"] == "aaaaaaaaaaaa-bbbbbbbbbbbb"
+    env = remote.runtime_env("a" * 40, "b" * 12, "c" * 12, storage_root="/srv/sddc")
+    assert env["py_executable"] == "/srv/sddc/envs/cccccccccccc/bin/python"
+    assert env["env_vars"]["SDDC_STORAGE_ROOT"] == "/srv/sddc"
+    assert env["env_vars"]["SDDC_SOURCE_ID"] == "aaaaaaaaaaaa-bbbbbbbbbbbb"
     assert "core/data_cache" in env["excludes"]
     assert Path(env["working_dir"]) == remote.REPO

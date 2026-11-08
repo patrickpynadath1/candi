@@ -19,7 +19,7 @@ data:
   allowed_ids_path: ${data.cache_dir}/allowed_ids.json
 preparation:
   name: sc-vs-depth
-  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/sc-vs-depth
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/sc-vs-depth
   evaluation_file: experiments/sc-vs-depth/evaluation/${preparation.task_name}.json
   family: sc_vs_depth
   recipe_name: ${preparation.path_name}-${preparation.feedback_name}

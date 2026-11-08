@@ -7,7 +7,7 @@
 #   ray stop --address=127.0.0.1:$PORT   (from the same environment)
 set -euo pipefail
 
-root=${CANDI_STORAGE_ROOT:-$HOME/.cache/candi}
+root=${SDDC_STORAGE_ROOT:-$HOME/.cache/sddc}
 gpus=${GPUS:?Set GPUS to the comma-separated GPU pool, e.g. GPUS=7}
 port=${PORT:-6390}
 dashboard_port=${DASHBOARD_PORT:-8275}
@@ -29,7 +29,7 @@ mkdir -p "$temp_dir" "$root/envs"
 (cd "$repo" && UV_PROJECT_ENVIRONMENT=$env_dir "$uv" sync --locked \
   --extra tuning --extra scoring --extra tracking --extra mazes)
 
-export CANDI_STORAGE_ROOT=$root
+export SDDC_STORAGE_ROOT=$root
 export PATH="$(dirname "$uv"):$PATH"
 export CUDA_VISIBLE_DEVICES=$gpus
 export OMP_NUM_THREADS=4

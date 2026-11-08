@@ -56,9 +56,9 @@ def selection_protocol(protocol):
 
 
 def source_identity():
-    """Snapshot that produced a result, as set by scripts/cluster/candi_remote.py."""
+    """Snapshot that produced a result, as set by scripts/cluster/sddc_remote.py."""
     return {
-        key: os.environ.get(f"CANDI_SOURCE_{key.upper()}")
+        key: os.environ.get(f"SDDC_SOURCE_{key.upper()}")
         for key in ("id", "rev", "dirty")
     }
 
@@ -578,7 +578,7 @@ def record_attempt(output):
         "host": socket.gethostname(),
         "pid": os.getpid(),
         "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
-        "source": os.environ.get("CANDI_SOURCE_ID"),
+        "source": os.environ.get("SDDC_SOURCE_ID"),
     }
     try:
         import ray

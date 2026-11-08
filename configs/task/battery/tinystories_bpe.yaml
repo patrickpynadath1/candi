@@ -19,6 +19,6 @@ data:
   allowed_ids_path: null
   max_train_examples: 2119719
   max_validation_examples: 21990
-  cache_dir: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/data_cache/tinystories_bpe
+  cache_dir: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/data_cache/tinystories_bpe
 preparation:
   task_name: tinystories-bpe-${bpe.vocabulary_size}

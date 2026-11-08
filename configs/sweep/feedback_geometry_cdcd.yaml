@@ -6,7 +6,7 @@ defaults:
 - _self_
 preparation:
   name: feedback-depth-cdcd-20k-20261030
-  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/feedback-geometry-cdcd-20k-20261030
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/feedback-geometry-cdcd-20k-20261030
   family: feedback_geometry_cdcd
   wandb:
     project: feedback-depth-cdcd-20k-20261030

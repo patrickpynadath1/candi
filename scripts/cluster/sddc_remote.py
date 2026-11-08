@@ -1,13 +1,13 @@
-"""Submit and manage CANDI jobs on the persistent server Ray cluster from the laptop.
+"""Submit and manage SDDC jobs on the persistent server Ray cluster from the laptop.
 
 Run without the project environment (the lock pins CUDA PyTorch):
 
     uv run --no-project --python 3.10 --with 'ray[default]==2.59.0' \
-        python scripts/cluster/candi_remote.py submit --name smoke -- \
+        python scripts/cluster/sddc_remote.py submit --name smoke -- \
         python main.py +experiment=smoke
 
-Requires the SSH tunnel from ``candi_remote.py tunnel`` and the cluster token at
-``~/.config/candi/ray_token``. Every command runs on the server through
+Requires the SSH tunnel from ``sddc_remote.py tunnel`` and the cluster token at
+``~/.config/sddc/ray_token``. Every command runs on the server through
 ``scripts/cluster/entrypoint.sh`` from a persistent source snapshot.
 """
 
@@ -22,14 +22,14 @@ import sys
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-# The server is configured per user: CANDI_REMOTE_HOST is an ssh host (alias)
-# and CANDI_REMOTE_STORAGE_ROOT its persistent storage root (absolute path).
-HOST = os.environ.get("CANDI_REMOTE_HOST")
-DASHBOARD_PORT = int(os.environ.get("CANDI_REMOTE_DASHBOARD_PORT", "8275"))
-ADDRESS = os.environ.get("CANDI_REMOTE_ADDRESS", f"http://127.0.0.1:{DASHBOARD_PORT}")
-STORAGE_ROOT = os.environ.get("CANDI_REMOTE_STORAGE_ROOT")
+# The server is configured per user: SDDC_REMOTE_HOST is an ssh host (alias)
+# and SDDC_REMOTE_STORAGE_ROOT its persistent storage root (absolute path).
+HOST = os.environ.get("SDDC_REMOTE_HOST")
+DASHBOARD_PORT = int(os.environ.get("SDDC_REMOTE_DASHBOARD_PORT", "8275"))
+ADDRESS = os.environ.get("SDDC_REMOTE_ADDRESS", f"http://127.0.0.1:{DASHBOARD_PORT}")
+STORAGE_ROOT = os.environ.get("SDDC_REMOTE_STORAGE_ROOT")
 TOKEN_PATH = Path(
-    os.environ.get("CANDI_REMOTE_TOKEN", "~/.config/candi/ray_token")
+    os.environ.get("SDDC_REMOTE_TOKEN", "~/.config/sddc/ray_token")
 ).expanduser()
 # Ray also honours .gitignore; these keep large or secret files out even if untracked.
 EXCLUDES = [
@@ -103,11 +103,11 @@ def runtime_env(revision, content, lock, storage_root=STORAGE_ROOT):
         # Workers use the same locked environment the entrypoint builds.
         "py_executable": f"{storage_root}/envs/{lock}/bin/python",
         "env_vars": {
-            "CANDI_STORAGE_ROOT": storage_root,
-            "CANDI_SOURCE_ID": f"{revision[:12]}-{content}",
-            "CANDI_SOURCE_REV": revision,
-            "CANDI_SOURCE_DIRTY": "1" if dirty else "0",
-            "CANDI_LOCK": lock,
+            "SDDC_STORAGE_ROOT": storage_root,
+            "SDDC_SOURCE_ID": f"{revision[:12]}-{content}",
+            "SDDC_SOURCE_REV": revision,
+            "SDDC_SOURCE_DIRTY": "1" if dirty else "0",
+            "SDDC_LOCK": lock,
             "RAY_ENABLE_UV_RUN_RUNTIME_ENV": "0",
         },
     }
@@ -116,7 +116,7 @@ def runtime_env(revision, content, lock, storage_root=STORAGE_ROOT):
 def client():
     if not TOKEN_PATH.is_file():
         raise SystemExit(
-            f"Missing {TOKEN_PATH}; copy it with: candi_remote.py fetch-token"
+            f"Missing {TOKEN_PATH}; copy it with: sddc_remote.py fetch-token"
         )
     # Ray reads these at import time.
     os.environ.setdefault("RAY_AUTH_MODE", "token")
@@ -143,13 +143,13 @@ def submit(args):
         entrypoint_num_cpus=0,
         metadata={
             "source_rev": revision,
-            "source_id": env["env_vars"]["CANDI_SOURCE_ID"],
-            "source_dirty": env["env_vars"]["CANDI_SOURCE_DIRTY"],
+            "source_id": env["env_vars"]["SDDC_SOURCE_ID"],
+            "source_dirty": env["env_vars"]["SDDC_SOURCE_DIRTY"],
             "lock": lock,
         },
     )
     print(job)
-    if env["env_vars"]["CANDI_SOURCE_DIRTY"] == "1":
+    if env["env_vars"]["SDDC_SOURCE_DIRTY"] == "1":
         print("note: uncommitted changes were included in this snapshot", file=sys.stderr)
     if args.follow:
         _follow(job)
@@ -180,11 +180,11 @@ def main():
             p.add_argument("--follow", action="store_true")
     commands.add_parser("list")
     commands.add_parser("gpus", help="Advisory GPU use: nvidia-smi plus Ray reservations")
-    commands.add_parser("tunnel", help=f"Forward port {DASHBOARD_PORT} from CANDI_REMOTE_HOST (blocks)")
-    commands.add_parser("fetch-token", help="Copy the cluster token from CANDI_REMOTE_HOST")
+    commands.add_parser("tunnel", help=f"Forward port {DASHBOARD_PORT} from SDDC_REMOTE_HOST (blocks)")
+    commands.add_parser("fetch-token", help="Copy the cluster token from SDDC_REMOTE_HOST")
     args = parser.parse_args()
-    needs = {"submit": ("CANDI_REMOTE_STORAGE_ROOT",), "tunnel": ("CANDI_REMOTE_HOST",),
-             "fetch-token": ("CANDI_REMOTE_HOST", "CANDI_REMOTE_STORAGE_ROOT")}
+    needs = {"submit": ("SDDC_REMOTE_STORAGE_ROOT",), "tunnel": ("SDDC_REMOTE_HOST",),
+             "fetch-token": ("SDDC_REMOTE_HOST", "SDDC_REMOTE_STORAGE_ROOT")}
     missing = [name for name in needs.get(args.action, ()) if not os.environ.get(name)]
     if missing:
         parser.error(f"set {' and '.join(missing)} (see docs/guides/remote-execution.md)")

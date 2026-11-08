@@ -1,6 +1,6 @@
-# CANDI documentation
+# SDDC documentation
 
-CANDI supports controlled experiments on diffusion language model recipes. Its
+SDDC (Some DLM Design Choices) supports controlled experiments on diffusion language model recipes. Its
 purpose is to make component choices and their interactions explicit, not to
 prescribe one diffusion algorithm or provide a large-scale pretraining stack.
 
@@ -105,5 +105,4 @@ See [task conventions](tasks/overview.md), then
 An available config does not establish benchmark parity. The validation pages
 separate execution checks from numerical comparisons and trained-model results.
 Generated artifacts under `core/outputs/` and cached datasets are local, ignored
-files; a clean clone does not contain them. Legacy implementations remain in Git
-history before the `candiv2.1` cleanup.
+files; a clean clone does not contain them.
