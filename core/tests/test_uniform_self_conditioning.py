@@ -6,6 +6,7 @@ from hydra.utils import instantiate
 
 from core.sweeps.configuration import compose
 from core.tests.test_self_conditioning import recorder
+from core.tests.view_inputs import view_prediction
 
 
 @pytest.mark.parametrize("source", ["hidden", "posterior_mean"])
@@ -32,7 +33,7 @@ def test_plugin_bootstrap_and_sampling_feedback(source, sampler):
     tokens = torch.randint(0, algo.process.vocab_size, (2, 7))
     keep = torch.full((2,), 0.5)
     calls, handle = recorder(algo.model)
-    prediction = algo.training_prediction(tokens, keep)
+    prediction = view_prediction(algo.training_prediction, tokens, keep)
     assert len(calls) == 2
     feedback = calls[1][1]["self_condition"]
     assert not feedback.requires_grad
@@ -41,7 +42,7 @@ def test_plugin_bootstrap_and_sampling_feedback(source, sampler):
         if source == "hidden"
         else (
             algo.predictor.training_plugin(calls[0][2].logits).exp()
-            @ algo.model.vocab_embed.embedding
+            @ algo.model.token_table
         )
     )
     torch.testing.assert_close(feedback, expected)

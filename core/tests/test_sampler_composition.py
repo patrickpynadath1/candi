@@ -45,13 +45,18 @@ def test_frozen_discrete_loop_equivalence(method, current, old, final):
                 "algorithm.length=8",
             ],
         )
-    if method == "sudoku_hard":
+    if method in ("sudoku_hard", "uniform_diffusion"):
         # The frozen loops use the standalone (state, keep) interface, which
-        # D3PM and the other standalone families keep; MDLM's own view path is
-        # covered in test_one_view_equivalence.
+        # D3PM and the other standalone families keep; the MDLM and uniform
+        # view paths are covered in test_one_view_equivalence and
+        # test_view_equivalence_uniform.
         from omegaconf import OmegaConf
 
-        OmegaConf.update(cfg, "algorithm._target_", "core.tests.reference_algorithms.mdlm.MDLM")
+        reference = {
+            "sudoku_hard": "core.tests.reference_algorithms.mdlm.MDLM",
+            "uniform_diffusion": "core.tests.reference_algorithms.uniform_diffusion.UniformDiffusion",
+        }[method]
+        OmegaConf.update(cfg, "algorithm._target_", reference)
     torch.manual_seed(31)
     algo = instantiate(cfg.algorithm).eval()
     # Nontrivial fixed tokens and an all-fixed sequence exercise prompt handling.
