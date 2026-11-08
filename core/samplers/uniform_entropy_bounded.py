@@ -4,12 +4,16 @@ By default only prompts are fixed. Every generated position participates at ever
 including positions committed on earlier steps. A sequence finishes when all
 its generated positions are selected in the same step. Set freeze=True for
 cumulative acceptance with permanently fixed committed tokens.
+
+Standalone algorithms are called as ``(state, keep)``; one-view algorithms
+(e.g. UniformDiffusion) through ``view_calls.predict`` at the global time.
 """
 
 import math
 import torch
 from .uniform_ancestral import initialize_uniform
 from .entropy_bounded import select_prefix
+from .view_calls import is_view_algorithm, predict
 from core.modifiers.self_conditioning.session import prediction_session
 
 
@@ -33,11 +37,11 @@ class UniformEntropyBoundedSampler:
 
     @torch.no_grad()
     def sample(self, algo, prompt_tokens, prompt_mask):
-        if hasattr(algo, "views"):
+        views = is_view_algorithm(algo)
+        if views and len(algo.views) != 1:
             raise TypeError(
-                "UniformEntropyBoundedSampler drives standalone uniform algorithms; "
-                "for view-based ones (incl. posterior uniform) use "
-                "sampler=parallel_entropy_bounded"
+                "UniformEntropyBoundedSampler drives one-view uniform algorithms; "
+                "for parallel views use sampler=parallel_entropy_bounded"
             )
         algo = prediction_session(algo)
         state = initialize_uniform(algo, prompt_tokens, prompt_mask)
@@ -53,9 +57,15 @@ class UniformEntropyBoundedSampler:
                 active &= ~committed
             if not active.any():
                 break
-            keep, _ = algo.schedule(time.expand(len(state)))
-            next_keep, _ = algo.schedule(next_time.expand(len(state)))
-            prediction = algo.sampling_prediction(state, keep)
+            batch_time = time.expand(len(state))
+            if views:
+                keep = algo.points(batch_time)[0].coefficients[0]
+                next_keep = algo.points(next_time.expand(len(state)))[0].coefficients[0]
+                prediction = predict(algo, state, batch_time)
+            else:
+                keep, _ = algo.schedule(batch_time)
+                next_keep, _ = algo.schedule(next_time.expand(len(state)))
+                prediction = algo.sampling_prediction(state, keep)
             # Match the original precision: full probabilities in double for
             # reverse transitions, entropy and multinomial commitment in float.
             prediction = prediction.double() if self.use_float64 else prediction.float()

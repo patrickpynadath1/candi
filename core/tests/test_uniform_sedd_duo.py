@@ -235,9 +235,16 @@ def test_duo_curriculum_boundaries_validation_and_trainer_context(table_path):
     tokens = torch.randint(0, 12, (2, 6))
     mask = torch.ones_like(tokens, dtype=torch.bool)
     observed = []
-    hook = a.model.vocab_embed.register_forward_pre_hook(
-        lambda module, args: observed.append(args[0].detach().clone())
-    )
+    # The uniform view's input map receives soft [B, L, V] relaxed scores or
+    # [B, L] uniform-corrupted tokens.
+    representation = a.model.views[0].representation
+    original = representation.to_model_embedding
+
+    def record(state, point):
+        observed.append(state.detach().clone())
+        return original(state, point)
+
+    representation.to_model_embedding = record
     for step, training, dimension in [
         (0, True, 3),
         (1, True, 3),
@@ -249,7 +256,7 @@ def test_duo_curriculum_boundaries_validation_and_trainer_context(table_path):
         loss = a.loss(tokens, mask, step=step, training=training)["loss"]
         assert torch.isfinite(loss)
         assert observed[-1].ndim == dimension
-    hook.remove()
+    representation.to_model_embedding = original
     assert a.curriculum.inverse_temperature(2) == 1e10
     curriculum = DuoCurriculum(
         start_step=10, end_step=20, log10_temperature_start=1, log10_temperature_end=-1
