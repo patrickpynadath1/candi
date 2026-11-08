@@ -125,8 +125,9 @@ def test_full_sampler_recovers_known_data_distribution(churn):
     )
     data_prior[:2] = torch.tensor([0.7, 0.2])
 
-    def exact_posterior(log_state, t):
-        strength = model.schedule(t).concentration * (1 - t.double())
+    def exact_posterior(states, points, t, **options):
+        (log_state,), (point,) = states, points
+        strength = point.coefficients.concentration * (1 - t.double())
         return (data_prior.log() + strength[:, None, None] * log_state).log_softmax(-1)
 
     model.sampling_prediction = exact_posterior
@@ -210,13 +211,13 @@ def test_expected_and_argmax_input_and_dropped_prompt():
     for mode in ("expectation", "argmax"):
         model = instantiate(tiny_config(**{"model.input_mode": mode}).algorithm).model
         logp = torch.tensor([[[0.2, 0.8] + [0.0] * 10]], dtype=torch.float64).log()
-        embedded = model.embed_state(logp)
-        table = model.vocab_embed.embedding
+        embedded = model.input(logp, None)
+        table = model.input.table
         expected = (
             0.2 * table[0] + 0.8 * table[1] if mode == "expectation" else table[1]
         )
         torch.testing.assert_close(embedded[0, 0], expected)
-        assert not model.embed_state(torch.full_like(logp, -torch.inf)).any()
+        assert not model.input(torch.full_like(logp, -torch.inf), None).any()
 
 
 def test_training_bootstrap_shares_state_time_and_detaches_feedback():
@@ -231,8 +232,10 @@ def test_training_bootstrap_shares_state_time_and_detaches_feedback():
     tokens = torch.randint(0, 12, (3, 6))
     model.loss(tokens, torch.ones_like(tokens), training=True)["loss"].backward()
     assert len(calls) == 2
+    # Network inputs are (states, points, global_time).
     torch.testing.assert_close(calls[0][0][0], calls[1][0][0])
-    torch.testing.assert_close(calls[0][0][1], calls[1][0][1])
+    torch.testing.assert_close(calls[0][0][1][0].time, calls[1][0][1][0].time)
+    torch.testing.assert_close(calls[0][0][2], calls[1][0][2])
     assert not calls[1][1]["self_condition"].requires_grad
     hook.remove()
 

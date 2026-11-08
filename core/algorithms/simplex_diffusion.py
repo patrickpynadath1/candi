@@ -1,10 +1,25 @@
-"""Simplex training orchestration; process and sampler own transition mathematics."""
+"""Simplex diffusion: Dirichlet corruption trained as clean-token posterior prediction.
 
-from .posterior import PosteriorDiffusion
-from .training_loss import finish_training_loss
+Runs on the view path: one Dirichlet view held by the algorithm on a ModularDiT
+adopted from the configured SimplexDiT (see core/models/legacy.py:adopt). The
+process and sampler own the transition mathematics. Training, sampling and
+parameter order are bit-identical to the former standalone implementation,
+which core/tests/reference_algorithms/simplex_diffusion.py keeps for comparison.
+"""
+
+from core.models.legacy import adopt
+from core.modifiers.hybrid.one_view import OneViewAlgorithm
+from core.modifiers.hybrid.training import HybridDiffusion
+from core.modifiers.hybrid.views import DiffusionView
+from core.modifiers.self_conditioning.sources import posterior_mean
+from core.representations.simplex_state import SimplexStateRepresentation
+from core.samplers.hybrid_updates import SimplexPosteriorUpdate
 
 
-class SimplexDiffusion(PosteriorDiffusion):
+class SimplexDiffusion(OneViewAlgorithm, HybridDiffusion):
+    # Simplex states carry no observed (committed) tokens to clamp.
+    clamp_observed = False
+
     def __init__(
         self,
         model,
@@ -17,57 +32,59 @@ class SimplexDiffusion(PosteriorDiffusion):
         prediction=None,
         condition_dropout=0.0,
     ):
-        super().__init__(prediction)
         if not 0 <= condition_dropout <= 1:
             raise ValueError("condition_dropout must be in [0,1]")
         if model.vocab_size != process.vocab_size:
             raise ValueError("simplex process and model vocabulary must match")
-        self.model, self.predictor, self.process = model, predictor, process
-        self.schedule, self.time_sampler, self.objective = (
-            schedule,
+        representation = SimplexStateRepresentation(process.vocab_size, process.state_dtype)
+        view = DiffusionView(process, schedule, representation, SimplexPosteriorUpdate())
+        # The raw sampler time conditions the network, as SimplexDiT took it.
+        network = adopt(model, time_coordinate="time")
+        super().__init__(
+            network,
+            predictor,
             time_sampler,
             objective,
+            length=length,
+            prediction=prediction,
+            views=[view],
         )
-        self.length, self.condition_dropout = length, condition_dropout
-        self.validate_prediction()
-
-    def model_inputs(self, state, time):
-        return state, time
+        self.condition_dropout = condition_dropout
+        self._drop_condition = False
 
     def prediction_logits(self, logits):
         return logits.float()
 
-    def loss(
-        self,
-        tokens,
-        loss_mask,
-        corruption_mask=None,
-        *,
-        step=0,
-        training=False,
-        time_sampler=None,
-        objective=None,
-        **time_context,
-    ):
-        time_sampler = self.time_sampler if time_sampler is None else time_sampler
-        objective = self.objective if objective is None else objective
-        if corruption_mask is None:
-            corruption_mask = loss_mask
-        time = time_sampler.sample(len(tokens), tokens.device, **time_context)
-        state = self.process.corrupt(tokens, self.schedule(time), corruption_mask)
-        if training:
-            state = self.process.drop_condition(
-                state, corruption_mask, self.condition_dropout
-            )
-        prediction = self.training_prediction(state, time)
-        per_token = objective(prediction, tokens)
-        return finish_training_loss(
-            per_token,
-            loss_mask,
-            tokens=tokens,
-            prediction=prediction,
-            step=step,
-            training=training,
-            time_sampler=time_sampler,
-            sampler_time=time,
-        )
+    def prediction_embedding_table(self):
+        return self.model.input.table
+
+    def prediction_mean(self, probabilities):
+        # FP32 matmul outside autocast against the network's token table.
+        return posterior_mean(probabilities, self.prediction_embedding_table())
+
+    def _observed(self, states):
+        # The parameterization and self-conditioning see the simplex state.
+        return states[0]
+
+    def _corrupt(self, tokens, points, corruption_mask):
+        state = self.process.corrupt(tokens, points[0].coefficients, corruption_mask)
+        if self._drop_condition:
+            state = self.process.drop_condition(state, corruption_mask, self.condition_dropout)
+        return (state,)
+
+    def _objective(self, objective, prediction, tokens, time, points, states):
+        return objective(prediction, tokens)
+
+    def _observe(self, sampler, feedback_time, time, points, prediction, tokens, per_token, loss_mask, step):
+        # Only the time sampler adapts; the simplex schedule takes no feedback.
+        observe = getattr(sampler, "observe", None)
+        if observe is not None:
+            observe(feedback_time, per_token, loss_mask, step)
+
+    def loss(self, tokens, loss_mask, corruption_mask=None, *, training=False, **options):
+        """Condition dropout corrupts prompts only for training losses."""
+        self._drop_condition = training
+        try:
+            return super().loss(tokens, loss_mask, corruption_mask, training=training, **options)
+        finally:
+            self._drop_condition = False
