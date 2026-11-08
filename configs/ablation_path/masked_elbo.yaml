@@ -1,0 +1,8 @@
+# @package _global_
+# Masked (absorbing) diffusion trained on the ELBO (keep-rate hazard weighting), as one
+# choice so a sweep can cross it with the other paths. Case names say "masked".
+defaults:
+- /content_view: masked
+- override /objective: masked_elbo
+preparation:
+  path_name: masked

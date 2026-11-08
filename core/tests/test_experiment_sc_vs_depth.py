@@ -15,6 +15,8 @@ import pytest
 from core.sweeps.configuration import ROOT
 
 POLICIES = ["native", "native_greedy", "eb_greedy", "renoise_sample", "renoise_greedy"]
+# The prepared (MI210) policy names; analyze.py reports them under POLICIES.
+PREPARED = ["native", "native_greedy", "eb_greedy", "renoising", "renoising_greedy"]
 
 
 def prepare(output, *overrides):
@@ -42,12 +44,10 @@ def prepare(output, *overrides):
 
 
 def tiny_overrides(tmp_path):
-    trials = [f"preparation.inference.{i}.trials=1" for i in range(3)] + [
-        f"preparation.policies.{name}.trials=1" for name in ("renoise_sample", "renoise_greedy")
-    ]
+    trials = [f"preparation.inference.{i}.trials=1" for i in range(5)]
     return [
         "task=battery/sudoku_hard",
-        "ablation_path=masked",
+        "ablation_path=masked_elbo",
         "feedback=expected_embedding",
         f"data.cache_dir={tmp_path / 'data'}",
         "data.num_train=8",
@@ -91,7 +91,7 @@ def test_sweep_expands_to_the_published_grid(tmp_path):
     }
     assert {case["name"] for case in cases} == expected
     for case in cases:
-        assert [policy["name"] for policy in case["inference"]] == POLICIES
+        assert [policy["name"] for policy in case["inference"]] == PREPARED
         assert case["evaluation"]["nfe"] == 128
         assert len(case["evaluation"]["test_indices"]) == 256
 
@@ -104,7 +104,7 @@ def test_tiny_case_runs_through_nested_tuning_and_both_analyses(tmp_path):
 
     (case,) = prepare(tmp_path / "plan", *tiny_overrides(tmp_path))
     assert case["name"] == "sudoku_hard-masked-expected_embedding-seed-1"
-    assert [policy["name"] for policy in case["inference"]] == POLICIES
+    assert [policy["name"] for policy in case["inference"]] == PREPARED
     assert case["wandb"] is None  # No W&B entity configured, so no tracking.
     ray.init(
         address="local",

@@ -38,9 +38,9 @@ listed policy was kept):
 
 | Task | Method | 8L | 8L + SC | 16L |
 | --- | --- | --- | --- | --- |
-| Sudoku-hard | Gaussian | renoise_greedy | renoise_sample | renoise_sample* |
+| Sudoku-hard | Gaussian | renoise_sample | renoise_greedy | renoise_sample |
 | | masked | eb_greedy | eb_greedy | eb_greedy |
-| | uniform | renoise_greedy | eb_greedy* | renoise_sample |
+| | uniform | renoise_sample | renoise_greedy | renoise_sample* |
 | text8 | Gaussian | renoise_sample | native | renoise_sample |
 | | masked | renoise_sample | native | renoise_sample |
 | | uniform | renoise_sample | native | renoise_sample |
@@ -49,30 +49,27 @@ listed policy was kept):
 | | uniform | eb_greedy | eb_greedy | renoise_sample |
 
 On text8, renoising wins for every model without SC (8 and 16 layers) and for none of
-the SC models. With SC, renoising stops working: the masked SC model gets 0.67 valid words
-per sample with `renoise_sample` and 0.11 with `renoise_greedy`, against 13.24 with
+the SC models. With SC, renoising stops working: the masked SC model gets 0.64 valid words
+per sample with `renoise_sample` and 0.03 with `renoise_greedy`, against 13.64 with
 `native`.
 
 Restricted to `native`, the text8 picture flips (validation, valid words per sample):
 
 | Method | 8L | 8L + SC | 16L |
 | --- | --- | --- | --- |
-| Gaussian | 10.84 | **14.79** | 12.30 |
-| masked | 12.16 | **13.24** | 12.77 |
-| uniform | 13.83 | 14.29 | **14.49** |
+| Gaussian | 11.17 | **14.16** | 12.19 |
+| masked | 11.48 | **13.64** | 12.36 |
+| uniform | 13.63 | 14.33 | **14.73** |
 
-These are the numbers the post quotes (13.2 against 12.2 and 12.8 for masked; 14.3
-against 13.8 and 14.5 for uniform). `analyze.py` on the stored runs reproduces all 135
+These are the numbers the post quotes (13.6 against 11.5 and 12.4 for masked; 14.3
+against 13.6 and 14.7 for uniform). `analyze.py` on the stored runs reproduces all 135
 policy scores and all 27 winners in `expected.csv`.
 
 ## Caveats
 
 - The comparison is on validation scores (128 examples x 2 seeds per policy), one
   training seed per model, and the flip is on one task.
-- The TinyStories rows inherit sc-vs-depth's differences: the published masked
-  TinyStories models used ELBO weighting, and the published TinyStories renoise policies
-  used `ForwardResamplingSampler` (named `renoising` / `renoising_greedy` there). A
-  rerun of the sweep uses plain CE and the composed renoise sampler everywhere, so the
-  TinyStories renoise rows can move. These rows carry a note in `expected.csv`.
+- The rows inherit sc-vs-depth's caveats (code and hardware, data, one training seed);
+  see [its README](../sc-vs-depth/README.md#how-a-rerun-can-differ).
 - Why SC models cannot use renoising is untested. One guess: renoising discards the noisy
   state the SC feedback was computed from.

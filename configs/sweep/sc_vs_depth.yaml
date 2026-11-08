@@ -8,10 +8,15 @@ defaults:
 - common
 - /ablation_path: gaussian_cdcd
 - /feedback: none
-- /policy@preparation.policies.renoise_sample: renoise_sample
-- /policy@preparation.policies.renoise_greedy: renoise_greedy
+- /inference_policies: hybrid_renoising
 - override /task: battery/sudoku_hard
 - _self_
+checkpoint:
+  every_n_steps: 1000
+data:
+  # Read only by TinyStories: the story cohort the evaluation indices refer to.
+  # Build it with scripts/prepare_data.py.
+  allowed_ids_path: ${data.cache_dir}/allowed_ids.json
 preparation:
   name: sc-vs-depth
   output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/sc-vs-depth
@@ -20,54 +25,9 @@ preparation:
   recipe_name: ${preparation.path_name}-${preparation.feedback_name}
   wandb:
     project: sc-vs-depth
-  # native, native_greedy and eb_greedy exactly as in common.yaml, then renoise.
-  inference:
-  - name: native
-    space:
-      algorithm.predictor.temperature:
-        type: float
-        low: 0.5
-        high: 1.5
-    initial_points:
-    - algorithm.predictor.temperature: 1.0
-    trials: 16
-    budget_parameter: steps
-  - name: native_greedy
-    space:
-      sampler.final_denoise:
-      - greedy
-      - sample
-    trials: 2
-    budget_parameter: steps
-    sampler_overrides:
-      greedy_clean_estimate: true
-  - name: eb_greedy
-    sampler:
-      _target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
-      steps: 127
-      freeze: true
-      greedy_clean_estimate: true
-      entropy_bound: 0.1
-    space:
-      algorithm.predictor.temperature:
-        type: float
-        low: 0.5
-        high: 1.5
-      sampler.entropy_bound:
-        type: float
-        low: 0.02
-        high: 0.5
-        log: true
-    initial_points:
-    - algorithm.predictor.temperature: 1.0
-      sampler.entropy_bound: 0.1
-    trials: 16
-    budget_parameter: steps
-  - ${preparation.policies.renoise_sample}
-  - ${preparation.policies.renoise_greedy}
 hydra:
   sweeper:
     params:
       task: battery/sudoku_hard,battery/text8,battery/tinystories_bpe
-      ablation_path: gaussian_cdcd,masked,uniform
+      ablation_path: gaussian_cdcd,masked_elbo,uniform
       feedback: none,expected_embedding,double_depth

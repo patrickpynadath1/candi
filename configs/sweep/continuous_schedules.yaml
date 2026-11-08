@@ -8,11 +8,16 @@ defaults:
 - common
 - /ablation_path: gaussian
 - /feedback: none
-- /policy@preparation.policies.renoise_sample: renoise_sample
-- /policy@preparation.policies.renoise_greedy: renoise_greedy
+- /inference_policies: hybrid_renoising
 - override /path_schedule: cdcd
 - override /task: battery/sudoku_hard
 - _self_
+checkpoint:
+  every_n_steps: 1000
+data:
+  # Read only by TinyStories: the story cohort the evaluation indices refer to.
+  # Build it with scripts/prepare_data.py.
+  allowed_ids_path: ${data.cache_dir}/allowed_ids.json
 preparation:
   name: continuous-schedules
   output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/continuous-schedules
@@ -21,52 +26,6 @@ preparation:
   evaluation_file: experiments/continuous-schedules/evaluation/${preparation.task_name}.json
   wandb:
     project: continuous-schedules
-  # The three samplers of common.yaml plus the two renoising samplers: each
-  # step redraws the state from the forward kernel at the next time.
-  inference:
-  - name: native
-    space:
-      algorithm.predictor.temperature:
-        type: float
-        low: 0.5
-        high: 1.5
-    initial_points:
-    - algorithm.predictor.temperature: 1.0
-    trials: 16
-    budget_parameter: steps
-  - name: native_greedy
-    space:
-      sampler.final_denoise:
-      - greedy
-      - sample
-    trials: 2
-    budget_parameter: steps
-    sampler_overrides:
-      greedy_clean_estimate: true
-  - name: eb_greedy
-    sampler:
-      _target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
-      steps: 127
-      freeze: true
-      greedy_clean_estimate: true
-      entropy_bound: 0.1
-    space:
-      algorithm.predictor.temperature:
-        type: float
-        low: 0.5
-        high: 1.5
-      sampler.entropy_bound:
-        type: float
-        low: 0.02
-        high: 0.5
-        log: true
-    initial_points:
-    - algorithm.predictor.temperature: 1.0
-      sampler.entropy_bound: 0.1
-    trials: 16
-    budget_parameter: steps
-  - ${preparation.policies.renoise_sample}
-  - ${preparation.policies.renoise_greedy}
 hydra:
   sweeper:
     params:

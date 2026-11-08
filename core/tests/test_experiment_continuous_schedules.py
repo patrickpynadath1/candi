@@ -83,8 +83,9 @@ def test_prepare_tune_and_analyze_one_tiny_case(tmp_path):
             for arm in ("none", "expected_embedding"):
                 assert f"{task}-{path}-{arm}-seed-1" in names
     case = next(case for case in manifest if case["name"] == CASE)
+    # The MI210 policy names; analyze.py reports them as renoise_sample/renoise_greedy.
     assert [p["name"] for p in case["inference"]] == [
-        "native", "native_greedy", "eb_greedy", "renoise_sample", "renoise_greedy"]
+        "native", "native_greedy", "eb_greedy", "renoising", "renoising_greedy"]
     assert case["evaluation"]["nfe"] == 128 and len(case["evaluation"]["test_indices"]) == 256
     config = OmegaConf.load(case["config"])
     assert config.trainer.max_steps == 20000
@@ -130,7 +131,7 @@ def test_expected_table_has_every_published_cell():
     scores = [r for r in rows if r["quantity"] == "score"]
     assert len(scores) == 24
     assert len({(r["task"], r["method"], r["arm"]) for r in scores}) == 24
-    assert all("different protocol" in r["note"] for r in scores if r["task"] == "tinystories")
+    assert all("BLEU without brevity penalty" in r["note"] for r in scores if r["task"] == "tinystories")
     linearity = [r for r in rows if r["quantity"].startswith("linearity_r2_")]
     assert min(float(r["value"]) for r in linearity
                if r["task"] != "sudoku_hard" and r["quantity"] != "linearity_r2_min") >= 0.998
