@@ -8,8 +8,9 @@ that a method can learn, not proof of convergence or paper-level performance.
 
 The suite runs in CI on Linux x86_64 (CPU) with the locked environment; CUDA
 checks run when a GPU is present. The byte-level sampler snapshots in
-`test_sampler_equivalence.py` hash raw float bytes recorded on Linux x86_64 and
-skip on other platforms. A passing suite is not a promise that every method,
+`test_sampler_equivalence.py` hash raw float bytes and hold only on the CPU that
+recorded them, so they run only with `SDDC_BYTE_SNAPSHOTS=1`; a portable test checks
+the same samplers' behavior everywhere. A passing suite is not a promise that every method,
 task, precision, sampler, modifier and distributed strategy combination has
 been tested. Run the current suite from the repository root:
 

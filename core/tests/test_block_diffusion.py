@@ -72,7 +72,8 @@ def test_full_block_matches_unmodified_model_and_future_clean_cannot_leak():
     expected = token_call(reference, noisy, condition)
     with wrapped.model.clean_context(tokens):
         actual = token_call(wrapped.model, noisy, condition)
-    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
+    # Same function, different kernel order: equal up to float32 rounding.
+    torch.testing.assert_close(actual, expected, rtol=1e-4, atol=1e-5)
 
     wrapped.block_size = wrapped.model.block_size = 2
     changed = tokens.clone()

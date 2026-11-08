@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import platform
 from pathlib import Path
 
@@ -12,13 +13,15 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 FIXTURE = Path(__file__).with_name("fixtures") / "sampler_behavior.json"
-# The snapshots hash raw float bytes of intermediate states, so they are only
-# defined on the CPU kernels that recorded them. Other platforms (e.g. ARM macOS)
-# round differently in the last bits; the samplers' math is covered elsewhere.
+# The snapshots hash raw float bytes of intermediate states, so they hold only on
+# the CPU kernels that recorded them: other CPUs (even other Linux x86_64 ones)
+# round differently in the last bits. They are opt-in (SDDC_BYTE_SNAPSHOTS=1, on
+# the recording machine); test_portable_behavior below runs everywhere.
 REFERENCE_PLATFORM = ("Linux", "x86_64")
 on_reference_platform = pytest.mark.skipif(
-    (platform.system(), platform.machine()) != REFERENCE_PLATFORM,
-    reason="byte-level sampler snapshots were recorded on Linux x86_64",
+    (platform.system(), platform.machine()) != REFERENCE_PLATFORM
+    or os.environ.get("SDDC_BYTE_SNAPSHOTS") != "1",
+    reason="byte-level snapshots: set SDDC_BYTE_SNAPSHOTS=1 on the machine that recorded them",
 )
 CASES = json.loads(FIXTURE.read_text()) if FIXTURE.exists() else []
 
