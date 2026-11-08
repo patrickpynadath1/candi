@@ -1,0 +1,20 @@
+# @package _global_
+# Autoregressive decoding: tuned-temperature sampling and greedy decoding. AR makes one
+# model call per token, so its NFE is the sequence length and no steps are budgeted.
+preparation:
+  sampler_budget_parameter: null
+  inference:
+  - name: native
+    space:
+      algorithm.predictor.commitment: [sample]
+      algorithm.predictor.temperature: {type: float, low: 0.5, high: 1.5}
+    initial_points:
+    - algorithm.predictor.commitment: sample
+      algorithm.predictor.temperature: 1.0
+    trials: 16
+    budget_parameter: null
+  - name: native_greedy
+    space:
+      algorithm.predictor.commitment: [greedy]
+    trials: 1
+    budget_parameter: null

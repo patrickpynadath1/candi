@@ -1,0 +1,36 @@
+vocab,method,sc,chosen,test,test_nobp,test_bp,test_len_ratio,note
+260,ar,,native_greedy,8.885,9.328,0.9525,0.9536,
+500,ar,,native_greedy,8.917,9.1554,0.9739,0.9742,
+1000,ar,,native_greedy,9.067,9.067,1.0,1.025,
+5000,ar,,native_greedy,9.682,9.8196,0.986,0.9861,
+10000,ar,,native,8.946,8.9732,0.9969,1.0043,
+260,gaussian,False,renoise_sample,6.009,7.1682,0.8383,0.8501,no-SC control launched separately from the SC ladder; same configs
+500,gaussian,False,renoise_sample,6.527,6.5288,0.9998,1.0011,no-SC control launched separately from the SC ladder; same configs
+1000,gaussian,False,renoise_sample,6.91,6.9403,0.9957,0.9971,no-SC control launched separately from the SC ladder; same configs
+5000,gaussian,False,renoise_sample,7.14,7.1721,0.9954,0.9993,no-SC control launched separately from the SC ladder; same configs
+10000,gaussian,False,renoise_sample,6.812,6.8119,1.0,1.0272,
+260,gaussian,True,native,7.55,8.1584,0.9255,0.9281,
+500,gaussian,True,native,7.482,7.4821,1.0,1.0059,
+1000,gaussian,True,renoise_sample,7.582,7.5903,0.9989,1.0036,
+5000,gaussian,True,native,7.657,8.1333,0.9414,0.9431,
+10000,gaussian,True,native,7.864,7.9335,0.9911,0.9943,
+260,masked,False,native_greedy,6.209,8.2734,0.7505,0.777,no-SC control launched separately from the SC ladder; same configs
+500,masked,False,native,5.918,7.1485,0.8278,0.8411,no-SC control launched separately from the SC ladder; same configs
+1000,masked,False,native,6.436,8.1117,0.7934,0.8121,no-SC control launched separately from the SC ladder; same configs
+5000,masked,False,native,6.456,7.0413,0.9169,0.9202,no-SC control launched separately from the SC ladder; same configs
+10000,masked,False,native,6.671,7.8328,0.8518,0.8618,
+260,masked,True,native_greedy,6.775,9.2279,0.7342,0.764,
+500,masked,True,native,6.809,7.6115,0.8945,0.8998,
+1000,masked,True,native,7.114,9.2266,0.771,0.7936,
+5000,masked,True,native,7.25,8.2728,0.8762,0.8833,
+10000,masked,True,native,6.908,7.7618,0.89,0.8957,
+260,uniform,False,eb_greedy,6.271,6.2707,1.0,1.0163,no-SC control launched separately from the SC ladder; same configs
+500,uniform,False,renoise_sample,7.011,7.1335,0.9832,0.9835,no-SC control launched separately from the SC ladder; same configs
+1000,uniform,False,renoise_sample,7.279,7.2939,0.998,0.9984,no-SC control launched separately from the SC ladder; same configs
+5000,uniform,False,native,6.399,7.6715,0.834,0.8465,no-SC control launched separately from the SC ladder; same configs
+10000,uniform,False,eb_greedy,6.624,7.4531,0.8894,0.8952,
+260,uniform,True,native,7.509,7.5292,0.9974,1.0006,
+500,uniform,True,renoise_sample,7.408,8.3105,0.8917,0.8972,
+1000,uniform,True,eb_greedy,7.235,7.3446,0.9849,0.985,
+5000,uniform,True,eb_greedy,7.574,8.0163,0.9451,0.9466,
+10000,uniform,True,eb_greedy,7.367,7.7317,0.953,0.954,

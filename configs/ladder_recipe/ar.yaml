@@ -1,0 +1,16 @@
+# @package _global_
+# Eight-layer causal transformer with cached sequential decoding. One model call per
+# token, so the evaluation NFE is the sequence length.
+defaults:
+- /experiment: autoregressive
+- /sweep/common
+- /inference_policies: autoregressive
+- _self_
+model:
+  n_blocks: 8
+self_conditioning:
+  enabled: false
+preparation:
+  recipe_name: ar-8
+  evaluation:
+    nfe: ${task.length}

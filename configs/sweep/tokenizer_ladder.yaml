@@ -1,0 +1,42 @@
+# @package _global_
+# Does the tokenizer change the picture? TinyStories with byte-level BPE at five
+# vocabulary sizes x seven recipes (Gaussian embedding, masked ELBO and uniform
+# posterior-CE diffusion, each without and with self-conditioning, plus an
+# autoregressive model) = 35 cases. See experiments/tokenizer-ladder/README.md.
+defaults:
+- /ladder_recipe: masked
+- override /task: battery/tinystories_bpe
+- _self_
+bpe:
+  vocabulary_size: 10000
+  # Sequence capacity per vocabulary: every story of the shared cohort
+  # (data.allowed_ids_path) fits at every vocabulary.
+  capacity:
+    '260': 1024
+    '500': 768
+    '1000': 512
+    '5000': 512
+    '10000': 512
+task:
+  length: ${oc.select:'bpe.capacity.${bpe.vocabulary_size}'}
+  calculate_bleu: true
+  num_eval_samples: 100000000
+data:
+  # The story cohort the evaluation indices refer to; build it with
+  # experiments/block-encoder-decoder/prepare_data.py tinystories (see the README).
+  allowed_ids_path: ${data.cache_dir}/allowed_ids.json
+checkpoint:
+  every_n_steps: 1000
+preparation:
+  name: tokenizer-ladder
+  output: ${oc.env:CANDI_STORAGE_ROOT,${oc.env:HOME}/.cache/candi}/plans/tokenizer-ladder
+  family: tokenizer_ladder
+  evaluation_file: experiments/tokenizer-ladder/evaluation/${preparation.task_name}.json
+  wandb:
+    project: tokenizer-ladder
+hydra:
+  sweeper:
+    params:
+      task: battery/tinystories_bpe
+      bpe.vocabulary_size: 260,500,1000,5000,10000
+      ladder_recipe: gaussian,gaussian_sc,masked,masked_sc,uniform,uniform_sc,ar
