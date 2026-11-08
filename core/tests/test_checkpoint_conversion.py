@@ -138,7 +138,8 @@ def test_current_checkpoint_converts_as_identity():
 
 
 def test_unmigrated_family_maps_to_itself():
-    cfg = config("ar", {})  # Autoregressive stays a standalone class.
+    # Autoregressive stays a standalone class (its causal network has no cond_dim).
+    cfg = compose("ar", {"model.hidden_size": 32, "model.n_blocks": 1, "model.n_heads": 2})
     plan = conversion_plan(cfg)
     assert all(new == old for new, old in plan.names.items())
     assert plan.old_order == plan.parameter_names

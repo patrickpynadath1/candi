@@ -54,10 +54,11 @@ regenerate_final.py`). The reference state is tag `v2.1-blog-reference`.
 - [x] Posterior uniform on the hybrid path (bit-identical).
 - [x] Modular DiT: token / simplex / sphere / continuous presets bit-identical (core/models/modular.py, legacy.py, test_modular_dit.py).
 - [x] `ViewsInput` slot: all 40 hybrid presets are bit-identical ModularDiT presets via the converter.
-- [x] Hybrid configs build ModularDiT (`model.views`/`fusion` kept, `model.backbone.*` -> `model.*`, `time_conditioning` -> `model.time.coordinate`); every preset resolves to the converter's config. Block diffusion, variable length and performance use the shared interface. Posterior uniform still wraps a legacy DiT via `one_view_model`.
+- [x] Hybrid configs build ModularDiT (`model.views`/`fusion` kept, `model.backbone.*` -> `model.*`, `time_conditioning` -> `model.time.coordinate`); every preset resolves to the converter's config. Block diffusion, variable length and performance use the shared interface. Posterior uniform adopts its DiT like MDLM.
 - [x] MDLM on the view path (adopts the configured DiT; bit-identical training and ancestral / entropy-bounded sampling vs the frozen class). Block diffusion, BlockGen mixtures and E2D2 run on it; their tests use the view interface.
 - [x] Foundation for the remaining families (tag `unify-4-foundation`): `adopt` for every network kind, `OneViewAlgorithm`, `HybridDiffusion` extension points and algorithm-held views, view sampler calls, shared equivalence helpers. Guide: [family-migration.md](family-migration.md).
-- [ ] MDLM checkpoint importers (`evaluation.legacy`, CANDI) through the converter; MDLM model configs to ModularDiT.
-- [ ] Gaussian, simplex, spherical, blurring on the modular path.
+- [x] Every standalone family on the view path, each proven equal to its frozen class (`core/tests/test_view_equivalence_*.py`): Gaussian (20 presets), RePlaid, blurring, simplex, spherical, plug-in uniform, DUO, D3PM, SEDD. Autoregressive stays separate (causal KV-cache path).
+- [x] Checkpoint importers through the converter (`core/models/legacy_checkpoints.py`): `evaluation.legacy=convert|true|candi`, `scripts/convert_checkpoint.py`, `regenerate_final.py --convert`; HybridModel load hook removed. Every family's old checkpoint converts and samples identically (`test_checkpoint_conversion_families.py`).
+- [ ] Model configs to ModularDiT (networks are adopted at construction today).
 - [ ] Contracts and generated compatibility table.
 - [ ] Remove legacy classes; regenerate blog results through the converter.
