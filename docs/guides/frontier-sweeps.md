@@ -13,7 +13,7 @@ For an original MDLM checkpoint trained with the small 768-wide, 12-layer DiT:
 ```bash
 CUDA_VISIBLE_DEVICES=0 uv run python frontier.py \
   +experiment=openwebtext inference/frontier=openwebtext inference/sampler=ancestral \
-  model.adaLN=true \
+  model.time.adaLN=true \
   evaluation.checkpoint=/absolute/path/to/pretrained.ckpt \
   evaluation.legacy=true noise_schedule.epsilon=0 \
   task.num_eval_samples=128 loader.eval_batch_size=4 \

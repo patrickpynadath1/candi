@@ -129,7 +129,7 @@ training sweep automatically.
 
 ### MDLM modulation and controlled comparisons
 
-The MDLM recipe explicitly enables decoder `model.adaLN`. Its default
+The MDLM recipe explicitly enables decoder `model.time.adaLN`. Its default
 `algorithm.time_conditioning=false` supplies a constant timestep to the learned
 modulation and residual gates; it does not remove those layers. E2D2, raw context,
 and encoder-K/V recipes inherit this setting. Clean encoder blocks remain
