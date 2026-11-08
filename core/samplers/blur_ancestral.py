@@ -1,4 +1,8 @@
-"""Stochastic reverse Gaussian bridge sampler for blurring diffusion."""
+"""Stochastic reverse Gaussian bridge sampler for blurring diffusion.
+
+Calls a one-view algorithm (BlurringDiffusion) with the view's local point
+over the active spans, so the network sees the same time the reverse bridge uses.
+"""
 
 import torch
 from .loop import FixedGridLoop
@@ -44,40 +48,41 @@ class BlurAncestralSampler:
         )
         nfe = 0
 
-        def predict(value, time):
+        def path(time):
+            # The view's local point over the active spans (one view).
+            return algo.points(time, corruption_mask=active, sequence_layout=layout)
+
+        def predict(value, time, points):
             nonlocal nfe
             if (
                 isinstance(algo, PredictionSession)
                 and self.self_conditioning_mode == "bootstrap"
             ):
                 algo.state.conditioning = None
-                algo.sampling_prediction(value, time)
+                algo.sampling_prediction((value,), points, time)
                 nfe += 1
-            result = algo.sampling_prediction(value, time)
+            result = algo.sampling_prediction((value,), points, time)
             nfe += 1
             return result
 
         def update(state, current, target, index):
             time = current.expand(len(state))
             next_time = target.expand(len(state))
-            probabilities = predict(state, time).float().exp()
+            points = path(time)
+            probabilities = predict(state, time, points).float().exp()
             estimate = (
                 algo.representation.encode(probabilities.argmax(-1))
                 if self.greedy_clean_estimate
                 else algo.representation.posterior_mean(probabilities)
             ).to(state)
-            current_path = algo.schedule.for_layout(
-                time, active, state.shape[-1], layout
-            )
-            target_path = algo.schedule.for_layout(
-                next_time, active, state.shape[-1], layout
-            )
+            current_path = points[0].coefficients
+            target_path = path(next_time)[0].coefficients
             state = algo.process.reverse(state, estimate, current_path, target_path)
             state = torch.where(prompt_mask.bool()[..., None], clean_prompt, state)
             return state
 
         state = FixedGridLoop()(state, times, update)
         final_time = torch.zeros(len(state), device=state.device, dtype=state.dtype)
-        final = predict(state, final_time)
+        final = predict(state, final_time, path(final_time))
         tokens = torch.where(prompt_mask.bool(), prompt_tokens, final.argmax(-1))
         return tokens, {"nfe": nfe, "nfe_per_sample": [nfe] * len(tokens)}
