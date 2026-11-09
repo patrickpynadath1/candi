@@ -1,6 +1,8 @@
 # @package _global_
+# Continuous REPLAiD as a recipe over GaussianDiffusion (no family class); see
+# docs/methods/replaid.md for what each component contributes.
 defaults:
-- override /denoising_task/algorithm: replaid
+- override /denoising_task/algorithm: gaussian_diffusion
 - override /information_path/representation: embedding
 - override /denoising_task/model: continuous_dit
 - override /denoising_task/model/input@model.input: linear
@@ -9,9 +11,15 @@ defaults:
 - override /information_path/process: gaussian
 - override /information_path/noise_schedule: plaid_log_snr
 - override /denoising_task/time_sampler: adaptive_allocation
-- override /denoising_task/objective: replaid
+- override /denoising_task/objective: gaussian_elbo
 - override /inference/sampler: gaussian_ddpm
 - override /information_path/token_space@token_space: data_only
+algorithm:
+  # Corrupt prompts too (noisy prompt inpainting); Sudoku presets set false.
+  corrupt_all: true
+noise_schedule:
+  # Variance-minimizing shape gradient from the ELBO's diffusion term.
+  adaptation_term: diffusion
 representation:
   dimension: 16
   trainable: true
@@ -34,6 +42,10 @@ self_conditioning:
   evaluation_probability: 1.0
 prediction:
   selection: fixed_count
+  # Self-conditioned rows train only the denoiser; uncorrupted positions feed
+  # back their clean embedding.
+  selected_gradients: denoiser_only
+  fixed_feedback: clean
 optimizer:
   groups:
   - patterns:

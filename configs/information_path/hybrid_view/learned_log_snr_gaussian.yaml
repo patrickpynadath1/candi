@@ -1,0 +1,15 @@
+# @package hybrid_view
+# Gaussian view over the recipe's representation (e.g. learned unit embeddings)
+# with a linear log-SNR schedule whose endpoints are learned. The REPLAiD
+# hybrid's content view; its local time comes from the algorithm's time sampler
+# when listed in algorithm.adaptive_time_views.
+_target_: core.modifiers.hybrid.views.DiffusionView
+process:
+  _target_: core.processes.gaussian.GaussianProcess
+schedule:
+  _target_: core.noise_schedules.learned_log_snr.LinearLogSNRSchedule
+  gamma_min: -13.3
+  gamma_max: 5.0
+representation: ${representation}
+update:
+  _target_: core.samplers.hybrid_updates.GaussianPosteriorUpdate

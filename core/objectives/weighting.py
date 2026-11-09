@@ -11,7 +11,15 @@ from core.models.layers import TimestepEmbedder
 
 @dataclass(frozen=True)
 class ObjectiveContext:
-    """Coordinates and optional noisy views, supplied without implicit detach."""
+    """Coordinates and optional noisy views, supplied without implicit detach.
+
+    ``schedules`` are the views' schedules (e.g. for a terminal prior);
+    ``time_draw`` is the time sampler's draw when it is richer than a tensor (an
+    estimator allocation); ``time_density`` is the importance proposal density of
+    the drawn local time, with gradients to the proposal; ``detached_rows`` marks
+    rows whose non-network inputs are detached (denoiser-only self-conditioned
+    rows).
+    """
 
     time: torch.Tensor
     alpha: torch.Tensor | None = None
@@ -20,6 +28,27 @@ class ObjectiveContext:
     coefficients: tuple = ()
     states: tuple = ()
     representations: tuple = ()
+    schedules: tuple = ()
+    loss_mask: torch.Tensor | None = None
+    corruption_mask: torch.Tensor | None = None
+    time_draw: object = None
+    time_density: torch.Tensor | None = None
+    detached_rows: torch.Tensor | None = None
+
+
+@dataclass(frozen=True)
+class ObjectiveResult:
+    """A tokenwise loss plus what adaptive components observe.
+
+    ``total`` is the tokenwise loss the algorithm reduces. ``estimate`` is the
+    per-example Monte Carlo estimate whose second moment an importance time
+    sampler minimizes; ``terms`` are named tokenwise terms for samplers and
+    schedules that observe them (``observe_terms``).
+    """
+
+    total: torch.Tensor
+    estimate: torch.Tensor | None = None
+    terms: dict | None = None
 
 
 def _positive_finite(value, name):

@@ -1,4 +1,6 @@
-"""Reference equations, gradient ownership and core lifecycle for RePlaid."""
+"""Reference equations, gradient ownership and core lifecycle for RePlaid.
+
+RePlaid is the replaid presets over GaussianDiffusion (no family class)."""
 
 from hydra.utils import instantiate
 import pytest
@@ -6,13 +8,15 @@ import torch
 from torch.nn import functional as F
 
 from core.noise_schedules.learned_log_snr import LearnedLogSNRSchedule
-from core.objectives.replaid import RePlaidObjective
+from core.noise_schedules.gaussian_path import path_from_gamma
+from core.objectives.gaussian_elbo import GaussianELBO
+from core.objectives.weighting import ObjectiveContext
 from core.parameterizations.gaussian_prior import GaussianPriorPosterior
 from core.processes.gaussian import GaussianProcess
 from core.modifiers.self_conditioning.gradient_routing import detach_selected, embedding_mean
 from core.modifiers.self_conditioning.prediction import PredictionCoordinator
 from core.samplers.gaussian_ddpm import GaussianDDPMSampler
-from core.time_sampling.adaptive_allocation import AdaptiveTimeAllocation
+from core.time_sampling.adaptive_allocation import AdaptiveTimeAllocation, TimeAllocation
 from core.sweeps.configuration import compose
 from core.training.module import TrainingModule
 from core.tests.networks import TINY32
@@ -52,17 +56,25 @@ def test_objective_hand_computed_masked_reduction():
     gamma = torch.tensor([-2.0, 1.0], dtype=torch.float64)
     derivative = torch.tensor([3.0, 4.0], dtype=torch.float64)
     terminal = torch.tensor([5.0], dtype=torch.float64)
-    terms = RePlaidObjective()(
-        probabilities.log(),
-        tokens,
-        clean,
-        probabilities,
-        gamma,
-        derivative,
-        terminal,
-        clean,
-        1,
+
+    class OneHotCodebook:
+        def codebook(self):
+            return torch.eye(2)
+
+        def encode(self, tokens):
+            return F.embedding(tokens, self.codebook())
+
+    def schedule(time):  # terminal gamma at t = 1
+        return path_from_gamma(terminal.expand(len(time)), torch.ones_like(time))
+
+    context = ObjectiveContext(
+        time=torch.zeros(2),
+        coefficients=(path_from_gamma(gamma, derivative),),
+        representations=(OneHotCodebook(),),
+        schedules=(schedule,),
+        time_draw=TimeAllocation(torch.zeros(2), 1),
     )
+    terms = GaussianELBO()(probabilities.log(), tokens, context=context)
     ce = -probabilities.log().gather(-1, tokens[..., None]).squeeze(-1).double()
     diffusion = (
         0.5

@@ -68,6 +68,6 @@ class UniformDiffusion(OneViewAlgorithm, HybridDiffusion):
         )
         self.time_conditioning = time_conditioning
 
-    def _objective(self, objective, prediction, tokens, time, points, states):
+    def _objective(self, objective, prediction, tokens, time, points, states, **entries):
         keep, derivative = points[0].coefficients  # per-call CE: block-size mixtures
         return keep_rate_objective(objective, prediction, states[0], tokens, time, keep, derivative)

@@ -84,7 +84,7 @@ class D3PMAbsorb(OneViewAlgorithm, HybridDiffusion):
         )
         return torch.where(committed[..., None], fixed, result)
 
-    def _objective(self, objective, prediction, tokens, time, points, states):
+    def _objective(self, objective, prediction, tokens, time, points, states, **entries):
         # The bound's reconstruction term: a second pass on the clean tokens
         # at the schedule's clean endpoint.
         clean_time = torch.zeros_like(time)

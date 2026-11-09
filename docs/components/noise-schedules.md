@@ -145,9 +145,13 @@ inside one; delegated observations must still be applied once.
 provides Dirichlet parameters, while its optional adaptive **time sampler** is a
 separate component. `blurring` supplies spectral decay coefficients.
 `learned_log_snr` and `plaid_log_snr` are differentiable learned Gaussian schedules
-used by RePlaid-related constructions, with trainable monotone shape and endpoint
-parameters. They differ from loss-buffer clock fitting and rely on the algorithm's
-specialized gradient routes. Hybrid branches may each own a schedule and explicit
+used by the RePlaid recipe, with trainable monotone shape and endpoint parameters.
+They differ from loss-buffer clock fitting. With `adaptation_term` set (e.g.
+`diffusion`), `training_coefficients` registers a per-row multiplier on the shape
+gradient and `observe_terms` sets it to twice the row's masked mean of that
+objective term (zero for reconstruction and denoiser-only rows); endpoints keep
+ordinary gradients. `linear_log_snr` (`LinearLogSNRSchedule`) is the linear-in-time
+member with the same learned endpoints and no shape. Hybrid branches may each own a schedule and explicit
 mapping from global time; there is no requirement to map their noisy states into
 each other.
 
@@ -158,13 +162,10 @@ and [implementation helpers](../../core/noise_schedules/utils.py).
 
 ### Shared importance clock
 
-`shared_importance_clock` selects `PiecewiseInverseCDFClock`: a positive
-piecewise-uniform density, its inverse CDF, and ordered Gaussian endpoints.
-`ClockGaussianSchedule` and `ClockKeepSchedule` reference the **same** module:
-`gamma(t)=lower+(upper-lower)*u(t)` and `keep(t)=1-u(t)`. The clock's `draw`
-returns stratified importance samples and their density. The zero-valued
-`variance_surrogate` trains density logits to reduce estimator second moment;
-training algorithms must add it only during training. Endpoint gradients come
-from the objective. DDP synchronizes these ordinary parameter gradients.
-The recipe preserves the original 1% density mixture; this is part of its
-protocol, not a change to CDCD recipes.
+A clock shared by several views is a time sampler, not a schedule: the REPLAiD
+hybrid selects `time_sampler=piecewise_importance` with
+`algorithm.adaptive_time_views: [0, 1]`, so both views read one local time
+`u = Q(t)` from the sampler's quantile map, and each view keeps its own plain
+schedule (`LinearLogSNRSchedule` gives `gamma(u)=lower+(upper-lower)*u`, `LogLinear`
+with `epsilon: 0` gives `keep(u)=1-u`). See
+[time sampling](time-sampling.md#learned-importance-density).

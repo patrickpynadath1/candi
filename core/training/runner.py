@@ -10,11 +10,14 @@ from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from omegaconf import OmegaConf
 
 from core.training.checkpoints import load_weights
+from core.training.legacy_checkpoints import migrate_legacy_config
 from core.training.module import TrainingModule
 from core.training.strategies import build_strategy
 
 
 def run(config):
+    # Saved run configs naming a removed family class are rebuilt from its preset.
+    config = migrate_legacy_config(config)
     # Default also applies to queued configs created before compilation existed.
     if "compile" not in config:
         config.compile = True

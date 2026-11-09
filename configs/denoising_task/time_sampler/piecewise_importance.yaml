@@ -1,0 +1,8 @@
+# @package time_sampler
+# Learned piecewise-constant importance density over the views' local time.
+# Use with algorithm.adaptive_time_views listing the views that read it; the
+# objective divides by the proposal density and the bin logits train only through
+# the zero-valued variance surrogate (core/time_sampling/importance.py).
+_target_: core.time_sampling.importance.PiecewiseImportanceTimeSampler
+bins: 64
+uniform_mix: 0.01

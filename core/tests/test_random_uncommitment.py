@@ -59,7 +59,8 @@ def test_refinement_defers_completion_and_counts_real_forwards():
 
 @pytest.mark.parametrize('rate',[-.1,1.1,float('nan')])
 def test_invalid_rates(rate):
-    with pytest.raises(ValueError):RandomUncommitment(rate)
+    with pytest.raises(ValueError):
+        RandomUncommitment(rate)
 
 
 @pytest.mark.parametrize('family',['simplex','spherical','gaussian','blurring','uniform'])
@@ -77,7 +78,8 @@ def test_process_geometry_and_churn(family, hybrid):
     algo=instantiate(cfg.algorithm).eval()
     assert len(algo.views) == (2 if hybrid else 1)
     tokens=torch.randint(0,12,(2,8))
-    prompt=torch.zeros_like(tokens,dtype=torch.bool);prompt[:,0]=True
+    prompt=torch.zeros_like(tokens,dtype=torch.bool)
+    prompt[:,0]=True
     points=algo.points(torch.full((2,),.5),corruption_mask=~prompt)
     states=tuple(v.representation.clean_state(tokens) for v in algo.views)
     churn=RandomUncommitment(rate=1)

@@ -1,0 +1,5 @@
+# @package objective
+# Prior KL + reconstruction CE + weighted embedding MSE over an estimator
+# allocation (time_sampler=adaptive_allocation); FP64 terms.
+_target_: core.objectives.gaussian_elbo.GaussianELBO
+view: 0

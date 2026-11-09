@@ -1,0 +1,15 @@
+# @package model.input
+# Two views (continuous content, then absorbing reveal): the continuous slot
+# embeds the noisy state, and revealed positions add a projection of their clean
+# embedding. Select the views under model.input.views, e.g.
+#   /information_path/hybrid_view@model.input.views.content: learned_log_snr_gaussian
+#   /information_path/hybrid_view@model.input.views.revealed: forced_target_mask
+_target_: core.models.revealed_context.RevealedContextInput
+_partial_: true
+# sqrt(dimension): clean context on the unit-embedding scale.
+context_scale: unit_embedding
+continuous:
+  _target_: core.models.modular.LinearInput
+  _partial_: true
+  bias: false
+  preconditioning: unit_embedding

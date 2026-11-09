@@ -22,7 +22,8 @@ track them.
 | `uniform` | Uniform/DUO plug-in diffusion loss |
 | `score_entropy` | Absorbing score entropy, including reference constant |
 | `d3pm` | Absorbing discrete variational term plus clean reconstruction CE |
-| `replaid` | Prior, reconstruction, and continuous diffusion bound terms |
+| `gaussian_elbo` | Prior, reconstruction, and continuous diffusion bound terms over an allocation (RePlaid) |
+| `hybrid_elbo` | Conditional reveal/Gaussian bound with a forced-target proposal (REPLAiD hybrid) |
 
 [Implementations](../../core/objectives/) and [configs](../../configs/denoising_task/objective/)
 define the call signatures. A normalized plug-in estimate is not a posterior
@@ -143,12 +144,23 @@ feed those coefficients so saved experiments and head-off ablations still work.
 clean endpoint because its denominator vanishes. Visible absorbing tokens have
 zero CE due to mandatory posterior constraints.
 
-[RePlaidObjective](../../core/objectives/replaid.py) returns a `RePlaidTerms`
-dataclass with prior, reconstruction, diffusion, and total tokenwise FP64 terms.
-Its diffusion term is a squared clean-embedding prediction error weighted by the
-SNR derivative. Reconstruction and diffusion subsets are rescaled by their batch
-fractions. The algorithm owns the multiple predictions and detached gradient routes;
-the objective owns these terms, not the generic self-conditioning modifier.
+[GaussianELBO](../../core/objectives/gaussian_elbo.py) (`gaussian_elbo`, RePlaid)
+reads its view's path, representation and schedule, the time draw and the
+detached rows from `ObjectiveContext` and returns an `ObjectiveResult` with the
+tokenwise FP64 total and named `prior`, `reconstruction` and `diffusion` terms.
+Its diffusion term is a squared clean-embedding prediction error weighted by
+`-1/2 dSNR/dt`, formed from the path's coefficients and derivatives. Reconstruction
+and diffusion rows (an allocation draw) are rescaled by their batch fractions;
+denoiser-only rows use detached embeddings, while the terminal prior KL keeps its
+ordinary gradient. The shared terms (`token_cross_entropy`,
+`gaussian_diffusion_weight`, `gaussian_prior_kl`) are reused by `hybrid_elbo`.
+
+An objective may return an `ObjectiveResult(total, estimate=None, terms=None)`
+instead of a tensor: the algorithm reduces `total`, passes `terms` to components
+with `observe_terms` (adaptive allocation, schedule variance adaptation) and
+`estimate` to an importance time sampler's `adaptation_loss`. `ObjectiveContext`
+also carries the views' `schedules`, `loss_mask`, `corruption_mask`, `time_draw`,
+`time_density` and `detached_rows`.
 
 The block modifier's optional clean autoregressive CE is computed from its clean
 stream and combined with the existing diffusion loss. It does not replace the
@@ -161,10 +173,12 @@ Do not move sampler policy or raw batch handling into the objective.
 ### Conditional hybrid ELBO
 
 `hybrid_elbo` combines masked reveal CE, Gaussian expected-embedding error and
-terminal Gaussian KL. `ForcedTargetMask` conditions on a uniformly selected
-valid position being masked; all other valid positions follow Bernoulli(u).
-The objective averages over all masked positions and corrects that proposal
-with `N / (K * density)`. Loss and corruption masks must coincide and be binary;
+terminal Gaussian KL, reading the views' coefficients, states, masks and the time
+sampler's proposal density from `ObjectiveContext`. `ForcedTargetMask` (the reveal
+view's `process.proposal`) conditions on a uniformly selected valid position being
+masked; all other valid positions follow Bernoulli(1 - keep). The objective averages
+over all masked positions and corrects that proposal with `N / (K * density)`; it
+reports each row's estimate for the importance sampler's variance surrogate. Loss and corruption masks must coincide and be binary;
 non-target positions are clean context. Empty examples are allowed but a whole
 batch without targets is rejected. This is a likelihood-bound estimator, not
 plain hybrid cross-entropy. See `core/tests/test_replaid_hybrid.py` for an

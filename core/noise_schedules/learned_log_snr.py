@@ -1,4 +1,11 @@
-"""Monotone VP negative-log-SNR schedule and variance-gradient adaptation."""
+"""Monotone VP negative-log-SNR schedules with learned endpoints.
+
+Optional variance adaptation (``adaptation_term``): in training, the schedule's
+interior shape receives the per-example multiplier ``2 * L_b`` on its gradient,
+where ``L_b`` is the masked mean of the named objective term (VDM's variance
+gradient). Reconstruction rows of an allocated time draw and denoiser-only
+self-conditioned rows get zero. Endpoints keep their ordinary gradients.
+"""
 
 from dataclasses import dataclass
 import math
@@ -26,11 +33,39 @@ class ScheduleGradient:
         self.weight[selected] = 0
 
 
-class LearnedLogSNRSchedule(nn.Module):
+class _VarianceAdaptation:
+    """Training-time shape-gradient hook driven by an objective term."""
+
+    def training_coefficients(self, time):
+        """Coefficients for a training step; registers the adaptation hook."""
+        if self.adaptation_term is None:
+            return self(time)
+        gamma, derivative, self._adaptation = self.gamma(time, 0)
+        return self.coefficients(gamma, derivative)
+
+    def observe_terms(self, terms, *, draw=None, loss_mask=None, detached_rows=None):
+        adaptation = getattr(self, "_adaptation", None)
+        if self.adaptation_term is None or adaptation is None:
+            return
+        if self.adaptation_term not in terms:
+            raise ValueError(
+                f"schedule adaptation needs objective term {self.adaptation_term!r}"
+            )
+        signal = terms[self.adaptation_term]
+        if detached_rows is None:
+            detached_rows = torch.zeros(len(signal), dtype=torch.bool, device=signal.device)
+        adaptation.observe(
+            signal, getattr(draw, "reconstruction_count", 0), detached_rows, loss_mask
+        )
+        self._adaptation = None
+
+
+class LearnedLogSNRSchedule(_VarianceAdaptation, nn.Module):
     representation_requirements = RepresentationRequirements(unit_normalized=True)
 
-    def __init__(self, gamma_min=-13.3, gamma_max=5.0, hidden_dim=16):
+    def __init__(self, gamma_min=-13.3, gamma_max=5.0, hidden_dim=16, adaptation_term=None):
         super().__init__()
+        self.adaptation_term = adaptation_term
         if not math.isfinite(gamma_min + gamma_max) or gamma_max <= gamma_min:
             raise ValueError("gamma endpoints must be finite and increasing")
         if hidden_dim < 1:
@@ -93,8 +128,9 @@ class LearnedLogSNRSchedule(nn.Module):
 class PlaidGammaSchedule(LearnedLogSNRSchedule):
     """Normalized positive-weight tanh MLP used by Plaid."""
 
-    def __init__(self, gamma_min, gamma_max, hidden_dim=1024):
+    def __init__(self, gamma_min, gamma_max, hidden_dim=1024, adaptation_term=None):
         nn.Module.__init__(self)
+        self.adaptation_term = adaptation_term
         if gamma_max <= gamma_min or hidden_dim < 1:
             raise ValueError("require ordered gamma endpoints and positive width")
         self.gamma_min = torch.nn.Parameter(torch.tensor(float(gamma_min)))
@@ -120,3 +156,25 @@ class PlaidGammaSchedule(LearnedLogSNRSchedule):
 
     def bounds(self):
         return self.gamma_min, self.gamma_max
+
+
+class LinearLogSNRSchedule(LearnedLogSNRSchedule):
+    """gamma(t) = gamma_min + (gamma_max - gamma_min) * t with learned endpoints.
+
+    The endpoint parameterization (and parameter names) match
+    LearnedLogSNRSchedule; there is no interior shape to adapt.
+    """
+
+    def __init__(self, gamma_min=-13.3, gamma_max=5.0):
+        nn.Module.__init__(self)
+        if not math.isfinite(gamma_min + gamma_max) or gamma_max <= gamma_min:
+            raise ValueError("gamma endpoints must be finite and increasing")
+        self.adaptation_term = None
+        self.gamma_min = nn.Parameter(torch.tensor(float(gamma_min), dtype=torch.float64))
+        self.gamma_delta_raw = nn.Parameter(
+            torch.tensor(math.log(math.expm1(gamma_max - gamma_min)), dtype=torch.float64)
+        )
+
+    def shape_and_derivative(self, time):
+        time = time.double()
+        return time, torch.ones_like(time)

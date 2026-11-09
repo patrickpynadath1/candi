@@ -88,7 +88,7 @@ Training masking intentionally corrects a historical bug: selected positions alw
 
 Every branch must consume a clean-token posterior. Uniform branches therefore use `PosteriorUniformProcess`, not the plug-in uniform transition. The framework rejects plug-in branches; see [discrete diffusion](discrete-diffusion.md) for why the mathematics differs.
 
-The current objective is token CE. RePlaid hybrid likelihood objectives are not implemented. A new process implements `corrupt_state(clean, coefficients, corruption_mask)` and `prior_state(clean, coefficients)`; its representation implements `encode`, `clean_state`, `to_model_embedding`, and `clean_embedding`. Its update is a callable in the sampler layer. This allows composition without editing the modifier's training/model code.
+The default objective is token CE; the [REPLAiD hybrid](replaid-hybrid.md) recipe selects the `hybrid_elbo` likelihood objective. A new process implements `corrupt_state(clean, coefficients, corruption_mask)` and `prior_state(clean, coefficients)`; its representation implements `encode`, `clean_state`, `to_model_embedding`, and `clean_embedding`. Its update is a callable in the sampler layer. This allows composition without editing the modifier's training/model code.
 
 Processes can expose `observed_tokens(state)` for exact clean observations, as absorbing corruption does. The modifier applies that constraint regardless of view order. Uniform observations are not treated as clean commitments. Gaussian schedule/representation compatibility is checked at construction.
 

@@ -15,6 +15,7 @@ generation grid or introduce an importance correction.
 | `discrete` | Wraps a base sampler and rounds onto positive D3PM steps |
 | `loss_derivative` | Fitted inverse-CDF training-time sampler, used by simplex and compatible view/insertion assemblies |
 | `adaptive_allocation` | RePlaid reconstruction/diffusion allocation plus stratified times |
+| `piecewise_importance` | Learned piecewise-constant importance density for adaptive-time views (REPLAiD hybrid) |
 
 [UniformTimeSampler](../../core/time_sampling/uniform.py) draws in
 `[epsilon,1)`, with `epsilon=1e-3` by default. Antithetic mode spreads draws across
@@ -47,9 +48,26 @@ See [SimplexInferenceGrid](../../core/time_sampling/simplex_grid.py).
 [AdaptiveTimeAllocation](../../core/time_sampling/adaptive_allocation.py) returns
 `TimeAllocation(time, reconstruction_count)`. It estimates reconstruction and
 diffusion standard deviations and allocates a leading reconstruction subset at
-time zero. Remaining examples receive stratified diffusion times. RePlaid's
-objective accounts for subset sizes; this object is not a drop-in replacement for
-a sampler returning only a tensor. Its EMA statistics are checkpointed buffers.
+time zero. Remaining examples receive stratified diffusion times. The shared loss
+accepts such draw objects (anything with `.time`) and passes them to the objective as
+`ObjectiveContext.time_draw`; `GaussianELBO` accounts for subset sizes. The sampler
+declares `min_batch = 2` (singleton batches are replicated) and observes the
+objective's `reconstruction` and `diffusion` terms through `observe_terms`. Its EMA
+statistics are checkpointed buffers.
+
+### Learned importance density
+
+[PiecewiseImportanceTimeSampler](../../core/time_sampling/importance.py)
+(`piecewise_importance`) learns a piecewise-constant density over a local time,
+mixed with a 1% uniform floor. Used with `algorithm.adaptive_time_views`, training
+draws stratified float64 uniform times (`uniform`), the detached inverse CDF (the
+sampler's call) gives the views' local time, and generation maps its uniform grid
+the same way. `proposal_density(u)` reaches the objective as
+`ObjectiveContext.time_density`; in training, `adaptation_loss` adds the zero-valued
+score-function surrogate on the objective's per-row `estimate`, so the bin logits
+learn to reduce the estimator's second moment and receive no loss-value gradient.
+Validation adds nothing. The logits are ordinary parameters (optimizer groups, EMA,
+DDP).
 
 ## Insertion-loss feedback
 

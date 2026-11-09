@@ -58,10 +58,11 @@ conversion itself need not silently change the input dtype.
 
 [GaussianPriorPosterior](../../core/parameterizations/gaussian_prior.py) adds
 `alpha / sigma**2 * (state @ E.T)` to network logits before posterior
-normalization. The algorithm supplies state, path coefficients, and the embedding
-table explicitly. The predictor does not reach into the representation. This
-unit-embedding correction is used by the RePlaid recipe, not automatically by
-ordinary Gaussian one-hot diffusion.
+normalization. `HybridDiffusion.prediction_transform` supplies the state, path
+coefficients and codebook of the parameterization's `prior_view` (default 0) for
+training, sampling and bootstrap predictions; the predictor does not reach into the
+representation. This unit-embedding correction is used by the RePlaid recipes, not
+automatically by ordinary Gaussian one-hot diffusion.
 
 ## Extending safely
 

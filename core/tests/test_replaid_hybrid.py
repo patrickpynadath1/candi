@@ -1,11 +1,17 @@
-"""Independent estimator, gradient, clock and sampler checks for the hybrid port."""
+"""Independent estimator, gradient, clock and sampler checks for the hybrid port.
+
+The REPLAiD hybrid is the replaid_hybrid preset over HybridDiffusion: the shared
+clock is the algorithm's importance time sampler, read by both views."""
 import itertools
 import torch
 import pytest
 from hydra.utils import instantiate
 from core.sweeps.configuration import compose
-from core.noise_schedules.shared_clock import PiecewiseInverseCDFClock
+from core.noise_schedules.gaussian_path import path_from_gamma
 from core.objectives.hybrid_elbo import HybridELBO
+from core.objectives.weighting import ObjectiveContext
+from core.processes.absorbing import AbsorbingProcess
+from core.time_sampling.importance import PiecewiseImportanceTimeSampler as PiecewiseInverseCDFClock
 from core.training.module import TrainingModule
 
 
@@ -55,9 +61,33 @@ def test_forced_target_estimator_matches_enumerated_original_mask_law():
     lower, upper = torch.tensor(-1.), torch.tensor(1.)
     ce = -log_probs.gather(-1,tokens[...,None]).squeeze(-1).double()
     mse = (predicted-clean).double().square().sum(-1)
+
+    class OneHotCodebook:
+        def encode(self, tokens):
+            return torch.nn.functional.one_hot(tokens, 2).float()
+
+        def posterior_mean(self, probabilities):
+            return probabilities.float()
+
+    # Gaussian log-SNR gamma(u) = lower + (upper - lower) u at u (gamma = 0),
+    # absorbing keep rate 1 - u; the terminal prior reads gamma(1) = upper.
+    def objective_at(mask):
+        state = torch.where(mask, 2, tokens)
+        context = ObjectiveContext(
+            time=torch.tensor([u]),
+            processes=(None, AbsorbingProcess(2)),
+            coefficients=(path_from_gamma(gamma, (upper-lower).double()[None]),
+                          (torch.tensor([1-u], dtype=torch.float64), -torch.ones(1, dtype=torch.float64))),
+            states=(None, state),
+            representations=(OneHotCodebook(), None),
+            schedules=(lambda t: path_from_gamma(upper.double().expand(len(t)), torch.ones_like(t)), None),
+            loss_mask=torch.ones_like(mask), corruption_mask=torch.ones_like(mask),
+            time_density=torch.ones(1, dtype=torch.float64),
+        )
+        return objective(log_probs, tokens, context=context).total
+
     # Prior is independent of the mask; obtain it with the no-mask case.
-    prior,_ = objective(log_probs,tokens,clean,predicted,gamma,torch.tensor([u]),
-                        torch.ones(1),lower,upper,torch.zeros_like(tokens).bool(),torch.ones_like(tokens).bool())
+    prior = objective_at(torch.zeros_like(tokens).bool())
     original = 0.
     forced = 0.
     for bits in itertools.product([False,True], repeat=2):
@@ -67,8 +97,7 @@ def test_forced_target_estimator_matches_enumerated_original_mask_law():
         original += probability*((ce/u + mse)*mask).mean()
         if k:
             proposal_probability = probability*k/(2*u)
-            loss,_ = objective(log_probs,tokens,clean,predicted,gamma,torch.tensor([u]),
-                               torch.ones(1),lower,upper,mask,torch.ones_like(mask))
+            loss = objective_at(mask)
             forced += proposal_probability*(loss-prior).mean()
     torch.testing.assert_close(forced,original,rtol=1e-6,atol=1e-7)
 
@@ -83,7 +112,7 @@ def test_train_checkpoint_generate_and_nfe(tmp_path):
     loss.backward()
     for name,p in algo.named_parameters():
         assert p.grad is not None and torch.isfinite(p.grad).all(), name
-    assert algo.clock.clock_logits.grad.abs().sum() > 0
+    assert algo.time_sampler.clock_logits.grad.abs().sum() > 0
     checkpoint = tmp_path/'state.pt'
     torch.save(algo.state_dict(),checkpoint)
     clone = TrainingModule(cfg).algorithm
@@ -98,18 +127,25 @@ def test_train_checkpoint_generate_and_nfe(tmp_path):
     assert sampler.steps_for_nfe(3)==3
     assert torch.equal(generated[~valid],x[~valid])
     assert generated.min() >= 0 and generated.max() < 5
-    # Both views must reference the same learned clock, including after reload.
-    assert clone.views[0].schedule.clock is clone.views[1].schedule.clock
+    # Both views must read the same learned clock, including after reload.
+    assert clone.adaptive_time_views == (0, 1)
+    assert torch.equal(clone.time_sampler.clock_logits, algo.time_sampler.clock_logits)
+    t = torch.linspace(0, 1, 7, dtype=torch.float64)
+    gaussian, reveal = clone.points(t)
+    assert torch.equal(gaussian.time, reveal.time)
+    assert torch.equal(gaussian.time, clone.time_sampler(t))
 
 
 def test_validation_does_not_train_clock_logits():
     a=instantiate(config().algorithm)
-    x=torch.randint(5,(2,4));a.loss(x,torch.ones_like(x).bool(),training=False)['loss'].backward()
-    assert a.clock.clock_logits.grad is None
+    x=torch.randint(5,(2,4))
+    a.loss(x,torch.ones_like(x).bool(),training=False)['loss'].backward()
+    assert a.time_sampler.clock_logits.grad is None
 
 
 def test_mask_contract():
-    a=instantiate(config().algorithm);x=torch.ones(2,4,dtype=torch.long)
+    a=instantiate(config().algorithm)
+    x=torch.ones(2,4,dtype=torch.long)
     with pytest.raises(ValueError,match='binary'):
         a.loss(x,torch.full((2,4),.5))
     with pytest.raises(ValueError,match='corruption_mask'):
@@ -132,8 +168,9 @@ def test_lightning_two_updates_then_generate(tmp_path):
                       enable_model_summary=False,num_sanity_val_steps=0)
     trainer.fit(module,loader)
     assert trainer.global_step==2
-    assert torch.isfinite(module.algorithm.clock.clock_logits).all()
-    x=torch.tensor([[1,2,3,4]]);fixed=torch.tensor([[True,False,False,False]])
+    assert torch.isfinite(module.algorithm.time_sampler.clock_logits).all()
+    x=torch.tensor([[1,2,3,4]])
+    fixed=torch.tensor([[True,False,False,False]])
     generated,_=module.algorithm.generate(instantiate(cfg.sampler,steps=1),x,fixed)
     assert generated[0,0]==1
 

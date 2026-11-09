@@ -57,6 +57,6 @@ class SphericalFlowMatching(OneViewAlgorithm, HybridDiffusion):
         # Expected embedding in state space, deliberately not sphere-normalized.
         return self.representation.posterior_mean(probabilities)
 
-    def _objective(self, objective, prediction, tokens, time, points, states):
+    def _objective(self, objective, prediction, tokens, time, points, states, **entries):
         # Plain per-token CE: the spherical path has no Gaussian alpha/sigma.
         return objective(prediction, tokens)

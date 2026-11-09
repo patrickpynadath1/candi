@@ -26,10 +26,12 @@ class BlockDiffusion(nn.Module):
             raise ValueError("clean_loss must be none or autoregressive")
         if clean_loss_weight < 0:
             raise ValueError("clean_loss_weight must be nonnegative")
-        if type(algorithm).__name__ == "RePlaid":
+        prediction = getattr(algorithm, "prediction", None)
+        if getattr(prediction, "selected_gradients", "all") != "all":
             raise TypeError(
-                "block diffusion does not support RePlaid's specialized gradient "
-                "routing and optimizer parameter groups; use MDLM or GaussianDiffusion"
+                "block diffusion does not support denoiser-only self-conditioned rows "
+                "(prediction.selected_gradients) or the recipe's optimizer parameter "
+                "groups; use MDLM or GaussianDiffusion"
             )
         variable_length = getattr(algorithm, "supports_variable_length", False)
         if not x0_causal and (variable_length or clean_loss != "none"):

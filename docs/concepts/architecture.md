@@ -112,7 +112,11 @@ Every diffusion family trains and predicts through
 ...) are recipes on that path: they hold
 their view(s) (`OneViewAlgorithm`) and override only what genuinely differs, through
 three hooks (`_corrupt`, `_objective`, `_observe`) and their `prediction_kind` /
-`prediction_pathway`. Autoregressive models stay separate (causal KV-cache path).
+`prediction_pathway`. Some recipes need no class at all: RePlaid and the REPLAiD
+hybrid are presets over `GaussianDiffusion` and `HybridDiffusion` whose components
+declare optional capabilities (time draws and proposal densities, `ObjectiveResult`
+terms, logit corrections, routed self-conditioned rows) that the shared loss uses.
+Autoregressive models stay separate (causal KV-cache path).
 
 ## Contracts
 

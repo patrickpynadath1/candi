@@ -120,3 +120,11 @@ Conditional REPLAiD hybrid: `test_replaid_hybrid.py` checks the inverse-CDF
 proposal distribution and endpoints, second-moment gradient, exact enumeration
 of the forced-mask estimator, all-parameter finite gradients, validation gradient
 ownership, checkpoint round trip, two Lightning updates, prompts and NFE.
+`test_replaid_components.py` checks the components both REPLAiD presets compose:
+the importance density's normalization and detached quantile map, stratified
+draws, `LinearLogSNRSchedule` endpoints/derivatives, the diffusion weight against
+autograd of the SNR, the prior KL against `torch.distributions`, forced-target mask
+marginals, the variance-adaptation multipliers, the revealed-context slot,
+denoiser-only gradient routing, clean training feedback and legacy key names.
+Both presets replaced dedicated algorithm classes; the move was checked by fixing
+every random variate and comparing losses, all gradients, buffers and generation.

@@ -33,7 +33,15 @@ class PredictionCoordinator:
         evaluation_probability=1.0,
         selection="bernoulli",
         gradient_mode="detached",
+        selected_gradients="all",
+        fixed_feedback="prediction",
     ):
+        """``selected_gradients="denoiser_only"``: in training, the rows selected
+        for self-conditioning train only the network; the algorithm detaches
+        their schedule coefficients, clean encodings and representation-table
+        reads. ``fixed_feedback="clean"``: bootstrap mean feedback at positions
+        that were not corrupted is the clean token's mean, as a clean-prompt
+        sampler feeds back (posterior_mean source only)."""
         if source not in SOURCES:
             raise ValueError(
                 "self-conditioning source must be posterior_mean or hidden"
@@ -48,6 +56,11 @@ class PredictionCoordinator:
         if gradient_mode not in {"detached", "both", "producer", "mixed"}:
             raise ValueError("unknown self-conditioning gradient mode")
         self.gradient_mode = gradient_mode
+        if selected_gradients not in {"all", "denoiser_only"}:
+            raise ValueError("selected_gradients must be all or denoiser_only")
+        if fixed_feedback not in {"prediction", "clean"}:
+            raise ValueError("fixed_feedback must be prediction or clean")
+        self.selected_gradients, self.fixed_feedback = selected_gradients, fixed_feedback
 
     def select(self, batch, device, training):
         probability = self.probability if training else self.evaluation_probability
@@ -164,7 +177,7 @@ class PredictionCoordinator:
                     )
                     with context:
                         bootstrap = model(
-                            *(_select_batch(value, selected) for value in inputs),
+                            *(select_batch(value, selected) for value in inputs),
                             return_features=True,
                             **({"hidden_only": True} if self.source == "hidden"
                                and getattr(model, "hidden_only_bootstrap", False) else {}),
@@ -226,25 +239,28 @@ class PredictionCoordinator:
         return parameterize(logits_transform(output.logits), observed)
 
 
-def _select_batch(value, selected):
+def select_batch(value, selected):
     """Select a batch through nested immutable model-input structures."""
     if callable(getattr(value, "select_batch", None)):
         return value.select_batch(selected)
     if torch.is_tensor(value):
         return value[selected]
     if isinstance(value, tuple):
-        return type(value)(_select_batch(item, selected) for item in value)
+        return type(value)(select_batch(item, selected) for item in value)
     if isinstance(value, list):
-        return [_select_batch(item, selected) for item in value]
+        return [select_batch(item, selected) for item in value]
     if is_dataclass(value):
         return replace(
             value,
             **{
-                field.name: _select_batch(getattr(value, field.name), selected)
+                field.name: select_batch(getattr(value, field.name), selected)
                 for field in fields(value)
             },
         )
     return value
+
+
+_select_batch = select_batch
 
 
 def _detached_parameters(model):

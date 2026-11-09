@@ -7,6 +7,7 @@ CANDI checkpoint). Imports rename keys explicitly (core/training/checkpoint_impo
 
 import torch
 from . import legacy_pickle
+from .legacy_checkpoints import migrate_legacy_checkpoint
 
 
 LEGACY_FORMATS = (False, True, "candi")
@@ -26,6 +27,7 @@ def initialize_weights(module, path):
     checkpoint = torch.load(path, map_location="cpu", weights_only=False, mmap=True)
     if checkpoint.get("core_format_version") != 1:
         raise ValueError("weight initialization requires a core checkpoint")
+    checkpoint = migrate_legacy_checkpoint(checkpoint, module)
     module.algorithm.load_state_dict(algorithm_state(checkpoint), strict=True)
     if module.ema:
         if "ema" not in checkpoint:
@@ -120,6 +122,7 @@ def load_weights(module, path, *, legacy=False, allow_config_mismatch=False):
             raise ValueError(
                 "not a core checkpoint; use evaluation.legacy=true for an MDLM import"
             )
+        checkpoint = migrate_legacy_checkpoint(checkpoint, module)
         module.load_state_dict(checkpoint["state_dict"], strict=True)
         check_recipe(module, checkpoint, allow_mismatch=allow_config_mismatch)
     if module.ema:

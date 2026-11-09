@@ -29,7 +29,9 @@ class GaussianDiffusion(OneViewAlgorithm, HybridDiffusion):
         length=180,
         representation=None,
         prediction=None,
+        **options,
     ):
+        """``options`` go to HybridDiffusion (e.g. ``corrupt_all``)."""
         # The default also reconstructs saved pre-representation one-hot configs.
         if representation is None:
             representation = OneHotRepresentation(model.vocab_size)
@@ -52,6 +54,7 @@ class GaussianDiffusion(OneViewAlgorithm, HybridDiffusion):
             length=length,
             prediction=prediction,
             views=[view],
+            **options,
         )
 
     def prediction_mean(self, probabilities):
@@ -65,11 +68,13 @@ class GaussianDiffusion(OneViewAlgorithm, HybridDiffusion):
         )
         return self.representation.posterior_mean(probabilities)
 
-    def _objective_context(self, time, points, states):
+    def _objective_context(self, time, points, states, **entries):
         # Objectives see the training-time coordinate the network saw.
-        return replace(super()._objective_context(time, points, states), time=points[0].time)
+        return replace(
+            super()._objective_context(time, points, states, **entries), time=points[0].time
+        )
 
-    def _observe(self, sampler, feedback_time, time, points, *rest):
+    def _observe(self, sampler, feedback_time, time, points, *rest, **observation):
         # The time sampler observes the schedule's training-time coordinate,
         # as in existing adaptive Gaussian runs (a <=training_epsilon rescaling).
-        super()._observe(sampler, points[0].time, time, points, *rest)
+        super()._observe(sampler, points[0].time, time, points, *rest, **observation)

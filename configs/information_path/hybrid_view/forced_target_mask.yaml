@@ -1,0 +1,19 @@
+# @package hybrid_view
+# Absorbing reveal view with keep rate 1 - t over raw token ids (no learned input
+# table) and the forced-target training proposal: every row masks at least one
+# eligible token. The proposal's importance ratio belongs to the objective
+# (objective=hybrid_elbo).
+_target_: core.modifiers.hybrid.views.DiffusionView
+process:
+  _target_: core.processes.absorbing.AbsorbingProcess
+  mask_index: ${task.vocab_size}
+  proposal:
+    _target_: core.processes.forced_mask.ForcedTargetMask
+schedule:
+  _target_: core.noise_schedules.log_linear.LogLinear
+  epsilon: 0.0
+representation:
+  _target_: core.representations.tokens.TokenRepresentation
+  vocab_size: ${task.vocab_size}
+update:
+  _target_: core.samplers.hybrid_updates.DiscretePosteriorUpdate

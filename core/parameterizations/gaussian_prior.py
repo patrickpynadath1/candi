@@ -5,9 +5,17 @@ from .posterior import PosteriorParameterization
 
 
 class GaussianPriorPosterior(PosteriorParameterization):
-    def __init__(self, output_prior=True, **kwargs):
+    """Adds ``alpha / sigma^2 * z^T e_v`` to the logits of every prediction.
+
+    ``prior_view`` names the Gaussian view whose state, coefficients and codebook
+    the algorithm supplies (HybridDiffusion.prediction_transform); the predictor
+    never reaches into the representation itself.
+    """
+
+    def __init__(self, output_prior=True, prior_view=0, **kwargs):
         super().__init__(**kwargs)
         self.output_prior = output_prior
+        self.prior_view = prior_view
 
     def _constrain(self, values, observed):
         # The Gaussian prior can yield large logits near the clean endpoint.

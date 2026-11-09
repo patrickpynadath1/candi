@@ -55,7 +55,8 @@ def test_native_sampler_prompt_nfe_and_update(recipe, key):
     calls=[]
     hook=a.model.register_forward_hook(lambda *args: calls.append(1))
     sampler=instantiate(cfg.sampler)
-    x=torch.tensor([[1,2,3,4]]);fixed=torch.tensor([[True,False,False,False]])
+    x=torch.tensor([[1,2,3,4]])
+    fixed=torch.tensor([[True,False,False,False]])
     torch.manual_seed(123)
     result,info=a.generate(sampler,x,fixed)
     hook.remove()
@@ -85,7 +86,8 @@ def test_tuning_policy_and_effect_on_first_transition(recipe, policy, key):
         captured.append((state.clone(), clean.clone(), source, noise.clone()))
         return original(state, clean, source, destination, noise)
     process.reverse_posterior = reverse
-    x = torch.tensor([[1,2,3,4]]);fixed = torch.tensor([[True,False,False,False]])
+    x = torch.tensor([[1,2,3,4]])
+    fixed = torch.tensor([[True,False,False,False]])
     outputs = []
     for tau in [1., .9]:
         OmegaConf.update(cfg, key, tau)

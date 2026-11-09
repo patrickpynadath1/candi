@@ -80,6 +80,6 @@ class SeddAbsorb(OneViewAlgorithm, HybridDiffusion):
             training_pathway=self._pathway("training"),
         )
 
-    def _objective(self, objective, prediction, tokens, time, points, states):
+    def _objective(self, objective, prediction, tokens, time, points, states, **entries):
         keep, derivative = points[0].coefficients  # CE may come as a per-call override
         return keep_rate_objective(objective, prediction, states[0], tokens, time, keep, derivative)

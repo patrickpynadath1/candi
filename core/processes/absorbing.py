@@ -14,8 +14,11 @@ class AbsorbingProcess:
     def observed_tokens(self, state):
         return state, state.ne(self.mask_index)
 
-    def __init__(self, mask_index):
+    def __init__(self, mask_index, proposal=None):
+        """``proposal(valid, probability)`` replaces the independent Bernoulli
+        mask draw in training corruption (e.g. ForcedTargetMask)."""
         self.mask_index = mask_index
+        self.proposal = proposal
 
     def prior(self, shape, device, prompt_tokens=None, prompt_mask=None):
         state = torch.full(shape, self.mask_index, dtype=torch.long, device=device)
@@ -24,6 +27,9 @@ class AbsorbingProcess:
         return state
 
     def corrupt(self, clean, keep_rate, corruption_mask):
+        if self.proposal is not None:
+            moves = self.proposal(corruption_mask.bool(), 1 - keep_rate)
+            return torch.where(moves, self.mask_index, clean)
         moves = torch.rand(clean.shape, device=clean.device) < 1 - keep_rate[:, None]
         return torch.where(moves & corruption_mask.bool(), self.mask_index, clean)
 

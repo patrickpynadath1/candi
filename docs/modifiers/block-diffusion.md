@@ -116,7 +116,7 @@ networks (single-state or view-based) with the required fused-stream interfaces.
 construction. This check is an integration boundary, not proof that every
 algorithm/model combination has been numerically validated.
 
-RePlaid is explicitly rejected: its specialized embedding-gradient routes and
+RePlaid is explicitly rejected (recipes with `prediction.selected_gradients=denoiser_only`): its embedding-gradient routes and
 optimizer parameter groups require a dedicated integration. Do not bypass the
 check by wrapping only its attention layer.
 

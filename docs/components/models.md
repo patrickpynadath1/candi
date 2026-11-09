@@ -27,7 +27,7 @@ layers in [`layers.py`](../../core/models/layers.py).
 | `causal_dit` | token ids, causal | AdaLN head | autoregressive, permuted AR |
 
 The presets are in [`configs/denoising_task/model/`](../../configs/denoising_task/model/). The slot groups are
-`configs/denoising_task/model/input/` (`token`, `simplex`, `linear`, `embedded_projection`) and
+`configs/denoising_task/model/input/` (`token`, `simplex`, `linear`, `embedded_projection`, `revealed_context`) and
 `configs/denoising_task/model/output/` (`adaln`, `embedding`); a recipe swaps one with
 `override /denoising_task/model/input@model.input: linear`, for example.
 
@@ -69,7 +69,7 @@ Slots are Hydra partials. The network fills in the dimensions each slot accepts
 
 | Slot | Classes | Options |
 | --- | --- | --- |
-| `input` | `TokenInput`, `SimplexInput`, `LinearInput`, `EmbeddedProjectionInput`, or `views` (see below) | `SimplexInput.mode`: `expectation`, `argmax`; `preconditioning` on the continuous inputs |
+| `input` | `TokenInput`, `SimplexInput`, `LinearInput`, `EmbeddedProjectionInput`, `RevealedContextInput`, or `views` (see below) | `SimplexInput.mode`: `expectation`, `argmax`; `preconditioning` on the continuous inputs |
 | `time` | `TimeConditioning` | `coordinate`, `adaLN`, `epsilon`, `input_projection`, `time_source` (`global` or the first view's `point` time) |
 | `self_conditioning` | `SelfConditioning` | `source` (`posterior_mean`, `hidden`), `space` (`hidden` or `state`), `initialization`, `scale` (a number or `unit_embedding`) |
 | `output` | `AdaLNHead`, `EmbeddingHead` | `adaLN`, `temperature` (AdaLN head); `output_dim` (embedding head) |
@@ -174,4 +174,6 @@ view. Unknown positions contribute zero context. Both use the continuous view's
 codebook, so there is no second learned token table. The extra parameter cost is
 `state_dim * hidden_size`; `context_scale=unit_embedding` multiplies context by
 `sqrt(state_dim)`. This is independent of posterior self-conditioning.
-The `replaid_hybrid` recipe binds this input through `algorithm.context_input`.
+Select it with `denoising_task/model/input@model.input: revealed_context` and put the
+two views under `model.input.views` (as `replaid_hybrid` does); the continuous part is
+the nested `continuous` slot (a linear input by default).

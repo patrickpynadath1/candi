@@ -34,7 +34,6 @@ process, predictor, model, or objective.
 | `spherical_flow_matching` | Unit embeddings and spherical corruption |
 | `simplex_diffusion` | Dirichlet corruption and clean-token CE |
 | `blurring_diffusion` | Sequence-aware spectral corruption over learned embeddings |
-| `replaid` | Learned embedding likelihood bound and specialized gradient routes |
 | `hybrid_diffusion` | Multiple noisy views fused before one backbone evaluation |
 | `autoregressive`, `permuted_autoregressive` | Causal token prediction in fixed or sampled order |
 
@@ -52,8 +51,12 @@ Adaptive schedule observations are routed through
 [adaptive.py](../../core/algorithms/adaptive.py); validation must not update them.
 The algorithm chooses whether feedback is raw CE or the objective and supplies
 masked, detached per-example observations. RePlaid's differentiable learned
-schedule has additional gradient semantics; it is not interchangeable with a
-buffer-fitted adaptive clock.
+schedule has additional gradient semantics (`training_coefficients`,
+`observe_terms`); it is not interchangeable with a buffer-fitted adaptive clock.
+RePlaid and the REPLAiD hybrid have no algorithm class: they are presets over
+`gaussian_diffusion` and `hybrid_diffusion` whose components use the optional
+capabilities listed in the `HybridDiffusion` docstring (time draws, proposal
+densities, `ObjectiveResult`, logit corrections, row routing, `corrupt_all`).
 
 ## Extending
 

@@ -1,2 +1,6 @@
 # @package objective
+# Conditional reveal/Gaussian ELBO for a Gaussian view and a forced-target
+# absorbing view sharing one local time (core/objectives/hybrid_elbo.py).
 _target_: core.objectives.hybrid_elbo.HybridELBO
+gaussian_view: 0
+reveal_view: 1

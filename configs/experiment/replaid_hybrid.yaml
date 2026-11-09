@@ -1,17 +1,27 @@
 # @package _global_
+# Conditional REPLAiD hybrid as a recipe over HybridDiffusion (no family class):
+# a Gaussian view on learned unit embeddings and a forced-target absorbing view
+# share one local time drawn from a learned importance density; revealed tokens
+# feed a clean-context input slot. See docs/methods/replaid-hybrid.md.
 defaults:
+- /information_path/hybrid_view@model.input.views.content: learned_log_snr_gaussian
+- /information_path/hybrid_view@model.input.views.revealed: forced_target_mask
 - override /denoising_task/model: continuous_dit
-- override /denoising_task/model/input@model.input: linear
+- override /denoising_task/model/input@model.input: revealed_context
 - override /denoising_task/model/output@model.output: adaln
 - override /information_path/representation: embedding
-- override /information_path/process: gaussian
 - override /denoising_task/parameterization: gaussian_prior
 - override /information_path/token_space@token_space: data_only
-- override /denoising_task/algorithm: replaid_hybrid
+- override /denoising_task/algorithm: hybrid_diffusion
 - override /denoising_task/objective: hybrid_elbo
-- override /information_path/noise_schedule: shared_importance_clock
+- override /denoising_task/time_sampler: piecewise_importance
 - override /inference/sampler: revealed_hybrid
 - _self_
+algorithm:
+  synchronize_committed: true
+  # Both views read the importance sampler's quantile map, in training and
+  # generation (one shared local time).
+  adaptive_time_views: [0, 1]
 representation:
   dimension: 16
   trainable: true
@@ -19,9 +29,6 @@ representation:
 self_conditioning:
   enabled: false
 model:
-  input:
-    preconditioning: unit_embedding
-    bias: false
   time:
     coordinate: negative_log_snr
     epsilon: 1.0e-30
@@ -32,11 +39,11 @@ optimizer:
   groups:
   - patterns:
     - model.input.views.0.representation.table
-    - model.input.views.0.schedule.clock.clock_logits
+    - time_sampler.clock_logits
     lr: 0.01
     weight_decay: 0.0
   - patterns:
-    - model.input.views.0.schedule.clock.gamma_min
-    - model.input.views.0.schedule.clock.width_raw
+    - model.input.views.0.schedule.gamma_min
+    - model.input.views.0.schedule.gamma_delta_raw
     lr: 0.01
     weight_decay: 0.0

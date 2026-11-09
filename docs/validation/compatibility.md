@@ -109,9 +109,9 @@ training step and samples three steps on CPU from a one-token prompt.
 55. self-conditioning prediction is not yet integrated for this algorithm
 56. token feedback needs one network pass per training loss; D3PMAbsorb makes 2
 57. token feedback requires a transformer with a compatible token embedding table
-58. block diffusion does not support RePlaid's specialized gradient routing and optimizer parameter groups; use MDLM or GaussianDiffusion
+58. block diffusion does not support denoiser-only self-conditioned rows (prediction.selected_gradients) or the recipe's optimizer parameter groups; use MDLM or Gau
 59. prediction policy and model must enable self-conditioning together
-60. conditional hybrid ELBO does not support block sequence layouts
+60. HybridELBO does not support block sequence layouts
 61. block diffusion needs a network whose clean prefix has a time coordinate; negative_log_keep_floor reads a keep rate
 62. token feedback output vocabulary must match the token embedding table; score/velocity outputs need an explicit token readout
 63. self-conditioning requires an enabled prediction coordinator on this algorithm

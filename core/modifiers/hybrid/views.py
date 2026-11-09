@@ -44,6 +44,9 @@ def point(view, time, *, training=False, corruption_mask=None, sequence_layout=N
         coefficients = view.schedule.for_layout(
             local, corruption_mask, view.representation.spec.dimension, layout
         )
+    elif training and hasattr(view.schedule, "training_coefficients"):
+        # e.g. a learned schedule registering its variance-adaptation hook.
+        coefficients = view.schedule.training_coefficients(local)
     else:
         coefficients = view.schedule(local)
     return ViewPoint(local, coefficients)

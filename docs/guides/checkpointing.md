@@ -57,6 +57,12 @@ raises on any difference. Sampling knobs (`predictor.temperature`, `top_k`,
 Set `evaluation.allow_config_mismatch=true` only for a deliberate cross-recipe
 evaluation. Legacy imports are not checked.
 
+Run configs and checkpoints saved by a family class that has since become a preset
+(the REPLAiD classes) are migrated automatically: the runner rebuilds the config
+from the preset, keeping the saved task, data, trainer, evaluation and sampler
+settings, and the loader renames moved state keys and migrates the checkpoint's
+saved config before the recipe check ([legacy checkpoints](../../core/training/legacy_checkpoints.py)).
+
 ## Import supported legacy weights
 
 | Setting | Supported import |

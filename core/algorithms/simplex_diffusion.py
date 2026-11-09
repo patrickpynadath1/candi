@@ -68,10 +68,10 @@ class SimplexDiffusion(OneViewAlgorithm, HybridDiffusion):
             state = self.process.drop_condition(state, corruption_mask, self.condition_dropout)
         return (state,)
 
-    def _objective(self, objective, prediction, tokens, time, points, states):
+    def _objective(self, objective, prediction, tokens, time, points, states, **entries):
         return objective(prediction, tokens)
 
-    def _observe(self, sampler, feedback_time, time, points, prediction, tokens, per_token, loss_mask, step):
+    def _observe(self, sampler, feedback_time, time, points, prediction, tokens, per_token, loss_mask, step, **observation):
         # Only the time sampler adapts; the simplex schedule takes no feedback.
         observe = getattr(sampler, "observe", None)
         if observe is not None:

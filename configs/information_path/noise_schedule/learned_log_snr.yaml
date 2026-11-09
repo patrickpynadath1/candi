@@ -3,3 +3,5 @@ _target_: core.noise_schedules.learned_log_snr.LearnedLogSNRSchedule
 gamma_min: -13.3
 gamma_max: 5.0
 hidden_dim: 16
+# Variance-adaptation term of the objective (e.g. diffusion), or null.
+adaptation_term: null

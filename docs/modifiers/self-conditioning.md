@@ -41,8 +41,12 @@ update adaptive observations.
 `evaluation_probability=1.0` separately controls validation-loss bootstrapping.
 It does not control trajectory reuse during generation. The coordinator also
 supports `selection=fixed_count`, selecting `ceil(probability*batch_size)` examples,
-for recipes such as RePlaid. Its specialized embedding/schedule gradient routes
-are separate from this general architectural mechanism.
+for recipes such as RePlaid. Two training options serve such recipes:
+`prediction.selected_gradients=denoiser_only` makes the selected rows train only
+the network (the algorithm detaches their schedule coefficients, clean encodings
+and representation-table reads; the rows are drawn before corruption), and
+`prediction.fixed_feedback=clean` feeds back the clean token's mean at positions
+that were not corrupted, as a clean-prompt sampler does (posterior-mean source).
 
 Adapters are built before optimizer and EMA creation and included in checkpoints.
 Disabled models retain the original state-dict keys and initialization behavior.

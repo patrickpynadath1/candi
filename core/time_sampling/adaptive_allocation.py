@@ -1,4 +1,11 @@
-"""Reconstruction/diffusion batch allocation and stratified continuous times."""
+"""Reconstruction/diffusion batch allocation and stratified continuous times.
+
+A draw (``TimeAllocation``) assigns the first ``reconstruction_count`` rows to the
+t = 0 reconstruction estimator and the rest to stratified diffusion times;
+objectives read the rows from ``ObjectiveContext.time_draw`` (GaussianELBO). The
+allocation follows the two estimators' standard deviations, observed from the
+objective's ``reconstruction`` and ``diffusion`` terms (``observe_terms``).
+"""
 
 from dataclasses import dataclass
 import torch
@@ -11,8 +18,17 @@ class TimeAllocation:
     time: torch.Tensor
     reconstruction_count: int
 
+    @property
+    def reconstruction(self):
+        """Rows assigned to the reconstruction estimator."""
+        rows = torch.arange(len(self.time), device=self.time.device)
+        return rows < self.reconstruction_count
+
 
 class AdaptiveTimeAllocation(nn.Module):
+    # Both estimators need a row; the algorithm replicates singleton batches.
+    min_batch = 2
+
     def __init__(self, momentum=0.99):
         super().__init__()
         if not 0 <= momentum < 1:
@@ -57,3 +73,8 @@ class AdaptiveTimeAllocation(nn.Module):
             getattr(self, f"{name}_std_ema").copy_(
                 (second - mean.square()).clamp_min(1e-12).sqrt()
             )
+
+    def observe_terms(self, terms, *, draw, loss_mask=None, **_):
+        self.observe(
+            terms["reconstruction"], terms["diffusion"], draw.reconstruction_count, loss_mask
+        )

@@ -1,4 +1,11 @@
-"""Forced-target absorbing proposal for low-variance conditional estimators."""
+"""Forced-target absorbing proposal for low-variance conditional estimators.
+
+Each row masks every eligible position independently with the masking
+probability, then forces one uniformly chosen eligible target to be masked. The
+proposal is ``q(m) = p(m) * |m| / (n * probability)`` for ``n`` eligible positions;
+HybridELBO carries the matching importance ratio. Select it as
+``process.proposal`` of an AbsorbingProcess view.
+"""
 import torch
 
 
