@@ -1,0 +1,10 @@
+# @package sampler
+# Two forwards per prediction; the wrapped sampler must support trajectory SC.
+_target_: core.samplers.self_conditioning.BootstrapSelfConditioningSampler
+steps: 32
+sampler:
+  _target_: core.samplers.forward_resampling.ForwardResamplingSampler
+  steps: 32
+  epsilon: 1.0e-5
+  greedy_clean_estimate: false
+  final_denoise: greedy

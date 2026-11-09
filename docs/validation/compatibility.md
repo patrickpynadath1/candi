@@ -8,25 +8,25 @@ training step and samples three steps on CPU from a one-token prompt.
 
 ## Samplers
 
-| | `analytic` | `ancestral` | `autoregressive` | `blur_ancestral` | `composed` | `dfm` | `entropy_bounded` | `euler` | `forward_resampling` | `gaussian_ddpm` | `heun` | `hybrid` | `hybrid_entropy_bounded` | `insertion` | `insertion_entropy_bounded` | `masked_hybrid_entropy_bounded` | `ode` | `parallel_entropy_bounded` | `permuted_autoregressive` | `random_commitment` | `revealed_hybrid` | `simplex` | `spherical` | `uniform_ancestral` | `uniform_entropy_bounded` | `vmf_predictor_corrector` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| MDLM (masked) | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | ✓ | ✓ | –<sup>4</sup> | ✓ | –<sup>5</sup> | –<sup>4</sup> | ✓ | ✓ | –<sup>6</sup> | –<sup>6</sup> | ✓ | –<sup>4</sup> | ✓ | –<sup>7</sup> | ✓ | ✓ | –<sup>8</sup> | –<sup>9</sup> | ✓ | –<sup>10</sup> | –<sup>11</sup> |
-| Posterior uniform | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | ✓ | –<sup>12</sup> | –<sup>13</sup> | ✓ | –<sup>14</sup> | –<sup>13</sup> | ✓ | ✓ | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>13</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>17</sup> | –<sup>9</sup> | ✓ | ✓ | –<sup>11</sup> |
-| Plug-in uniform | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>19</sup> | ✓ | –<sup>20</sup> | –<sup>19</sup> | ✓ | ✓ | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>19</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>21</sup> | –<sup>9</sup> | ✓ | ✓ | –<sup>11</sup> |
-| DUO | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>19</sup> | ✓ | –<sup>20</sup> | –<sup>19</sup> | ✓ | ✓ | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>19</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>21</sup> | –<sup>9</sup> | ✓ | ✓ | –<sup>11</sup> |
-| SEDD (absorbing) | ✓ | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> | –<sup>22</sup> |
-| D3PM (absorbing) | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | ✓ | –<sup>23</sup> | –<sup>4</sup> | ✓ | –<sup>5</sup> | –<sup>4</sup> | ✓ | ✓ | –<sup>6</sup> | –<sup>6</sup> | ✓ | –<sup>4</sup> | ✓ | –<sup>7</sup> | ✓ | ✓ | –<sup>8</sup> | –<sup>9</sup> | ✓ | –<sup>10</sup> | –<sup>11</sup> |
-| GIDD | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>24</sup> | ✓ | –<sup>25</sup> | –<sup>24</sup> | ✓ | –<sup>26</sup> | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>24</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>27</sup> | –<sup>9</sup> | ✓ | –<sup>10</sup> | –<sup>11</sup> |
-| Gaussian | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | ✓ | ✓ | ✓ | ✓ | ✓ | –<sup>28</sup> | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | ✓ | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>29</sup> | –<sup>9</sup> | –<sup>30</sup> | –<sup>10</sup> | –<sup>11</sup> |
-| RePlaid | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | ✓ | ✓ | ✓ | ✓ | ✓ | –<sup>28</sup> | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>31</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>29</sup> | –<sup>9</sup> | –<sup>30</sup> | –<sup>10</sup> | –<sup>11</sup> |
-| RePlaid hybrid | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>24</sup> | ✓ | –<sup>25</sup> | –<sup>24</sup> | ✓ | –<sup>28</sup> | –<sup>6</sup> | –<sup>6</sup> | ✓ | –<sup>24</sup> | ✓ | –<sup>7</sup> | ✓ | ✓ | –<sup>27</sup> | –<sup>9</sup> | –<sup>30</sup> | –<sup>32</sup> | –<sup>11</sup> |
-| Simplex | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>33</sup> | ✓ | –<sup>34</sup> | –<sup>33</sup> | ✓ | –<sup>35</sup> | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>33</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | ✓ | –<sup>9</sup> | –<sup>30</sup> | –<sup>10</sup> | –<sup>11</sup> |
-| Spherical | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>36</sup> | ✓ | –<sup>37</sup> | –<sup>36</sup> | ✓ | ✓ | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>36</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>38</sup> | ✓ | –<sup>30</sup> | –<sup>10</sup> | –<sup>11</sup> |
-| Spherical vMF | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>24</sup> | ✓ | –<sup>25</sup> | –<sup>24</sup> | ✓ | ✓ | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>24</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>27</sup> | –<sup>9</sup> | –<sup>30</sup> | –<sup>10</sup> | ✓ |
-| Blurring | –<sup>1</sup> | ✓ | –<sup>2</sup> | ✓ | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>39</sup> | ✓ | –<sup>40</sup> | –<sup>39</sup> | ✓ | –<sup>41</sup> | –<sup>6</sup> | –<sup>6</sup> | –<sup>15</sup> | –<sup>39</sup> | ✓ | –<sup>7</sup> | ✓ | –<sup>16</sup> | –<sup>42</sup> | –<sup>9</sup> | –<sup>30</sup> | –<sup>10</sup> | –<sup>11</sup> |
-| CANDI hybrid | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | –<sup>18</sup> | –<sup>12</sup> | –<sup>24</sup> | ✓ | –<sup>25</sup> | –<sup>24</sup> | ✓ | ✓ | –<sup>6</sup> | –<sup>6</sup> | ✓ | –<sup>24</sup> | ✓ | –<sup>7</sup> | ✓ | ✓ | –<sup>27</sup> | –<sup>9</sup> | –<sup>30</sup> | –<sup>32</sup> | –<sup>11</sup> |
-| Autoregressive | –<sup>1</sup> | –<sup>43</sup> | ✓ | –<sup>3</sup> | –<sup>44</sup> | –<sup>44</sup> | –<sup>45</sup> | –<sup>24</sup> | –<sup>46</sup> | –<sup>25</sup> | –<sup>24</sup> | –<sup>47</sup> | –<sup>48</sup> | –<sup>6</sup> | –<sup>6</sup> | –<sup>49</sup> | –<sup>24</sup> | –<sup>50</sup> | –<sup>7</sup> | –<sup>44</sup> | –<sup>44</sup> | –<sup>27</sup> | –<sup>9</sup> | –<sup>51</sup> | –<sup>52</sup> | –<sup>44</sup> |
-| Permuted AR | –<sup>1</sup> | –<sup>43</sup> | –<sup>53</sup> | –<sup>3</sup> | –<sup>44</sup> | –<sup>44</sup> | –<sup>45</sup> | –<sup>24</sup> | –<sup>46</sup> | –<sup>25</sup> | –<sup>24</sup> | –<sup>47</sup> | –<sup>48</sup> | –<sup>6</sup> | –<sup>6</sup> | –<sup>49</sup> | –<sup>24</sup> | –<sup>50</sup> | ✓ | –<sup>44</sup> | –<sup>44</sup> | –<sup>27</sup> | –<sup>9</sup> | –<sup>51</sup> | –<sup>52</sup> | –<sup>44</sup> |
+| | `analytic` | `ancestral` | `autoregressive` | `blur_ancestral` | `bootstrap_self_conditioning` | `composed` | `dfm` | `entropy_bounded` | `euler` | `forward_resampling` | `gaussian_ddpm` | `heun` | `hybrid` | `hybrid_entropy_bounded` | `insertion` | `insertion_entropy_bounded` | `masked_hybrid_entropy_bounded` | `ode` | `parallel_entropy_bounded` | `permuted_autoregressive` | `random_commitment` | `revealed_hybrid` | `simplex` | `spherical` | `uniform_ancestral` | `uniform_entropy_bounded` | `vmf_predictor_corrector` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| MDLM (masked) | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | ✓ | ✓ | –<sup>5</sup> | ✓ | –<sup>6</sup> | –<sup>5</sup> | ✓ | ✓ | –<sup>7</sup> | –<sup>7</sup> | ✓ | –<sup>5</sup> | ✓ | –<sup>8</sup> | ✓ | ✓ | –<sup>9</sup> | –<sup>10</sup> | ✓ | –<sup>11</sup> | –<sup>12</sup> |
+| Posterior uniform | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | ✓ | –<sup>13</sup> | –<sup>14</sup> | ✓ | –<sup>15</sup> | –<sup>14</sup> | ✓ | ✓ | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>14</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>18</sup> | –<sup>10</sup> | ✓ | ✓ | –<sup>12</sup> |
+| Plug-in uniform | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>20</sup> | ✓ | –<sup>21</sup> | –<sup>20</sup> | ✓ | ✓ | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>20</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>22</sup> | –<sup>10</sup> | ✓ | ✓ | –<sup>12</sup> |
+| DUO | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>20</sup> | ✓ | –<sup>21</sup> | –<sup>20</sup> | ✓ | ✓ | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>20</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>22</sup> | –<sup>10</sup> | ✓ | ✓ | –<sup>12</sup> |
+| SEDD (absorbing) | ✓ | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> | –<sup>23</sup> |
+| D3PM (absorbing) | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | ✓ | –<sup>24</sup> | –<sup>5</sup> | ✓ | –<sup>6</sup> | –<sup>5</sup> | ✓ | ✓ | –<sup>7</sup> | –<sup>7</sup> | ✓ | –<sup>5</sup> | ✓ | –<sup>8</sup> | ✓ | ✓ | –<sup>9</sup> | –<sup>10</sup> | ✓ | –<sup>11</sup> | –<sup>12</sup> |
+| GIDD | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>25</sup> | ✓ | –<sup>26</sup> | –<sup>25</sup> | ✓ | –<sup>27</sup> | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>25</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>28</sup> | –<sup>10</sup> | ✓ | –<sup>11</sup> | –<sup>12</sup> |
+| Gaussian | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | ✓ | ✓ | ✓ | ✓ | ✓ | –<sup>29</sup> | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | ✓ | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>30</sup> | –<sup>10</sup> | –<sup>31</sup> | –<sup>11</sup> | –<sup>12</sup> |
+| RePlaid | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | ✓ | ✓ | –<sup>19</sup> | –<sup>13</sup> | ✓ | ✓ | ✓ | ✓ | ✓ | –<sup>29</sup> | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>32</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>30</sup> | –<sup>10</sup> | –<sup>31</sup> | –<sup>11</sup> | –<sup>12</sup> |
+| RePlaid hybrid | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>25</sup> | ✓ | –<sup>26</sup> | –<sup>25</sup> | ✓ | –<sup>29</sup> | –<sup>7</sup> | –<sup>7</sup> | ✓ | –<sup>25</sup> | ✓ | –<sup>8</sup> | ✓ | ✓ | –<sup>28</sup> | –<sup>10</sup> | –<sup>31</sup> | –<sup>33</sup> | –<sup>12</sup> |
+| Simplex | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>34</sup> | ✓ | –<sup>35</sup> | –<sup>34</sup> | ✓ | –<sup>36</sup> | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>34</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | ✓ | –<sup>10</sup> | –<sup>31</sup> | –<sup>11</sup> | –<sup>12</sup> |
+| Spherical | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>37</sup> | ✓ | –<sup>38</sup> | –<sup>37</sup> | ✓ | ✓ | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>37</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>39</sup> | ✓ | –<sup>31</sup> | –<sup>11</sup> | –<sup>12</sup> |
+| Spherical vMF | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>25</sup> | ✓ | –<sup>26</sup> | –<sup>25</sup> | ✓ | ✓ | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>25</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>28</sup> | –<sup>10</sup> | –<sup>31</sup> | –<sup>11</sup> | ✓ |
+| Blurring | –<sup>1</sup> | ✓ | –<sup>2</sup> | ✓ | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>40</sup> | ✓ | –<sup>41</sup> | –<sup>40</sup> | ✓ | –<sup>42</sup> | –<sup>7</sup> | –<sup>7</sup> | –<sup>16</sup> | –<sup>40</sup> | ✓ | –<sup>8</sup> | ✓ | –<sup>17</sup> | –<sup>43</sup> | –<sup>10</sup> | –<sup>31</sup> | –<sup>11</sup> | –<sup>12</sup> |
+| CANDI hybrid | –<sup>1</sup> | ✓ | –<sup>2</sup> | –<sup>3</sup> | –<sup>4</sup> | ✓ | –<sup>19</sup> | –<sup>13</sup> | –<sup>25</sup> | ✓ | –<sup>26</sup> | –<sup>25</sup> | ✓ | ✓ | –<sup>7</sup> | –<sup>7</sup> | ✓ | –<sup>25</sup> | ✓ | –<sup>8</sup> | ✓ | ✓ | –<sup>28</sup> | –<sup>10</sup> | –<sup>31</sup> | –<sup>33</sup> | –<sup>12</sup> |
+| Autoregressive | –<sup>1</sup> | –<sup>44</sup> | ✓ | –<sup>3</sup> | –<sup>4</sup> | –<sup>45</sup> | –<sup>45</sup> | –<sup>46</sup> | –<sup>25</sup> | –<sup>47</sup> | –<sup>26</sup> | –<sup>25</sup> | –<sup>48</sup> | –<sup>49</sup> | –<sup>7</sup> | –<sup>7</sup> | –<sup>50</sup> | –<sup>25</sup> | –<sup>51</sup> | –<sup>8</sup> | –<sup>45</sup> | –<sup>45</sup> | –<sup>28</sup> | –<sup>10</sup> | –<sup>52</sup> | –<sup>53</sup> | –<sup>45</sup> |
+| Permuted AR | –<sup>1</sup> | –<sup>44</sup> | –<sup>54</sup> | –<sup>3</sup> | –<sup>4</sup> | –<sup>45</sup> | –<sup>45</sup> | –<sup>46</sup> | –<sup>25</sup> | –<sup>47</sup> | –<sup>26</sup> | –<sup>25</sup> | –<sup>48</sup> | –<sup>49</sup> | –<sup>7</sup> | –<sup>7</sup> | –<sup>50</sup> | –<sup>25</sup> | –<sup>51</sup> | ✓ | –<sup>45</sup> | –<sup>45</sup> | –<sup>28</sup> | –<sup>10</sup> | –<sup>52</sup> | –<sup>53</sup> | –<sup>45</sup> |
 
 ## Modifiers (with the family's own sampler)
 
@@ -36,83 +36,84 @@ training step and samples three steps on CPU from a one-token prompt.
 | Posterior uniform | ✓ | ✓ | ✓ |
 | Plug-in uniform | ✓ | ✓ | ✓ |
 | DUO | ✓ | ✓ | ✓ |
-| SEDD (absorbing) | –<sup>54</sup> | ✓ | ✓ |
-| D3PM (absorbing) | –<sup>54</sup> | ✓ | –<sup>55</sup> |
+| SEDD (absorbing) | –<sup>55</sup> | ✓ | ✓ |
+| D3PM (absorbing) | –<sup>55</sup> | ✓ | –<sup>56</sup> |
 | GIDD | ✓ | ✓ | ✓ |
-| Gaussian | ✓ | ✓ | –<sup>56</sup> |
-| RePlaid | ✓ | –<sup>57</sup> | –<sup>56</sup> |
-| RePlaid hybrid | –<sup>58</sup> | –<sup>59</sup> | ✓ |
+| Gaussian | ✓ | ✓ | –<sup>57</sup> |
+| RePlaid | ✓ | –<sup>58</sup> | –<sup>57</sup> |
+| RePlaid hybrid | –<sup>59</sup> | –<sup>60</sup> | ✓ |
 | Simplex | ✓ | ✓ | ✓ |
-| Spherical | ✓ | –<sup>60</sup> | –<sup>56</sup> |
+| Spherical | ✓ | –<sup>61</sup> | –<sup>57</sup> |
 | Spherical vMF | ✓ | ✓ | ✓ |
-| Blurring | ✓ | ✓ | –<sup>56</sup> |
-| CANDI hybrid | ✓ | ✓ | –<sup>61</sup> |
-| Autoregressive | –<sup>62</sup> | –<sup>63</sup> | –<sup>64</sup> |
-| Permuted AR | –<sup>62</sup> | –<sup>63</sup> | –<sup>64</sup> |
+| Blurring | ✓ | ✓ | –<sup>57</sup> |
+| CANDI hybrid | ✓ | ✓ | –<sup>62</sup> |
+| Autoregressive | –<sup>63</sup> | –<sup>64</sup> | –<sup>65</sup> |
+| Permuted AR | –<sup>63</sup> | –<sup>64</sup> | –<sup>65</sup> |
 
 ## Notes
 
 1. analytic sampling requires absorbing scores and process
 2. autoregressive sampler requires Autoregressive algorithm
 3. blur ancestral sampling requires a blurring recipe (a sequence-layout schedule)
-4. continuous sampling requires a Gaussian process; AbsorbingProcess has no reverse_vector_field
-5. Gaussian DDPM requires a Gaussian process; AbsorbingProcess has no reverse_posterior
-6. this sampler requires a variable-length assembly
-7. permuted sampler requires PermutedAutoregressive
-8. simplex bridge sampling requires a Dirichlet process; AbsorbingProcess has no drop_condition
-9. spherical sampler requires spherical flow matching
-10. uniform samplers require matching posterior/process or plug-in/process semantics
-11. spherical correction requires a spherical view with a score
-12. entropy-bounded sampling needs one absorbing view
-13. continuous sampling requires a Gaussian process; PosteriorUniformProcess has no reverse_vector_field
-14. Gaussian DDPM requires a Gaussian process; PosteriorUniformProcess has no reverse_posterior
-15. Masked hybrid EB requires an absorbing process view
-16. state decoding requires exactly one absorbing token view
-17. simplex bridge sampling requires a Dirichlet process; PosteriorUniformProcess has no drop_condition
-18. DFM requires absorbing or posterior-uniform mixture paths; plug-in weights are not clean-token posteriors
-19. continuous sampling requires PosteriorParameterization
-20. Gaussian DDPM requires a Gaussian process; UniformProcess has no reverse_posterior
-21. simplex bridge sampling requires a Dirichlet process; UniformProcess has no drop_condition
-22. this sampler requires PosteriorParameterization; SEDD log scores need a score sampler (inference/sampler=analytic)
-23. entropy-bounded sampling needs a posterior that excludes the mask token (parameterization.mask_index); this recipe's posterior can choose it
-24. continuous sampling requires a Gaussian process; this recipe (no single process) has no reverse_vector_field
-25. Gaussian DDPM requires a Gaussian process; this recipe (no single process) has no reverse_posterior
-26. unsupported operand type(s) for -: 'int' and 'GIDDPath'
-27. simplex bridge sampling requires a Dirichlet process; this recipe (no single process) has no drop_condition
-28. unsupported operand type(s) for -: 'int' and 'GaussianPath'
-29. simplex bridge sampling requires a Dirichlet process; GaussianProcess has no drop_condition
-30. a terminal reverse transition needs one discrete view
-31. self-conditioning is not yet integrated with adaptive ODE sampling; use Euler or Heun
-32. UniformEntropyBoundedSampler drives one-view uniform algorithms; for parallel views use inference/sampler=parallel_entropy_bounded
-33. continuous sampling requires a Gaussian process; DirichletProcess has no reverse_vector_field
-34. Gaussian DDPM requires a Gaussian process; DirichletProcess has no reverse_posterior
-35. unsupported operand type(s) for -: 'int' and 'SimplexPath'
-36. continuous sampling requires a Gaussian process; SphericalProcess has no reverse_vector_field
-37. Gaussian DDPM requires a Gaussian process; SphericalProcess has no reverse_posterior
-38. simplex bridge sampling requires a Dirichlet process; SphericalProcess has no drop_condition
-39. continuous sampling requires a Gaussian process; BlurringProcess has no reverse_vector_field
-40. Gaussian DDPM requires a Gaussian process; BlurringProcess has no reverse_posterior
-41. a sequence-aware schedule requires a corruption mask
-42. simplex bridge sampling requires a Dirichlet process; BlurringProcess has no drop_condition
-43. ancestral sampling requires a discrete process; this recipe (no single process) has no reverse
-44. ComposedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
-45. entropy-bounded sampling requires a absorbing process; this recipe (no single process) has no reverse
-46. ForwardResamplingSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
-47. HybridSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
-48. CANDIEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
-49. MaskedHybridEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
-50. ParallelEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
-51. uniform ancestral sampling requires a uniform process; this recipe (no single process) has no reverse
-52. uniform entropy-bounded sampling requires a uniform process; this recipe (no single process) has no reverse
-53. PermutedAutoregressive.sampling_prediction() missing 2 required keyword-only arguments: 'key_position_ids' and 'query_position_ids'
-54. self-conditioning prediction is not yet integrated for this algorithm
-55. token feedback needs one network pass per training loss; D3PMAbsorb makes 2
-56. token feedback requires a transformer with a compatible token embedding table
-57. block diffusion does not support RePlaid's specialized gradient routing and optimizer parameter groups; use MDLM or GaussianDiffusion
-58. prediction policy and model must enable self-conditioning together
-59. conditional hybrid ELBO does not support block sequence layouts
-60. block diffusion needs a network whose clean prefix has a time coordinate; negative_log_keep_floor reads a keep rate
-61. token feedback output vocabulary must match the token embedding table; score/velocity outputs need an explicit token readout
-62. self-conditioning requires an enabled prediction coordinator on this algorithm
-63. block diffusion requires a model with fused-stream hidden interfaces
-64. token feedback requires the standard block policy, not CausalBlocks
+4. bootstrap requires a trained self-conditioning input
+5. continuous sampling requires a Gaussian process; AbsorbingProcess has no reverse_vector_field
+6. Gaussian DDPM requires a Gaussian process; AbsorbingProcess has no reverse_posterior
+7. this sampler requires a variable-length assembly
+8. permuted sampler requires PermutedAutoregressive
+9. simplex bridge sampling requires a Dirichlet process; AbsorbingProcess has no drop_condition
+10. spherical sampler requires spherical flow matching
+11. uniform samplers require matching posterior/process or plug-in/process semantics
+12. spherical correction requires a spherical view with a score
+13. entropy-bounded sampling needs one absorbing view
+14. continuous sampling requires a Gaussian process; PosteriorUniformProcess has no reverse_vector_field
+15. Gaussian DDPM requires a Gaussian process; PosteriorUniformProcess has no reverse_posterior
+16. Masked hybrid EB requires an absorbing process view
+17. state decoding requires exactly one absorbing token view
+18. simplex bridge sampling requires a Dirichlet process; PosteriorUniformProcess has no drop_condition
+19. DFM requires absorbing or posterior-uniform mixture paths; plug-in weights are not clean-token posteriors
+20. continuous sampling requires PosteriorParameterization
+21. Gaussian DDPM requires a Gaussian process; UniformProcess has no reverse_posterior
+22. simplex bridge sampling requires a Dirichlet process; UniformProcess has no drop_condition
+23. this sampler requires PosteriorParameterization; SEDD log scores need a score sampler (inference/sampler=analytic)
+24. entropy-bounded sampling needs a posterior that excludes the mask token (parameterization.mask_index); this recipe's posterior can choose it
+25. continuous sampling requires a Gaussian process; this recipe (no single process) has no reverse_vector_field
+26. Gaussian DDPM requires a Gaussian process; this recipe (no single process) has no reverse_posterior
+27. unsupported operand type(s) for -: 'int' and 'GIDDPath'
+28. simplex bridge sampling requires a Dirichlet process; this recipe (no single process) has no drop_condition
+29. unsupported operand type(s) for -: 'int' and 'GaussianPath'
+30. simplex bridge sampling requires a Dirichlet process; GaussianProcess has no drop_condition
+31. a terminal reverse transition needs one discrete view
+32. self-conditioning is not yet integrated with adaptive ODE sampling; use Euler or Heun
+33. UniformEntropyBoundedSampler drives one-view uniform algorithms; for parallel views use inference/sampler=parallel_entropy_bounded
+34. continuous sampling requires a Gaussian process; DirichletProcess has no reverse_vector_field
+35. Gaussian DDPM requires a Gaussian process; DirichletProcess has no reverse_posterior
+36. unsupported operand type(s) for -: 'int' and 'SimplexPath'
+37. continuous sampling requires a Gaussian process; SphericalProcess has no reverse_vector_field
+38. Gaussian DDPM requires a Gaussian process; SphericalProcess has no reverse_posterior
+39. simplex bridge sampling requires a Dirichlet process; SphericalProcess has no drop_condition
+40. continuous sampling requires a Gaussian process; BlurringProcess has no reverse_vector_field
+41. Gaussian DDPM requires a Gaussian process; BlurringProcess has no reverse_posterior
+42. a sequence-aware schedule requires a corruption mask
+43. simplex bridge sampling requires a Dirichlet process; BlurringProcess has no drop_condition
+44. ancestral sampling requires a discrete process; this recipe (no single process) has no reverse
+45. ComposedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+46. entropy-bounded sampling requires a absorbing process; this recipe (no single process) has no reverse
+47. ForwardResamplingSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+48. HybridSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+49. CANDIEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+50. MaskedHybridEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+51. ParallelEntropyBoundedSampler samples diffusion recipes on the view path; autoregressive models use inference/sampler=autoregressive
+52. uniform ancestral sampling requires a uniform process; this recipe (no single process) has no reverse
+53. uniform entropy-bounded sampling requires a uniform process; this recipe (no single process) has no reverse
+54. PermutedAutoregressive.sampling_prediction() missing 2 required keyword-only arguments: 'key_position_ids' and 'query_position_ids'
+55. self-conditioning prediction is not yet integrated for this algorithm
+56. token feedback needs one network pass per training loss; D3PMAbsorb makes 2
+57. token feedback requires a transformer with a compatible token embedding table
+58. block diffusion does not support RePlaid's specialized gradient routing and optimizer parameter groups; use MDLM or GaussianDiffusion
+59. prediction policy and model must enable self-conditioning together
+60. conditional hybrid ELBO does not support block sequence layouts
+61. block diffusion needs a network whose clean prefix has a time coordinate; negative_log_keep_floor reads a keep rate
+62. token feedback output vocabulary must match the token embedding table; score/velocity outputs need an explicit token readout
+63. self-conditioning requires an enabled prediction coordinator on this algorithm
+64. block diffusion requires a model with fused-stream hidden interfaces
+65. token feedback requires the standard block policy, not CausalBlocks

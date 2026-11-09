@@ -304,3 +304,21 @@ They retain the recipe's native sampler and existing NFE accounting.
 results at temperature 1 and uses logit-temperature sweeps. It reports worse
 low-NFE performance for score temperature, with some benefit at high NFE in the
 low-entropy regime. Plaid's published code defaults to score temperature 0.9.
+
+### Fresh bootstrap versus trajectory self-conditioning
+
+`inference/sampler=bootstrap_self_conditioning` wraps a trajectory-capable sampler
+with fresh two-pass self-conditioning at every prediction. The first forward has
+no feedback; its clean prediction conditions the second forward at the same
+noisy state. This includes each Euler/Heun field evaluation. The default inner
+sampler is forward resampling; set `sampler.sampler` to another compatible sampler.
+The checkpoint must have a trained self-conditioning input. Revealed-token hybrid
+context is not that input and cannot be substituted for it.
+
+The wrapper's `steps` controls the inner solver, including its cached linear time
+grid. `steps_for_nfe` reserves both forwards, solver stages, and terminal decoding;
+reported NFE is the total number of network calls. Do not wrap a native sampler
+already configured with `self_conditioning_mode=bootstrap`. For native Gaussian
+DDPM, use its own `self_conditioning_mode=bootstrap` or `previous` option instead.
+Trajectory conditioning reuses earlier predictions and usually costs one forward
+per prediction, allowing more sampling steps at the same NFE budget.

@@ -43,8 +43,8 @@ class PredictionSession:
 
 
 def prediction_session(algorithm):
-    while isinstance(algorithm, PredictionSession):
-        algorithm = algorithm.algorithm
+    if isinstance(algorithm, PredictionSession):
+        return algorithm
     policy = getattr(algorithm, "prediction", None)
     if policy is None or not policy.enabled:
         return algorithm
