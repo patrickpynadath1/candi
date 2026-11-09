@@ -13,6 +13,7 @@ give numbers close to ours. Most cells are a single training seed, so expect see
 | [tokenizer-ladder](tokenizer-ladder/) | Does the tokenizer change the picture? | `+sweep=tokenizer_ladder` |
 | [continuous-schedules](continuous-schedules/) | How do learned (CDCD) noise schedules spend training? | `+sweep=continuous_schedules` |
 | [block-encoder-decoder](block-encoder-decoder/) | Block diffusion: scale the encoder or the decoder? | `+sweep=block_encoder_decoder` |
+| [hybrid-sc](hybrid-sc/) | Does a discrete view change what self-conditioning does to continuous paths? (new; no published numbers) | `+sweep=hybrid_sc` |
 
 ## Running an example
 

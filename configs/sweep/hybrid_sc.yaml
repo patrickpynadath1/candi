@@ -1,0 +1,37 @@
+# @package _global_
+# Worked example experiments/hybrid-sc: does pairing a continuous path with a discrete view
+# (masked or uniform) change what self-conditioning does?
+# 2 discrete views x 4 continuous paths x {no SC, SC} x 3 tasks = 48 cases. Same protocol as
+# continuous-schedules (CDCD learned clock, 8-layer / 512-wide backbone, 20k steps, its
+# evaluation splits), so continuous-schedules supplies the no-discrete-view baseline.
+defaults:
+- /experiment: corruption_factorial
+- common
+- /ablation_path: gaussian
+- /information_path/discrete_view: masked
+- /modifiers/feedback: none
+- /inference/inference_policies: hybrid_renoising
+- override /information_path/path_schedule: cdcd
+- override /task: battery/sudoku_hard
+- _self_
+checkpoint:
+  every_n_steps: 1000
+data:
+  # Read only by TinyStories: the story cohort the evaluation indices refer to.
+  # Build it with scripts/prepare_data.py.
+  allowed_ids_path: ${data.cache_dir}/allowed_ids.json
+preparation:
+  name: hybrid-sc
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/hybrid-sc
+  family: hybrid_sc
+  recipe_name: ${preparation.discrete_name}-${preparation.path_name}-${preparation.feedback_name}
+  evaluation_file: experiments/hybrid-sc/evaluation/${preparation.task_name}.json
+  wandb:
+    project: hybrid-sc
+hydra:
+  sweeper:
+    params:
+      task: battery/sudoku_hard,battery/text8,battery/tinystories_bpe
+      information_path/discrete_view: masked,uniform
+      ablation_path: gaussian,simplex,spherical,spherical_vmf
+      modifiers/feedback: none,expected_embedding
