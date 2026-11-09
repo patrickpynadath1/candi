@@ -1,0 +1,11 @@
+# @package sampler
+_target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
+steps: 65
+epsilon: 1.0e-5
+freeze: true
+greedy_clean_estimate: true
+entropy_bound: 0.1
+churn:
+  _target_: core.samplers.churn.RandomUncommitment
+  rate: 0.05
+  stop_fraction: 0.8

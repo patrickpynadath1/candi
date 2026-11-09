@@ -18,6 +18,7 @@ class ComposedSampler:
         transition=None,
         commitment="none",
         corrector=None,
+        churn=None,
         final_denoise="greedy",
         final_prediction=None,
         synchronize_committed=False,
@@ -54,6 +55,7 @@ class ComposedSampler:
         self.tokens = tokens if tokens is not None else TokenSelection("posterior")
         self.positions = positions if positions is not None else AllPositions()
         self.transition = transition if transition is not None else ReverseTransition()
+        self.churn = churn
         self.corrector = corrector
         if corrector is not None and commitment != "none":
             raise ValueError("correctors currently require commitment=none")
@@ -108,6 +110,8 @@ class ComposedSampler:
                 "sampling requires the single-view/parallel-view algorithm interface"
             )
         self.transition.validate(algo.views, self.commitment)
+        if self.churn is not None:
+            self.churn.validate(algo.views, self.commitment)
         if self.corrector is not None:
             self.corrector.validate(algo.views)
         state_views = [i for i, v in enumerate(algo.views) if callable(getattr(v.process, "observed_tokens", None))]
@@ -134,15 +138,23 @@ class ComposedSampler:
         output = prompt_tokens.clone()
         per_sample = torch.zeros(batch, dtype=torch.long, device=prompt_tokens.device)
         counts = []
+        churn_counts = []
         nfe = 0
         source = points  # each step's destination is the next step's source
         for index in range(self.steps):
+            churning = self.churn is not None and self.churn.probability(index, self.steps) > 0
+            if self.churn is not None:
+                states, committed, reopened = self.churn(
+                    algo.views, states, source, output, committed, prompt_mask, index, self.steps
+                )
+                churn_counts.append(reopened.sum(-1).cpu().tolist())
+                complete = complete & ~reopened.any(-1)
             active = (
                 generated & ~committed if self.commitment == "freeze" else generated
             )
             if self.commitment != "none":
                 active = active & ~complete[:, None]
-                if not active.any():
+                if not active.any() and not churning:
                     break
             time, next_time = times[index].expand(batch), times[index + 1].expand(batch)
             destination = algo.points(next_time, corruption_mask=generated)
@@ -216,6 +228,8 @@ class ComposedSampler:
                 committed = next_committed
                 counts.append(selected.sum(-1).cpu().tolist())
                 newly_complete = ~complete & committed.all(-1)
+                if churning:
+                    newly_complete = torch.zeros_like(newly_complete)
                 per_sample[newly_complete] = nfe
                 complete |= newly_complete
             source = destination
@@ -254,6 +268,8 @@ class ComposedSampler:
                 per_sample[~complete] = nfe
         output = torch.where(prompt_mask, prompt_tokens, output)
         info = dict(nfe=nfe, nfe_per_sample=per_sample.cpu().tolist())
+        if self.churn is not None:
+            info["uncommitted_per_step"] = churn_counts
         if self.commitment != "none":
             info.update(
                 accepted_per_step=counts, completed_per_sample=complete.cpu().tolist()

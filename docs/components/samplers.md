@@ -322,3 +322,40 @@ already configured with `self_conditioning_mode=bootstrap`. For native Gaussian
 DDPM, use its own `self_conditioning_mode=bootstrap` or `previous` option instead.
 Trajectory conditioning reuses earlier predictions and usually costs one forward
 per prediction, allowing more sampling steps at the same NFE budget.
+
+### Random uncommitment (EB churn)
+
+`inference/sampler=entropy_churn` composes entropy-based frozen commitment with
+`RandomUncommitment`. Before each prediction, each committed generated token is
+independently reopened with probability `rate * max(0, 1-progress/stop_fraction)`.
+Prompts are never reopened. The same release mask resets every view: absorbing
+states become masks, and other states use their own process's `corrupt_state`
+kernel around the previous committed token at the current noise level. This
+preserves the process geometry: Dirichlet corruption for simplex states, spherical
+corruption for sphere-valued states, and Gaussian corruption for embeddings.
+The release mask is shared across views; unselected states are preserved exactly,
+even for a forward kernel that couples sequence positions. Any process exposing
+`corrupt_state` and a token-encoding representation can participate; no Gaussian
+inheritance is required. The surrounding sampler must support freeze commitment. This is a refinement heuristic, not an exact
+ancestral sampler. No extra model calls are made by churn itself.
+
+Early completion is deferred while the churn window is active; after it closes,
+ordinary EB completion resumes. A zero rate preserves ordinary EB's trajectory,
+random-number consumption, and early stopping. Metadata `uncommitted_per_step`
+records per-example release counts. Churn can consume more of the NFE budget
+than early-terminating EB, so compare both accuracy and measured NFE.
+
+
+EB commitment is sampler-owned: **a purely continuous model needs no masked or
+other discrete view to use EB or random uncommitment**. The sampler stores the
+committed token IDs and clamps their continuous states to the representation's
+clean state. Churn clears that bookkeeping and applies the continuous process's
+forward kernel. In a hybrid model, the same mask additionally resets its other
+views. `ParallelEntropyBoundedSampler` supports both one and multiple views;
+"parallel" does not require a discrete branch.
+
+For example, compose a pure simplex or spherical recipe with
+`inference/sampler=entropy_churn`; set `sampler.churn.rate=0.05` and
+`sampler.churn.stop_fraction=0.8`. The same preset works with pure Gaussian,
+blurring, and REPLAiD recipes. This changes inference only; it does not add a
+training corruption, a discrete input, or a new learned model component.

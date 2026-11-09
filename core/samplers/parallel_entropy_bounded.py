@@ -9,6 +9,7 @@ class ParallelEntropyBoundedSampler(ComposedSampler):
         self,
         *,
         freeze=True,
+        churn=None,
         entropy_bound=0.1,
         steps=180,
         epsilon=1e-5,
@@ -29,6 +30,7 @@ class ParallelEntropyBoundedSampler(ComposedSampler):
                 noise="zero", preserve_absorbing=True, renoise_released=not freeze
             ),
             commitment="freeze" if freeze else "revise",
+            churn=churn,
             final_denoise="greedy" if greedy_clean_estimate else "sample",
             final_prediction="sampling",
         )
