@@ -256,4 +256,12 @@ def test_selection_reads_validation_and_test_only_by_name(tmp_path):
     assert [r["prompt"] for r in validation] == ["held out"]
     assert len(test) == 2
     with pytest.raises(ValueError, match="unknown TinyGSM"):
-        task.evaluation_dataset("validation")
+        task.evaluation_dataset("unknown")
+
+
+def test_nested_tuning_validation_alias(tmp_path):
+    task = make_task(tmp_path)
+    alias = task.evaluation_dataset('validation')
+    explicit = task.evaluation_dataset('gsm8k_validation')
+    assert alias['prompt'] == explicit['prompt']
+    assert isinstance(task.create_metric_accumulator('validation'), TinyGSMMetrics)

@@ -14,7 +14,8 @@ class TinyGSMTask(Task):
     # Selection reads a held-out slice of GSM8K train; the test split ("gsm8k")
     # is only scored when requested by name, e.g. evaluator.evaluation_name=gsm8k.
     primary_metric = PrimaryMetric("accuracy", "max", "gsm8k_validation")
-    evaluation_splits = {"gsm8k": "test", "gsm8k_validation": "validation"}
+    evaluation_splits = {"gsm8k": "test", "gsm8k_validation": "validation",
+                         "validation": "validation"}
 
     def __init__(self, data, evaluation, vocab_size=49153, length=512, tokenizer=None):
         if length < 2:
