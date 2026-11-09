@@ -3,26 +3,37 @@
 # template and Auto Scaling group (spot only, any us-east-1 zone, 0..1 machines).
 #
 #   scripts/cluster/aws_autorun/setup.sh RUN SETS_FILE "TYPE[,TYPE...]"   # creates, desired 0
-#   aws autoscaling set-desired-capacity --auto-scaling-group-name sddc-patrick-RUN --desired-capacity 1
+#   aws autoscaling set-desired-capacity --auto-scaling-group-name PREFIX-RUN --desired-capacity 1
 #
 # SETS_FILE lines: `<plan name> <sweep> [prepare overrides...]`. The group replaces an
 # interrupted machine automatically; the machine resumes from S3 and sets the group to 0 when
 # every case is done. Code is the working tree at setup time (tracked and new files, local edits).
 #
 # Several machines can share one run as slices: SDDC_AWS_SLICE=NAME SDDC_AWS_CASES=FILE (lines
-# `PLAN/CASE`) adds a group sddc-patrick-RUN-NAME whose machine runs, restores and syncs only
+# `PLAN/CASE`) adds a group PREFIX-RUN-NAME whose machine runs, restores and syncs only
 # those cases; the run's code, run.env and sets.txt are reused, not replaced.
 # SDDC_AWS_ON_DEMAND=1 makes the group on-demand instead of spot.
 set -euo pipefail
 run=${1:?RUN name} sets=${2:?SETS_FILE} types=${3:?instance types}
 export AWS_REGION=${AWS_REGION:-us-east-1}
-bucket=${SDDC_AWS_BUCKET:-sddc-patrick-data-029636175027}
-profile=${SDDC_AWS_PROFILE:-sddc-patrick-s3}
-sg=${SDDC_AWS_SG:-sg-02d0644bebe11c87b}
-key=${SDDC_AWS_KEY:-sddc-patrick}
+# Account-specific settings come from the environment (keep them in an untracked file):
+#   SDDC_AWS_BUCKET   S3 bucket holding data_cache/, hf/, plans/, runs/, logs/, autorun/
+#   SDDC_AWS_PROFILE  EC2 instance profile with access to that bucket (and, to let a
+#                     machine turn its own group off, autoscaling:SetDesiredCapacity
+#                     on PREFIX-* groups)
+#   SDDC_AWS_SG       security group (SSH only from your address)
+#   SDDC_AWS_KEY      EC2 key pair name
+#   SDDC_AWS_PREFIX   name prefix for groups and launch templates (default sddc)
+#   SDDC_AWS_OWNER    value of the Owner tag on everything created (default $USER)
+bucket=${SDDC_AWS_BUCKET:?set SDDC_AWS_BUCKET}
+profile=${SDDC_AWS_PROFILE:?set SDDC_AWS_PROFILE}
+sg=${SDDC_AWS_SG:?set SDDC_AWS_SG}
+key=${SDDC_AWS_KEY:?set SDDC_AWS_KEY}
+prefix=${SDDC_AWS_PREFIX:-sddc}
+owner=${SDDC_AWS_OWNER:-$USER}
 ami=${SDDC_AWS_AMI:-$(aws ssm get-parameter --name /aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-22.04/latest/ami-id --query Parameter.Value --output text)}
 slice=${SDDC_AWS_SLICE:-}
-asg=sddc-patrick-$run${slice:+-$slice}
+asg=$prefix-$run${slice:+-$slice}
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$here/../../.." && pwd)
 tmp=$(mktemp -d)
@@ -63,10 +74,10 @@ systemd-run --unit sddc-autorun --uid ubuntu --setenv=HOME=/home/ubuntu --setenv
 EOF
 
 # Launch template (a new version on every setup).
-python3 - "$tmp" "$ami" "$profile" "$sg" "$key" "$asg" <<'EOF'
+python3 - "$tmp" "$ami" "$profile" "$sg" "$key" "$asg" "$owner" <<'EOF'
 import base64, json, sys
-tmp, ami, profile, sg, key, name = sys.argv[1:]
-tags = [{"Key": "Owner", "Value": "patrick"}, {"Key": "Name", "Value": name}]
+tmp, ami, profile, sg, key, name, owner = sys.argv[1:]
+tags = [{"Key": "Owner", "Value": owner}, {"Key": "Name", "Value": name}]
 data = {
     "ImageId": ami, "KeyName": key, "SecurityGroupIds": [sg],
     "IamInstanceProfile": {"Name": profile},
@@ -85,7 +96,7 @@ if aws ec2 describe-launch-templates --launch-template-names "$lt" >/dev/null 2>
   aws ec2 modify-launch-template --launch-template-name "$lt" --default-version "$version" >/dev/null
 else
   aws ec2 create-launch-template --launch-template-name "$lt" --launch-template-data "file://$tmp/template.json" \
-    --tag-specifications "ResourceType=launch-template,Tags=[{Key=Owner,Value=patrick}]" >/dev/null
+    --tag-specifications "ResourceType=launch-template,Tags=[{Key=Owner,Value=$owner}]" >/dev/null
 fi
 
 # Auto Scaling group: spot only, every default subnet, the given types in priority-free capacity order.
@@ -108,7 +119,7 @@ if aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$asg
 else
   aws autoscaling create-auto-scaling-group --auto-scaling-group-name "$asg" --mixed-instances-policy "$policy" \
     --vpc-zone-identifier "$subnets" --min-size 0 --max-size 1 --desired-capacity 0 \
-    --tags "Key=Owner,Value=patrick,PropagateAtLaunch=false"
+    --tags "Key=Owner,Value=$owner,PropagateAtLaunch=false"
 fi
 echo "ready: $asg (desired 0). Start: aws autoscaling set-desired-capacity --auto-scaling-group-name $asg --desired-capacity 1"
 echo "logs:  aws s3 ls s3://$bucket/logs/$run/   results: s3://$bucket/runs/$run/"
