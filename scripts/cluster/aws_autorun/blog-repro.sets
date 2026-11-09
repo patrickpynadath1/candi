@@ -1,0 +1,9 @@
+# The four worked-example sweeps (113 cases) plus the new hybrid-sc question (48 cases) with their published protocols, for
+# scripts/cluster/aws_autorun/setup.sh. Only the checkpoint interval differs from the
+# published runs: saving every 1000 steps (keeping best, last and the newest step file,
+# save_top_k=1) bounds the work an interruption can lose; it does not change training.
+sc_vs_depth            sc_vs_depth            checkpoint.every_n_steps=1000
+continuous_schedules   continuous_schedules   checkpoint.every_n_steps=1000
+block_encoder_decoder  block_encoder_decoder  checkpoint.every_n_steps=1000
+tokenizer_ladder       tokenizer_ladder       checkpoint.every_n_steps=1000
+hybrid_sc              hybrid_sc              checkpoint.every_n_steps=1000
