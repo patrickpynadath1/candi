@@ -4,6 +4,7 @@ import math
 import torch
 from .decoding import prediction
 from .loop import FixedGridLoop
+from .score_temperature import GaussianScoreTemperature
 from . import requirements
 
 from core.parameterizations.posterior import PosteriorParameterization
@@ -23,6 +24,7 @@ class GaussianDDPMSampler:
         prompt_mode="noisy",
         final_transition_noise=False,
         self_conditioning=True,
+        score_temperature=1.0,
     ):
         if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
             raise ValueError("steps must be a positive integer")
@@ -40,6 +42,7 @@ class GaussianDDPMSampler:
         self.final_transition_noise = final_transition_noise
         self.prior_mode = prior_mode
         self.steps, self.epsilon = steps, epsilon
+        self.score_temperature = GaussianScoreTemperature(score_temperature)
 
     def steps_for_nfe(self, nfe):
         """Reserve terminal prediction and account for per-step SC bootstraps."""
@@ -115,6 +118,7 @@ class GaussianDDPMSampler:
             path_t, path_s = algo.schedule(time), algo.schedule(next_time)
             probabilities = predict(state, time, path_t).float().exp()
             mean = algo.representation.posterior_mean(probabilities)
+            mean = self.score_temperature(state, mean, path_t)
             noise = (
                 torch.zeros_like(state)
                 if index == self.steps - 1 and not self.final_transition_noise

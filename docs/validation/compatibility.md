@@ -41,14 +41,14 @@ training step and samples three steps on CPU from a one-token prompt.
 | GIDD | ✓ | ✓ | ✓ |
 | Gaussian | ✓ | ✓ | –<sup>56</sup> |
 | RePlaid | ✓ | –<sup>57</sup> | –<sup>56</sup> |
-| RePlaid hybrid | –<sup>58</sup> | –<sup>58</sup> | –<sup>58</sup> |
+| RePlaid hybrid | –<sup>58</sup> | –<sup>59</sup> | ✓ |
 | Simplex | ✓ | ✓ | ✓ |
-| Spherical | ✓ | –<sup>59</sup> | –<sup>56</sup> |
+| Spherical | ✓ | –<sup>60</sup> | –<sup>56</sup> |
 | Spherical vMF | ✓ | ✓ | ✓ |
 | Blurring | ✓ | ✓ | –<sup>56</sup> |
-| CANDI hybrid | ✓ | ✓ | –<sup>60</sup> |
-| Autoregressive | –<sup>61</sup> | –<sup>62</sup> | –<sup>63</sup> |
-| Permuted AR | –<sup>61</sup> | –<sup>62</sup> | –<sup>63</sup> |
+| CANDI hybrid | ✓ | ✓ | –<sup>61</sup> |
+| Autoregressive | –<sup>62</sup> | –<sup>63</sup> | –<sup>64</sup> |
+| Permuted AR | –<sup>62</sup> | –<sup>63</sup> | –<sup>64</sup> |
 
 ## Notes
 
@@ -109,9 +109,10 @@ training step and samples three steps on CPU from a one-token prompt.
 55. token feedback needs one network pass per training loss; D3PMAbsorb makes 2
 56. token feedback requires a transformer with a compatible token embedding table
 57. block diffusion does not support RePlaid's specialized gradient routing and optimizer parameter groups; use MDLM or GaussianDiffusion
-58. RePlaidHybrid.__init__() got an unexpected keyword argument 'context_input'
-59. block diffusion needs a network whose clean prefix has a time coordinate; negative_log_keep_floor reads a keep rate
-60. token feedback output vocabulary must match the token embedding table; score/velocity outputs need an explicit token readout
-61. self-conditioning requires an enabled prediction coordinator on this algorithm
-62. block diffusion requires a model with fused-stream hidden interfaces
-63. token feedback requires the standard block policy, not CausalBlocks
+58. prediction policy and model must enable self-conditioning together
+59. conditional hybrid ELBO does not support block sequence layouts
+60. block diffusion needs a network whose clean prefix has a time coordinate; negative_log_keep_floor reads a keep rate
+61. token feedback output vocabulary must match the token embedding table; score/velocity outputs need an explicit token readout
+62. self-conditioning requires an enabled prediction coordinator on this algorithm
+63. block diffusion requires a model with fused-stream hidden interfaces
+64. token feedback requires the standard block policy, not CausalBlocks

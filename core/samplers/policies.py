@@ -79,6 +79,7 @@ class ReverseTransition:
         final_transition_noise=False,
         preserve_absorbing=False,
         renoise_released=False,
+        score_temperature=1.0,
     ):
         if noise not in {"native", "zero"}:
             raise ValueError("reverse noise must be native or zero")
@@ -88,8 +89,17 @@ class ReverseTransition:
         self.final_transition_noise = bool(final_transition_noise)
         self.preserve_absorbing = bool(preserve_absorbing)
         self.renoise_released = bool(renoise_released)
+        from .hybrid_updates import GaussianPosteriorUpdate
+        self.gaussian_update = GaussianPosteriorUpdate(score_temperature)
+        self.score_temperature = float(score_temperature)
 
     def validate(self, views, commitment):
+        if self.score_temperature != 1.0:
+            from core.processes.gaussian import GaussianProcess
+            from .hybrid_updates import GaussianPosteriorUpdate
+            gaussian = [v for v in views if isinstance(v.process, GaussianProcess)]
+            if not gaussian or any(type(v.update) is not GaussianPosteriorUpdate for v in gaussian):
+                raise TypeError("score_temperature requires a Gaussian posterior reverse update")
         if (
             self.preserve_absorbing
             and commitment == "revise"
@@ -128,10 +138,13 @@ class ReverseTransition:
             )
             else None
         )
+        from core.processes.gaussian import GaussianProcess
+        update = (self.gaussian_update if self.score_temperature != 1.0
+                  and isinstance(view.process, GaussianProcess) else view.update)
         value = (
             state
             if self.preserve_absorbing and isinstance(view.process, AbsorbingProcess)
-            else view.update(
+            else update(
                 view.process,
                 view.representation,
                 state,

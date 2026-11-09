@@ -1,0 +1,13 @@
+# @package _global_
+# Opt-in score-only sweep; retain the native sampler and NFE accounting.
+# Requires GaussianDDPMSampler / a Gaussian posterior ReverseTransition respectively.
+preparation:
+  inference:
+  - name: score_temperature
+    space:
+      sampler.score_temperature: {type: float, low: 0.5, high: 1.5}
+    initial_points:
+    - sampler.score_temperature: 1.0
+    - sampler.score_temperature: 0.9
+    trials: 16
+    budget_parameter: steps

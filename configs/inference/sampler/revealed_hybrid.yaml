@@ -9,3 +9,4 @@ final_denoise: state
 transition:
   _target_: core.samplers.policies.ReverseTransition
   final_transition_noise: true
+  score_temperature: 1.0

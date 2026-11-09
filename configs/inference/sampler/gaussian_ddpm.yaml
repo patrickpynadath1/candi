@@ -7,3 +7,4 @@ prompt_mode: clean
 self_conditioning_mode: previous
 self_conditioning: ${self_conditioning.enabled}
 final_transition_noise: false
+score_temperature: 1.0

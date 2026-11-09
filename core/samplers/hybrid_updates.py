@@ -24,6 +24,10 @@ class DiscretePosteriorUpdate:
 
 
 class GaussianPosteriorUpdate:
+    def __init__(self, score_temperature=1.0):
+        from .score_temperature import GaussianScoreTemperature
+        self.score_temperature = GaussianScoreTemperature(score_temperature)
+
     def __call__(
         self,
         process,
@@ -36,6 +40,7 @@ class GaussianPosteriorUpdate:
         noise=None,
     ):
         clean = representation.posterior_mean(probabilities)
+        clean = self.score_temperature(state, clean, source.coefficients)
         noise = torch.randn_like(state) if noise is None else noise
         return process.reverse_posterior(
             state, clean, source.coefficients, destination.coefficients, noise

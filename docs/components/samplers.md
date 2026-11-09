@@ -274,3 +274,33 @@ clock grids. The `revealed_hybrid` preset combines these with Gaussian posterior
 updates, absorbing reveal updates, final transition noise and synchronized clean
 states. Discrete random draws may differ from other implementations even when
 the transition distribution is identical.
+
+### Gaussian score temperature
+
+`GaussianScoreTemperature` is a reusable, sampling-only clean-estimate transform.
+It implements the [original Plaid sampler's](https://github.com/igul222/plaid/blob/main/sample.py)
+noise rescaling: `epsilon_pred /= tau`. For `z = alpha*x + sigma*epsilon`,
+this means `x_tempered = x + (1/tau - 1)*(x - z/alpha)`.
+This differs from categorical/logit temperature (`algorithm.predictor.temperature`).
+Transition noise variance, training losses, raw self-conditioning feedback and
+terminal logits are unchanged. Default `tau=1` is an exact no-op.
+
+- Gaussian DDPM / plain REPLAiD: `sampler.score_temperature=0.9`.
+- Composed Gaussian posterior transitions / REPLAiD hybrid:
+  `sampler.transition.score_temperature=0.9`.
+
+The hybrid setting acts only on Gaussian posterior updates; the discrete view
+still uses its original token posterior. Unsupported transitions or discrete-only
+recipes reject non-unit score temperature. A zero source alpha also rejects it:
+converting a rescaled score back to a finite clean estimate is singular there.
+Very small positive alpha can amplify the estimate; tune at each NFE budget.
+
+Opt-in policy sets `+inference/inference_policies=gaussian_score_temperature` and
+`+inference/inference_policies=hybrid_score_temperature` search 0.5–1.5 with initial points
+1.0 and 0.9. These are configurable search bounds, not a paper-prescribed optimum.
+They retain the recipe's native sampler and existing NFE accounting.
+
+[REPLAiD Appendix O](https://arxiv.org/html/2605.18530v1#A15) reports headline
+results at temperature 1 and uses logit-temperature sweeps. It reports worse
+low-NFE performance for score temperature, with some benefit at high NFE in the
+low-entropy regime. Plaid's published code defaults to score temperature 0.9.
