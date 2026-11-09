@@ -1,0 +1,11 @@
+# @package sampler
+_target_: core.samplers.composed.ComposedSampler
+steps: 32
+epsilon: 0.0
+prior_mode: standard_normal
+grid_precision: float64
+synchronize_committed: true
+final_denoise: state
+transition:
+  _target_: core.samplers.policies.ReverseTransition
+  final_transition_noise: true

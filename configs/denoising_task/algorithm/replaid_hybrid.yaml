@@ -1,0 +1,17 @@
+# @package algorithm
+_target_: core.algorithms.replaid_hybrid.RePlaidHybrid
+model: ${model}
+predictor: ${parameterization}
+process: ${process}
+clock: ${noise_schedule}
+representation: ${representation}
+objective: ${objective}
+time_sampler: null
+length: ${task.length}
+prediction: ${prediction}
+corruption:
+  _target_: core.processes.forced_mask.ForcedTargetMask
+context_scale: unit_embedding
+context_input:
+  _target_: core.models.revealed_context.RevealedContextInput
+  _partial_: true

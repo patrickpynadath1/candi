@@ -1,0 +1,6 @@
+# @package noise_schedule
+_target_: core.noise_schedules.shared_clock.PiecewiseInverseCDFClock
+lower: -13.3
+upper: 5.0
+bins: 64
+uniform_mix: 0.01

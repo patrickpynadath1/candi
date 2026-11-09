@@ -155,3 +155,16 @@ For extension, supply coefficients and derivatives in the stated coordinate,
 declare geometry requirements, register persistent state, and test finite-difference
 derivatives and endpoint behavior. See [all configs](../../configs/information_path/noise_schedule/)
 and [implementation helpers](../../core/noise_schedules/utils.py).
+
+### Shared importance clock
+
+`shared_importance_clock` selects `PiecewiseInverseCDFClock`: a positive
+piecewise-uniform density, its inverse CDF, and ordered Gaussian endpoints.
+`ClockGaussianSchedule` and `ClockKeepSchedule` reference the **same** module:
+`gamma(t)=lower+(upper-lower)*u(t)` and `keep(t)=1-u(t)`. The clock's `draw`
+returns stratified importance samples and their density. The zero-valued
+`variance_surrogate` trains density logits to reduce estimator second moment;
+training algorithms must add it only during training. Endpoint gradients come
+from the objective. DDP synchronizes these ordinary parameter gradients.
+The recipe preserves the original 1% density mixture; this is part of its
+protocol, not a change to CDCD recipes.

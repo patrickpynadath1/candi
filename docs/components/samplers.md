@@ -260,3 +260,17 @@ posterior-weighted tangent Euler update in the shared sampler. Optional
 `SphericalLangevinCorrector` steps run fresh predictions after each predictor
 and contribute to reported NFE. Select `inference/sampler=vmf_predictor_corrector` for the
 predictor-corrector preset; the ordinary `hybrid` sampler uses only the predictor.
+
+### Decode a completed absorbing state
+
+`ComposedSampler(final_denoise=state, epsilon=0, commitment=none)` returns the
+fully revealed token view after its last transition, with no terminal denoiser
+call. Exactly one absorbing view is required, and incomplete final states raise
+an error. NFE is the number of actual transition predictions (plus corrector
+calls), and `steps_for_nfe` does not reserve a terminal call in this mode.
+`prior_mode=standard_normal` initializes Gaussian views from N(0,I), leaving
+other view priors unchanged. `grid_precision=float64` preserves fine learned
+clock grids. The `revealed_hybrid` preset combines these with Gaussian posterior
+updates, absorbing reveal updates, final transition noise and synchronized clean
+states. Discrete random draws may differ from other implementations even when
+the transition distribution is identical.

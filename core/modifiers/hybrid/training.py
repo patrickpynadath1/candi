@@ -168,6 +168,10 @@ class HybridDiffusion(PosteriorDiffusion):
             states[0].shape[:2], dtype=torch.long, device=states[0].device
         )
 
+    def prediction_transform(self, states, points):
+        """State-dependent correction before the shared posterior pathway."""
+        return self.prediction_logits
+
     def _prediction(self, pathway, states, points, global_time, trajectory=None):
         result = self.prediction.predict(
             self.model,
@@ -176,7 +180,7 @@ class HybridDiffusion(PosteriorDiffusion):
             self._observed(states),
             pathway,
             mean=self.prediction_mean,
-            logits_transform=self.prediction_logits,
+            logits_transform=self.prediction_transform(states, points),
             trajectory=trajectory,
             training_pathway=self._pathway("training"),
         )

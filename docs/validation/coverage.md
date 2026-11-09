@@ -115,3 +115,8 @@ encoders are not implemented by the tokenwise representation interface.
 Legacy optimizer-state import and bitwise interrupted-run data replay are also
 outside the current guarantees. Removing legacy source did not turn these
 omissions into implemented functionality.
+
+Conditional REPLAiD hybrid: `test_replaid_hybrid.py` checks the inverse-CDF
+proposal distribution and endpoints, second-moment gradient, exact enumeration
+of the forced-mask estimator, all-parameter finite gradients, validation gradient
+ownership, checkpoint round trip, two Lightning updates, prompts and NFE.

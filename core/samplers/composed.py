@@ -24,6 +24,8 @@ class ComposedSampler:
         require_completion=False,
         precision="float32",
         transition_prediction="sampling",
+        prior_mode="schedule",
+        grid_precision="float32",
     ):
         if int(steps) != steps or steps < 1 or not 0 <= epsilon < 1:
             raise ValueError("positive integer steps and epsilon in [0, 1) required")
@@ -38,11 +40,16 @@ class ComposedSampler:
             raise ValueError("precision must be float32 or float64")
         if final_denoise == "reverse" and commitment != "none":
             raise ValueError("a terminal reverse transition requires commitment=none")
-        if final_denoise not in {"greedy", "sample", "reverse"} or final_prediction not in {
+        if final_denoise not in {"greedy", "sample", "reverse", "state"} or final_prediction not in {
             "greedy",
             "sampling",
         }:
             raise ValueError("invalid terminal token selection or prediction pathway")
+        if prior_mode not in {"schedule", "standard_normal"} or grid_precision not in {"float32", "float64"}:
+            raise ValueError("invalid prior mode or grid precision")
+        if final_denoise == "state" and (epsilon != 0 or commitment != "none"):
+            raise ValueError("state decoding requires epsilon=0 and commitment=none")
+        self.prior_mode, self.grid_dtype = prior_mode, getattr(torch, grid_precision)
         self.steps, self.epsilon = int(steps), float(epsilon)
         self.tokens = tokens if tokens is not None else TokenSelection("posterior")
         self.positions = positions if positions is not None else AllPositions()
@@ -67,7 +74,7 @@ class ComposedSampler:
         """Largest complete predictor/corrector trajectory within a call budget."""
         nfe = requirements.integer_nfe(nfe)
         calls_per_step = 1 + (self.corrector.steps if self.corrector is not None else 0)
-        steps = (int(nfe) - 1) // calls_per_step  # Reserve terminal decoding.
+        steps = (int(nfe) - int(self.final_denoise != "state")) // calls_per_step  # Reserve terminal decoding.
         if steps < 1:
             raise ValueError(
                 "NFE budget cannot fit a predictor/corrector step and decoding"
@@ -103,17 +110,25 @@ class ComposedSampler:
         self.transition.validate(algo.views, self.commitment)
         if self.corrector is not None:
             self.corrector.validate(algo.views)
+        state_views = [i for i, v in enumerate(algo.views) if callable(getattr(v.process, "observed_tokens", None))]
+        if self.final_denoise == "state" and len(state_views) != 1:
+            raise TypeError("state decoding requires exactly one absorbing token view")
         algo = prediction_session(algo)
         batch = len(prompt_tokens)
         prompt_mask = prompt_mask.bool()
         generated = ~prompt_mask
         times = torch.linspace(
-            1, self.epsilon, self.steps + 1, device=prompt_tokens.device
+            1, self.epsilon, self.steps + 1, device=prompt_tokens.device, dtype=self.grid_dtype
         )
         points = algo.points(times[0].expand(batch), corruption_mask=generated)
-        states = tuple(
-            prior(v, prompt_tokens, p, prompt_mask) for v, p in zip(algo.views, points)
-        )
+        def initial(view, point):
+            if self.prior_mode == "standard_normal":
+                from core.processes.gaussian import GaussianProcess
+                if isinstance(view.process, GaussianProcess):
+                    clean = view.representation.encode(prompt_tokens)
+                    return clamp(view, torch.randn_like(clean), prompt_tokens, prompt_mask)
+            return prior(view, prompt_tokens, point, prompt_mask)
+        states = tuple(initial(v, p) for v, p in zip(algo.views, points))
         committed = prompt_mask.clone()
         complete = ~generated.any(-1)
         output = prompt_tokens.clone()
@@ -204,6 +219,12 @@ class ComposedSampler:
                 per_sample[newly_complete] = nfe
                 complete |= newly_complete
             source = destination
+        if self.final_denoise == "state":
+            final_tokens, known = algo.views[state_views[0]].process.observed_tokens(states[state_views[0]])
+            if not known.all():
+                raise RuntimeError("terminal discrete state is not fully revealed")
+            output = torch.where(prompt_mask, prompt_tokens, final_tokens)
+            return output, {"nfe": nfe, "nfe_per_sample": [nfe] * batch}
         if self.commitment == "none" or not complete.all():
             if self.require_completion:
                 raise RuntimeError("masked hybrid EB exhausted steps before completion")

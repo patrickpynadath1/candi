@@ -1,0 +1,42 @@
+# @package _global_
+defaults:
+- override /denoising_task/model: continuous_dit
+- override /denoising_task/model/input@model.input: linear
+- override /denoising_task/model/output@model.output: adaln
+- override /information_path/representation: embedding
+- override /information_path/process: gaussian
+- override /denoising_task/parameterization: gaussian_prior
+- override /information_path/token_space@token_space: data_only
+- override /denoising_task/algorithm: replaid_hybrid
+- override /denoising_task/objective: hybrid_elbo
+- override /information_path/noise_schedule: shared_importance_clock
+- override /inference/sampler: revealed_hybrid
+- _self_
+representation:
+  dimension: 16
+  trainable: true
+  project_after_update: true
+self_conditioning:
+  enabled: false
+model:
+  input:
+    preconditioning: unit_embedding
+    bias: false
+  time:
+    coordinate: negative_log_snr
+    epsilon: 1.0e-30
+    input_projection: true
+  self_conditioning:
+    enabled: false
+optimizer:
+  groups:
+  - patterns:
+    - model.input.views.0.representation.table
+    - model.input.views.0.schedule.clock.clock_logits
+    lr: 0.01
+    weight_decay: 0.0
+  - patterns:
+    - model.input.views.0.schedule.clock.gamma_min
+    - model.input.views.0.schedule.clock.width_raw
+    lr: 0.01
+    weight_decay: 0.0

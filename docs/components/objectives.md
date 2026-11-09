@@ -157,3 +157,15 @@ base objective; see [block diffusion](../modifiers/block-diffusion.md).
 For a new objective, define required domains and shapes, expose unreduced losses,
 and test masking, gradients, endpoint limits, and any additive weighting terms.
 Do not move sampler policy or raw batch handling into the objective.
+
+### Conditional hybrid ELBO
+
+`hybrid_elbo` combines masked reveal CE, Gaussian expected-embedding error and
+terminal Gaussian KL. `ForcedTargetMask` conditions on a uniformly selected
+valid position being masked; all other valid positions follow Bernoulli(u).
+The objective averages over all masked positions and corrects that proposal
+with `N / (K * density)`. Loss and corruption masks must coincide and be binary;
+non-target positions are clean context. Empty examples are allowed but a whole
+batch without targets is rejected. This is a likelihood-bound estimator, not
+plain hybrid cross-entropy. See `core/tests/test_replaid_hybrid.py` for an
+exhaustive two-token comparison against the unconditioned mask law.

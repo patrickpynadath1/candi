@@ -34,6 +34,7 @@ FAMILIES = {
     "GIDD": "gidd_elbo",
     "Gaussian": "gaussian_diffusion_sudoku",
     "RePlaid": "replaid_sudoku_hard",
+    "RePlaid hybrid": "replaid_hybrid",
     "Simplex": "sudoku_simplex",
     "Spherical": "sudoku_spherical",
     "Spherical vMF": "spherical_vmf",

@@ -1,0 +1,2 @@
+# @package objective
+_target_: core.objectives.hybrid_elbo.HybridELBO

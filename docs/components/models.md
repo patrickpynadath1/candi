@@ -165,3 +165,13 @@ hidden-feature and stream interfaces only when their meaning is defined, and tes
 cached against uncached execution where a cache exists. A new architecture alone does
 not make it compatible with every modifier; see the
 [compatibility table](../validation/compatibility.md).
+
+### Revealed clean context
+
+`core.models.revealed_context.RevealedContextInput` combines a continuous input
+slot with a projection of clean embeddings at positions revealed by an absorbing
+view. Unknown positions contribute zero context. Both use the continuous view's
+codebook, so there is no second learned token table. The extra parameter cost is
+`state_dim * hidden_size`; `context_scale=unit_embedding` multiplies context by
+`sqrt(state_dim)`. This is independent of posterior self-conditioning.
+The `replaid_hybrid` recipe binds this input through `algorithm.context_input`.
