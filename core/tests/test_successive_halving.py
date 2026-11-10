@@ -175,6 +175,46 @@ def test_several_nfe_budgets_are_tuned_and_tested_separately(tmp_path, monkeypat
                         (27 * 4 + 9 * 12 + 3 * 36 + 3 * 36 + 10) * (4 + 8))
 
 
+def test_extra_test_budget_scores_every_policy_winner_after_selection(tmp_path, monkeypatch):
+    settings = spec(tmp_path)
+    second = copy.deepcopy(settings["inference"][0])
+    second["name"] = "other"
+    settings["inference"].append(second)
+    settings["evaluation"]["extra_test_nfe"] = [16]
+    recorder = Recorder()
+    monkeypatch.setattr(tuning, "execute", recorder)
+    winner = tuning.run_case(settings, tmp_path / "runs", concurrency=1)
+    tests = [(i, c) for i, c in enumerate(recorder.calls) if c["evaluation"]["indices"] == TEST]
+    # One test call at the tuning budget for the winner, then one per policy at 16.
+    assert [c["evaluation"]["nfe"] for _, c in tests] == [4, 16, 16]
+    assert [i for i, _ in tests] == [len(recorder.calls) - 3, len(recorder.calls) - 2,
+                                     len(recorder.calls) - 1]  # all after every validation call
+    assert {c["policy"]["name"] for _, c in tests[1:]} == {"native", "other"}
+    for _, call in tests[1:]:
+        name = call["policy"]["name"]
+        chosen = winner["policy_winners"][name]["inference_parameters"]
+        assert call["parameters"] == chosen  # each policy's own validation winner
+    root = tmp_path / "runs/example"
+    extra = json.loads((root / "final-extra/nfe-16/other/result.json").read_text())
+    assert extra["measurement"] == "extra_test_nfe" and extra["nfe"] == 16
+    # The extra numbers never reach selection: the case's choice is unchanged.
+    plain = spec(tmp_path / "plain")
+    plain["inference"].append({**copy.deepcopy(second)})
+    monkeypatch.setattr(tuning, "execute", Recorder())
+    reference = tuning.run_case(plain, tmp_path / "plain/runs", concurrency=1)
+    assert reference["inference_parameters"] == winner["inference_parameters"]
+    count = len(recorder.calls)
+    monkeypatch.setattr(tuning, "execute", recorder)
+    tuning.run_case(settings, tmp_path / "runs", concurrency=1)
+    assert len(recorder.calls) == count
+    cost = tuning.generation_cost(settings)
+    assert cost["extra_test_calls"] == 2 * len(TEST) * 1 * 16
+    assert cost["network_calls"] == cost["tuning_calls"] + cost["test_calls"] + cost["extra_test_calls"]
+    settings["evaluation"]["extra_test_nfe"] = [4]
+    with pytest.raises(ValueError, match="extra_test_nfe"):
+        tuning.validate(settings)
+
+
 def test_conditional_parameters_exist_only_under_their_condition(tmp_path):
     import optuna
 

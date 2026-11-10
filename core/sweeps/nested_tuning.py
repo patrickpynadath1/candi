@@ -142,6 +142,11 @@ def validate_inference(spec):
         seen.append(key)
     if "halving" in spec:
         validate_halving(spec)
+    extra = spec.get("extra_test_nfe", [])
+    if any(type(b) is not int or b < 2 for b in extra) or len(set(extra)) != len(extra) or (
+        set(extra) & set(budgets)
+    ):
+        raise ValueError("extra_test_nfe must list distinct NFE budgets not used for tuning")
 
 
 # Sampling-only predictor settings a policy may tune (never the training objective).
@@ -789,7 +794,12 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
                 )
             choose = max if direction == "maximize" else min
             winners[budget] = choose(choices, key=lambda r: r["score"])
+            if budget == budgets[0] and evaluation.get("extra_test_nfe"):
+                # Each policy's own validation winner, for the extra test measurements.
+                winners["policies"] = {c["policy"]["name"]: c for c in choices}
         first = winners[budgets[0]]
+        if "policies" in winners:
+            first = {**first, "policy_winners": winners["policies"]}
         if len(budgets) == 1:
             return first
         return {**first, "budgets": {str(b): winners[b] for b in budgets}}
@@ -854,6 +864,39 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
             final_dir,
         )
         save(final_path, {**result, "selection": selection, "source": source_identity()})
+    # Extra measurements after selection, never read by it: every policy's validation
+    # winner scored once on the test split at each extra NFE budget.
+    for budget in evaluation.get("extra_test_nfe", []):
+        for name, selection in winner["policy_winners"].items():
+            folder = root / "final-extra" / f"nfe-{budget}" / name
+            if (folder / "result.json").exists():
+                continue
+            verify_checkpoint(selection["checkpoint"])
+            final = {
+                **validation,
+                "nfe": budget,
+                "dataset": evaluation.get(
+                    "test_dataset", validation.get("dataset", "validation")
+                ),
+                "indices": evaluation["test_indices"],
+                "seeds": evaluation["test_seeds"],
+            }
+            final.pop("halving", None)
+            result = execute(
+                "evaluate",
+                {
+                    "checkpoint": selection["checkpoint"],
+                    "policy": selection["policy"],
+                    "parameters": selection["inference_parameters"],
+                    "evaluation": final,
+                    "resources": resources,
+                },
+                folder,
+            )
+            save(folder / "result.json", {
+                **result, "nfe": budget, "measurement": "extra_test_nfe",
+                "selection": selection, "source": source_identity(),
+            })
     return winner
 
 
@@ -1013,7 +1056,7 @@ def generation_cost(spec):
     """
     evaluation = spec["evaluation"]
     seeds = len(evaluation["seeds"])
-    tuning = test = calls = 0
+    tuning = test = tuning_calls = test_calls = 0
     for budget in nfe_budgets(evaluation):
         sequences = 0
         for policy in spec["inference"]:
@@ -1032,8 +1075,18 @@ def generation_cost(spec):
         sequences *= spec["training"]["trials"]
         final = len(evaluation["test_indices"]) * len(evaluation["test_seeds"])
         tuning, test = tuning + sequences, test + final
-        calls += (sequences + final) * budget
-    return {"tuning_sequences": tuning, "test_sequences": test, "network_calls": calls}
+        tuning_calls += sequences * budget
+        test_calls += final * budget
+    final = len(evaluation["test_indices"]) * len(evaluation["test_seeds"])
+    extra = sum(len(spec["inference"]) * final for _ in evaluation.get("extra_test_nfe", []))
+    extra_calls = sum(
+        len(spec["inference"]) * final * b for b in evaluation.get("extra_test_nfe", [])
+    )
+    return {
+        "tuning_sequences": tuning, "test_sequences": test, "extra_test_sequences": extra,
+        "tuning_calls": tuning_calls, "test_calls": test_calls, "extra_test_calls": extra_calls,
+        "network_calls": tuning_calls + test_calls + extra_calls,
+    }
 
 
 def check_manifest(specs, output=None):
@@ -1091,13 +1144,15 @@ def print_check(rows, errors, costs=None):
         extra = ()
         if costs:
             cost = costs[row[0]]
-            extra = (cost["tuning_sequences"] + cost["test_sequences"], cost["network_calls"])
+            extra = (cost["tuning_sequences"] + cost["test_sequences"]
+                     + cost["extra_test_sequences"], cost["network_calls"])
         print(f"{row[0]:{width}}  " + "  ".join(f"{str(v):>9}" for v in (*row[1:], *extra)))
     trained = sum(row[1] for row in rows)
     summary = (f"{len(rows)} cases, {trained} training runs, "
                f"{sum(row[1] * row[3] for row in rows)} inference trials")
     if costs:
-        sequences = sum(c["tuning_sequences"] + c["test_sequences"] for c in costs.values())
+        sequences = sum(c["tuning_sequences"] + c["test_sequences"] + c["extra_test_sequences"]
+                        for c in costs.values())
         calls = sum(c["network_calls"] for c in costs.values())
         summary += f", {sequences} generated sequences, {calls / 1e6:.1f}M sequence network calls"
     print(summary)
