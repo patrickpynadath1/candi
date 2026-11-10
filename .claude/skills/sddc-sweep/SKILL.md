@@ -61,7 +61,9 @@ What to decide:
   `optimizer.`, `model.`, `algorithm.`, `objective.`, `noise_schedule.`, `time_sampler.`,
   `training.`, `self_conditioning.` or `lr_scheduler.`. Default: one fixed candidate.
 - **Budget**: `preparation.evaluation.nfe` (default 128 network calls, terminal included;
-  a list such as `[128, 512]` tunes and tests at each budget).
+  a list such as `[128, 512]` tunes and tests at each budget; `extra_test_nfe: [512]`
+  instead scores each policy's validation winner once more on the test split at 512,
+  reported only).
 - **Resources**: `preparation.local.resources_per_job` (0 or 1 whole GPU per worker).
 
 ## 2. Prepare and collect

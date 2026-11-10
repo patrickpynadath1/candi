@@ -1,0 +1,17 @@
+# @package _global_
+# Inference-only rerun of continuous_schedules on its trained checkpoints (experiments/rerun):
+# 24 cases: 4 continuous paths x {no SC, SC} x 3 tasks.
+# The recipe, data cohort and seeds come from continuous_schedules unchanged, so its checkpoints load
+# as is. Policies: the five of hybrid_renoising, plus eb_churn and psi.
+defaults:
+- continuous_schedules
+- rerun_common
+- override /inference/inference_policies: [hybrid_renoising, eb_churn, psi]
+- _self_
+preparation:
+  name: continuous-schedules-rerun
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/continuous-schedules-rerun
+  family: continuous_schedules_rerun
+  source_runs: ${preparation.source_root}/continuous_schedules
+  wandb:
+    project: continuous-schedules-rerun

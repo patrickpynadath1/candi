@@ -1,0 +1,22 @@
+# @package _global_
+# Shared protocol of the inference-only reruns (experiments/rerun): each case scores the
+# fixed checkpoint of its source case (same recipe, data and seed) with the evaluation
+# files in experiments/rerun/evaluation (TinyStories by SOL; Sudoku and text8 keep their
+# metrics), successive-halving sampler tuning at NFE 128, one test evaluation of the
+# winner, and every policy's validation winner scored once more on the test split at
+# NFE 512 (reported only, never used for selection). A sweep including this file sets
+# preparation.source_runs to its source sweep's run directory.
+preparation:
+  # Where the source runs live (the AWS H100 reproduction); prepare on that machine.
+  source_root: ${oc.env:SDDC_SOURCE_RUNS,/data/sddc/runs/blog-repro-h100}
+  source_case: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}
+  case_name: ${preparation.source_case}-rerun
+  evaluation_file: experiments/rerun/evaluation/${preparation.task_name}.json
+  training:
+    space: {}
+    trials: 1
+    # The source sweeps' single fixed training candidate: sha256("{}")[:20].
+    checkpoint: ${preparation.source_runs}/${preparation.source_case}/training/candidates/44136fa355b3678a1146/training/checkpoints/last.ckpt
+  evaluation:
+    nfe: 128
+    extra_test_nfe: [512]

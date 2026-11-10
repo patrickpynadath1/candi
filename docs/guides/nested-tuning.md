@@ -136,6 +136,16 @@ budget keeps the single-budget layout (`inference/<policy>`, `final/`); the othe
 first budget's winner with all winners under `budgets`. A training search selects on the
 first budget.
 
+### Extra test budgets (reported only)
+
+`evaluation.extra_test_nfe` (e.g. `[512]`) adds measurements after selection and after
+the main test evaluation. Each policy's own validation winner (from the first tuning budget,
+on the selected training candidate) is scored once on the test split at each listed NFE,
+into `final-extra/nfe-<n>/<policy>/result.json` with `"measurement": "extra_test_nfe"`.
+Nothing reads these results for selection. Their budgets must differ from the tuning
+budgets, and the winners' parameters are reused with the steps recomputed for the larger
+budget.
+
 `--check` prints, per case, the generated sequences and sequence network calls these
 settings imply (an upper bound: early-stopping samplers and skipped trials use less), and
 refuses a fixed `training.checkpoint` that does not exist on this machine.
