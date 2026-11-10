@@ -53,7 +53,7 @@ schedule, process or time conditioning. Native evaluation therefore compares the
 checkpoint's saved `algorithm`, `block_diffusion`, `variable_length`,
 `token_feedback` and `encoder_decoder` sections with the current config and
 raises on any difference. Sampling knobs (`predictor.temperature`, `top_k`,
-`top_p`, `commitment`), the time sampler and the training objective may differ.
+`top_p`, `commitment`), the training time sampler and the training objective may differ.
 Set `evaluation.allow_config_mismatch=true` only for a deliberate cross-recipe
 evaluation. Legacy imports are not checked.
 

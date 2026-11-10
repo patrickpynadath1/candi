@@ -26,8 +26,18 @@ class TimeAllocation:
 
 
 class AdaptiveTimeAllocation(nn.Module):
+    """Estimator allocation; ``GaussianELBO`` weights the two estimators itself.
+
+    Diffusion rows are stratified uniform times (density 1). Reconstruction rows
+    sit at ``t = 0`` and belong to a separate estimator, not to the time integral:
+    a point mass, so they report a NaN density and observers that need a density
+    drop them. Only ``uncorrected`` weighting applies (the objective reads the
+    allocation from ``ObjectiveContext.time_draw``).
+    """
+
     # Both estimators need a row; the algorithm replicates singleton batches.
     min_batch = 2
+    objective_weighting = "uncorrected"
 
     def __init__(self, momentum=0.99):
         super().__init__()
@@ -54,6 +64,9 @@ class AdaptiveTimeAllocation(nn.Module):
             + torch.arange(diffusion, device=device) / diffusion
         ) % 1
         return TimeAllocation(time, recon)
+
+    def time_density(self, time):
+        return torch.where(time == 0, torch.nan, torch.ones_like(time))
 
     @torch.no_grad()
     def observe(self, reconstruction, diffusion, reconstruction_count, loss_mask=None):

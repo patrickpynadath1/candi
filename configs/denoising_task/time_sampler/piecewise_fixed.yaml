@@ -1,0 +1,11 @@
+# @package time_sampler
+# Fixed piecewise-constant training time sampler: relative masses of equal-width
+# bins of [0, 1] (default: mid-range t visited 3x as often as the ends). The noise
+# schedule still fixes what each t means. importance_corrected divides the loss by
+# the draw density, so the objective is the uniform-time one and only the variance
+# changes; uncorrected also re-weights the objective toward the oversampled bins.
+_target_: core.time_sampling.piecewise.PiecewiseTimeSampler
+weights: [1.0, 3.0, 3.0, 1.0]
+epsilon: 0.001
+antithetic: true
+objective_weighting: importance_corrected

@@ -1,12 +1,24 @@
 import torch
 
+from .density import check_objective_weighting
+
 
 class UniformTimeSampler:
-    def __init__(self, epsilon=1e-3, antithetic=True):
+    """Uniform training times on ``[epsilon, 1)``, optionally stratified.
+
+    Every draw has density 1 relative to uniform, so ``objective_weighting`` does
+    not change the objective; it is accepted for a uniform interface.
+    """
+
+    def __init__(self, epsilon=1e-3, antithetic=True, objective_weighting="uncorrected"):
         if not 0 < epsilon < 1:
             raise ValueError("training time epsilon must be in (0, 1)")
         self.epsilon = epsilon
         self.antithetic = antithetic
+        self.objective_weighting = check_objective_weighting(objective_weighting)
+
+    def time_density(self, time):
+        return torch.ones_like(time)
 
     def sample(
         self,

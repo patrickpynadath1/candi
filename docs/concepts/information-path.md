@@ -27,9 +27,14 @@ it. The same fitted map is used during generation. The Gaussian-specific adaptiv
 schedule wrapper remains available for standalone Gaussian recipes; do not apply
 both wrappers unintentionally.
 
-An adaptive clock changes the noise distribution encountered during training and
-the physical spacing of inference points. It is distinct from choosing a different
-[training time sampler](denoising-task.md), though these choices interact.
+An adaptive clock changes what each time means: the noise level encountered at
+each training time and the physical spacing of inference points. A
+[training time sampler](../components/time-sampling.md) instead changes how often
+training visits each time and plays no role at inference. In training only their
+combination and the loss weighting matter, and the two interact: an adaptive
+schedule fits from the times the sampler draws. Training therefore passes each
+draw's density to the schedule, and the schedule divides it out, so the schedule
+it learns does not depend on the sampler (see the [recipe](recipe.md#noise-schedule-and-training-time-sampler)).
 
 ## Multiple paths and changing sequence length
 

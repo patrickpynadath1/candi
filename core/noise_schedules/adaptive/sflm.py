@@ -19,9 +19,14 @@ class SFLMAdaptiveSchedule(BufferedAdaptiveSchedule):
             ),
             Ridge(alpha=self.ridge_alpha),
         )
+        draw_weights = self.draw_weight_buf.cpu().numpy()
+        # Weight by 1 / (training time sampler density) so the fit targets the
+        # true per-time loss; uniform draws keep the unweighted reference fit.
+        options = {} if np.all(draw_weights == 1) else {"ridge__sample_weight": draw_weights}
         model.fit(
             self.t_buf.cpu().numpy().reshape(-1, 1),
             self.loss_buf.cpu().numpy(),
+            **options,
         )
         smooth_loss = model.predict(self._grid.reshape(-1, 1))
         importance = np.maximum(np.gradient(smooth_loss, self._grid), 0)

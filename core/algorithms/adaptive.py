@@ -20,15 +20,25 @@ def validate_adaptive_feedback(schedule, predictor):
         )
 
 
+def observes_training_loss(schedule):
+    """True for an adaptive noise schedule (or clock) that fits training losses."""
+    return hasattr(schedule, "observe")
+
+
 @torch.no_grad()
 def observe_training_loss(
-    schedule, time, prediction, tokens, per_token, loss_mask, *, step, training
+    schedule, time, prediction, tokens, per_token, loss_mask, *, step, training, density=None
 ):
     """Send detached per-example feedback, excluding examples without targets.
 
     The schedule owns fitting; selecting and reducing its observation signal
     belongs to training orchestration. All ranks call observe, even when this
     rank has no valid examples, so the schedule can gather observations safely.
+    ``density`` is the training time sampler's per-row draw density relative to
+    uniform (``core/time_sampling/density.py``). It is forwarded as
+    ``observe(..., density=...)`` only when some draw is non-uniform, so uniform
+    samplers make exactly the call they made before (and a schedule whose
+    ``observe`` cannot take a density fails loudly only for non-uniform draws).
     """
     if not training or not hasattr(schedule, "observe"):
         return
@@ -40,4 +50,11 @@ def observe_training_loss(
     valid = counts > 0
     masked = torch.where(weights != 0, signal, 0) * weights
     per_example = masked.sum(-1) / counts.clamp_min(1)
-    schedule.observe(time.detach()[valid], per_example[valid], step, training=True)
+    options = (
+        {}
+        if density is None or bool((density == 1).all())
+        else {"density": density.detach()[valid]}
+    )
+    schedule.observe(
+        time.detach()[valid], per_example[valid], step, training=True, **options
+    )

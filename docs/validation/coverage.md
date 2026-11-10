@@ -97,6 +97,17 @@ These demonstrate composition and trainability, not converged language quality.
 See the [recorded insertion pilot evidence](../modifiers/variable-length.md#what-has-been-demonstrated)
 for a checkpoint-specific snapshot and its limitations.
 
+Training time sampler densities are execution tested in
+`core/tests/test_time_sampler_density.py`. Every sampler's density integrates to
+1 and matches its draws' histogram. CDCD and S-FLM adaptive noise schedules fitted
+from strongly non-uniform draws match the uniform-draw fit on a synthetic
+known loss curve, and they do not without the density correction. Uniform draws
+reproduce the earlier fit bit-for-bit. `importance_corrected` keeps the Monte
+Carlo objective, and `uncorrected` re-weights it by the density. The
+`cdcd_mid_range_times` preset trains and generates on CPU without generation
+touching the sampler. It has not been trained to convergence, so whether a
+non-uniform training time sampler helps CDCD is not established.
+
 | Infrastructure | Executed check | Remaining qualification |
 | --- | --- | --- |
 | DDP | Two GPUs, four MDLM steps, cosine scheduler, EMA, callback generation, checkpoint | Not a matrix of all algorithms/modifiers |

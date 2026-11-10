@@ -2,8 +2,11 @@
 
 Recipe context: [information path](../concepts/information-path.md).
 
-Schedules map global time to corruption coefficients; they do not draw training
-times or corrupt states. In the usual convention, zero is clean and increasing
+A noise schedule fixes what each time `t` means: it maps `t` to corruption
+coefficients, and training and generation share it. It does not draw training
+times (that is the [training time sampler](time-sampling.md), which decides how
+often training visits each `t` and has no role at inference) and it does not
+corrupt states. In the usual convention, zero is clean and increasing
 time means more noise. Sampling proceeds toward smaller times. Endpoint choices
 are method-specific and are not automatically exact clean/pure-noise marginals.
 
@@ -127,9 +130,36 @@ training only. `loss_signal=cross_entropy` requires normalized predictions;
 - S-FLM defaults to `coordinate=legacy_time`: spline/ridge expected-loss fit,
   nonnegative slope, uniform coverage, inverse-CDF PCHIP, and bias-corrected EMA.
   `physical` explicitly fits normalized corruption instead.
-- CDCD defaults to physical coordinates and CE. It uses inverse-density-weighted
-  isotonic regression and a fixed bin grid (100 bins by default). This is the
+- CDCD defaults to physical coordinates and CE. The schedule is learned so that
+  the loss rises linearly in `t`. It uses inverse-density-weighted isotonic
+  regression and a fixed bin grid (100 bins by default). This is the
   repository's CDCD-style approximation, not trainable original-CDCD bin logits.
+
+### Fitting under a non-uniform training time sampler
+
+The buffered observations come from the training time sampler, which need not be
+uniform. Left alone, a sampler that oversamples mid-range `t` would fill the buffer
+with mid-range losses, and the fit would linearize the loss under that skewed
+sample rather than the true loss along `t`. Training therefore passes each draw's
+density `d` relative to uniform (the sampler's `time_density`, see
+[training time samplers](time-sampling.md#the-contract)) as
+`schedule.observe(time, loss, step, training=True, density=d)`, and the fit weights
+each observation by `1 / d`:
+
+- CDCD: the isotonic-regression weight is `min(1 / (p_warp * d), max_importance)`,
+  where `p_warp` is the corruption-level density its own current warp induces from
+  uniform times (the original correction, `importance_buf`) and `1 / d` is stored
+  in `draw_weight_buf`.
+- S-FLM: the spline/ridge fit uses `1 / d` as its sample weight.
+- `gumbel` (learnable): each squared residual is multiplied by `1 / d`.
+
+The fitted schedule then targets the true per-`t` loss whatever the sampler
+(`core/tests/test_time_sampler_density.py` checks this against a known loss curve).
+A uniform sampler reports `d = 1` and training then makes exactly the call it made
+before, so existing recipes fit bit-for-bit as before. Checkpoints saved before
+`draw_weight_buf` existed load with uniform weights. Observations without a finite
+positive density (an allocation's reconstruction rows) are dropped. The schedule
+always observes the unweighted per-`t` loss, never the importance-weighted one.
 
 Defaults include buffer size 12800, warmup 1000, refit every 50, grid size 1000,
 and EMA 0.9. Legacy-time CDF extrapolation can cross an endpoint: public evaluation
@@ -142,8 +172,8 @@ inside one; delegated observations must still be applied once.
 ## Other schedule families
 
 `spherical` and `spherical_adaptive` provide spherical progress; `simplex`
-provides Dirichlet parameters, while its optional adaptive **time sampler** is a
-separate component. `blurring` supplies spectral decay coefficients.
+provides Dirichlet parameters, while its optional adaptive **training time
+sampler** is a separate component. `blurring` supplies spectral decay coefficients.
 `learned_log_snr` and `plaid_log_snr` are differentiable learned Gaussian schedules
 used by the RePlaid recipe, with trainable monotone shape and endpoint parameters.
 They differ from loss-buffer clock fitting. With `adaptation_term` set (e.g.
@@ -162,7 +192,8 @@ and [implementation helpers](../../core/noise_schedules/utils.py).
 
 ### Shared importance clock
 
-A clock shared by several views is a time sampler, not a schedule: the REPLAiD
+A learned clock shared by several views is configured as a training time sampler,
+although generation also reuses its map, so here it acts as both warp and sampler: the REPLAiD
 hybrid selects `time_sampler=piecewise_importance` with
 `algorithm.adaptive_time_views: [0, 1]`, so both views read one local time
 `u = Q(t)` from the sampler's quantile map, and each view keeps its own plain

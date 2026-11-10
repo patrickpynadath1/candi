@@ -8,7 +8,7 @@ and how training rewards that prediction.
 | [Backbone and conditioning](../components/models.md) | Transform noisy representations, prompts, time, and optional feedback into outputs |
 | [Output parameterization](../components/predictors.md) | Give those outputs mathematical meaning, such as clean-token posterior or absorbing score |
 | [Objective](../components/objectives.md) | Define the prediction loss, weighting, and auxiliary terms |
-| [Training time sampler](../components/time-sampling.md) | Choose the time points presented during training |
+| [Training time sampler](../components/time-sampling.md) | Decide how often training visits each time `t` (training only; the noise schedule fixes what `t` means) and how oversampling enters the loss (`objective_weighting`) |
 
 A shared tensor shape does not imply a shared prediction meaning. For example,
 uniform posterior cross-entropy and uniform plug-in formulations require their own

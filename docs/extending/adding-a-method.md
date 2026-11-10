@@ -35,7 +35,7 @@ defaults:
   - override /information_path/token_space@token_space: data_only
 ```
 
-A complete recipe must also select a compatible schedule and time sampler and
+A complete recipe must also select a compatible noise schedule and training time sampler and
 supply any required model/algorithm options. Copy the structure from a verified
 existing recipe such as [gaussian_base.yaml](../../configs/experiment/gaussian_base.yaml),
 then inspect composition with `uv run python main.py +experiment=<name> --cfg job`.

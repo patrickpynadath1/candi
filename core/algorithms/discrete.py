@@ -99,6 +99,7 @@ class DiscreteDiffusion(nn.Module):
             sampler_time=times,
             schedule=self.schedule,
             schedule_time=times,
+            objective=objective,
         )
 
     @torch.no_grad()

@@ -103,21 +103,31 @@ class GumbelSchedule(nn.Module):
         return path_from_gamma(*self.gamma(time))
 
     @torch.no_grad()
-    def observe(self, time, loss, step, *, training=False):
+    def observe(self, time, loss, step, *, training=False, density=None):
+        """``density``: the training time sampler's density of each draw relative
+        to uniform; squared errors are weighted by its inverse (None: uniform)."""
         if not training or not self.training or not self.learnable:
             return
         if time.shape != loss.shape or time.ndim != 1:
             raise ValueError("schedule feedback must be matching per-example vectors")
         valid = torch.isfinite(time) & torch.isfinite(loss) & (loss >= 0)
+        if density is not None:
+            valid = valid & torch.isfinite(density) & (density > 0)
         gamma = self.gamma(time[valid].detach())[0].detach().to(self.fit_parameters)
         target = loss[valid].detach().to(self.fit_parameters)
+        weight = (
+            None
+            if density is None
+            else density[valid].detach().to(self.fit_parameters).reciprocal()
+        )
         # Detaching gamma is essential: differentiating CDF(icdf(q)) would
         # cancel the very location/scale gradients that fit the loss profile.
         with torch.enable_grad():
             parameters = self.fit_parameters.detach().clone().requires_grad_()
             standardized = (gamma - parameters[0]) / parameters[1].exp()
             predicted = parameters[2].exp() * (-(-standardized).exp()).exp()
-            squared = (predicted - target).square().sum()
+            residual = (predicted - target).square()
+            squared = (residual if weight is None else residual * weight).sum()
             (gradient,) = torch.autograd.grad(squared, parameters)
         statistics = torch.cat(
             (gradient, squared.detach().reshape(1), gradient.new_tensor([len(target)]))

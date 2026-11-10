@@ -110,7 +110,7 @@ It consumes the actual path coefficients and process mixing derivatives, with
 no schedule reconstructed inside the loss. It requires interior times.
 `ClippedWeight` wraps this weight independently of the loss terms.
 The ELBO interpretation assumes the matching GIDD kernel and time integration;
-changing training time sampling or time warping requires the corresponding
+changing the training time sampler or time warping requires the corresponding
 importance/Jacobian correction. The dynamic GIDD+ weighting is not included.
 Using these divergence terms with another kernel does not establish an ELBO.
 
@@ -161,6 +161,14 @@ with `observe_terms` (adaptive allocation, schedule variance adaptation) and
 `estimate` to an importance time sampler's `adaptation_loss`. `ObjectiveContext`
 also carries the views' `schedules`, `loss_mask`, `corruption_mask`, `time_draw`,
 `time_density` and `detached_rows`.
+
+Weighting by the training time sampler's density is the algorithm's job, chosen by
+the sampler's `objective_weighting` (`importance_corrected` divides the tokenwise
+loss by the draw density, `uncorrected` leaves it as drawn; see
+[training time samplers](time-sampling.md#the-contract)). An objective that
+already divides by `context.time_density` itself declares
+`divides_by_time_density = True` (the hybrid ELBO), so the algorithm does not
+correct a second time, and `uncorrected` is then refused.
 
 The block modifier's optional clean autoregressive CE is computed from its clean
 stream and combined with the existing diffusion loss. It does not replace the

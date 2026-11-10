@@ -8,7 +8,7 @@ from collections.abc import Mapping
 import torch
 from torch import nn
 
-from core.algorithms.adaptive import observe_training_loss
+from core.algorithms.adaptive import observe_training_loss, observes_training_loss
 from core.modifiers.hybrid.views import point
 from core.noise_schedules.insertion import PowerInsertionSchedule
 from core.objectives.insertion import InsertionObjective
@@ -19,6 +19,11 @@ from .birth import ForwardInsertion, UniformInsertion
 from core.processes.uniform_posterior import PosteriorUniformProcess
 from .model import GapHead, SequencePrediction, forward_features
 from core.sequence_edits import valid_positions
+from core.time_sampling.density import (
+    objective_weighting,
+    training_time_density,
+    weight_objective,
+)
 
 
 class VariableLengthDiffusion(nn.Module):
@@ -235,9 +240,19 @@ class VariableLengthDiffusion(nn.Module):
             or len(tokens) % time_group_size
         ):
             raise ValueError("time_group_size must divide the batch size")
-        times = self.algorithm.time_sampler.sample(
-            len(tokens) // time_group_size, tokens.device, **time_context
-        ).repeat_interleave(time_group_size)
+        sampler = self.algorithm.time_sampler
+        drawn = sampler.sample(len(tokens) // time_group_size, tokens.device, **time_context)
+        corrected = objective_weighting(sampler) != "uncorrected"
+        observed_density = training and any(
+            observes_training_loss(view.schedule) for view in self.views
+        )
+        # Per-row training time sampler density, before the epsilon clamp.
+        density = (
+            training_time_density(sampler, drawn).repeat_interleave(time_group_size)
+            if corrected or observed_density
+            else None
+        )
+        times = drawn.repeat_interleave(time_group_size)
         times = times.clamp(self.training_epsilon, 1 - self.training_epsilon)
         sample = self.process.corrupt(valid, editable, times, self.schedule)
         edit = sample.edit
@@ -267,7 +282,14 @@ class VariableLengthDiffusion(nn.Module):
                 else {}
             ),
         )
-        token_sum = torch.where(compact_loss.bool(), per_token * compact_loss, 0).sum()
+        # importance_corrected divides each row's token and insertion losses by
+        # its draw density; observers keep the unweighted per_token.
+        optimized = (
+            weight_objective(per_token, sampler, density, self.algorithm.objective)
+            if corrected
+            else per_token
+        )
+        token_sum = torch.where(compact_loss.bool(), optimized * compact_loss, 0).sum()
         # Gaps containing removed targets, and gaps adjacent to editable tokens,
         # are eligible. Fully protected interiors never learn to insert.
         allowed = torch.zeros_like(sample.gap_counts, dtype=torch.bool)
@@ -287,10 +309,15 @@ class VariableLengthDiffusion(nn.Module):
             clean,
             allowed,
             self.schedule.rate(times),
-            **({"reduction": "none"} if self.time_sampling_include_aux else {}),
+            **({"reduction": "none"} if self.time_sampling_include_aux or corrected else {}),
         )
-        if self.time_sampling_include_aux:
+        if self.time_sampling_include_aux or corrected:
             insertion_per_example = insertion_sum
+            if corrected:
+                insertion_sum, counts, content = (
+                    weight_objective(value, sampler, density)
+                    for value in (insertion_sum, counts, content)
+                )
             insertion_sum, counts, content = (
                 insertion_sum.sum(),
                 counts.sum(),
@@ -307,6 +334,7 @@ class VariableLengthDiffusion(nn.Module):
                     compact_loss,
                     step=step,
                     training=True,
+                    density=density,
                 )
             observer = getattr(self.algorithm.time_sampler, "observe", None)
             if observer is not None:
