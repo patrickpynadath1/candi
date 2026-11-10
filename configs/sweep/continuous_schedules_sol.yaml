@@ -1,0 +1,35 @@
+# @package _global_
+# Inference-only rerun of continuous-schedules on its trained TinyStories checkpoints:
+# SOL (GPT-2 Large) replaces BLEU as the score, sampler tuning uses successive halving
+# (64 -> 256 -> 1024 prompts of a 2,048-prompt pool, best third promoted, top 3
+# re-scored with a fresh seed), NFE budgets 128 and 512, and EB with churn joins the
+# sampler policies. 4 continuous paths x {no SC, SC} = 8 cases. The recipe, data cohort
+# and model come from continuous_schedules unchanged, so its checkpoints load as is.
+# Protocol: experiments/sol-rerun/README.md.
+defaults:
+- continuous_schedules
+- override /inference/inference_policies: [hybrid_renoising, eb_churn]
+- _self_
+preparation:
+  name: continuous-schedules-sol
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/continuous-schedules-sol
+  family: continuous_schedules_sol
+  evaluation_file: experiments/sol-rerun/evaluation/${preparation.task_name}.json
+  # The finished continuous-schedules run whose checkpoints are scored (override to
+  # point elsewhere, e.g. preparation.source_runs=/data/sddc/runs/continuous-schedules).
+  source_runs: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/runs/continuous-schedules
+  source_case: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}
+  case_name: ${preparation.source_case}-sol
+  training:
+    space: {}
+    trials: 1
+    # The single fixed training candidate's directory is sha256("{}")[:20].
+    checkpoint: ${preparation.source_runs}/${preparation.source_case}/training/candidates/44136fa355b3678a1146/training/checkpoints/last.ckpt
+  evaluation:
+    nfe: [128, 512]
+  wandb:
+    project: continuous-schedules-sol
+hydra:
+  sweeper:
+    params:
+      task: battery/tinystories_bpe
