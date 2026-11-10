@@ -118,6 +118,20 @@ def test_fixed_seeds_give_identical_projections_and_bootstrap():
     assert same["low"] == same["high"] == 0.0
 
 
+def test_bootstrap_sub_slices_are_the_smaller_seeded_families():
+    x, y = corpus(0), corpus(1, shift=0.4)
+    small = SOLConfig(n_directions=6, n_projections=4, n_quantiles=8)
+    # The first k seeded directions and GP draws are exactly the k-draw families.
+    full = sol.quantile_features(x, SMALL, device="cpu")[:, :6]
+    torch.testing.assert_close(full, sol.quantile_features(x, small, device="cpu"))
+    fx = sol.quantile_features(x, SMALL, device="cpu")
+    fy = sol.quantile_features(y, SMALL, device="cpu")
+    whole = sol.sol_bootstrap(fx, fy, SMALL, 5, replicates=30, device="cpu", slices=None)
+    sub = sol.sol_bootstrap(fx, fy, SMALL, 5, replicates=30, device="cpu", slices=(6, 4))
+    assert sub["slices"] == [6, 4] and whole["slices"] == [24, 16]
+    assert 0 <= sub["low"] <= sub["high"] and 0 <= whole["low"] <= whole["high"]
+
+
 def test_features_do_not_depend_on_batching():
     x = corpus(7, n=9)
     whole = sol.quantile_features(x, SMALL, device="cpu", documents_per_batch=64)

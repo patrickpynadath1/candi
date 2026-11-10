@@ -39,11 +39,16 @@ unnormalised GP draws with Cholesky jitter, `scale = d`.
 | Quantile bins | 64 | |
 | Truncation | the model's 1024 positions | TinyStories continuations are far shorter |
 
-Deviations, both for generated text the reference code rejects: an empty
+Two deviations. An empty
 continuation (EOS at once) is encoded as the encoder's EOS token, so it is a valid,
-distant measure instead of an error; and `sol_interval` (optional) is a percentile
-bootstrap with **paired** resampling of prompts (generated text i and reference i are
-drawn together), which the reference code does not provide.
+distant measure instead of the reference code's error. And `sol_interval` (optional, not in the
+reference code) is a bootstrap interval with **paired** resampling of prompts (generated
+text i and reference i are drawn together). To keep it affordable, replicates are scored
+on the first `bootstrap_slices` (default 128 x 128) of the same seeded slice families, a
+true sub-estimator, and the interval is the full estimate shifted by the quantiles of
+(replicate - sub-estimate on the original sample); `bootstrap_slices: null` scores
+replicates on all slices. Resampled corpora contain duplicates, which bias distances
+upward, so read the interval as prompt-sampling spread, not as an exact coverage claim.
 
 ## Use in TinyStories
 

@@ -209,12 +209,17 @@ def sol_from_features(fx, fy, config, dimension, *, device=None, slice_batch_siz
 
 def sol_bootstrap(
     fx, fy, config, dimension, *, replicates=100, confidence=0.95, seed=0, device=None,
-    slice_batch_size=32768,
+    slice_batch_size=32768, slices=(128, 128),
 ):
-    """Percentile interval of SOL under paired resampling of prompts.
+    """Bootstrap interval of SOL under paired resampling of prompts.
 
     Generated and reference documents are paired by prompt (same order, same n);
     each replicate draws one set of prompt indices with replacement for both sides.
+    ``slices = (directions, projections)`` scores the replicates on the first slices of
+    the same seeded families (a sub-estimator; ``None`` uses all of them) and shifts
+    the replicate distribution to the full estimate: [full + q_lo(rep - sub),
+    full + q_hi(rep - sub)], where sub is the sub-estimator on the original sample.
+    This keeps the prompt-resampling spread at a fraction of the full cost.
     """
     if fx.shape[0] != fy.shape[0]:
         raise ValueError("a paired bootstrap needs one reference per generated text")
@@ -222,18 +227,30 @@ def sol_bootstrap(
         raise ValueError("replicates must be positive and confidence in (0, 1)")
     scale = config.scale if config.scale is not None else float(dimension)
     device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+    full = _scores(fx, fy, config, scale, device=device, slice_batch_size=slice_batch_size)[0]
+    sub_config = config
+    if slices is not None:
+        directions_, projections = (min(int(slices[0]), config.n_directions),
+                                    min(int(slices[1]), config.n_projections))
+        # The first k seeded draws of each family are the k-draw family: a true subset.
+        sub_config = SOLConfig(directions_, projections, config.n_quantiles,
+                               config.lengthscale, config.seed, config.gp_seed, config.scale)
+        fx, fy = fx[:, :directions_], fy[:, :directions_]
     generator = np.random.default_rng(seed)
     n = fx.shape[0]
-    indices = [
+    indices = [None] + [
         torch.as_tensor(generator.integers(0, n, n), device=device) for _ in range(replicates)
     ]
     scores = _scores(
-        fx, fy, config, scale, device=device, slice_batch_size=slice_batch_size, resample=indices
+        fx, fy, sub_config, scale, device=device, slice_batch_size=slice_batch_size,
+        resample=indices,
     )
     tail = (1 - confidence) / 2
-    low, high = np.quantile(scores, [tail, 1 - tail])
-    return {"low": float(low), "high": float(high), "replicates": replicates,
-            "confidence": confidence, "resampling": "paired_prompts"}
+    low, high = np.quantile(np.array(scores[1:]) - scores[0], [tail, 1 - tail])
+    return {"low": float(max(0.0, full + low)), "high": float(full + high),
+            "replicates": replicates, "confidence": confidence,
+            "resampling": "paired_prompts",
+            "slices": [sub_config.n_directions, sub_config.n_projections]}
 
 
 # Paper-pinned encoder revisions (the reference implementation's MODELS.md).
@@ -367,6 +384,7 @@ class SOLScorer:
         bootstrap=0,
         bootstrap_confidence=0.95,
         bootstrap_seed=0,
+        bootstrap_slices=(128, 128),
         cache_dir=None,
         device="auto",
         slice_batch_size=32768,
@@ -379,6 +397,7 @@ class SOLScorer:
         self.encoder = encoder
         self.bootstrap, self.bootstrap_confidence = int(bootstrap), float(bootstrap_confidence)
         self.bootstrap_seed = int(bootstrap_seed)
+        self.bootstrap_slices = None if bootstrap_slices is None else tuple(bootstrap_slices)
         if cache_dir is None and os.environ.get("SDDC_STORAGE_ROOT"):
             cache_dir = Path(os.environ["SDDC_STORAGE_ROOT"]) / "sol_cache"
         self.cache_dir = None if cache_dir is None else Path(cache_dir).expanduser()
@@ -440,5 +459,6 @@ class SOLScorer:
                 fx, fy, self.config, dimension, replicates=self.bootstrap,
                 confidence=self.bootstrap_confidence, seed=self.bootstrap_seed,
                 device=device, slice_batch_size=self.slice_batch_size,
+                slices=self.bootstrap_slices,
             )
         return result
