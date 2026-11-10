@@ -1,6 +1,6 @@
 """Every rerun case composes for every policy's starting point, as the evaluate worker does.
 
-For all 99 cases of the three rerun manifests and every inference policy, applies the
+For all 72 cases of the three rerun manifests and the 27 gauss512 training cases and every inference policy, applies the
 evaluation overrides, the policy's sampler and its first initial point (or a random
 draw from its space) with ``nested_tuning.evaluation_config``, checks the recipe is
 unchanged apart from the tuned values, and instantiates the algorithm (at test size)
@@ -21,7 +21,10 @@ from core.sweeps import nested_tuning
 from core.tests.helpers import ROOT, run_python
 from core.tests.networks import TINY16_SIZES
 
-SWEEPS = ("sc_vs_depth", "continuous_schedules", "hybrid_sc")
+SWEEPS = tuple(f"{s}_{kind}" for kind in ("rerun", "gauss512")
+               for s in ("sc_vs_depth", "continuous_schedules", "hybrid_sc"))
+COUNTS = {"sc_vs_depth_rerun": 18, "continuous_schedules_rerun": 18, "hybrid_sc_rerun": 36,
+          "sc_vs_depth_gauss512": 9, "continuous_schedules_gauss512": 6, "hybrid_sc_gauss512": 12}
 
 
 @pytest.fixture(scope="module")
@@ -32,7 +35,7 @@ def manifests(tmp_path_factory):
     result = {}
     for sweep in SWEEPS:
         plan = root / sweep
-        run_python("-m", "core.sweeps.prepare", "-m", f"+sweep={sweep}_rerun",
+        run_python("-m", "core.sweeps.prepare", "-m", f"+sweep={sweep}",
                    f"preparation.output={plan}", env=env)
         run_python("-m", "core.sweeps.prepare", "collect", str(plan), env=env)
         result[sweep] = json.loads((plan / "manifest.json").read_text())
@@ -64,7 +67,7 @@ def flat(value, prefix=""):
 @pytest.mark.parametrize("sweep", SWEEPS)
 def test_every_policy_composes_and_instantiates_for_every_case(manifests, sweep):
     cases = manifests[sweep]
-    assert len(cases) == {"sc_vs_depth": 27, "continuous_schedules": 24, "hybrid_sc": 48}[sweep]
+    assert len(cases) == COUNTS[sweep]
     for case in cases:
         base = OmegaConf.load(case["config"])
         recipe = dict(flat(OmegaConf.to_container(base.algorithm, resolve=True)))

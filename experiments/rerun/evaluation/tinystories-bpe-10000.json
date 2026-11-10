@@ -189,7 +189,8 @@
    "bootstrap_confidence": 0.95,
    "bootstrap_seed": 0,
    "cache_dir": "${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/ref_w1_cache"
-  }
+  },
+  "loader.eval_batch_size": 128
  },
  "test_overrides": {
   "task.sol": {

@@ -1,0 +1,23 @@
+# @package _global_
+# Retrain the Gaussian-embedding arm of sc_vs_depth with the 512-dimensional embedding (now
+# the default of information_path/hybrid_view/gaussian.yaml), 9 cases, and evaluate
+# it with the rerun protocol (rerun_protocol.yaml). The recipe is sc_vs_depth's; only the
+# embedding size and gradient accumulation differ (global batch 256, 20k steps).
+defaults:
+- sc_vs_depth
+- rerun_protocol
+- override /inference/inference_policies: [hybrid_renoising, eb_churn, psi]
+- _self_
+trainer:
+  accumulate_grad_batches: 1
+preparation:
+  name: sc-vs-depth-gauss512
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/sc-vs-depth-gauss512
+  family: sc_vs_depth_gauss512
+  case_name: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}-gauss512
+  wandb:
+    project: sc-vs-depth-gauss512
+hydra:
+  sweeper:
+    params:
+      ablation_path: gaussian_cdcd

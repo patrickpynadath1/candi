@@ -24,7 +24,9 @@
   ],
   "stage2_bootstrap": 200
  },
- "overrides": {},
+ "overrides": {
+  "loader.eval_batch_size": 256
+ },
  "tuning_indices": [
   1937,
   1006,

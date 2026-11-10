@@ -1,6 +1,6 @@
 # @package _global_
 # Inference-only rerun of sc_vs_depth on its trained checkpoints (experiments/rerun):
-# 27 cases: {Gaussian (CDCD clock), masked, uniform} x {8 layers,
+# 18 cases: {masked, uniform} x {8 layers,
 # 8 layers + SC, 16 layers} x {Sudoku-hard, text8, TinyStories BPE-10k}. Also the runs
 # experiments/sc-sampler-choice reads.
 # The recipe, data cohort and seeds come from sc_vs_depth unchanged, so its checkpoints load
@@ -17,3 +17,8 @@ preparation:
   source_runs: ${preparation.source_root}/sc_vs_depth
   wandb:
     project: sc-vs-depth-rerun
+hydra:
+  sweeper:
+    params:
+      # The Gaussian-embedding arm is retrained at 512 dimensions (sc_vs_depth_gauss512).
+      ablation_path: masked_elbo,uniform

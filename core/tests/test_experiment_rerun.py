@@ -41,6 +41,8 @@ def test_partitions_are_disjoint_two_stage_ready_and_unseen(task):
     assert 0 <= min(tuning + test) and max(tuning + test) < size
     # The source runs' training callbacks generated from their tuning indices.
     assert not set(test) & set(old["tuning_indices"])
+    batch = 128 if task.startswith("tinystories") else 256
+    assert spec["overrides"]["loader.eval_batch_size"] == batch
     stages = spec["two_stage"]
     assert (stages["stage1"], stages["stage2"], stages["finalists"]) == (64, 256, 3)
     assert stages["stage1"] + stages["stage2"] <= pool
@@ -52,7 +54,8 @@ def test_partitions_are_disjoint_two_stage_ready_and_unseen(task):
     else:  # Sudoku and text8 keep their metrics and overrides.
         score = {k: v for k, v in spec["score"].items() if k != "per_example"}
         assert (score, spec["direction"]) == (old["score"], old["direction"])
-        assert spec["overrides"] == old.get("overrides", {})
+        assert {k: v for k, v in spec["overrides"].items() if k != "loader.eval_batch_size"} \
+            == old.get("overrides", {})
 
 
 def test_per_example_paths_average_to_the_task_metrics(tmp_path):
@@ -107,7 +110,7 @@ def prepare(sweep, plan, env):
 
 
 @pytest.mark.parametrize("source,count", [
-    ("sc_vs_depth", 27), ("continuous_schedules", 24), ("hybrid_sc", 48),
+    ("sc_vs_depth", 18), ("continuous_schedules", 18), ("hybrid_sc", 36),
 ])
 def test_prepare_reuses_source_checkpoints_and_recipes(tmp_path, source, count):
     env = {**os.environ, "PYTHONPATH": str(ROOT), "SDDC_STORAGE_ROOT": str(tmp_path),
@@ -115,7 +118,11 @@ def test_prepare_reuses_source_checkpoints_and_recipes(tmp_path, source, count):
     cases = prepare(f"{source}_rerun", tmp_path / "plan", env)
     originals = {c["name"]: c for c in prepare(source, tmp_path / "source", env)}
     assert len(cases) == count
-    assert {c["name"] for c in cases} == {f"{name}-rerun" for name in originals}
+    # The Gaussian-embedding arm is retrained at 512 dimensions instead (*_gauss512).
+    assert {c["name"] for c in cases} == {
+        f"{name}-rerun" for name in originals if "gaussian_embedding" not in name}
+    tasks = [c["name"].split("-")[0] for c in cases]
+    assert tasks == sorted(tasks, key=["tinystories", "text8", "sudoku_hard"].index)  # longest first
     for case in cases:
         base = originals[case["name"][: -len("-rerun")]]
         assert base["training"] == {"space": {}, "trials": 1}  # one candidate: hash of {}
@@ -188,3 +195,45 @@ def test_new_policies_sample_every_family(name, family, view):
         output, info = algo.generate(instantiate(config.sampler), tokens, prompt)
         assert torch.equal(output[prompt], tokens[prompt])
         assert max(info["nfe_per_sample"]) <= 7
+
+
+GAUSS_KEYS = (
+    "model.views.content.representation.state_representation.dimension",
+    "model.views.content.representation.state_dim",
+    "model.views.content.schedule.dimension",
+)
+
+
+@pytest.mark.parametrize("source,count", [
+    ("sc_vs_depth", 9), ("continuous_schedules", 6), ("hybrid_sc", 12),
+])
+def test_gauss512_retrains_the_gaussian_arm_with_the_rerun_protocol(tmp_path, source, count):
+    env = {**os.environ, "PYTHONPATH": str(ROOT), "SDDC_STORAGE_ROOT": str(tmp_path)}
+    cases = prepare(f"{source}_gauss512", tmp_path / "plan", env)
+    originals = {c["name"]: c for c in prepare(source, tmp_path / "source", env)}
+    assert len(cases) == count
+    assert {c["name"] for c in cases} == {
+        f"{name}-gauss512" for name in originals if "gaussian_embedding" in name}
+    tasks = [c["name"].split("-")[0] for c in cases]
+    assert tasks == sorted(tasks, key=["tinystories", "text8", "sudoku_hard"].index)
+    for case in cases:
+        config = OmegaConf.load(case["config"])
+        resolved = OmegaConf.to_container(config, resolve=True)
+        for key in GAUSS_KEYS:
+            assert OmegaConf.select(OmegaConf.create(resolved), key) == 512, (case["name"], key)
+        assert config.trainer.accumulate_grad_batches == 1
+        assert config.loader.global_batch_size == 256 and config.trainer.max_steps == 20000
+        assert case["training"] == {"space": {}, "trials": 1}  # trained from scratch
+        assert [p["name"] for p in case["inference"]] == POLICIES
+        task = next(t for t in SIZES if case["name"].startswith(t))
+        expected = json.loads((EVALUATION / f"{task}.json").read_text())
+        assert case["evaluation"]["test_indices"] == expected["test_indices"]
+        assert case["evaluation"]["two_stage"] == expected["two_stage"]
+        assert case["evaluation"]["extra_test_nfe"] == [512]
+        # Everything else is the source recipe: only the embedding size and accumulation.
+        old = OmegaConf.to_container(
+            OmegaConf.load(originals[case["name"][: -len("-gauss512")]]["config"]), resolve=False)
+        new = OmegaConf.to_container(config, resolve=False)
+        for key in set(old) | set(new):
+            if key not in {"output_dir", "wandb", "benchmark", "callback", "trainer", "training"}:
+                assert old.get(key) == new.get(key), (case["name"], key)

@@ -1,6 +1,7 @@
 # @package _global_
 # Inference-only rerun of continuous_schedules on its trained checkpoints (experiments/rerun):
-# 24 cases: 4 continuous paths x {no SC, SC} x 3 tasks.
+# 18 cases: {simplex, spherical, vMF} x {no SC, SC} x 3 tasks (the Gaussian arm is
+# retrained at 512 dimensions by continuous_schedules_gauss512).
 # The recipe, data cohort and seeds come from continuous_schedules unchanged, so its checkpoints load
 # as is. Policies: the five of hybrid_renoising, plus eb_churn and psi.
 defaults:
@@ -15,3 +16,8 @@ preparation:
   source_runs: ${preparation.source_root}/continuous_schedules
   wandb:
     project: continuous-schedules-rerun
+hydra:
+  sweeper:
+    params:
+      # The Gaussian-embedding arm is retrained at 512 dimensions (continuous_schedules_gauss512).
+      ablation_path: simplex,spherical,spherical_vmf

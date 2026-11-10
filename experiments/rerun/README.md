@@ -6,6 +6,11 @@ checkpoints of their H100 reproduction (`blog-repro-h100`). It also covers
 [sc-sampler-choice](../sc-sampler-choice/), which only reads the sc-vs-depth runs'
 per-policy validation scores. block-encoder-decoder is not included.
 
+The Gaussian-embedding arm is not rerun on its old checkpoints. The embedding default is
+now 512 dimensions, which would no longer match those 128-dimensional checkpoints, so
+the arm is **retrained** at 512 by the `*_gauss512` sweeps under the same evaluation
+protocol (see below). The reruns cover the other 72 cases.
+
 The recipes, data cohorts, seeds and checkpoints are those of the source runs. The cases'
 pinned configs equal the source runs' `protocol.json` configs apart from two
 training-only keys that later code adds with their default values
@@ -74,17 +79,44 @@ dictionary is the first 65,536 bytes of `"\n\n".join(prompt + reference)` over t
 on the cohort cache `stories_validation_16009c882a778c54728e38f8.json`, and the scorer
 refuses any other dictionary.
 
+## Sweeps
+
+| Sweep | Cases | What |
+| --- | --- | --- |
+| `sc_vs_depth_gauss512` | 9 | train: Gaussian embedding (CDCD clock) x {8L, 8L + SC, 16L} x 3 tasks |
+| `continuous_schedules_gauss512` | 6 | train: Gaussian embedding x {no SC, SC} x 3 tasks |
+| `hybrid_sc_gauss512` | 12 | train: {masked, uniform} view x Gaussian embedding x {no SC, SC} x 3 tasks |
+| `sc_vs_depth_rerun` | 18 | evaluate: {masked, uniform} x {8L, 8L + SC, 16L} x 3 tasks |
+| `continuous_schedules_rerun` | 18 | evaluate: {simplex, spherical, vMF} x {no SC, SC} x 3 tasks |
+| `hybrid_sc_rerun` | 36 | evaluate: {masked, uniform} x {simplex, spherical, vMF} x {no SC, SC} x 3 tasks |
+
+The gauss512 cases (`<source case>-gauss512`) use the source sweeps' recipes, data
+cohorts and seeds, trained from scratch for 20k steps with global batch 256. The only
+differences are the 512-dimensional embedding (all three Gaussian keys follow
+`state_representation.dimension`) and `trainer.accumulate_grad_batches: 1`.
+
+Both kinds share `configs/sweep/rerun_protocol.yaml`, which sets the evaluation:
+- the partitions in `evaluation/`;
+- two-stage selection, with ref_w1 tuning and SOL testing on TinyStories;
+- the 7 policies;
+- the per-policy NFE-512 smoke test;
+- evaluation batch 128 for TinyStories and 256 for text8 and Sudoku;
+- manifests ordered longest task first (TinyStories, text8, Sudoku).
+
 ## Run
 
-On the H100 machine, where `/data/sddc/runs/blog-repro-h100/<sweep>/` holds the source
-runs (also in `s3://sddc-patrick-data-029636175027/runs/blog-repro-h100/`; override the
-root with `SDDC_SOURCE_RUNS`):
+**Launch the gauss512 training sweeps first**: they train as well as evaluate, so they are
+the long pole. Then launch the reruns, which only evaluate. On the H100 machine, where
+`/data/sddc/runs/blog-repro-h100/<sweep>/` holds the source runs (also in
+`s3://sddc-patrick-data-029636175027/runs/blog-repro-h100/`; override the root with
+`SDDC_SOURCE_RUNS`):
 
 ```bash
-for sweep in sc_vs_depth continuous_schedules hybrid_sc; do
-  name=${sweep//_/-}-rerun
+for sweep in sc_vs_depth_gauss512 continuous_schedules_gauss512 hybrid_sc_gauss512 \
+             sc_vs_depth_rerun continuous_schedules_rerun hybrid_sc_rerun; do
+  name=${sweep//_/-}
   uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare -m \
-    +sweep=${sweep}_rerun preparation.output=$SDDC_STORAGE_ROOT/plans/$name
+    +sweep=$sweep preparation.output=$SDDC_STORAGE_ROOT/plans/$name
   uv run --locked --extra tuning --extra scoring python -m core.sweeps.prepare collect \
     $SDDC_STORAGE_ROOT/plans/$name
   uv run --locked --extra tuning --extra scoring python -m core.sweeps.nested_tuning \
@@ -92,15 +124,21 @@ for sweep in sc_vs_depth continuous_schedules hybrid_sc; do
 done
 ```
 
-then `nested_tuning ... --output $SDDC_STORAGE_ROOT/runs/<name> --address auto` per plan.
-Every case reads `<source case>/training/candidates/44136fa355b3678a1146/training/checkpoints/last.ckpt`
-(the single fixed training candidate, the same hash in all three sweeps). `--check` refuses
-a missing checkpoint. GPT-2 Large downloads at its pinned revision on first scoring.
+then run `nested_tuning ... --output $SDDC_STORAGE_ROOT/runs/<name> --address auto` per
+plan, in the same order.
+- Every rerun case reads
+  `<source case>/training/candidates/44136fa355b3678a1146/training/checkpoints/last.ckpt`,
+  the single fixed training candidate, with the same hash in all three sweeps.
+- `--check` refuses a missing checkpoint.
+- GPT-2 Large downloads at its pinned revision on first scoring.
 
 ## Cost
 
 These are sequence network calls (sequences x NFE) from `generation_cost`, an upper bound:
-EB stops early. The current column is the source sweeps' own tuning plus test.
+EB stops early. The current column is the source sweeps' own tuning plus test. The rows
+count all 99 evaluated cases per experiment: the 72 reruns plus the 27 gauss512 cases,
+which share the protocol and so the evaluation cost. Training the 27 gauss512 cases
+comes on top.
 
 | Sweep (cases) | Stage 1 | Stage 2 | Test @128 (winner) | Smoke @512 (per policy) | Total | Current | Ratio |
 | --- | --- | --- | --- | --- | --- | --- | --- |

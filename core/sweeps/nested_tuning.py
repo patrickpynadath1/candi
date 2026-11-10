@@ -76,7 +76,7 @@ def save(path, value):
 
 # Recorded in protocol.json but not compared on resume: where a case runs and
 # where it logs do not change what is selected or scored.
-EXECUTION_FIELDS = ("resources", "wandb")
+EXECUTION_FIELDS = ("resources", "wandb", "priority")
 
 
 def selection_protocol(protocol):

@@ -1,0 +1,29 @@
+# @package _global_
+# The evaluation protocol shared by the inference-only reruns (rerun_common) and the
+# gauss512 training sweeps: experiments/rerun/evaluation partitions (two-stage selection;
+# TinyStories tuned by ref_w1, tested by SOL), NFE 128, every policy's validation winner
+# smoke-tested at NFE 512 on 128 test prompts with one seed, per-policy Optuna samplers,
+# and manifests ordered longest task first.
+preparation:
+  evaluation_file: experiments/rerun/evaluation/${preparation.task_name}.json
+  evaluation:
+    nfe: 128
+    extra_test_nfe: [512]
+    extra_test_examples: 128   # fixed subset of the test partition
+    extra_test_seeds: [1041]   # one test seed
+  # Fields of the shared hybrid_renoising policies (eb_churn and psi set their own): GP
+  # Bayesian optimisation for the small continuous spaces, and both values of the
+  # two-trial categorical policies as initial points so each is evaluated once.
+  inference_overrides:
+    native: {search: {algorithm: gp}}
+    eb_greedy: {search: {algorithm: gp}}
+    renoising: {search: {algorithm: gp}}
+    native_greedy:
+      initial_points: [{sampler.final_denoise: greedy}, {sampler.final_denoise: sample}]
+    renoising_greedy:
+      initial_points: [{sampler.final_denoise: greedy}, {sampler.final_denoise: sample}]
+  # Manifest order (collect sorts by it, then by name): the longest tasks first.
+  case_priority:
+    tinystories-bpe-10000: 0
+    text8: 1
+    sudoku_hard: 2

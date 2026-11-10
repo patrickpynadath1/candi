@@ -1,6 +1,6 @@
 # @package _global_
 # Inference-only rerun of hybrid_sc on its trained checkpoints (experiments/rerun):
-# 48 cases: {masked, uniform} view x 4 continuous paths x {no SC, SC}
+# 36 cases: {masked, uniform} view x {simplex, spherical, vMF} x {no SC, SC}
 # x 3 tasks.
 # The recipe, data cohort and seeds come from hybrid_sc unchanged, so its checkpoints load
 # as is. Policies: the five of hybrid_renoising, plus eb_churn and psi.
@@ -16,3 +16,8 @@ preparation:
   source_runs: ${preparation.source_root}/hybrid_sc
   wandb:
     project: hybrid-sc-rerun
+hydra:
+  sweeper:
+    params:
+      # The Gaussian-embedding arm is retrained at 512 dimensions (hybrid_sc_gauss512).
+      ablation_path: simplex,spherical,spherical_vmf

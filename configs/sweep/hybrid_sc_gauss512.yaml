@@ -1,0 +1,23 @@
+# @package _global_
+# Retrain the Gaussian-embedding arm of hybrid_sc with the 512-dimensional embedding (now
+# the default of information_path/hybrid_view/gaussian.yaml), 12 cases, and evaluate
+# it with the rerun protocol (rerun_protocol.yaml). The recipe is hybrid_sc's; only the
+# embedding size and gradient accumulation differ (global batch 256, 20k steps).
+defaults:
+- hybrid_sc
+- rerun_protocol
+- override /inference/inference_policies: [hybrid_renoising, eb_churn, psi]
+- _self_
+trainer:
+  accumulate_grad_batches: 1
+preparation:
+  name: hybrid-sc-gauss512
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/hybrid-sc-gauss512
+  family: hybrid_sc_gauss512
+  case_name: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}-gauss512
+  wandb:
+    project: hybrid-sc-gauss512
+hydra:
+  sweeper:
+    params:
+      ablation_path: gaussian

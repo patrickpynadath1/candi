@@ -118,6 +118,10 @@ def prepare_case(config):
         wandb=None if config.wandb is None else OmegaConf.to_container(config.wandb),
         resources=metadata["local"]["resources_per_job"],
     )
+    # Optional manifest order (lower first, e.g. the longest tasks): execution only.
+    priorities = metadata.get("case_priority") or {}
+    if metadata["task_name"] in priorities:
+        case["priority"] = int(priorities[metadata["task_name"]])
     validate(case)
     destination.mkdir(parents=True)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -136,6 +140,8 @@ def collect(output):
         cases.append(case)
     if not cases:
         raise ValueError("No prepared cases")
+    # Cases with a priority run in that order; the rest keep name order after them.
+    cases.sort(key=lambda c: (c.get("priority", float("inf")), c["name"]))
     if len({c["name"] for c in cases}) != len(cases):
         raise ValueError("Duplicate case names")
     (output / "manifest.json").write_text(json.dumps(cases, indent=2) + "\n")
