@@ -55,8 +55,11 @@ What to decide:
   `budget_parameter: steps`, and optionally its own `sampler` or `sampler_overrides`. Shared
   sets live in `configs/inference/inference_policies/`; single-policy files there
   (`eb_churn`, `psi`, `uniform_psi`) add to a set through `preparation.extra_inference`.
-- **Successive halving** (opt-in): an evaluation-file `halving` block (rungs, keep,
-  finalists, fresh `finalist_seeds`); see `docs/guides/nested-tuning.md`.
+- **Two-stage selection** (opt-in): an evaluation-file `two_stage` block (`stage1` and
+  `stage2` prompt counts, `finalists`, fresh `stage2_seeds`); per-policy Optuna samplers
+  through `search` (`gp` for small continuous spaces, TPE `multivariate`/`group` for
+  categorical or conditional ones) or a sweep's `preparation.inference_search`; see
+  `docs/guides/nested-tuning.md`.
 - **Training search** (`preparation.training.space`, `trials`): keys must start with
   `optimizer.`, `model.`, `algorithm.`, `objective.`, `noise_schedule.`, `time_sampler.`,
   `training.`, `self_conditioning.` or `lr_scheduler.`. Default: one fixed candidate.

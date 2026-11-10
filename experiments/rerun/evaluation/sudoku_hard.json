@@ -1,6 +1,6 @@
 {
  "task": "sudoku_hard",
- "source": "numpy.random.default_rng(20261111): test = 976 of the 2000 validation examples, excluding the 128 tuning indices the source runs' training callbacks saw; tuning pool = 1024 of the rest, in draw order (halving rungs are its prefixes)",
+ "source": "numpy.random.default_rng(20261111): test = 976 of the 2000 validation examples, excluding the 128 tuning indices the source runs' training callbacks saw; tuning pool = 1024 of the rest, in draw order (two-stage selection uses its first stage1 and the next stage2 prompts)",
  "score": {
   "kind": "metric",
   "metric": "accuracy"
@@ -14,15 +14,11 @@
   1041,
   1042
  ],
- "halving": {
-  "rungs": [
-   64,
-   256,
-   1024
-  ],
-  "keep": 0.3333333333333333,
+ "two_stage": {
+  "stage1": 64,
+  "stage2": 256,
   "finalists": 3,
-  "finalist_seeds": [
+  "stage2_seeds": [
    2041
   ]
  },

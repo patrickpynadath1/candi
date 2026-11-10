@@ -1,4 +1,4 @@
-# rerun: SOL scoring, Ψ and EB-churn samplers, successive-halving tuning
+# rerun: SOL scoring, Ψ and EB-churn samplers, two-stage sampler selection
 
 An inference-only rerun of [sc-vs-depth](../sc-vs-depth/),
 [continuous-schedules](../continuous-schedules/) and [hybrid-sc](../hybrid-sc/) on the
@@ -24,9 +24,16 @@ What changes:
    - `psi`: the [Ψ-sampler](../../docs/components/psi-sampler.md), tuning schedule, η,
      loop t_on/t_off, top_p and temperature (24 trials). It applies to every corruption
      (Gaussian, simplex, spherical, vMF, masked, uniform and the hybrids).
-3. **Tuning.** Successive halving at NFE 128. Every trial is scored on 64 tuning prompts,
-   the best third on 256, the best third of those on 1024. The top 3 are then re-scored
-   on the 1024 with a fresh seed (2041), with a SOL bootstrap interval on TinyStories.
+3. **Tuning.** Two-stage selection at NFE 128. Every trial is scored on a stage-1 subset
+   of the tuning pool with the tuning seeds: 64 prompts for Sudoku and text8, 128 for
+   TinyStories. Each policy's top 3 are then re-scored on the next, disjoint stage-2
+   subset (256 prompts; 512 for TinyStories) with a fresh seed (2041). The best stage-2
+   score wins. On TinyStories the stage-2 SOL carries a 200-replicate bootstrap
+   interval.
+   - **Optuna samplers:** GP (`GPSampler`) for the policies with small continuous spaces
+     (native, eb_greedy, renoising, eb_churn). TPE with `multivariate` and `group` for
+     psi, whose space is categorical and conditional. native_greedy and
+     renoising_greedy (one two-valued choice) keep TPE.
 4. **Test.** The overall validation winner is scored once on the test split at NFE 128.
    Afterwards, as a smoke measurement, **each policy's** validation winner is scored once
    at NFE 512 on a fixed 128-prompt subset of the test partition with one test seed
@@ -45,7 +52,7 @@ generated from.
 | text8 | 19,531 | 2,048 | 2,048 | 128 / 256 |
 | TinyStories BPE-10k | 13,092 | 2,048 | 2,048 | 128 / 256 |
 
-Halving rungs are prefixes of the tuning pool (in draw order). Tuning seeds are 41 and
+Stage 1 uses the first `stage1` prompts of the tuning pool (in draw order) and stage 2 the next `stage2`; the rest of the pool is unused. Tuning seeds are 41 and
 42, test seeds 1041 and 1042. text8's size is the packed validation split
 (5,000,000 characters in 256-character rows: 19,531). Its official test split is also
 available (`evaluation.test_dataset: test`) if a still larger untouched test set is
@@ -79,14 +86,22 @@ a missing checkpoint. GPT-2 Large downloads at its pinned revision on first scor
 These are sequence network calls (sequences x NFE) from `generation_cost`, an upper bound:
 EB stops early. The current column is the source sweeps' own tuning plus test.
 
-| Sweep (cases) | Tuning @128 | Test @128 (winner) | Smoke @512 (per policy) | Total | Current | Ratio |
-| --- | --- | --- | --- | --- | --- | --- |
-| sc_vs_depth_rerun (27) | 256.6M | 11.7M | 12.4M | 280.7M | 47.8M | 5.9x |
-| continuous_schedules_rerun (24) | 228.1M | 10.4M | 11.0M | 249.5M | 42.5M | 5.9x |
-| hybrid_sc_rerun (48) | 456.1M | 20.8M | 22.0M | 498.9M | 84.9M | 5.9x |
-| **All (99)** | **940.8M** | **42.9M** | **45.4M** | **1,029.0M** | **175.2M** | **5.9x** |
+| Sweep (cases) | Stage 1 | Stage 2 | Test @128 (winner) | Smoke @512 (per policy) | Total | Current | Ratio |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| sc_vs_depth_rerun (27) | 59.0M | 22.4M | 11.7M | 12.4M | 105.5M | 47.8M | 2.2x |
+| continuous_schedules_rerun (24) | 52.4M | 19.9M | 10.4M | 11.0M | 93.7M | 42.5M | 2.2x |
+| hybrid_sc_rerun (48) | 104.9M | 39.8M | 20.8M | 22.0M | 187.5M | 84.9M | 2.2x |
+| **All (99)** | **216.3M** | **82.2M** | **42.8M** | **45.4M** | **386.7M** | **175.2M** | **2.2x** |
 
-Tuning is 91% of the total and 5.6x the current tuning: 7 policies with 112 trials,
-each trial at most 64 + 256 + 1024 prompts, against 52 trials of 128 prompts. The NFE-512
-smoke measurement is 7 policies x 128 prompts x 1 seed x 512 calls per case.
+By task, over all three sweeps (33 cases each):
+
+| Task | Stage 1 | Stage 2 | Test @128 | Smoke @512 | Total | Current | Ratio |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Sudoku-hard | 54.1M | 20.5M | 8.2M | 15.1M | 98.0M | 58.4M | 1.7x |
+| text8 | 54.1M | 20.5M | 17.3M | 15.1M | 107.1M | 58.4M | 1.8x |
+| TinyStories | 108.1M | 41.1M | 17.3M | 15.1M | 181.7M | 58.4M | 3.1x |
+
+Per case: 112 trials x 64 prompts x 2 seeds at stage 1 (x 128 for TinyStories), and 7
+policies x 3 finalists x 256 prompts x 1 seed at stage 2 (x 512 for TinyStories). The
+NFE-512 smoke measurement is 7 policies x 128 prompts x 1 seed.
 SOL scoring adds one GPT-2 Large pass per generated story.

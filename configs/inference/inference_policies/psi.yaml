@@ -46,3 +46,4 @@ preparation:
         algorithm.predictor.temperature: 1.0
       trials: 24
       budget_parameter: steps
+      search: {algorithm: tpe, multivariate: true, group: true}

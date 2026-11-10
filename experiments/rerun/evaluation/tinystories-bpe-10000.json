@@ -1,6 +1,6 @@
 {
  "task": "tinystories-bpe-10000",
- "source": "numpy.random.default_rng(20261113): test = 2048 of the 13092 validation examples, excluding the 128 tuning indices the source runs' training callbacks saw; tuning pool = 2048 of the rest, in draw order (halving rungs are its prefixes)",
+ "source": "numpy.random.default_rng(20261113): test = 2048 of the 13092 validation examples, excluding the 128 tuning indices the source runs' training callbacks saw; tuning pool = 2048 of the rest, in draw order (two-stage selection uses its first stage1 and the next stage2 prompts)",
  "score": {
   "kind": "metric",
   "metric": "sol"
@@ -14,18 +14,14 @@
   1041,
   1042
  ],
- "halving": {
-  "rungs": [
-   64,
-   256,
-   1024
-  ],
-  "keep": 0.3333333333333333,
+ "two_stage": {
+  "stage1": 128,
+  "stage2": 512,
   "finalists": 3,
-  "finalist_seeds": [
+  "stage2_seeds": [
    2041
   ],
-  "finalist_overrides": {
+  "stage2_overrides": {
    "task.sol.bootstrap": 200
   }
  },

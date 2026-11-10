@@ -99,33 +99,39 @@ In sweep configs, `preparation.extra_inference` maps policy names to policies an
 appended to `preparation.inference`; it lets several policy files each add one policy
 (`- /inference/inference_policies: [hybrid_renoising, eb_churn, psi]`).
 
-### Successive halving (opt-in)
+### Two-stage selection (opt-in)
 
-An `evaluation.halving` block replaces each policy's flat search by successive
-halving over the tuning pool:
+An `evaluation.two_stage` block replaces each policy's flat search by two stages over
+the tuning pool:
 
 ```python
-"halving": {
-    "rungs": [64, 256, 1024],     # prompts per rung: prefixes of tuning_indices
-    "keep": 1 / 3,                # fraction promoted from each rung (at least one)
-    "finalists": 3,               # re-scored on the largest rung
-    "finalist_seeds": [2041],     # fresh: unlike the tuning and test seeds
-    "finalist_overrides": {"task.sol.bootstrap": 200},  # e.g. a bootstrap interval
+"two_stage": {
+    "stage1": 64,             # every trial: the first 64 prompts of tuning_indices
+    "stage2": 256,            # the top finalists: the next 256 prompts (disjoint)
+    "finalists": 3,
+    "stage2_seeds": [2041],   # fresh: unlike the tuning and test seeds
+    "stage2_overrides": {"task.sol.bootstrap": 200},  # e.g. a bootstrap interval
 }
 ```
 
-The policy's Optuna study proposes its `trials` candidates as before, but each is
-scored on the first `rungs[0]` prompts only (the study sees these scores). The best
-third is scored on the first `rungs[1]` prompts, its best third on `rungs[2]`, and the
-best `finalists` of the largest rung are re-scored on it with `finalist_seeds`; the best
-re-score is the policy's selection and competes with the other policies. Ties keep the
-earlier trial. Every evaluation is cached under
-`<policy>/{candidates,rung-<n>,finalists}/<parameters hash>/result.json`, so a resume
-repeats nothing and selects the same candidate; `selected.json` records every rung's
-ranking under `halving`. When the metric reports an interval (SOL with
-`task.sol.bootstrap`), the finalists' results and `selected.json` carry it as
-`score_interval`. The test split is still scored once, after selection. Without
-`halving`, cases behave exactly as before.
+1. **Stage 1.** The policy's Optuna study proposes its `trials` candidates as before.
+   Each is scored on the stage-1 prompts with the tuning seeds, and the study sees only
+   these scores.
+2. **Stage 2.** The best `finalists` are re-scored on the stage-2 prompts with
+   `stage2_seeds`. The best stage-2 score is the policy's selection and competes with the
+   other policies. Ties keep the earlier trial.
+
+Every evaluation is cached under
+`<policy>/{candidates,stage2}/<parameters hash>/result.json`, so a resume repeats nothing
+and selects the same candidate. `selected.json` records both rankings under `two_stage`.
+When the metric reports an interval (SOL with `task.sol.bootstrap`), the stage-2 results
+and `selected.json` carry it as `score_interval`. The test split is still scored once,
+after selection. Without `two_stage`, cases behave exactly as before.
+
+A Wilcoxon pruner (Optuna's `WilcoxonPruner`, stopping a trial early on per-example
+scores) is not offered. Each evaluation is one remote worker that loads the checkpoint
+and returns aggregate metrics, so scoring a trial in prompt batches would multiply the
+model loads. SOL is a set-level metric with no per-example scores at all.
 
 ### Several NFE budgets
 
@@ -165,6 +171,8 @@ block naming an Optuna sampler; options go to its constructor unchanged:
 "search": {"algorithm": "tpe", "n_startup_trials": 4, "constant_liar": True}
 "search": {"algorithm": "random"}
 "search": {"algorithm": "qmc", "scramble": True}                 # quasi-random
+"search": {"algorithm": "gp"}                                    # Gaussian process
+"search": {"algorithm": "tpe", "multivariate": True, "group": True}
 ```
 
 The default is Optuna's `TPESampler` with its default options, which is what
@@ -175,6 +183,17 @@ every existing protocol used. With 16 trials, TPE spends its first 10
 resumed TPE or random study is reseeded by its trial count so it never repeats a
 proposal, while QMC keeps its seed because it indexes a fixed sequence by trial
 number. The `search` block is part of the protocol: changing it needs a new case.
+
+`gp` is Optuna's `GPSampler`, Bayesian optimisation with a Gaussian process. It needs
+torch and scipy, both project dependencies. It suits small, continuous spaces (a
+temperature, an entropy bound, churn rates). It proposes randomly for its first 10
+trials (`n_startup_trials`), and it refits on all stored trials, so a resumed study
+continues from them. For categorical or conditional spaces (the Ψ policy, whose
+`t_on`/`t_off` exist only for `loop`), use TPE with `multivariate: true, group: true`,
+which models the parameters jointly and groups trials by which parameters they have. A
+sweep can set the sampler of policies from a shared set without copying it:
+`preparation.inference_search: {native: {algorithm: gp}}` applies to named policies
+that have no `search` of their own.
 
 ### Failed candidates
 

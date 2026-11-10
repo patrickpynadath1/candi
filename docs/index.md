@@ -46,7 +46,7 @@ A manifest lists cases; each case can contain nested Optuna studies. Both traini
 and inference choices are selected on validation before final evaluation.
 
 - [Nested training and inference tuning](guides/nested-tuning.md), including
-  inference-only tuning of a fixed checkpoint, successive-halving sampler tuning and
+  inference-only tuning of a fixed checkpoint, two-stage sampler selection and
   several NFE budgets
 
 - [Training](guides/training.md)

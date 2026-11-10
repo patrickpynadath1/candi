@@ -140,8 +140,8 @@ def validate_inference(spec):
         if any(condition not in seen for condition in when):
             raise ValueError(f"{key}: a `when` condition must name an earlier parameter")
         seen.append(key)
-    if "halving" in spec:
-        validate_halving(spec)
+    if "two_stage" in spec:
+        validate_two_stage(spec)
     extra = spec.get("extra_test_nfe", [])
     if any(type(b) is not int or b < 2 for b in extra) or len(set(extra)) != len(extra) or (
         set(extra) & set(budgets)
@@ -163,23 +163,23 @@ PREDICTOR_PARAMETERS = {
 }
 
 
-def validate_halving(spec):
-    halving = spec["halving"]
-    rungs = halving.get("rungs", [])
-    if not rungs or any(type(r) is not int or r < 1 for r in rungs) or rungs != sorted(set(rungs)):
-        raise ValueError("Halving rungs must be increasing positive prompt counts")
-    if rungs[-1] > len(spec["tuning_indices"]):
-        raise ValueError("The largest halving rung exceeds the tuning pool")
-    if not 0 < halving.get("keep", 1 / 3) <= 1 or halving.get("finalists", 3) < 1:
-        raise ValueError("Halving keeps a fraction in (0, 1] and at least one finalist")
-    seeds = halving.get("finalist_seeds", [])
+def validate_two_stage(spec):
+    stages = spec["two_stage"]
+    first, second = stages.get("stage1"), stages.get("stage2")
+    if any(type(n) is not int or n < 1 for n in (first, second)):
+        raise ValueError("Two-stage selection needs positive stage1 and stage2 prompt counts")
+    if first + second > len(spec["tuning_indices"]):
+        raise ValueError("stage1 + stage2 prompts exceed the tuning pool")
+    if type(stages.get("finalists", 3)) is not int or stages.get("finalists", 3) < 1:
+        raise ValueError("Two-stage selection needs at least one finalist")
+    seeds = stages.get("stage2_seeds", [])
     if not seeds or len(set(seeds)) != len(seeds) or set(seeds) & (
         set(spec["seeds"]) | set(spec["test_seeds"])
     ):
-        raise ValueError("Finalist seeds must be fresh: unique, unlike tuning and test seeds")
-    for override in halving.get("finalist_overrides", {}):
+        raise ValueError("Stage-2 seeds must be fresh: unique, unlike tuning and test seeds")
+    for override in stages.get("stage2_overrides", {}):
         if not override.startswith("task."):
-            raise ValueError(f"Not a finalist evaluation override: {override}")
+            raise ValueError(f"Not a stage-2 evaluation override: {override}")
 
 
 def validate(spec):
@@ -230,6 +230,9 @@ SEARCH_ALGORITHMS = {
     "tpe": "TPESampler",
     "random": "RandomSampler",
     "qmc": "QMCSampler",
+    # Gaussian-process Bayesian optimisation (needs torch and scipy); best for small,
+    # continuous spaces. Parameters outside its relative space fall back to random.
+    "gp": "GPSampler",
 }
 FAILURE_POLICIES = ("skip", "stop")
 
@@ -241,7 +244,7 @@ class StopSearch(RuntimeError):
 def make_sampler(settings, completed_trials=0):
     """Build a study's Optuna sampler from its ``search`` block.
 
-    ``search: {algorithm: tpe|random|qmc, ...options}``; the seed comes from the
+    ``search: {algorithm: tpe|random|qmc|gp, ...options}``; the seed comes from the
     study's ``seed`` (default 42). A resumed TPE or random study is reseeded by
     its trial count so it never replays proposals it already made. QMC indexes a
     fixed low-discrepancy sequence by trial number, so its seed stays fixed.
@@ -773,7 +776,7 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
                         "policy": policy,
                         "inference_parameters": parameters,
                     }
-                    if "halving" in evaluation or len(budgets) > 1:
+                    if "two_stage" in evaluation or len(budgets) > 1:
                         record.update(
                             nfe=budget,
                             prompts=len(settings["indices"]),
@@ -782,8 +785,8 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
                     return record
 
                 folder = budget_directory(directory, budget) / policy["name"]
-                if "halving" in evaluation:
-                    choice = halving_search(
+                if "two_stage" in evaluation:
+                    choice = two_stage_search(
                         folder, policy, direction, evaluate, evaluation, concurrency,
                         retry_skipped,
                     )
@@ -857,7 +860,7 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
             "indices": evaluation["test_indices"],
             "seeds": evaluation["test_seeds"],
         }
-        final.pop("halving", None)
+        final.pop("two_stage", None)
         result = execute(
             "evaluate",
             {
@@ -888,7 +891,7 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
                 "indices": extra_indices,
                 "seeds": extra_seeds,
             }
-            final.pop("halving", None)
+            final.pop("two_stage", None)
             result = execute(
                 "evaluate",
                 {
@@ -953,42 +956,37 @@ def completed_trials(directory):
     ]
 
 
-def halving_rungs(evaluation):
-    """[(prompt count, indices)] of each rung: nested prefixes of the tuning pool."""
-    pool = evaluation["tuning_indices"]
-    return [(n, pool[:n]) for n in evaluation["halving"]["rungs"]]
+def two_stage_subsets(evaluation):
+    """(stage-1 indices, stage-2 indices): disjoint consecutive slices of the tuning pool."""
+    stages = evaluation["two_stage"]
+    pool, first = evaluation["tuning_indices"], stages["stage1"]
+    return pool[:first], pool[first : first + stages["stage2"]]
 
 
-def promoted_count(count, keep):
-    return max(1, math.ceil(count * keep - 1e-9))
+def two_stage_search(directory, policy, direction, evaluate, evaluation, concurrency,
+                     retry_skipped=False):
+    """Two-stage selection of one policy's trials.
 
-
-def halving_search(directory, policy, direction, evaluate, evaluation, concurrency,
-                   retry_skipped=False):
-    """Successive halving over one policy's trials, then a fresh-seed final round.
-
-    Rung 0: the policy's Optuna study proposes ``trials`` candidates, each scored on
-    the first ``rungs[0]`` tuning prompts (the study sees only these scores). Rung r:
-    the best ``keep`` fraction (at least one) of rung r-1 is scored on the first
-    ``rungs[r]`` prompts. The best ``finalists`` of the largest rung are re-scored on
-    it with ``finalist_seeds`` (and ``finalist_overrides``, e.g. a bootstrap); the
-    best re-score is selected. Every evaluation is cached by its parameters, so a
-    resumed run repeats nothing and selects the same candidate.
+    Stage 1: the policy's Optuna study proposes ``trials`` candidates, each scored on the
+    first ``stage1`` tuning prompts with the tuning seeds (the study sees only these
+    scores). Stage 2: the best ``finalists`` (default 3) are re-scored on the next
+    ``stage2`` prompts of the pool (disjoint from stage 1) with ``stage2_seeds`` and
+    ``stage2_overrides`` (e.g. a bootstrap); the best stage-2 score is selected. Every
+    evaluation is cached by its parameters, so a resumed run repeats nothing and
+    selects the same candidate. Ties keep the earlier trial.
     """
-    halving = evaluation["halving"]
-    keep = halving.get("keep", 1 / 3)
-    rungs = halving_rungs(evaluation)
+    stages = evaluation["two_stage"]
+    first_indices, second_indices = two_stage_subsets(evaluation)
     directory = Path(directory).resolve()
     skip = policy.get("on_failure", "skip") == "skip"
     log = logging.getLogger(__name__)
 
     def first(parameters, output):
-        return evaluate(parameters, output, indices=rungs[0][1])
+        return evaluate(parameters, output, indices=first_indices)
 
     if search(directory, policy, direction, first, concurrency, retry_skipped) is None:
         return None
     entries = ranked(completed_trials(directory), direction)
-    history = {"rungs": [{"prompts": rungs[0][0], "scores": entries}]}
 
     def score_round(name, candidates, **options):
         folder = directory / name
@@ -1046,26 +1044,23 @@ def halving_search(directory, policy, direction, evaluate, evaluation, concurren
             raise failure
         return ranked(scored, direction)
 
-    for prompts, indices in rungs[1:]:
-        promoted = entries[: promoted_count(len(entries), keep)]
-        entries = score_round(f"rung-{prompts}", promoted, indices=indices)
-        history["rungs"].append({"prompts": prompts, "scores": entries})
-        if not entries:
-            return None
-    finalists = entries[: halving.get("finalists", 3)]
+    finalists = entries[: stages.get("finalists", 3)]
     final = score_round(
-        "finalists",
+        "stage2",
         finalists,
-        indices=rungs[-1][1],
-        seeds=halving["finalist_seeds"],
-        overrides=halving.get("finalist_overrides"),
+        indices=second_indices,
+        seeds=stages["stage2_seeds"],
+        overrides=stages.get("stage2_overrides"),
     )
-    history["finalists"] = final
     if not final:
         return None
     best = final[0]
     result = json.loads(Path(best["result_path"]).read_text())
-    selected = {**result, "parameters": best["parameters"], "halving": history}
+    selected = {
+        **result,
+        "parameters": best["parameters"],
+        "two_stage": {"stage1": entries, "stage2": final},
+    }
     save(directory / "selected.json", selected)
     return selected
 
@@ -1077,7 +1072,7 @@ run_study = run_case
 def generation_cost(spec):
     """Upper-bound generation work of one case: sequences and network calls.
 
-    Counts every validation trial (each halving rung and finalist round) and the
+    Counts every validation trial (both two-stage rounds) and the
     final test evaluation(s), per NFE budget and training candidate. Skipped
     candidates and early-stopping samplers make the real cost lower.
     """
@@ -1088,15 +1083,11 @@ def generation_cost(spec):
         sequences = 0
         for policy in spec["inference"]:
             trials = policy["trials"]
-            if "halving" in evaluation:
-                halving = evaluation["halving"]
-                count = trials
-                for index, prompts in enumerate(halving["rungs"]):
-                    if index:
-                        count = promoted_count(count, halving.get("keep", 1 / 3))
-                    sequences += count * prompts * seeds
-                finalists = min(halving.get("finalists", 3), count)
-                sequences += finalists * halving["rungs"][-1] * len(halving["finalist_seeds"])
+            if "two_stage" in evaluation:
+                stages = evaluation["two_stage"]
+                sequences += trials * stages["stage1"] * seeds
+                finalists = min(stages.get("finalists", 3), trials)
+                sequences += finalists * stages["stage2"] * len(stages["stage2_seeds"])
             else:
                 sequences += trials * len(evaluation["tuning_indices"]) * seeds
         sequences *= spec["training"]["trials"]

@@ -65,8 +65,8 @@ uv run --locked python main.py mode=evaluate evaluation.checkpoint=/path/last.ck
 ```
 
 `configs/task/sol/gpt2_large.yaml` holds the settings; `bootstrap: N` adds
-`sol_interval` (N full-cost replicates; successive-halving sweeps ask for it only when
-re-scoring finalists). `result.json` records `sol`, `sol_signature` (settings and
+`sol_interval` (N replicates on `bootstrap_slices`; two-stage sweeps ask for it only at
+stage 2). `result.json` records `sol`, `sol_signature` (settings and
 encoder provenance) and, with BLEU on, `corpus_bleu`, `corpus_bleu_no_bp` and
 `bleu_brevity_penalty`.
 

@@ -5,6 +5,7 @@ sweeps (the cases must reuse the source recipes and checkpoints unchanged), and 
 every new policy's sampler on a tiny recipe of each corruption family.
 """
 
+import copy
 import hashlib
 import json
 import os
@@ -23,12 +24,14 @@ EVALUATION = ROOT / "experiments/rerun/evaluation"
 CANDIDATE = hashlib.sha256(json.dumps({}, sort_keys=True).encode()).hexdigest()[:20]
 SIZES = {"sudoku_hard": (2000, 1024, 976), "text8": (19531, 2048, 2048),
          "tinystories-bpe-10000": (13092, 2048, 2048)}
+GP = {"algorithm": "gp"}
+TPE = {"algorithm": "tpe", "multivariate": True, "group": True}
 POLICIES = ["native", "native_greedy", "eb_greedy", "renoising", "renoising_greedy",
             "eb_churn", "psi"]
 
 
 @pytest.mark.parametrize("task", sorted(SIZES))
-def test_partitions_are_disjoint_halving_ready_and_unseen(task):
+def test_partitions_are_disjoint_two_stage_ready_and_unseen(task):
     spec = json.loads((EVALUATION / f"{task}.json").read_text())
     old = json.loads((ROOT / f"experiments/sc-vs-depth/evaluation/{task}.json").read_text())
     size, pool, test_size = SIZES[task]
@@ -38,8 +41,13 @@ def test_partitions_are_disjoint_halving_ready_and_unseen(task):
     assert 0 <= min(tuning + test) and max(tuning + test) < size
     # The source runs' training callbacks generated from their tuning indices.
     assert not set(test) & set(old["tuning_indices"])
-    assert spec["halving"]["rungs"][-1] <= pool
-    assert set(spec["halving"]["finalist_seeds"]).isdisjoint(spec["seeds"] + spec["test_seeds"])
+    stages = spec["two_stage"]
+    expected = (128, 512) if task.startswith("tinystories") else (64, 256)
+    assert (stages["stage1"], stages["stage2"], stages["finalists"]) == (*expected, 3)
+    assert stages["stage1"] + stages["stage2"] <= pool
+    assert set(stages["stage2_seeds"]).isdisjoint(spec["seeds"] + spec["test_seeds"])
+    if task.startswith("tinystories"):  # the winner's stage-2 SOL carries an interval
+        assert stages["stage2_overrides"] == {"task.sol.bootstrap": 200}
     if task.startswith("tinystories"):
         assert spec["score"] == {"kind": "metric", "metric": "sol"}
         assert spec["direction"] == "minimize"
@@ -77,7 +85,14 @@ def test_prepare_reuses_source_checkpoints_and_recipes(tmp_path, source, count):
                               / CANDIDATE / "training/checkpoints/last.ckpt"),
         }
         assert [p["name"] for p in case["inference"]] == POLICIES
-        assert case["inference"][:5] == base["inference"]  # the source policies, exactly
+        # The source policies, exactly, apart from the Optuna sampler the rerun picks.
+        searches = {p["name"]: p.pop("search", None) for p in copy.deepcopy(case["inference"])}
+        assert [{k: v for k, v in p.items() if k != "search"} for p in case["inference"][:5]] \
+            == base["inference"]
+        assert searches == {
+            "native": GP, "native_greedy": None, "eb_greedy": GP, "renoising": GP,
+            "renoising_greedy": None, "eb_churn": GP, "psi": TPE,
+        }
         evaluation = case["evaluation"]
         assert evaluation["nfe"] == 128 and evaluation["extra_test_nfe"] == [512]
         assert (evaluation["extra_test_examples"], evaluation["extra_test_seeds"]) == (128, [1041])
