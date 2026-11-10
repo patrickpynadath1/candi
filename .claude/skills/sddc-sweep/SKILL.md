@@ -58,7 +58,7 @@ What to decide:
 - **Two-stage selection** (opt-in): an evaluation-file `two_stage` block (`stage1` and
   `stage2` prompt counts, `finalists`, fresh `stage2_seeds`); per-policy Optuna samplers
   through `search` (`gp` for small continuous spaces, TPE `multivariate`/`group` for
-  categorical or conditional ones) or a sweep's `preparation.inference_search`; see
+  categorical or conditional ones) or a sweep's `preparation.inference_overrides`; see
   `docs/guides/nested-tuning.md`.
 - **Training search** (`preparation.training.space`, `trials`): keys must start with
   `optimizer.`, `model.`, `algorithm.`, `objective.`, `noise_schedule.`, `time_sampler.`,

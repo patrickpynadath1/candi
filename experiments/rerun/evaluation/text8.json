@@ -3,7 +3,8 @@
  "source": "numpy.random.default_rng(20261112): test = 2048 of the 19531 validation examples, excluding the 128 tuning indices the source runs' training callbacks saw; tuning pool = 2048 of the rest, in draw order (two-stage selection uses its first stage1 and the next stage2 prompts)",
  "score": {
   "kind": "metric",
-  "metric": "generated/by_min_length/5/aggregate/mean_per_sample/unique_valid"
+  "metric": "generated/by_min_length/5/aggregate/mean_per_sample/unique_valid",
+  "per_example": "generated/by_min_length/5/counts/unique_valid"
  },
  "direction": "maximize",
  "seeds": [
@@ -20,7 +21,8 @@
   "finalists": 3,
   "stage2_seeds": [
    2041
-  ]
+  ],
+  "stage2_bootstrap": 200
  },
  "overrides": {
   "task.min_word_lengths": [

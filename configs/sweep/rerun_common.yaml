@@ -23,10 +23,14 @@ preparation:
     extra_test_nfe: [512]
     extra_test_examples: 128   # fixed subset of the test partition
     extra_test_seeds: [1041]   # one test seed
-  # Optuna samplers of the shared hybrid_renoising policies (eb_churn and psi set their
-  # own): GP Bayesian optimisation for their small continuous spaces. native_greedy and
-  # renoising_greedy (one two-valued choice, two trials) keep the default TPE.
-  inference_search:
-    native: {algorithm: gp}
-    eb_greedy: {algorithm: gp}
-    renoising: {algorithm: gp}
+  # Fields of the shared hybrid_renoising policies (eb_churn and psi set their own): GP
+  # Bayesian optimisation for the small continuous spaces, and both values of the
+  # two-trial categorical policies as initial points so each is evaluated once.
+  inference_overrides:
+    native: {search: {algorithm: gp}}
+    eb_greedy: {search: {algorithm: gp}}
+    renoising: {search: {algorithm: gp}}
+    native_greedy:
+      initial_points: [{sampler.final_denoise: greedy}, {sampler.final_denoise: sample}]
+    renoising_greedy:
+      initial_points: [{sampler.final_denoise: greedy}, {sampler.final_denoise: sample}]

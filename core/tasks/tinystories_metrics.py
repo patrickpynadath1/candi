@@ -45,15 +45,25 @@ class StoryAggregate:
     sol: float | None = None
     sol_interval: dict | None = None
     sol_signature: dict | None = None
+    # ref_w1 (core/evaluation/ref_w1.py): coding-rate and NLL W1s over their floors.
+    ref_w1: float | None = None
+    ref_w1_rate: float | None = None
+    ref_w1_rate_floor: float | None = None
+    ref_w1_nll: float | None = None
+    ref_w1_nll_floor: float | None = None
+    ref_w1_interval: dict | None = None
+    ref_w1_signature: dict | None = None
 
 
 class TinyStoriesMetrics:
     supports_variable_length = True
 
-    def __init__(self, tokenizer, calculate_bleu=False, data_manifest=None, sol=None):
+    def __init__(self, tokenizer, calculate_bleu=False, data_manifest=None, sol=None,
+                 ref_w1=None):
         self.tokenizer, self.records = tokenizer, []
         self.data_manifest = data_manifest or {}
         self.sol = sol  # an optional core.evaluation.sol.SOLScorer
+        self.ref_w1 = ref_w1  # an optional core.evaluation.ref_w1.RefW1Scorer
         self.bleu = None
         if calculate_bleu:
             from sacrebleu.metrics import BLEU
@@ -123,6 +133,12 @@ class TinyStoriesMetrics:
                 [r.continuation for r in records], [r.reference for r in records]
             )
             sol["sol_signature"] = self.sol.signature()
+        if self.ref_w1 is not None and n:
+            sol.update(self.ref_w1.score(
+                [r.prompt for r in records],
+                [r.continuation for r in records],
+                [r.reference for r in records],
+            ))
         return StoryAggregate(
             n,
             mean("eos_present"),

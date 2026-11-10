@@ -270,3 +270,49 @@ def test_conditional_parameters_exist_only_under_their_condition(tmp_path):
     settings["inference"][0]["space"] = {**space, "algorithm.predictor.top_k": [0, 5]}
     with pytest.raises(ValueError, match="Not a tunable"):
         tuning.validate(settings)
+
+
+def test_test_score_and_overrides_reach_only_the_test_split(tmp_path, monkeypatch):
+    settings = spec(tmp_path)
+    settings["evaluation"].update(
+        score={"kind": "metric", "metric": "ref_w1"},
+        test_score={"kind": "metric", "metric": "sol"},
+        overrides={"task.ref_w1": {"fit_indices": [1]}},
+        test_overrides={"task.sol": {"n_directions": 8}, "task.primary_metric": "sol"},
+        extra_test_nfe=[16], extra_test_examples=4,
+    )
+    recorder = Recorder()
+    monkeypatch.setattr(tuning, "execute", recorder)
+    tuning.run_case(settings, tmp_path / "runs", concurrency=1)
+    tests = [c for c in recorder.calls if set(c["evaluation"]["indices"]) <= set(TEST)]
+    tuned = [c for c in recorder.calls if c not in tests]
+    assert len(tests) == 2 and tuned
+    for call in tuned:  # selection reads the tuning metric, never the test settings
+        assert call["evaluation"]["score"]["metric"] == "ref_w1"
+        assert "task.sol" not in call["evaluation"].get("overrides", {})
+        assert "test_score" not in call["evaluation"] and "test_overrides" not in call["evaluation"]
+    for call in tests:
+        assert call["evaluation"]["score"]["metric"] == "sol"
+        assert call["evaluation"]["overrides"] == {
+            "task.ref_w1": {"fit_indices": [1]}, "task.sol": {"n_directions": 8},
+            "task.primary_metric": "sol"}
+
+
+def test_per_example_bootstrap_of_stage_two_scores(tmp_path):
+    records = [{"index": i, "exact": bool(i % 3)} for i in range(30)]
+    score = {"kind": "metric", "metric": "accuracy", "per_example": "exact"}
+    values = tuning.per_example_scores({"records": records}, score, 20 / 30)
+    assert sum(values.values()) == 20
+    with pytest.raises(ValueError, match="averages"):
+        tuning.per_example_scores({"records": records}, score, 0.5)
+    interval = tuning.mean_bootstrap([values], 200)
+    assert interval["low"] < 20 / 30 < interval["high"] and interval["replicates"] == 200
+    assert tuning.mean_bootstrap([values], 200) == interval  # seeded
+    same = tuning.mean_bootstrap([{i: 1.0 for i in range(5)}], 50)
+    assert same["low"] == same["high"] == 1.0
+    settings = spec(tmp_path)
+    settings["evaluation"]["two_stage"]["stage2_bootstrap"] = 200
+    with pytest.raises(ValueError, match="per_example"):
+        tuning.validate(settings)
+    settings["evaluation"]["score"]["per_example"] = "exact"
+    tuning.validate(settings)

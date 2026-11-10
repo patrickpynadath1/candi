@@ -128,6 +128,20 @@ When the metric reports an interval (SOL with `task.sol.bootstrap`), the stage-2
 and `selected.json` carry it as `score_interval`. The test split is still scored once,
 after selection. Without `two_stage`, cases behave exactly as before.
 
+`stage2_bootstrap: N` adds a per-example bootstrap interval to the stage-2 scores of
+metrics that are means over examples. `score.per_example` names the per-record field,
+such as `exact` for Sudoku accuracy or `generated/by_min_length/5/counts/unique_valid`
+for text8; the worker checks that it averages to the metric. Prompts are resampled and
+paired across seeds. Set-level metrics report their own interval through a task
+override instead, for example `stage2_overrides: {task.ref_w1.bootstrap: 200}`.
+
+### A different test metric
+
+`evaluation.test_score` and `evaluation.test_overrides` apply to the test evaluations
+only: the winner's test, and the extra-budget measurements. The TinyStories reruns tune
+with `ref_w1` and report SOL on the test split, with `test_overrides` adding the SOL
+scorer. Tuning workers never receive these fields.
+
 A Wilcoxon pruner (Optuna's `WilcoxonPruner`, stopping a trial early on per-example
 scores) is not offered. Each evaluation is one remote worker that loads the checkpoint
 and returns aggregate metrics, so scoring a trial in prompt batches would multiply the
@@ -191,9 +205,9 @@ trials (`n_startup_trials`), and it refits on all stored trials, so a resumed st
 continues from them. For categorical or conditional spaces (the Ψ policy, whose
 `t_on`/`t_off` exist only for `loop`), use TPE with `multivariate: true, group: true`,
 which models the parameters jointly and groups trials by which parameters they have. A
-sweep can set the sampler of policies from a shared set without copying it:
-`preparation.inference_search: {native: {algorithm: gp}}` applies to named policies
-that have no `search` of their own.
+sweep can set fields of policies from a shared set without copying it:
+`preparation.inference_overrides: {native: {search: {algorithm: gp}}}` updates the named
+policies (unknown names are refused).
 
 ### Failed candidates
 

@@ -42,21 +42,61 @@ def test_partitions_are_disjoint_two_stage_ready_and_unseen(task):
     # The source runs' training callbacks generated from their tuning indices.
     assert not set(test) & set(old["tuning_indices"])
     stages = spec["two_stage"]
-    expected = (128, 512) if task.startswith("tinystories") else (64, 256)
-    assert (stages["stage1"], stages["stage2"], stages["finalists"]) == (*expected, 3)
+    assert (stages["stage1"], stages["stage2"], stages["finalists"]) == (64, 256, 3)
     assert stages["stage1"] + stages["stage2"] <= pool
     assert set(stages["stage2_seeds"]).isdisjoint(spec["seeds"] + spec["test_seeds"])
-    if task.startswith("tinystories"):  # the winner's stage-2 SOL carries an interval
-        assert stages["stage2_overrides"] == {"task.sol.bootstrap": 200}
-    if task.startswith("tinystories"):
-        assert spec["score"] == {"kind": "metric", "metric": "sol"}
+    if task.startswith("tinystories"):  # ref_w1 tunes (with an interval), SOL tests
+        assert stages["stage2_overrides"] == {"task.ref_w1.bootstrap": 200}
         assert spec["direction"] == "minimize"
-        sol = OmegaConf.to_container(OmegaConf.load(ROOT / "configs/task/sol/gpt2_large.yaml"))
-        assert spec["overrides"]["task.sol"] == sol
         assert spec["overrides"]["task.calculate_bleu"] is True  # BLEU stays recorded
     else:  # Sudoku and text8 keep their metrics and overrides.
-        assert (spec["score"], spec["direction"]) == (old["score"], old["direction"])
+        score = {k: v for k, v in spec["score"].items() if k != "per_example"}
+        assert (score, spec["direction"]) == (old["score"], old["direction"])
         assert spec["overrides"] == old.get("overrides", {})
+
+
+def test_per_example_paths_average_to_the_task_metrics(tmp_path):
+    from dataclasses import asdict
+
+    from core.tasks.text8 import Text8Task  # noqa: F401  (instantiated through config)
+    from core.tests.test_text8 import settings_for
+
+    settings = settings_for(tmp_path)
+    settings.task.min_word_lengths = [5, 6]
+    task = instantiate(settings.task)
+    task.prepare_data()
+    dataset = task.evaluation_dataset("validation")
+    examples = [dataset[i] for i in range(len(dataset))]
+    metric = task.create_metric_accumulator("validation")
+    noise = torch.randint(8, 35, (len(examples), len(examples[0]["input_ids"])))
+    metric.update(noise, examples, list(range(len(examples))))
+    result = json.loads(json.dumps(asdict(metric.compute())))
+    spec = json.loads((EVALUATION / "text8.json").read_text())
+    aggregate = nested_tuning.metric_value(result, spec["score"]["metric"])
+    values = nested_tuning.per_example_scores(result, spec["score"], aggregate)
+    assert len(values) == len(examples)
+    sudoku = json.loads((EVALUATION / "sudoku_hard.json").read_text())
+    records = [{"index": i, "exact": i % 2 == 0} for i in range(6)]
+    assert nested_tuning.per_example_scores({"records": records}, sudoku["score"], 0.5)
+    for task_spec in (spec, sudoku):
+        assert task_spec["two_stage"]["stage2_bootstrap"] == 200
+
+
+def test_tinystories_tunes_by_ref_w1_and_tests_by_sol():
+    spec = json.loads((EVALUATION / "tinystories-bpe-10000.json").read_text())
+    assert spec["score"] == {"kind": "metric", "metric": "ref_w1"}
+    assert spec["test_score"] == {"kind": "metric", "metric": "sol"}
+    ref = spec["overrides"]["task.ref_w1"]
+    fit = set(ref["fit_indices"])
+    old = json.loads((ROOT / "experiments/sc-vs-depth/evaluation/tinystories-bpe-10000.json").read_text())
+    assert len(fit) == 128 and not fit & (set(spec["tuning_indices"]) | set(spec["test_indices"])
+                                          | set(old["tuning_indices"]))
+    assert ref["dictionary_sha256"] == spec["fit_split"]["dictionary_sha256"]
+    assert (ref["dictionary_bytes"], ref["level"], ref["window_log"]) == (65536, 10, 23)
+    assert spec["two_stage"]["stage2_overrides"] == {"task.ref_w1.bootstrap": 200}
+    assert "task.sol" not in spec["overrides"] and "task.sol" in spec["test_overrides"]
+    sol = OmegaConf.to_container(OmegaConf.load(ROOT / "configs/task/sol/gpt2_large.yaml"))
+    assert spec["test_overrides"]["task.sol"] == sol
 
 
 def prepare(sweep, plan, env):
@@ -87,8 +127,13 @@ def test_prepare_reuses_source_checkpoints_and_recipes(tmp_path, source, count):
         assert [p["name"] for p in case["inference"]] == POLICIES
         # The source policies, exactly, apart from the Optuna sampler the rerun picks.
         searches = {p["name"]: p.pop("search", None) for p in copy.deepcopy(case["inference"])}
-        assert [{k: v for k, v in p.items() if k != "search"} for p in case["inference"][:5]] \
-            == base["inference"]
+        changed = ("search", "initial_points")
+        assert [{k: v for k, v in p.items() if k not in changed} for p in case["inference"][:5]] \
+            == [{k: v for k, v in p.items() if k not in changed} for p in base["inference"]]
+        both = [{"sampler.final_denoise": "greedy"}, {"sampler.final_denoise": "sample"}]
+        for policy in case["inference"]:
+            if policy["name"] in ("native_greedy", "renoising_greedy"):
+                assert policy["initial_points"] == both and policy["trials"] == 2
         assert searches == {
             "native": GP, "native_greedy": None, "eb_greedy": GP, "renoising": GP,
             "renoising_greedy": None, "eb_churn": GP, "psi": TPE,

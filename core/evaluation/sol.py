@@ -265,6 +265,8 @@ class TextEncoder:
     once) is encoded as the tokenizer's EOS token so it remains a valid measure.
     """
 
+    auto_class = "AutoModel"  # subclasses load e.g. a causal LM head the same way
+
     def __init__(
         self,
         model_name="gpt2-large",
@@ -295,11 +297,11 @@ class TextEncoder:
         if self.dtype == "auto":  # The paper encodes in FP16 on GPUs.
             self.dtype = "float16" if str(self.device).startswith("cuda") else "float32"
         if self.model is None or self.tokenizer is None:
-            from transformers import AutoModel, AutoTokenizer
+            import transformers
 
             options = {"revision": self.revision, "local_files_only": self.local_files_only}
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, **options)
-            self.model = AutoModel.from_pretrained(
+            self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name, **options)
+            self.model = getattr(transformers, self.auto_class).from_pretrained(
                 self.model_name, dtype=getattr(torch, self.dtype), **options
             )
         self.model = self.model.to(self.device, getattr(torch, self.dtype)).eval()

@@ -14,7 +14,7 @@ give numbers close to ours. Most cells are a single training seed, so expect see
 | [continuous-schedules](continuous-schedules/) | How do learned (CDCD) noise schedules spend training? | `+sweep=continuous_schedules` |
 | [block-encoder-decoder](block-encoder-decoder/) | Block diffusion: scale the encoder or the decoder? | `+sweep=block_encoder_decoder` |
 | [hybrid-sc](hybrid-sc/) | Does a discrete view change what self-conditioning does to continuous paths? (new; no published numbers) | `+sweep=hybrid_sc` |
-| [rerun](rerun/) | Do the conclusions hold with SOL on TinyStories, Ψ and EB-churn samplers and two-stage sampler selection? (inference-only rerun of sc-vs-depth, continuous-schedules, hybrid-sc; not yet run) | `+sweep=sc_vs_depth_rerun`, `continuous_schedules_rerun`, `hybrid_sc_rerun` |
+| [rerun](rerun/) | Do the conclusions hold with ref_w1 tuning and SOL testing on TinyStories, Ψ and EB-churn samplers and two-stage sampler selection? (inference-only rerun of sc-vs-depth, continuous-schedules, hybrid-sc; not yet run) | `+sweep=sc_vs_depth_rerun`, `continuous_schedules_rerun`, `hybrid_sc_rerun` |
 
 ## Running an example
 

@@ -3,7 +3,8 @@
  "source": "numpy.random.default_rng(20261111): test = 976 of the 2000 validation examples, excluding the 128 tuning indices the source runs' training callbacks saw; tuning pool = 1024 of the rest, in draw order (two-stage selection uses its first stage1 and the next stage2 prompts)",
  "score": {
   "kind": "metric",
-  "metric": "accuracy"
+  "metric": "accuracy",
+  "per_example": "exact"
  },
  "direction": "maximize",
  "seeds": [
@@ -20,7 +21,8 @@
   "finalists": 3,
   "stage2_seeds": [
    2041
-  ]
+  ],
+  "stage2_bootstrap": 200
  },
  "overrides": {},
  "tuning_indices": [

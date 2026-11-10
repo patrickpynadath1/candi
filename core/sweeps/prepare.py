@@ -94,12 +94,14 @@ def prepare_case(config):
         for name, policy in (metadata.get("extra_inference") or {}).items()
         if policy is not None
     ]
-    # ``inference_search`` sets the Optuna sampler of named policies that have none,
-    # without copying a shared policy set (e.g. {native: {algorithm: gp}}).
-    searches = metadata.get("inference_search") or {}
+    # ``inference_overrides`` sets fields of named policies (e.g. their Optuna ``search``
+    # or ``initial_points``) without copying a shared policy set.
+    overrides = metadata.get("inference_overrides") or {}
+    unknown = set(overrides) - {p["name"] for p in metadata["inference"] + extra}
+    if unknown:
+        raise ValueError(f"inference_overrides names unknown policies: {sorted(unknown)}")
     for policy in metadata["inference"] + extra:
-        if policy["name"] in searches and "search" not in policy:
-            policy["search"] = dict(searches[policy["name"]])
+        policy.update(overrides.get(policy["name"]) or {})
         native = policy.get("sampler") or OmegaConf.to_container(
             config.sampler, resolve=True
         )

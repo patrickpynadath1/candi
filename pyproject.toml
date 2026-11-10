@@ -25,7 +25,7 @@ dependencies = [
 tracking = ["wandb>=0.27.0"]
 mazes = ["maze-dataset==1.4.2", "muutils==0.8.3", "zanj==0.5.0"]
 tuning = ["optuna>=4,<5"]
-scoring = ["sacrebleu>=2.4,<3"]
+scoring = ["sacrebleu>=2.4,<3", "zstandard>=0.23"]
 
 [dependency-groups]
 dev = ["pytest>=9.0.3", "ruff>=0.15.13"]

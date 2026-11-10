@@ -177,6 +177,11 @@ def validate_two_stage(spec):
         set(spec["seeds"]) | set(spec["test_seeds"])
     ):
         raise ValueError("Stage-2 seeds must be fresh: unique, unlike tuning and test seeds")
+    bootstrap = stages.get("stage2_bootstrap")
+    if bootstrap is not None and (type(bootstrap) is not int or bootstrap < 1):
+        raise ValueError("stage2_bootstrap must be a positive replicate count")
+    if bootstrap and not spec["score"].get("per_example"):
+        raise ValueError("stage2_bootstrap needs score.per_example (a per-record path)")
     for override in stages.get("stage2_overrides", {}):
         if not override.startswith("task."):
             raise ValueError(f"Not a stage-2 evaluation override: {override}")
@@ -216,9 +221,11 @@ def validate(spec):
             )
         ):
             raise ValueError(f"Not a training hyperparameter: {key}")
-    for override in evaluation.get("overrides", {}):
+    for override in {**evaluation.get("overrides", {}), **evaluation.get("test_overrides", {})}:
         if not override.startswith(("task.", "loader.eval_batch_size")):
             raise ValueError(f"Not an evaluation override: {override}")
+    if evaluation.get("test_score", {"kind": "metric"}).get("kind") != "metric":
+        raise ValueError("test_score must be a scalar task metric")
     resources = spec.get("resources", {"cpu": 4, "gpu": 1})
     if resources.get("gpu", 1) not in (0, 1) or resources.get("cpu", 4) < 1:
         raise ValueError("Workers require positive CPUs and zero or one whole GPU")
@@ -614,7 +621,7 @@ def _evaluate_worker(payload, output):
         "evaluation_name": evaluation.get("dataset", "validation"),
         "indices": evaluation["indices"],
     }
-    scores, intervals = [], []
+    scores, intervals, examples = [], [], []
     for seed in evaluation["seeds"]:
         destination = Path(output) / f"seed-{seed}"
         config.seed = seed
@@ -629,13 +636,45 @@ def _evaluate_worker(payload, output):
             raise ValueError("Sampler exceeded NFE budget")
         scores.append(metric_value(result, evaluation["score"]["metric"]))
         intervals.append(result.get(f"{evaluation['score']['metric']}_interval"))
+        if evaluation.get("bootstrap") and evaluation["score"].get("per_example"):
+            examples.append(per_example_scores(result, evaluation["score"], scores[-1]))
     record = {"score": sum(scores) / len(scores), "seed_scores": scores}
-    if any(interval is not None for interval in intervals):
+    if examples:
+        record["score_interval"] = mean_bootstrap(examples, evaluation["bootstrap"])
+    elif any(interval is not None for interval in intervals):
         # A metric's own bootstrap interval (e.g. SOL with task.sol.bootstrap).
         record["seed_intervals"] = intervals
         if len(intervals) == 1:
             record["score_interval"] = intervals[0]
     return record
+
+
+def per_example_scores(result, score, aggregate):
+    """{example index: value} at ``score.per_example`` in each record; checks the mean."""
+    values = {
+        int(record["index"]): metric_value(record, score["per_example"])
+        for record in result["records"]
+    }
+    mean = sum(values.values()) / len(values)
+    if not math.isclose(mean, aggregate, rel_tol=1e-9, abs_tol=1e-12):
+        raise ValueError(
+            f"per_example {score['per_example']} averages to {mean}, not the metric {aggregate}"
+        )
+    return values
+
+
+def mean_bootstrap(examples, replicates, confidence=0.95, seed=0):
+    """Percentile interval of the seed-averaged mean, resampling examples (paired)."""
+    import numpy as np
+
+    keys = sorted(set.intersection(*(set(e) for e in examples)))
+    values = np.array([[e[k] for k in keys] for e in examples], dtype=np.float64).mean(0)
+    generator = np.random.default_rng(seed)
+    means = [values[generator.integers(0, len(keys), len(keys))].mean() for _ in range(int(replicates))]
+    tail = (1 - confidence) / 2
+    low, high = np.quantile(means, [tail, 1 - tail])
+    return {"low": float(low), "high": float(high), "replicates": int(replicates),
+            "confidence": confidence, "resampling": "paired_examples"}
 
 
 def record_attempt(output):
@@ -733,7 +772,8 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
     validation = {
         k: v
         for k, v in evaluation.items()
-        if k not in ("test_indices", "test_seeds", "test_dataset", "tuning_indices")
+        if k not in ("test_indices", "test_seeds", "test_dataset", "tuning_indices",
+                     "test_score", "test_overrides")
     }
     validation["indices"] = evaluation["tuning_indices"]
 
@@ -751,8 +791,10 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
             for policy in spec["inference"]:
 
                 def evaluate(parameters, output, indices=None, seeds=None, overrides=None,
-                             policy=policy, tuned=tuned):
+                             bootstrap=None, policy=policy, tuned=tuned):
                     settings = dict(tuned)
+                    if bootstrap:
+                        settings["bootstrap"] = bootstrap
                     if indices is not None:
                         settings["indices"] = indices
                     if seeds is not None:
@@ -861,6 +903,7 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
             "seeds": evaluation["test_seeds"],
         }
         final.pop("two_stage", None)
+        final.update(test_settings(evaluation, final))
         result = execute(
             "evaluate",
             {
@@ -892,6 +935,7 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
                 "seeds": extra_seeds,
             }
             final.pop("two_stage", None)
+            final.update(test_settings(evaluation, final))
             result = execute(
                 "evaluate",
                 {
@@ -928,6 +972,20 @@ def extra_test_subset(evaluation):
         random.Random(0).sample(test, count)
     )
     return indices, list(evaluation.get("extra_test_seeds", evaluation["test_seeds"][:1]))
+
+
+def test_settings(evaluation, final):
+    """The test split's score and task overrides (``test_score``, ``test_overrides``).
+
+    Tuning reads ``score``; a test evaluation may report another metric (SOL on
+    TinyStories while ref_w1 tunes). Selection never reads test results.
+    """
+    settings = {}
+    if evaluation.get("test_score"):
+        settings["score"] = evaluation["test_score"]
+    if evaluation.get("test_overrides"):
+        settings["overrides"] = {**final.get("overrides", {}), **evaluation["test_overrides"]}
+    return settings
 
 
 def nfe_budgets(evaluation):
@@ -1051,6 +1109,7 @@ def two_stage_search(directory, policy, direction, evaluate, evaluation, concurr
         indices=second_indices,
         seeds=stages["stage2_seeds"],
         overrides=stages.get("stage2_overrides"),
+        bootstrap=stages.get("stage2_bootstrap"),
     )
     if not final:
         return None

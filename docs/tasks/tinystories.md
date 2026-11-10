@@ -77,7 +77,11 @@ continuations only, stopping at the first EOS:
   embedded by a frozen GPT-2 Large. Lower is better. Select it with
   `+task/sol=gpt2_large task.primary_metric=sol` (or the `task.sol` override of an
   evaluation spec); `task.primary_metric` may be `termination_rate` (default),
-  `corpus_bleu` or `sol`.
+  `corpus_bleu`, `sol` or `ref_w1`.
+- Optional `ref_w1` ([ref_w1](ref-w1.md)): W1 between real and generated per-continuation
+  Zstandard coding rates (prompt-conditioned, reference dictionary) plus W1 between their
+  GPT-2 Large NLLs, each over its real-vs-real floor. It is cheap and sample-efficient,
+  and the reruns tune with it (`+task/ref_w1=gpt2_large`).
 
 `termination_rate` is a placeholder primary **diagnostic**, not a quality score.
 Do not select the best generator using EOS rate alone. Judge quality and diversity
