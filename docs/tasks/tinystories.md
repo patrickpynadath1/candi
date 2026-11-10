@@ -70,6 +70,14 @@ continuations only, stopping at the first EOS:
   saved. Use `uv run --extra scoring` and set `task.calculate_bleu=true`. This compares
   a continuation against the one observed ending, so valid alternative stories
   can score poorly. It is a secondary overlap diagnostic, not coherence accuracy.
+  `corpus_bleu_no_bp` is the same score without the brevity penalty (the geometric
+  mean of n-gram precisions) and `bleu_brevity_penalty` the factor itself.
+- Optional `sol` ([SOL](sol.md)): the double sliced Wasserstein distance between the
+  generated continuations and the reference continuations of the same prompts,
+  embedded by a frozen GPT-2 Large. Lower is better. Select it with
+  `+task/sol=gpt2_large task.primary_metric=sol` (or the `task.sol` override of an
+  evaluation spec); `task.primary_metric` may be `termination_rate` (default),
+  `corpus_bleu` or `sol`.
 
 `termination_rate` is a placeholder primary **diagnostic**, not a quality score.
 Do not select the best generator using EOS rate alone. Judge quality and diversity

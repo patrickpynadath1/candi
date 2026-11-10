@@ -1,0 +1,23 @@
+# @package task.sol
+# SOL (double sliced Wasserstein between token-state measures) with the GPT-2 Large
+# encoder: final layer (last_hidden_state), FP16 on CUDA, pinned paper revision,
+# 1024 x 1024 slices, 64 quantile bins, RBF lengthscale 0.1, fixed seeds.
+# Select with `+task/sol=gpt2_large task.primary_metric=sol`; see docs/tasks/sol.md.
+encoder:
+  model_name: gpt2-large
+  revision: 32b71b12589c2f8d625668d2335a01cac3249519
+  dtype: auto
+  max_length: auto
+  batch_size: 16
+  max_tokens_per_batch: 8192
+n_directions: 1024
+n_projections: 1024
+n_quantiles: 64
+lengthscale: 0.1
+seed: 0
+gp_seed: 0
+scale: null
+bootstrap: 0
+bootstrap_confidence: 0.95
+bootstrap_seed: 0
+cache_dir: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/sol_cache
