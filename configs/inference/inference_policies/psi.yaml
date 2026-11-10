@@ -1,0 +1,46 @@
+# @package _global_
+# Adds the Ψ-sampler policy (configs/inference/sampler/psi.yaml) for masked recipes and
+# hybrids with a masked or uniform discrete view; combine with a policy set, e.g.
+# `- /inference/inference_policies: [hybrid_renoising, psi]`. Uniform single-view
+# recipes (DUO/UDLM) use uniform_psi instead. t_on/t_off are tuned only for loop.
+# Initial points: the paper's best language settings (rescale, eta 0.02 and 0.01) with
+# its nucleus p = 0.9. The native policy of the set is the ancestral control.
+preparation:
+  extra_inference:
+    psi:
+      sampler:
+        _target_: core.samplers.composed.ComposedSampler
+        steps: 127
+        epsilon: 1.0e-05
+        tokens: {_target_: core.samplers.policies.TokenSelection, mode: posterior}
+        positions: {_target_: core.samplers.policies.AllPositions}
+        transition:
+          _target_: core.samplers.psi.PsiTransition
+          schedule: rescale
+          eta: 0.02
+          t_on: 0.55
+          t_off: 0.05
+          alpha_on: 0.9
+        commitment: none
+        final_denoise: greedy
+        precision: float64
+      space:
+        sampler.transition.schedule: [rescale, cap, loop]
+        sampler.transition.eta: {type: float, low: 0.005, high: 0.1, log: true}
+        sampler.transition.t_on:
+          {type: float, low: 0.5, high: 1.0, when: {sampler.transition.schedule: loop}}
+        sampler.transition.t_off:
+          {type: float, low: 0.05, high: 0.2, when: {sampler.transition.schedule: loop}}
+        algorithm.predictor.top_p: [0.9, 0.95, 1.0]
+        algorithm.predictor.temperature: {type: float, low: 0.5, high: 1.5}
+      initial_points:
+      - sampler.transition.schedule: rescale
+        sampler.transition.eta: 0.02
+        algorithm.predictor.top_p: 0.9
+        algorithm.predictor.temperature: 1.0
+      - sampler.transition.schedule: rescale
+        sampler.transition.eta: 0.01
+        algorithm.predictor.top_p: 0.9
+        algorithm.predictor.temperature: 1.0
+      trials: 24
+      budget_parameter: steps
