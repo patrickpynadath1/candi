@@ -1,7 +1,11 @@
 # @package _global_
+# Simplex Sudoku with SDM's fitted loss-derivative time warp switched on (a
+# learned time map on the information path, inherited from the simplex preset):
+# training times are Q(t) of uniform t. Training callbacks keep the linear grid;
+# sampler.time_grid=adaptive applies Q to the generation grid.
 defaults:
 - sudoku_simplex
-time_sampler:
+time_map:
   adaptive: true
 sampler:
   time_grid: linear

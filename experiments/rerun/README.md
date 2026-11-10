@@ -9,7 +9,13 @@ per-policy validation scores. block-encoder-decoder is not included.
 The recipes, data cohorts, seeds and checkpoints are those of the source runs. The cases'
 pinned configs equal the source runs' `protocol.json` configs apart from two
 training-only keys that later code adds with their default values
-(`prediction.fixed_feedback`, `prediction.selected_gradients`).
+(`prediction.fixed_feedback`, `prediction.selected_gradients`), and the CDCD cases'
+learned clock layout: the source runs held it as the `cdcd` training time sampler,
+the cases as the learned time map `algorithm.time_map` (`cdcd_loss_cdf`) with the
+`antithetic` sampler that drew the same times. The source protocols migrate to
+exactly the case configs (`core.training.legacy_checkpoints.migrate_time_map_config_dict`,
+checked on all 99 source protocols), and the checkpoints' `time_sampler.*` state
+loads as `time_map.*`, so evaluation is unchanged.
 
 What changes:
 

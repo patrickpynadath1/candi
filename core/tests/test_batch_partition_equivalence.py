@@ -3,7 +3,7 @@
 import torch
 import pytest
 from core.time_sampling.uniform import UniformTimeSampler
-from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
+from core.noise_schedules.learned_time_maps import LossDerivativeTimeMap
 from core.algorithms.discrete import reduce_token_loss
 
 LAYOUTS = [(8, 8, 8), (4, 8, 16), (4, 16, 8)]  # ranks, accumulation, microbatch
@@ -63,7 +63,7 @@ def test_variable_token_counts_change_weights_even_at_same_microbatch_size():
 
 def refit_audit(layout):
     world, accum, micro = layout
-    sampler = LossDerivativeTimeSampler(adaptive=True, warmup=0, refit_every=50)
+    sampler = LossDerivativeTimeMap(adaptive=True, warmup=0, refit_every=50)
     seen = []
     sampler.refit = lambda: seen.append(int(sampler.count))
     # Model the concatenated all-gather result from each microbatch round.
@@ -94,7 +94,7 @@ def test_refitted_distribution_depends_on_layout_even_with_same_observation_coun
     for world, accum, micro in LAYOUTS:
         times = (torch.arange(512).float() + 0.5) / 512
         first_round = times.reshape(world, accum, micro)[:, 0].reshape(-1)
-        sampler = LossDerivativeTimeSampler(adaptive=True, warmup=0, refit_every=50)
+        sampler = LossDerivativeTimeMap(adaptive=True, warmup=0, refit_every=50)
         losses = first_round.square() + first_round.pow(3)
         sampler.observe(first_round, losses[:, None], None, step=1000)
         assert sampler.ready

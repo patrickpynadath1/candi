@@ -44,7 +44,7 @@ def corruption_curve(algorithm, vocab_size, *, samples=8192, points=101, seed=12
     from core.noise_schedules.embedding_rank import embedding_table_rank
 
     algorithm.eval()
-    clock, view = algorithm.time_sampler, algorithm.views[0]
+    clock, view = algorithm.time_map, algorithm.views[0]
     device = clock.ema_logits.device
     book = codebook(view)
     if book is not None and book.shape[0] != vocab_size:

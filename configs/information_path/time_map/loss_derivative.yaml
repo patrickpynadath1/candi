@@ -1,0 +1,13 @@
+# @package time_map
+# SDM Appendix J.1 fitted loss-derivative CDF as a learned time map u = Q(t)
+# (core/noise_schedules/learned_time_maps.py). For simplex diffusion
+# (algorithm.time_map: ${time_map}): training times are Q(t) of uniform t, and
+# the sampler's time_grid=adaptive applies Q to a uniform grid.
+_target_: core.noise_schedules.learned_time_maps.LossDerivativeTimeMap
+adaptive: true
+buffer_size: 65536
+bins: 50
+grid_size: 1000
+warmup: 1000
+refit_every: 50
+momentum: 0.9

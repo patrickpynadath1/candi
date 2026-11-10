@@ -1,11 +1,16 @@
 # @package _global_
+# Simplex diffusion. The SDM loss-derivative clock is a learned time warp on the
+# information path (information_path/time_map=loss_derivative at
+# algorithm.time_map), off here (adaptive: false, the identity); the training
+# time sampler draws uniform times. sudoku_simplex_adaptive turns the warp on.
 defaults:
+- /information_path/time_map: loss_derivative
 - override /denoising_task/algorithm: simplex_diffusion
 - override /denoising_task/model: simplex_dit
 - override /denoising_task/parameterization: gaussian_posterior
 - override /information_path/process: dirichlet
 - override /information_path/noise_schedule: simplex
-- override /denoising_task/time_sampler: loss_derivative
+- override /denoising_task/time_sampler: antithetic
 - override /denoising_task/objective: cross_entropy
 - override /inference/sampler: simplex
 - override /information_path/token_space@token_space: data_only
@@ -13,3 +18,9 @@ self_conditioning:
   source: hidden
 trainer:
   precision: 32-true
+algorithm:
+  time_map: ${time_map}
+time_sampler:
+  epsilon: 1.0e-05
+time_map:
+  adaptive: false

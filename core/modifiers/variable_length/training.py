@@ -21,7 +21,7 @@ from .model import GapHead, SequencePrediction, forward_features
 from core.sequence_edits import valid_positions
 from core.time_sampling.density import (
     objective_weighting,
-    training_time_density,
+    mapped_time_density,
     weight_objective,
 )
 
@@ -242,17 +242,26 @@ class VariableLengthDiffusion(nn.Module):
             raise ValueError("time_group_size must divide the batch size")
         sampler = self.algorithm.time_sampler
         drawn = sampler.sample(len(tokens) // time_group_size, tokens.device, **time_context)
+        # A whole-path learned time map (information path) warps the draws.
+        time_map = (
+            self.algorithm.time_map
+            if getattr(self.algorithm, "time_map_reads_path", False)
+            else None
+        )
+        warped = drawn if time_map is None else time_map(drawn)
         corrected = objective_weighting(sampler) != "uncorrected"
         observed_density = training and any(
             observes_training_loss(view.schedule) for view in self.views
         )
         # Per-row training time sampler density, before the epsilon clamp.
         density = (
-            training_time_density(sampler, drawn).repeat_interleave(time_group_size)
+            mapped_time_density(sampler, drawn, time_map, warped).repeat_interleave(
+                time_group_size
+            )
             if corrected or observed_density
             else None
         )
-        times = drawn.repeat_interleave(time_group_size)
+        times = warped.repeat_interleave(time_group_size)
         times = times.clamp(self.training_epsilon, 1 - self.training_epsilon)
         sample = self.process.corrupt(valid, editable, times, self.schedule)
         edit = sample.edit
@@ -336,8 +345,11 @@ class VariableLengthDiffusion(nn.Module):
                     training=True,
                     density=density,
                 )
-            observer = getattr(self.algorithm.time_sampler, "observe", None)
-            if observer is not None:
+            observers = [
+                getattr(component, "observe", None)
+                for component in (self.algorithm.time_sampler, time_map)
+            ]
+            for observer in filter(None, observers):
                 if self.time_sampling_include_aux:
                     # Use the same weighted objective and original target-token
                     # normalization as training, including fully deleted rows.

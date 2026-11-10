@@ -172,8 +172,8 @@ inside one; delegated observations must still be applied once.
 ## Other schedule families
 
 `spherical` and `spherical_adaptive` provide spherical progress; `simplex`
-provides Dirichlet parameters, while its optional adaptive **training time
-sampler** is a separate component. `blurring` supplies spectral decay coefficients.
+provides Dirichlet parameters, while its optional fitted loss-derivative clock is
+a separate [learned time map](#learned-time-maps). `blurring` supplies spectral decay coefficients.
 `learned_log_snr` and `plaid_log_snr` are differentiable learned Gaussian schedules
 used by the RePlaid recipe, with trainable monotone shape and endpoint parameters.
 They differ from loss-buffer clock fitting. With `adaptation_term` set (e.g.
@@ -190,13 +190,63 @@ declare geometry requirements, register persistent state, and test finite-differ
 derivatives and endpoint behavior. See [all configs](../../configs/information_path/noise_schedule/)
 and [implementation helpers](../../core/noise_schedules/utils.py).
 
-### Shared importance clock
+## Learned time maps
 
-A learned clock shared by several views is configured as a training time sampler,
-although generation also reuses its map, so here it acts as both warp and sampler: the REPLAiD
-hybrid selects `time_sampler=piecewise_importance` with
-`algorithm.adaptive_time_views: [0, 1]`, so both views read one local time
-`u = Q(t)` from the sampler's quantile map, and each view keeps its own plain
-schedule (`LinearLogSNRSchedule` gives `gamma(u)=lower+(upper-lower)*u`, `LogLinear`
-with `epsilon: 0` gives `keep(u)=1-u`). See
-[time sampling](time-sampling.md#learned-importance-density).
+A learned time map `u = Q(t)` is part of what a time means, so it sits on the
+information path next to the schedule: config group `information_path/time_map`,
+placed at `algorithm.time_map` (`algorithm.time_map: ${time_map}`), code in
+[`learned_time_maps.py`](../../core/noise_schedules/learned_time_maps.py). Training
+and generation both read it; the training time sampler only draws `t` and is never
+read by generation. Each view still evaluates its own plain schedule at the time
+it reads.
+
+| `information_path/time_map` | Map | How it learns |
+| --- | --- | --- |
+| `cdcd_loss_cdf` (`CDCDTimeMap`) | CDCD's learned piecewise-linear loss CDF (Appendix A.1--A.4), inverted; identity until `warmup` fitter updates | `observe(times, loss, mask, step)` accumulates an inverse-proposal-weighted MSE gradient; `post_optimizer_step` takes a separate Adam step on buffer logits |
+| `loss_derivative` (`LossDerivativeTimeMap`) | SDM's fitted loss-derivative CDF (Appendix J.1), inverted: the process spends more of `[0, 1]` where the loss changes fastest; identity with `adaptive: false` (the `simplex` preset) | `observe` keeps a running record of loss against `t` (a ring buffer, gathered across ranks), refits the density of the loss derivative every `refit_every` steps after `warmup`, with EMA `momentum` |
+| `piecewise_importance` (`PiecewiseImportanceTimeMap`) | quantile map of a piecewise-constant density `q(u)` with a uniform floor | `adaptation_loss`: a zero-valued score-function surrogate on the objective's per-row estimate, so the bin logits (ordinary parameters: optimizer groups, EMA, DDP) learn to reduce the estimator's second moment |
+
+Who reads the map:
+
+- **Adaptive views.** `algorithm.adaptive_time_views` lists the views whose local
+  time is `Q(t)` of the coordinator time `t`, in training and generation; the
+  other views and the coordinator (discrete) clock stay on `t`. Endpoints stay
+  exact (`Q(0) = 0`, `Q(1) = 1`). `information_path/path_schedule=cdcd` selects
+  `cdcd_loss_cdf` for view 0 with an `antithetic` sampler (`epsilon: 0.001`).
+  The REPLAiD hybrid selects `piecewise_importance` for both views (one shared
+  local time) with the `stratified` sampler; its `LinearLogSNRSchedule` gives
+  `gamma(u)=lower+(upper-lower)*u` and the revealed view's `LogLinear` with
+  `epsilon: 0` gives `keep(u)=1-u`.
+- **The whole path.** Without `adaptive_time_views` the map warps the path's
+  time itself: training times are `Q(t)` of the sampler's uniform draws (the
+  network, schedule and objective all read them). Simplex diffusion's
+  `time_grid=adaptive` applies the same `Q` to its generation grid
+  (`sudoku_simplex_adaptive` with `sampler.time_grid=adaptive`). Other samplers
+  keep their own grids, so there the map shapes training only, as the
+  loss-derivative training time sampler it replaces did (variable-length
+  insertion feedback, for example). A per-call sampler (block-size mixtures)
+  bypasses the map.
+
+The map's density at the mapped time (`time_density`) combines with the
+sampler's draw density ([training time samplers](time-sampling.md#with-a-learned-time-map)):
+adaptive schedules of mapped views divide their fits by the product, the
+REPLAiD hybrid's ELBO divides its integrand by `q(u)`, and
+`piecewise_importance` passes `q(u)` with gradients to its `adaptation_loss`.
+The loss-CDF maps observe the time they placed (for a Gaussian view, its
+training-time coordinate).
+
+The map is registered on the algorithm where the training time sampler used to
+hold it, so parameter order (EMA shadows, optimizer state) is unchanged. Configs
+and checkpoints saved with the map in the time sampler slot
+(`time_sampler=cdcd` with `adaptive_time_views`, the removed
+`time_sampler=piecewise_importance` and `time_sampler=loss_derivative` (every use,
+including the `simplex` presets' switched-off one), or a simplex `cdcd` sampler
+with `time_grid=adaptive`) migrate on load: `time_sampler.*` state becomes
+`time_map.*` and the sampler becomes the uniform one that drew the same times
+([`legacy_checkpoints.py`](../../core/training/legacy_checkpoints.py)).
+
+These maps are distinct from a view's own `time_map` (`model.views.<name>.time_map`,
+e.g. `information_path/time_map=cdcd` through `path_schedule=adaptive`), which
+wraps the view's clock with a fitted CDCD-style adaptive schedule
+(`AdaptiveTimeMap`, see [fitted adaptive clocks](#fitted-adaptive-clocks)) and
+fits through the view-level `observe(time, loss, step, training=...)`.

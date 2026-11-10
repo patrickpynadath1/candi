@@ -82,7 +82,7 @@ def main():
                 "model.backbone.n_blocks=2",
                 "model.backbone.cond_dim=32",
                 "model.backbone.dropout=0",
-                "time_sampler.warmup=0",
+                "time_map.warmup=0",
                 "sampler.steps=7",
             ],
         )
@@ -114,7 +114,7 @@ def main():
             if callable(hook):
                 hook()
         losses.append(float(loss.detach()))
-    assert algo.time_sampler.ready
+    assert algo.time_map.ready
     algo.eval()
     with (
         torch.no_grad(),
@@ -132,7 +132,7 @@ def main():
             "losses": losses,
             "nfe": info,
             "prompt_preserved": True,
-            "cdcd_updates": int(algo.time_sampler.updates),
+            "cdcd_updates": int(algo.time_map.updates),
             "note": "Small two-layer execution/gradient test, not a solve-rate evaluation. Uses 128-dimensional learnable embeddings, BF16 and cached real Sudoku.",
         },
     }

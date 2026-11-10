@@ -15,7 +15,8 @@ checkpoint rather than clipping them at the general model default.
 | Gaussian view | `hybrid_view@model.input.views.content: learned_log_snr_gaussian` | Gaussian process, `LinearLogSNRSchedule` (learned endpoints), the recipe's embedding representation |
 | Reveal view | `hybrid_view@model.input.views.revealed: forced_target_mask` | `AbsorbingProcess` with the `ForcedTargetMask` proposal, keep rate `1 - u` (`LogLinear`, `epsilon: 0`) |
 | Model input | `model/input@model.input: revealed_context` | `RevealedContextInput`: linear continuous input plus clean context at revealed positions |
-| Time sampler | `time_sampler: piecewise_importance`, `algorithm.adaptive_time_views: [0, 1]` | `PiecewiseImportanceTimeSampler`: stratified uniform draws, inverse-CDF quantile map, proposal density, variance surrogate |
+| Learned time map | `information_path/time_map: piecewise_importance`, `algorithm.time_map: ${time_map}`, `algorithm.adaptive_time_views: [0, 1]` | `PiecewiseImportanceTimeMap`: inverse-CDF quantile map, proposal density, variance surrogate |
+| Time sampler | `time_sampler: stratified`, `objective_weighting: importance_corrected` | `StratifiedUniformTimeSampler`: stratified float64 uniform draws |
 | Parameterization | `parameterization: gaussian_prior` | Gaussian-prior correction on the Gaussian view (`prior_view: 0`) |
 | Objective | `objective: hybrid_elbo` | `HybridELBO`: reveal CE, Gaussian expected-embedding error, terminal Gaussian KL |
 | Algorithm | `algorithm: hybrid_diffusion`, `synchronize_committed: true` | The shared hybrid loss |
@@ -23,18 +24,19 @@ checkpoint rather than clipping them at the general model default.
 
 ## Training step
 
-Both views are adaptive-time views: the coordinator draws stratified uniform times
-`t`, the sampler's quantile map gives the local time `u = Q(t)` (detached), and both
+Both views are adaptive-time views: the training time sampler draws stratified
+uniform times `t`, the learned time map gives the local time `u = Q(t)` (detached), and both
 views' schedules read `u`. The Gaussian view corrupts every target; the reveal view
 masks with probability `u` and forces one target; synchronizing committed tokens
 then restores the clean embedding wherever the reveal view kept the token, so Gaussian
 noise applies only to masked tokens. `HybridELBO` reads the masks, coefficients,
 states and the proposal density `q(u)` from `ObjectiveContext`, divides its interior
 estimator by the detached density, and reports each row's estimate. In training the
-time sampler's `adaptation_loss` adds the zero-valued score-function surrogate on that
+time map's `adaptation_loss` adds the zero-valued score-function surrogate on that
 estimate, so the density logits receive the second-moment (variance) gradient and
 nothing else; endpoints and embeddings receive ELBO gradients. Validation adds no
-surrogate. Generation uses the same quantile map on its uniform grid.
+surrogate. Generation uses the same quantile map on its uniform grid; it never reads
+the training time sampler.
 
 The objective requires binary loss masks, `corruption_mask == loss_mask`, and
 rejects block sequence layouts (`supports_sequence_layout = False`). Self-conditioning
@@ -47,7 +49,9 @@ Native checkpoints include model, representation, schedule endpoints, importance
 clock and EMA. The former `RePlaidHybrid` class stored the shared clock under both
 views (`model.input.views.{0,1}.schedule.clock.*`); now the endpoints are
 `model.input.views.0.schedule.{gamma_min,gamma_delta_raw}` and the bin logits
-`time_sampler.clock_logits`. Loading migrates such checkpoints automatically
+`time_map.clock_logits` (`time_sampler.clock_logits` in checkpoints saved while the
+map was configured as the time sampler; those keys are renamed on load, with no
+change of parameter order). Loading migrates such checkpoints automatically
 (`core.training.legacy_checkpoints.migrate_legacy_checkpoint`): it renames the keys,
 drops the duplicate and reorders EMA and optimizer state. Saved run configs naming
 the removed class are rebuilt from this preset by the runner

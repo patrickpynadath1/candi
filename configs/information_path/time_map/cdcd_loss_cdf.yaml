@@ -1,0 +1,15 @@
+# @package time_map
+# CDCD Appendix A.1--A.4 learned loss CDF as a learned time map u = Q(t)
+# (core/noise_schedules/learned_time_maps.py). Place it at algorithm.time_map
+# (algorithm.time_map: ${time_map}) with algorithm.adaptive_time_views listing the
+# views that read it, in training and generation; pair it with a uniform training
+# time sampler (antithetic). Identity until `warmup` fitter updates.
+_target_: core.noise_schedules.learned_time_maps.CDCDTimeMap
+adaptive: true
+bins: 100
+min_bin_size: 0.0001
+learning_rate: 0.001
+momentum: 0.99
+warmup: 1000
+refit_every: 1
+epsilon: 1.0e-05

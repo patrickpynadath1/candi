@@ -3,9 +3,11 @@
 Recipe context: [denoising task](../concepts/denoising-task.md).
 
 A training time sampler decides how often training visits each time `t`. It is
-used in training only and has no role at inference. The
-[noise schedule](noise-schedules.md) fixes what each `t` means (the corruption
-level) and is shared by training and generation. The config group keeps its
+used in training only and has no role at inference: generation never consults it,
+in any recipe (`core/tests/test_generation_ignores_time_sampler.py` checks every
+preset). The [noise schedule](noise-schedules.md) fixes what each `t` means (the
+corruption level) and is shared by training and generation, and so is a
+[learned time map](noise-schedules.md#learned-time-maps) when a recipe has one. The config group keeps its
 historical name, `denoising_task/time_sampler` (selected as `time_sampler`), since
 saved run configs and protocols depend on it.
 
@@ -51,10 +53,9 @@ needs the density raises if a sampler does not declare `time_density`.
 | --- | --- | --- |
 | `antithetic` (`UniformTimeSampler`) | 1 | `uncorrected` (identical to corrected) |
 | `discrete` | `steps * P(step)`, the base density at the step's cell midpoint (1 for a uniform base) | the base's |
-| `loss_derivative` | slope of its fitted CDF (1 when `adaptive=false`) | `uncorrected` (SDM's heuristic) |
 | `cdcd` | slope `F'` of its learned CDF (1 until fitted) | `uncorrected` (CDCD's time warping) |
 | `adaptive_allocation` | 1 for diffusion rows; NaN for the `t = 0` reconstruction rows (a separate estimator) | `uncorrected` only; `GaussianELBO` weights the estimators |
-| `piecewise_importance` | `q(u)` of the local time | `importance_corrected`, applied by the hybrid ELBO itself |
+| `stratified` (`StratifiedUniformTimeSampler`) | 1 | `uncorrected` (REPLAiD hybrid sets `importance_corrected`) |
 | `piecewise_fixed` (`PiecewiseTimeSampler`) | the bin's `bins * p_k` | `importance_corrected` |
 | `FixedTimeSampler` (block-mixture override) | none (`time_density = None`) | `uncorrected` only |
 
@@ -62,12 +63,24 @@ Every existing recipe keeps its behaviour. Defaults reproduce what each sampler
 did before (no algorithm divided by a density, and the hybrid ELBO divided by
 `q`), and the YAML files of existing samplers are unchanged. Set
 `+time_sampler.objective_weighting=importance_corrected` (with `+`, because the
-key is not in those files) to change one. One combination behaves differently now:
-`piecewise_importance` with an objective that does not divide by `q` itself is
-now importance-corrected by the algorithm. No preset uses it, and
-`objective_weighting=uncorrected` restores the old behaviour.
+key is not in those files) to change one.
 Variable-length training applies `importance_corrected` to both its token and
 insertion losses.
+
+### With a learned time map
+
+When a recipe has a learned time map `u = Q(t)` (`algorithm.time_map`, see
+[noise schedules](noise-schedules.md#learned-time-maps)), the training time
+sampler draws `t` and the map places the time the views read. The density of the
+mapped time relative to uniform is the sampler's draw density times the map's
+density at `u` (`mapped_time_density` in
+[`density.py`](../../core/time_sampling/density.py)). That product is what
+adaptive noise schedules of the mapped views receive, and what the sampler's
+`objective_weighting` divides by when it is `importance_corrected`. With a uniform
+sampler this is "uniform in `t` through the map", which is importance sampling in
+`u` with density `q(u)`: the REPLAiD hybrid's ELBO divides by `q(u)` itself
+(`divides_by_time_density`), so its `stratified` sampler declares
+`importance_corrected`, and `uncorrected` is refused for it.
 
 ## Implementations
 
@@ -75,9 +88,8 @@ insertion losses.
 | --- | --- |
 | `antithetic` | UniformTimeSampler; bounded uniform draws, optionally stratified |
 | `discrete` | Wraps a base sampler and rounds onto positive D3PM steps |
-| `loss_derivative` | Fitted inverse-CDF training time sampler, used by simplex and compatible view/insertion assemblies |
 | `adaptive_allocation` | RePlaid reconstruction/diffusion allocation plus stratified times |
-| `piecewise_importance` | Learned piecewise-constant importance density for adaptive-time views (REPLAiD hybrid) |
+| `stratified` | One float64 uniform draw per stratum, in random row order (the REPLAiD hybrid's coordinator times) |
 | `piecewise_fixed` | Fixed piecewise-constant density on equal-width bins (`weights`), exact inverse CDF of antithetic uniform draws |
 
 ### A non-uniform sampler with an adaptive noise schedule
@@ -96,19 +108,31 @@ uv run --locked python main.py +experiment=cdcd_mid_range_times \
   'time_sampler.weights=[1,8,8,1]' time_sampler.objective_weighting=uncorrected
 ```
 
-### Where generation does use a learned training-time map
+### Learned maps that generation reads live on the information path
 
-Two existing components learn a map in the training time sampler slot that
-generation then reuses. In those recipes the component acts as warp and sampler
-at once:
+A fitted map that reshapes how the process moves through `t` is not a training
+time sampler. The learned loss CDFs (`cdcd_loss_cdf`, and SDM's loss-derivative
+CDF `loss_derivative`, which spends more training on the `t` where the loss
+changes fastest) and the learned importance density (`piecewise_importance`) are [learned time maps](noise-schedules.md#learned-time-maps)
+in `information_path/time_map`, placed at `algorithm.time_map`, and the training
+time sampler of those recipes draws uniform times:
 
-- `algorithm.adaptive_time_views` (`cdcd` time sampler through
-  `path_schedule=cdcd`, and `piecewise_importance`): the sampler's quantile map
-  places the views' local times in training **and** generation.
-- The simplex sampler's `time_grid=adaptive` builds its inference grid from a
-  fitted `loss_derivative` or `cdcd` sampler.
+| Recipe | Learned time map | Training time sampler |
+| --- | --- | --- |
+| `path_schedule=cdcd` (hybrid-sc, continuous-schedules, sc-vs-depth CDCD cases), `sudoku_pca_blurring` | `cdcd_loss_cdf`, read by `adaptive_time_views: [0]` | `antithetic`, `epsilon: 0.001` |
+| `replaid_hybrid` | `piecewise_importance`, read by `adaptive_time_views: [0, 1]` | `stratified`, `importance_corrected` |
+| `simplex`, `sudoku_simplex*` | `loss_derivative`, warping the whole path (`adaptive: false`, the identity, except in `sudoku_simplex_adaptive`; `sampler.time_grid=adaptive` reads it) | `antithetic`, `epsilon: 1.0e-05` |
 
-Outside these opt-in cases, generation never consults the training time sampler.
+These draw the same training times, fit the same maps and generate the same
+tokens as when the map sat in the sampler slot. Saved configs and checkpoints in
+that older layout migrate on load
+([`legacy_checkpoints.py`](../../core/training/legacy_checkpoints.py)).
+The former `time_sampler=loss_derivative` option is gone: the loss-derivative
+clock is always a learned time map (`information_path/time_map=loss_derivative` at
+`algorithm.time_map`), and saved configs naming `LossDerivativeTimeSampler`
+migrate to it whatever recipe they belong to. `cdcd` stays available as a
+training time sampler for recipes whose generation does not read its map (an
+adaptive sampler on a Gaussian or simplex path without view-local times).
 
 [UniformTimeSampler](../../core/time_sampling/uniform.py) draws in
 `[epsilon,1)`, with `epsilon=1e-3` by default. Antithetic mode spreads draws across
@@ -125,19 +149,12 @@ the objective and sampler step counts must describe the same D3PM construction.
 
 ## Adaptive distributions
 
-[LossDerivativeTimeSampler](../../core/time_sampling/loss_derivative.py) defaults
-to `adaptive=false`. When enabled, it collects detached masked losses, gathers
-observations across ranks, bins them, interpolates the loss profile, and forms a
-CDF from its nonnegative derivative. Warmup, buffer capacity, refit cadence, and
-EMA are explicit settings. A flat or insufficiently observed profile leaves the
-previous/uniform clock intact. This is a distribution over times, not a learned
-corruption formula. By default it does not importance-correct CE
-(`objective_weighting=uncorrected`); `importance_corrected` divides by its density.
-
-The simplex inference helper can use `linear`, `cosine`, or `adaptive` grids.
-Adaptive inference requires an enabled, fitted training sampler and errors if it
-is unavailable. The helper returns descending times with exact zero/one endpoints.
-See [SimplexInferenceGrid](../../core/time_sampling/simplex_grid.py).
+The simplex sampler's grid can be `linear`, `cosine`, or `adaptive`. `adaptive`
+applies the recipe's fitted learned time map (`algorithm.time_map`, e.g.
+`information_path/time_map=loss_derivative`) to a uniform grid and errors if
+there is none or it has not been fitted; it never reads the training time
+sampler. The grid has descending times with exact zero/one endpoints. See
+[SimplexInferenceGrid](../../core/samplers/simplex_grid.py).
 
 [AdaptiveTimeAllocation](../../core/time_sampling/adaptive_allocation.py) returns
 `TimeAllocation(time, reconstruction_count)`. It estimates reconstruction and
@@ -151,25 +168,20 @@ statistics are checkpointed buffers.
 
 ### Learned importance density
 
-[PiecewiseImportanceTimeSampler](../../core/time_sampling/importance.py)
-(`piecewise_importance`) learns a piecewise-constant density over a local time,
-mixed with a 1% uniform floor. Used with `algorithm.adaptive_time_views`, training
-draws stratified float64 uniform times (`uniform`), the detached inverse CDF (the
-sampler's call) gives the views' local time, and generation maps its uniform grid
-the same way. `proposal_density(u)` reaches the objective as
-`ObjectiveContext.time_density`; in training, `adaptation_loss` adds the zero-valued
-score-function surrogate on the objective's per-row `estimate`, so the bin logits
-learn to reduce the estimator's second moment and receive no loss-value gradient.
-Validation adds nothing. The logits are ordinary parameters (optimizer groups, EMA,
-DDP).
+The REPLAiD hybrid's learned piecewise-constant importance density is a learned
+time map (`information_path/time_map=piecewise_importance`,
+[`PiecewiseImportanceTimeMap`](../../core/noise_schedules/learned_time_maps.py));
+see [noise schedules](noise-schedules.md#learned-time-maps). Its training time
+sampler is `stratified`: stratified float64 uniform times `t`, which the map sends
+to the views' local time `u = Q(t)`.
 
 ## Insertion-loss feedback
 
-[Variable-length diffusion](../modifiers/variable-length.md) preserves the
-loss-derivative sampler's observation hook. Select it with
-`denoising_task/time_sampler=loss_derivative time_sampler.adaptive=true`.
+[Variable-length diffusion](../modifiers/variable-length.md) feeds the
+loss-derivative time map (a whole-path learned warp of the training times). Select
+it with `+information_path/time_map@algorithm.time_map=loss_derivative`.
 
-By default, the sampler observes loss averaged over surviving target tokens;
+By default, the map observes loss averaged over surviving target tokens;
 fully deleted examples do not contribute token-only observations. Set
 `variable_length.time_sampling_include_aux=true` to instead observe, per example,
 

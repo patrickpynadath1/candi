@@ -28,13 +28,20 @@ def load_trained(trained, device="cpu"):
     from omegaconf import OmegaConf
 
     from core.training.checkpoints import algorithm_state
+    from core.training.legacy_checkpoints import (
+        migrate_legacy_config,
+        migrate_time_map_state_dict,
+    )
 
     if not isinstance(trained, dict):
         trained = json.loads(Path(trained).read_text())
-    config = OmegaConf.load(trained["config"])
+    # Runs saved with the CDCD clock as the time sampler load with it as the
+    # algorithm's learned time map (same state under time_map.*).
+    config = migrate_legacy_config(OmegaConf.load(trained["config"]))
     checkpoint = torch.load(trained["checkpoint"], map_location="cpu", weights_only=False)
     algorithm = instantiate(config.algorithm)
-    algorithm.load_state_dict(algorithm_state(checkpoint), strict=True)
+    state = migrate_time_map_state_dict(algorithm_state(checkpoint), algorithm.state_dict())
+    algorithm.load_state_dict(state, strict=True)
     return config, checkpoint, algorithm.to(device)
 
 
@@ -57,7 +64,7 @@ def schedule_curve(algorithm, grid=101):
     """{u, t, fit, <native parameter>} on ``grid`` equally spaced u in [0, 1]."""
     import torch
 
-    clock, schedule = algorithm.time_sampler, algorithm.views[0].schedule
+    clock, schedule = algorithm.time_map, algorithm.views[0].schedule
     device = clock.ema_logits.device
     with torch.no_grad():
         u = torch.linspace(0, 1, grid, device=device)
@@ -73,7 +80,7 @@ def loss_bins(algorithm, config, step, *, split="validation", bins=20, examples=
     from hydra.utils import instantiate
     from torch.utils.data import DataLoader, Subset
 
-    clock = algorithm.time_sampler
+    clock = algorithm.time_map
     device = clock.ema_logits.device
     total = float(clock.ema_logits[1].float().exp().sum())
     task = instantiate(config.task)
@@ -84,7 +91,9 @@ def loss_bins(algorithm, config, step, *, split="validation", bins=20, examples=
     )
     captured = []
     hook = algorithm.objective.register_forward_hook(lambda module, args, out: captured.append(out.detach()))
-    original = clock.uniform.sample
+    # The (uniform) training time sampler draws the coordinator time u.
+    draws = algorithm.time_sampler
+    original = draws.sample
     autocast = torch.autocast("cuda", dtype=torch.bfloat16, enabled=device.type == "cuda")
     algorithm.train()
     rows = []
@@ -100,7 +109,7 @@ def loss_bins(algorithm, config, step, *, split="validation", bins=20, examples=
                 mask = batch["loss_mask"].to(device)
                 corruption = batch.get("corruption_mask", batch["loss_mask"]).to(device)
                 ub = (b + torch.rand(len(tokens), device=device)) / bins
-                clock.uniform.sample = lambda count, device, _u=ub, **context: _u
+                draws.sample = lambda count, device, _u=ub, **context: _u
                 with torch.no_grad(), autocast:
                     algorithm.loss(tokens, mask, corruption_mask=corruption, training=False, step=step)
                 per_token = captured.pop()
@@ -117,7 +126,7 @@ def loss_bins(algorithm, config, step, *, split="validation", bins=20, examples=
             })
     finally:
         hook.remove()
-        clock.uniform.sample = original
+        draws.sample = original
     return rows
 
 
@@ -139,7 +148,7 @@ def schedule_case(trained, *, bins=20, examples=128, grid=101, device="cpu"):
         trained = json.loads(Path(trained).read_text())
     config, checkpoint, algorithm = load_trained(trained, device)
     step = int(checkpoint["global_step"])
-    clock = algorithm.time_sampler
+    clock = algorithm.time_map
     result = {
         "schedule": schedule_curve(algorithm, grid),
         "bins": loss_bins(algorithm, config, step, split="validation", bins=bins, examples=examples),

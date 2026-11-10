@@ -56,3 +56,28 @@ class UniformTimeSampler:
                 raise ValueError("local batch exceeds its global time partition")
             times = times[:count]
         return times
+
+
+class StratifiedUniformTimeSampler:
+    """One float64 draw per stratum, ``(i + U_i) / n``, in random row order.
+
+    Every draw has density 1 relative to uniform. ``objective_weighting`` matters
+    only when the times are mapped by a learned time map (``algorithm.time_map``):
+    ``importance_corrected`` then divides by the mapped time's density, as the
+    hybrid ELBO does itself for the REPLAiD hybrid's importance map.
+    """
+
+    def __init__(self, objective_weighting="uncorrected"):
+        self.objective_weighting = check_objective_weighting(objective_weighting)
+
+    def time_density(self, time):
+        return torch.ones_like(time)
+
+    def sample(self, count, device, **context):
+        if count < 1:
+            raise ValueError("stratified time sampling requires a nonempty batch")
+        time = (
+            torch.arange(count, device=device, dtype=torch.float64)
+            + torch.rand(count, device=device, dtype=torch.float64)
+        ) / count
+        return time[torch.randperm(count, device=device)]

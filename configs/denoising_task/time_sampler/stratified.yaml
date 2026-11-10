@@ -1,0 +1,6 @@
+# @package time_sampler
+# One float64 uniform draw per stratum, in random row order (density 1). With a
+# learned time map (algorithm.time_map), the mapped time's density is the map's;
+# objective_weighting then says whether the loss is divided by it.
+_target_: core.time_sampling.uniform.StratifiedUniformTimeSampler
+objective_weighting: uncorrected

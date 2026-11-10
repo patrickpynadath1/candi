@@ -1,0 +1,10 @@
+# @package time_map
+# Learned piecewise-constant importance density q(u) over the views' local time,
+# and its quantile map u = Q(t) (core/noise_schedules/learned_time_maps.py).
+# Place it at algorithm.time_map with algorithm.adaptive_time_views listing the
+# views that read it (training and generation), and a stratified uniform training
+# time sampler. The objective divides by q(u) and the bin logits train only
+# through the zero-valued variance surrogate (adaptation_loss).
+_target_: core.noise_schedules.learned_time_maps.PiecewiseImportanceTimeMap
+bins: 64
+uniform_mix: 0.01

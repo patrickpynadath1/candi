@@ -25,7 +25,11 @@ and ``objective_weighting``, how a non-uniform draw enters the optimized loss:
 - ``uncorrected``: the loss is used as drawn, so oversampling a region of ``t``
   also up-weights it in the objective (the heuristic adaptive samplers).
 
-For a uniform sampler the two are the same objective. Observers (adaptive noise
+For a uniform sampler the two are the same objective. A learned time map
+(``algorithm.time_map``, information path) can place the times a recipe's views
+read; the density of a mapped time is then the sampler's draw density times the
+map's (``mapped_time_density``), and the sampler's ``objective_weighting`` applies
+to it. Generation reads the map, never the sampler. Observers (adaptive noise
 schedules, adaptive time samplers) always receive the unweighted per-``t`` loss
 plus the draw density, never the importance-weighted loss.
 """
@@ -66,6 +70,19 @@ def training_time_density(sampler, time):
     if not torch.is_tensor(time):
         raise TypeError("time_density needs the sampled time tensor")
     return sampler.time_density(time).detach()
+
+
+def mapped_time_density(sampler, time, time_map=None, mapped=None):
+    """Density of ``mapped = time_map(time)`` for ``time`` drawn by ``sampler``.
+
+    The sampler's draw density times the learned time map's density of the mapped
+    time (``core/noise_schedules/learned_time_maps.py``); the sampler's alone
+    without a map. None when the sampler's draws have no density.
+    """
+    density = training_time_density(sampler, time)
+    if time_map is None or density is None:
+        return density
+    return density * time_map.time_density(mapped).detach()
 
 
 def weight_objective(per_token, sampler, density, objective=None):

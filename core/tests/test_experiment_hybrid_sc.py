@@ -29,6 +29,7 @@ def test_sweep_expands_to_views_x_paths_x_sc_x_tasks(tmp_path):
         # Every case is a two-view model, continuous path first, discrete view second ...
         assert list(config.model.views) == ["content", "discrete"]
         # ... and CDCD learns the clock of the continuous view (index 0).
-        assert config.time_sampler._target_ == "core.time_sampling.cdcd.CDCDTimeSampler"
+        assert config.time_map._target_ == "core.noise_schedules.learned_time_maps.CDCDTimeMap"
+        assert config.time_sampler._target_ == "core.time_sampling.uniform.UniformTimeSampler"
         assert list(config.algorithm.adaptive_time_views) == [0]
         assert case["evaluation"]["nfe"] == 128

@@ -55,6 +55,7 @@ preparation:
   - objective
   - noise_schedule
   - time_sampler
+  - time_map  # only when the recipe has a learned time map
   - prediction
   - self_conditioning
   - optimizer

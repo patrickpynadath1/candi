@@ -13,6 +13,17 @@ preset, keeping the saved task, data, loader, trainer, evaluation and sampler
 settings and the recipe values the old classes took as arguments; the runner
 applies it to the run config and the loader to a checkpoint's saved config.
 ``migrate_legacy_checkpoint`` renames old hybrid state on load.
+
+Learned time maps used to sit in the training time sampler slot wherever
+generation reused them (``algorithm.adaptive_time_views``, and simplex
+``time_grid=adaptive``), and the loss-derivative clock was a training time
+sampler everywhere (``time_sampler=loss_derivative``). They are now information-path components at
+``algorithm.time_map`` with a uniform training time sampler.
+``migrate_time_map_config_dict`` rewrites such saved configs (the same learned
+component and the same uniform draws, so the same training and generation), and
+the checkpoint migration renames ``time_sampler.*`` state to ``time_map.*``. The
+map is registered where the sampler was, so parameter order (EMA shadows,
+optimizer state) is unchanged.
 """
 
 import copy
@@ -34,6 +45,7 @@ _PRESET_SECTIONS = (
     "process",
     "objective",
     "time_sampler",
+    "time_map",
     "noise_schedule",
 )
 
@@ -92,7 +104,7 @@ def migrate_legacy_config_dict(saved, compose=None):
 
     current = OmegaConf.to_container(compose(preset), resolve=False)
     out = copy.deepcopy(saved)
-    out.update({key: current[key] for key in _PRESET_SECTIONS})
+    out.update({key: current[key] for key in _PRESET_SECTIONS if key in current})
     old = saved["algorithm"]
     _overlay(out["parameterization"], old["predictor"], "parameterization")
     _overlay(out["representation"], old["representation"], "representation")
@@ -117,7 +129,7 @@ def migrate_legacy_config_dict(saved, compose=None):
         _overlay(content["process"], old["process"], "process")
         revealed = model_input["views"]["revealed"]["process"]
         _overlay(revealed["proposal"], old["corruption"], "corruption")
-        out["time_sampler"].update(bins=clock["bins"], uniform_mix=clock["uniform_mix"])
+        out["time_map"].update(bins=clock["bins"], uniform_mix=clock["uniform_mix"])
     # Parameter names moved, so only the optimizer groups follow the preset.
     out["optimizer"] = {**saved.get("optimizer", {}), "groups": current["optimizer"]["groups"]}
     for path in (("sampler",), ("callback", "sampler_config")):
@@ -133,19 +145,174 @@ def migrate_legacy_config_dict(saved, compose=None):
 
 
 def migrate_legacy_config(config, compose=None):
-    """``migrate_legacy_config_dict`` for an OmegaConf run config."""
+    """``migrate_legacy_config_dict`` and ``migrate_time_map_config_dict`` for an
+    OmegaConf run config."""
     from omegaconf import OmegaConf
 
     preset = legacy_recipe(config)
-    if preset is None:
+    if preset is not None:
+        logging.getLogger(__name__).warning(
+            "config names the removed %s; rebuilding it from the %s preset",
+            config.algorithm._target_,
+            preset,
+        )
+        saved = OmegaConf.to_container(config, resolve=False)
+        return OmegaConf.create(migrate_legacy_config_dict(saved, compose))
+    saved = OmegaConf.to_container(config, resolve=False)
+    migrated = migrate_time_map_config_dict(saved)
+    if migrated is saved:
         return config
     logging.getLogger(__name__).warning(
-        "config names the removed %s; rebuilding it from the %s preset",
-        config.algorithm._target_,
-        preset,
+        "config holds a learned time map as its training time sampler; "
+        "moving it to algorithm.time_map with a uniform training time sampler"
     )
-    saved = OmegaConf.to_container(config, resolve=False)
-    return OmegaConf.create(migrate_legacy_config_dict(saved, compose))
+    return OmegaConf.create(migrated)
+
+
+# Old training-time-sampler classes whose learned map generation read: the
+# information-path time map holding the same fitter, the map's arguments with the
+# old class's defaults, and the uniform sampler that now draws the times.
+_UNIFORM = "core.time_sampling.uniform.UniformTimeSampler"
+_STRATIFIED = "core.time_sampling.uniform.StratifiedUniformTimeSampler"
+_MAPS = "core.noise_schedules.learned_time_maps."
+_SAMPLER_MAPS = {
+    "core.time_sampling.cdcd.CDCDTimeSampler": (
+        _MAPS + "CDCDTimeMap",
+        dict(adaptive=False, bins=100, min_bin_size=1e-4, learning_rate=1e-3,
+             momentum=0.99, warmup=1000, refit_every=1, epsilon=1e-5),
+        _UNIFORM,
+    ),
+    "core.time_sampling.loss_derivative.LossDerivativeTimeSampler": (
+        _MAPS + "LossDerivativeTimeMap",
+        dict(adaptive=False, buffer_size=65536, bins=50, grid_size=1000, warmup=1000,
+             refit_every=50, momentum=0.9),
+        _UNIFORM,
+    ),
+    "core.time_sampling.importance.PiecewiseImportanceTimeSampler": (
+        _MAPS + "PiecewiseImportanceTimeMap",
+        dict(bins=64, uniform_mix=0.01),
+        _STRATIFIED,
+    ),
+}
+_SIMPLEX = "core.algorithms.simplex_diffusion.SimplexDiffusion"
+_LOSS_DERIVATIVE = "core.time_sampling.loss_derivative.LossDerivativeTimeSampler"
+_LINK = "${time_sampler}"
+
+
+def split_time_sampler(sampler):
+    """``(time_map, uniform sampler)`` configs replacing an old sampler config."""
+    target, defaults, uniform = _SAMPLER_MAPS[sampler["_target_"]]
+    time_map = {"_target_": target}
+    time_map.update(
+        {key: copy.deepcopy(sampler.get(key, value)) for key, value in defaults.items()}
+    )
+    if uniform == _UNIFORM:
+        draws = {"_target_": _UNIFORM, "epsilon": sampler.get("epsilon", 1e-5),
+                 "antithetic": sampler.get("antithetic", True)}
+        if "objective_weighting" in sampler:
+            draws["objective_weighting"] = sampler["objective_weighting"]
+    else:
+        draws = {"_target_": _STRATIFIED,
+                 "objective_weighting": sampler.get("objective_weighting", "importance_corrected")}
+    return time_map, draws
+
+
+def _adaptive_grid(config):
+    samplers = [config.get("sampler"), (config.get("callback") or {}).get("sampler_config")]
+    return any(isinstance(s, dict) and s.get("time_grid") == "adaptive" for s in samplers)
+
+
+def _old_time_sampler(section):
+    """The section's algorithm, whether its time sampler is the top-level link,
+    and that sampler's config when it is an old learned-map sampler."""
+    algorithm = section.get("algorithm") if isinstance(section, dict) else None
+    if not isinstance(algorithm, dict) or algorithm.get("time_map") is not None:
+        return None, False, None
+    linked = algorithm.get("time_sampler") == _LINK
+    sampler = section.get("time_sampler") if linked else algorithm.get("time_sampler")
+    if not isinstance(sampler, dict) or sampler.get("_target_") not in _SAMPLER_MAPS:
+        return None, False, None
+    return algorithm, linked, sampler
+
+
+def _move_time_map(section):
+    """Rewrite one config section (a run config or its ``algorithm_definition``)."""
+    algorithm, linked, sampler = _old_time_sampler(section)
+    if algorithm is None:
+        return
+    time_map, draws = split_time_sampler(sampler)
+    if linked:
+        section["time_sampler"], section["time_map"] = draws, time_map
+        algorithm["time_map"] = "${time_map}"
+    else:
+        if section.get("time_sampler") == sampler:  # a resolved config's top-level copy
+            section["time_sampler"] = copy.deepcopy(draws)
+            section["time_map"] = copy.deepcopy(time_map)
+        algorithm["time_sampler"], algorithm["time_map"] = draws, time_map
+    for group in (section.get("optimizer") or {}).get("groups") or []:
+        group["patterns"] = [
+            "time_map." + pattern[len("time_sampler."):]
+            if pattern.startswith("time_sampler.")
+            else pattern
+            for pattern in group.get("patterns", [])
+        ]
+
+
+def migrate_time_map_config_dict(saved, force=False):
+    """Move a learned map out of the training time sampler slot (a plain dict).
+
+    Applies to every removed ``LossDerivativeTimeSampler`` (the loss-derivative
+    clock is a learned warp: ``algorithm.time_map``, warping the whole path's
+    time), and where generation read a sampler's map: an algorithm with
+    ``adaptive_time_views``, or simplex diffusion with an adaptive CDCD sampler
+    and ``time_grid=adaptive`` (or ``force``, when the module being loaded into
+    already holds a whole-path time map). The sweep record ``algorithm_definition``
+    is rewritten the same way. Returns ``saved`` itself when nothing applies.
+    Works on unresolved (``${time_sampler}``) and resolved configs.
+    """
+    algorithm, _, sampler = _old_time_sampler(saved)
+    if algorithm is None:
+        return saved
+    views = algorithm.get("adaptive_time_views")
+    # The loss-derivative clock is a learned time warp (a noise-schedule-side
+    # map), never a training time sampler, so every such config migrates.
+    loss_derivative = sampler["_target_"] == _LOSS_DERIVATIVE
+    simplex = (
+        algorithm.get("_target_") == _SIMPLEX
+        and bool(sampler.get("adaptive", False))
+        and (force or _adaptive_grid(saved))
+    )
+    if not views and not loss_derivative and not simplex:
+        return saved
+    out = copy.deepcopy(saved)
+    _move_time_map(out)
+    if isinstance(out.get("algorithm_definition"), dict):
+        _move_time_map(out["algorithm_definition"])
+    return out
+
+
+def reads_path_time_map(module):
+    """True when the module holds a whole-path learned time map."""
+    return any(
+        getattr(component, "time_map_reads_path", False)
+        for component in module.algorithm.modules()
+    )
+
+
+def migrate_time_map_state_dict(state_dict, expected):
+    """Rename ``*time_sampler.*`` state to ``*time_map.*`` where only the latter
+    is an ``expected`` key (the module's own state-dict keys)."""
+    expected = set(expected)
+    renamed = {}
+    for key, value in state_dict.items():
+        new = key
+        if key not in expected and ".time_sampler." in f".{key}":
+            head, _, tail = f".{key}".rpartition(".time_sampler.")
+            candidate = f"{head}.time_map.{tail}"[1:]
+            if candidate in expected:
+                new = candidate
+        renamed[new] = value
+    return renamed
 
 
 def migrate_legacy_checkpoint(checkpoint, module):
@@ -165,8 +332,19 @@ def migrate_legacy_checkpoint(checkpoint, module):
             **hyper,
             "config": OmegaConf.to_container(config, resolve=True),
         }
+    elif hyper.get("config") is not None:
+        config = migrate_time_map_config_dict(
+            hyper["config"], force=reads_path_time_map(module)
+        )
+        if config is not hyper["config"]:
+            checkpoint = dict(checkpoint)
+            checkpoint["hyper_parameters"] = {**hyper, "config": config}
     if any(".schedule.clock." in key for key in checkpoint["state_dict"]):
         checkpoint = migrate_replaid_hybrid_checkpoint(checkpoint, module)
+    if any(".time_sampler." in f".{key}" for key in checkpoint["state_dict"]):
+        renamed = migrate_time_map_state_dict(checkpoint["state_dict"], module.state_dict())
+        if list(renamed) != list(checkpoint["state_dict"]):
+            checkpoint = {**checkpoint, "state_dict": renamed}
     return checkpoint
 
 
@@ -174,7 +352,7 @@ _CLOCK = "model.input.views.{view}.schedule.clock."
 _RENAMES = {
     "gamma_min": "model.input.views.0.schedule.gamma_min",
     "width_raw": "model.input.views.0.schedule.gamma_delta_raw",
-    "clock_logits": "time_sampler.clock_logits",
+    "clock_logits": "time_map.clock_logits",
 }
 
 

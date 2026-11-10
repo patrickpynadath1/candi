@@ -19,7 +19,7 @@ and the component page you are extending: `docs/components/representations.md`,
 | time → coefficients | `core/noise_schedules/` | `information_path/noise_schedule` | discrete: keep rate and its derivative; Gaussian: the full path coefficients and derivatives (`core/noise_schedules/gaussian_path.py`), not a lone sigma |
 | vocabulary layout | — | `information_path/token_space` | whether an absorbing mask token is appended |
 | a branch of a hybrid | `core/modifiers/hybrid/views.py` | `information_path/hybrid_view` | one `DiffusionView` with its own process, schedule, representation and clock |
-| a learned or adaptive clock | `core/time_sampling/`, `core/modifiers/hybrid/time_maps.py` | `information_path/time_map` | see skill `sddc-add-denoising-component` for time samplers |
+| a learned or adaptive clock that generation reads | `core/noise_schedules/learned_time_maps.py` (shared map at `algorithm.time_map`), `core/modifiers/hybrid/time_maps.py` (per-view map) | `information_path/time_map` | never a training time sampler: generation must not read `denoising_task/time_sampler` |
 
 A schedule and a process must agree on what the coefficients mean; a Gaussian schedule's
 rank calibration is tied to a representation's geometry. Check `docs/validation/compatibility.md`

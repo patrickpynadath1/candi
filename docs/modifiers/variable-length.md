@@ -362,9 +362,10 @@ peaked at step 4,000 rather than improving monotonically.
 
 ## Adaptive training-time feedback
 
-Set `denoising_task/time_sampler=loss_derivative time_sampler.adaptive=true
-variable_length.time_sampling_include_aux=true` to fit the training-time sampler
-to the combined token and insertion objective. The default is `false`, preserving
+Set `+information_path/time_map@algorithm.time_map=loss_derivative
+variable_length.time_sampling_include_aux=true` to fit the loss-derivative time
+map (a learned warp of the training times, formerly the `loss_derivative` training
+time sampler) to the combined token and insertion objective. The default is `false`, preserving
 surviving-token-only feedback. With the option enabled, each example contributes
 its surviving-token loss plus weighted insertion-count and insertion-content
 losses, divided by its original target-token count. Fully deleted examples still
