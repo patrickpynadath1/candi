@@ -63,11 +63,24 @@ def source_identity():
     }
 
 
+def active(distribution, values):
+    """A parameter with ``when: {key: value or [values]}`` exists only under that condition."""
+    when = {} if isinstance(distribution, list) else distribution.get("when") or {}
+    return all(
+        values.get(key) in (expected if isinstance(expected, list) else [expected])
+        for key, expected in when.items()
+    )
+
+
 def suggest(trial, space):
     values = {}
     for key, distribution in space.items():
+        if not active(distribution, values):
+            continue  # The sampler keeps its configured value for this parameter.
         if isinstance(distribution, list):
             values[key] = trial.suggest_categorical(key, distribution)
+        elif distribution["type"] == "categorical":
+            values[key] = trial.suggest_categorical(key, distribution["choices"])
         elif distribution["type"] == "float":
             values[key] = trial.suggest_float(
                 key,
@@ -105,18 +118,57 @@ def validate_inference(spec):
         raise ValueError(
             "Final generation seeds must be nonempty and separate from tuning"
         )
-    if spec["nfe"] < 2 or spec["trials"] < 1:
+    budgets = spec["nfe"] if isinstance(spec["nfe"], list) else [spec["nfe"]]
+    if (
+        not budgets
+        or len(set(budgets)) != len(budgets)
+        or any(type(b) is not int or b < 2 for b in budgets)
+        or spec["trials"] < 1
+    ):
         raise ValueError("Invalid NFE or trial budget")
     if spec["direction"] not in ("minimize", "maximize"):
         raise ValueError("Invalid optimization direction")
     if spec["budget_parameter"] not in (None, "steps", "max_steps"):
         raise ValueError("Unsupported sampler budget parameter")
-    for key in spec["space"]:
+    seen = []
+    for key, distribution in spec["space"].items():
         if key in {"sampler.steps", "sampler.max_steps"} or not (
-            key.startswith("sampler.")
-            or key in {"algorithm.predictor.temperature", "algorithm.predictor.commitment"}
+            key.startswith("sampler.") or key in PREDICTOR_PARAMETERS
         ):
             raise ValueError(f"Not a tunable inference parameter: {key}")
+        when = {} if isinstance(distribution, list) else distribution.get("when") or {}
+        if any(condition not in seen for condition in when):
+            raise ValueError(f"{key}: a `when` condition must name an earlier parameter")
+        seen.append(key)
+    if "halving" in spec:
+        validate_halving(spec)
+
+
+# Sampling-only predictor settings a policy may tune (never the training objective).
+PREDICTOR_PARAMETERS = {
+    "algorithm.predictor.temperature",
+    "algorithm.predictor.commitment",
+    "algorithm.predictor.top_p",
+}
+
+
+def validate_halving(spec):
+    halving = spec["halving"]
+    rungs = halving.get("rungs", [])
+    if not rungs or any(type(r) is not int or r < 1 for r in rungs) or rungs != sorted(set(rungs)):
+        raise ValueError("Halving rungs must be increasing positive prompt counts")
+    if rungs[-1] > len(spec["tuning_indices"]):
+        raise ValueError("The largest halving rung exceeds the tuning pool")
+    if not 0 < halving.get("keep", 1 / 3) <= 1 or halving.get("finalists", 3) < 1:
+        raise ValueError("Halving keeps a fraction in (0, 1] and at least one finalist")
+    seeds = halving.get("finalist_seeds", [])
+    if not seeds or len(set(seeds)) != len(seeds) or set(seeds) & (
+        set(spec["seeds"]) | set(spec["test_seeds"])
+    ):
+        raise ValueError("Finalist seeds must be fresh: unique, unlike tuning and test seeds")
+    for override in halving.get("finalist_overrides", {}):
+        if not override.startswith("task."):
+            raise ValueError(f"Not a finalist evaluation override: {override}")
 
 
 def validate(spec):
@@ -315,7 +367,8 @@ def search(directory, settings, direction, objective, concurrency, retry_skipped
             optuna.trial.TrialState.FAIL,
         ) or (old.user_attrs.get("skipped") and not retry_skipped):
             continue
-        if set(old.params) != set(settings["space"]) or any(
+        expected = {k for k, d in settings["space"].items() if active(d, old.params)}
+        if set(old.params) != expected or any(
             t.params == old.params for t in completed + skipped
         ):
             continue
@@ -547,7 +600,7 @@ def _evaluate_worker(payload, output):
         "evaluation_name": evaluation.get("dataset", "validation"),
         "indices": evaluation["indices"],
     }
-    scores = []
+    scores, intervals = [], []
     for seed in evaluation["seeds"]:
         destination = Path(output) / f"seed-{seed}"
         config.seed = seed
@@ -561,7 +614,14 @@ def _evaluate_worker(payload, output):
         if result["max_nfe"] > evaluation["nfe"]:
             raise ValueError("Sampler exceeded NFE budget")
         scores.append(metric_value(result, evaluation["score"]["metric"]))
-    return {"score": sum(scores) / len(scores), "seed_scores": scores}
+        intervals.append(result.get(f"{evaluation['score']['metric']}_interval"))
+    record = {"score": sum(scores) / len(scores), "seed_scores": scores}
+    if any(interval is not None for interval in intervals):
+        # A metric's own bootstrap interval (e.g. SOL with task.sol.bootstrap).
+        record["seed_intervals"] = intervals
+        if len(intervals) == 1:
+            record["score_interval"] = intervals[0]
+    return record
 
 
 def record_attempt(output):
@@ -663,47 +723,76 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
     }
     validation["indices"] = evaluation["tuning_indices"]
 
-    def inference(checkpoint, directory):
-        choices = []
-        for policy in spec["inference"]:
+    budgets = nfe_budgets(evaluation)
 
-            def objective(parameters, output):
-                result = execute(
-                    "evaluate",
-                    {
+    def budget_directory(base, budget):
+        # The first budget keeps the single-budget layout (status/analysis read it).
+        return base if budget == budgets[0] else base.parent / f"{base.name}-nfe-{budget}"
+
+    def inference(checkpoint, directory):
+        winners = {}
+        for budget in budgets:
+            tuned = {**validation, "nfe": budget}
+            choices = []
+            for policy in spec["inference"]:
+
+                def evaluate(parameters, output, indices=None, seeds=None, overrides=None,
+                             policy=policy, tuned=tuned):
+                    settings = dict(tuned)
+                    if indices is not None:
+                        settings["indices"] = indices
+                    if seeds is not None:
+                        settings["seeds"] = seeds
+                    if overrides:
+                        settings["overrides"] = {**settings.get("overrides", {}), **overrides}
+                    result = execute(
+                        "evaluate",
+                        {
+                            "checkpoint": checkpoint,
+                            "policy": policy,
+                            "parameters": parameters,
+                            "evaluation": settings,
+                            "resources": resources,
+                        },
+                        output,
+                    )
+                    record = {
+                        **result,
                         "checkpoint": checkpoint,
                         "policy": policy,
-                        "parameters": parameters,
-                        "evaluation": validation,
-                        "resources": resources,
-                    },
-                    output,
-                )
-                return {
-                    **result,
-                    "checkpoint": checkpoint,
-                    "policy": policy,
-                    "inference_parameters": parameters,
-                }
+                        "inference_parameters": parameters,
+                    }
+                    if "halving" in evaluation or len(budgets) > 1:
+                        record.update(
+                            nfe=budget,
+                            prompts=len(settings["indices"]),
+                            seeds=list(settings["seeds"]),
+                        )
+                    return record
 
-            choices.append(
-                search(
-                    directory / policy["name"],
-                    policy,
-                    direction,
-                    objective,
-                    concurrency,
-                    retry_skipped,
+                folder = budget_directory(directory, budget) / policy["name"]
+                if "halving" in evaluation:
+                    choice = halving_search(
+                        folder, policy, direction, evaluate, evaluation, concurrency,
+                        retry_skipped,
+                    )
+                else:
+                    choice = search(
+                        folder, policy, direction, evaluate, concurrency, retry_skipped
+                    )
+                choices.append(choice)
+            # A policy whose every trial failed (and was skipped) has no candidate.
+            choices = [choice for choice in choices if choice is not None]
+            if not choices:
+                raise RuntimeError(
+                    f"Every inference policy failed for {checkpoint['checkpoint']}"
                 )
-            )
-        # A policy whose every trial failed (and was skipped) has no candidate.
-        choices = [choice for choice in choices if choice is not None]
-        if not choices:
-            raise RuntimeError(
-                f"Every inference policy failed for {checkpoint['checkpoint']}"
-            )
-        choose = max if direction == "maximize" else min
-        return choose(choices, key=lambda r: r["score"])
+            choose = max if direction == "maximize" else min
+            winners[budget] = choose(choices, key=lambda r: r["score"])
+        first = winners[budgets[0]]
+        if len(budgets) == 1:
+            return first
+        return {**first, "budgets": {str(b): winners[b] for b in budgets}}
 
     def train_candidate(parameters, output):
         output.mkdir(parents=True, exist_ok=True)
@@ -735,34 +824,216 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
         )
     save(root / "selected.json", winner)
     # No final evaluation occurs until both levels and sampler selection finish.
-    final_path = root / "final/result.json"
-    if not final_path.exists():
-        verify_checkpoint(winner["checkpoint"])
+    # With several NFE budgets each budget's winner is scored once on the test split.
+    for budget in budgets:
+        selection = winner if len(budgets) == 1 else winner["budgets"][str(budget)]
+        final_dir = budget_directory(root / "final", budget)
+        final_path = final_dir / "result.json"
+        if final_path.exists():
+            continue
+        verify_checkpoint(selection["checkpoint"])
         final = {
             **validation,
+            "nfe": budget,
             "dataset": evaluation.get(
                 "test_dataset", validation.get("dataset", "validation")
             ),
             "indices": evaluation["test_indices"],
             "seeds": evaluation["test_seeds"],
         }
+        final.pop("halving", None)
         result = execute(
             "evaluate",
             {
-                "checkpoint": winner["checkpoint"],
-                "policy": winner["policy"],
-                "parameters": winner["inference_parameters"],
+                "checkpoint": selection["checkpoint"],
+                "policy": selection["policy"],
+                "parameters": selection["inference_parameters"],
                 "evaluation": final,
                 "resources": resources,
             },
-            root / "final",
+            final_dir,
         )
-        save(final_path, {**result, "selection": winner, "source": source_identity()})
+        save(final_path, {**result, "selection": selection, "source": source_identity()})
     return winner
+
+
+def nfe_budgets(evaluation):
+    """The NFE budgets a case tunes at: ``nfe`` is one integer or a list of them."""
+    nfe = evaluation["nfe"]
+    return list(nfe) if isinstance(nfe, list) else [nfe]
+
+
+def ranked(entries, direction):
+    """Best first; ties keep the earlier trial (deterministic on resume)."""
+    sign = -1 if direction == "maximize" else 1
+    return sorted(entries, key=lambda e: (sign * e["score"], e["trial"]))
+
+
+def completed_trials(directory):
+    """(trial number, parameters, score) of every completed trial of a study."""
+    import optuna
+
+    study = optuna.load_study(
+        storage=f"sqlite:///{Path(directory).resolve() / 'optuna.sqlite'}", study_name="search"
+    )
+    return [
+        {"trial": t.number, "parameters": t.params, "score": t.value}
+        for t in study.trials
+        if t.state == optuna.trial.TrialState.COMPLETE
+    ]
+
+
+def halving_rungs(evaluation):
+    """[(prompt count, indices)] of each rung: nested prefixes of the tuning pool."""
+    pool = evaluation["tuning_indices"]
+    return [(n, pool[:n]) for n in evaluation["halving"]["rungs"]]
+
+
+def promoted_count(count, keep):
+    return max(1, math.ceil(count * keep - 1e-9))
+
+
+def halving_search(directory, policy, direction, evaluate, evaluation, concurrency,
+                   retry_skipped=False):
+    """Successive halving over one policy's trials, then a fresh-seed final round.
+
+    Rung 0: the policy's Optuna study proposes ``trials`` candidates, each scored on
+    the first ``rungs[0]`` tuning prompts (the study sees only these scores). Rung r:
+    the best ``keep`` fraction (at least one) of rung r-1 is scored on the first
+    ``rungs[r]`` prompts. The best ``finalists`` of the largest rung are re-scored on
+    it with ``finalist_seeds`` (and ``finalist_overrides``, e.g. a bootstrap); the
+    best re-score is selected. Every evaluation is cached by its parameters, so a
+    resumed run repeats nothing and selects the same candidate.
+    """
+    halving = evaluation["halving"]
+    keep = halving.get("keep", 1 / 3)
+    rungs = halving_rungs(evaluation)
+    directory = Path(directory).resolve()
+    skip = policy.get("on_failure", "skip") == "skip"
+    log = logging.getLogger(__name__)
+
+    def first(parameters, output):
+        return evaluate(parameters, output, indices=rungs[0][1])
+
+    if search(directory, policy, direction, first, concurrency, retry_skipped) is None:
+        return None
+    entries = ranked(completed_trials(directory), direction)
+    history = {"rungs": [{"prompts": rungs[0][0], "scores": entries}]}
+
+    def score_round(name, candidates, **options):
+        folder = directory / name
+
+        def run(entry):
+            key = hashlib.sha256(
+                json.dumps(entry["parameters"], sort_keys=True).encode()
+            ).hexdigest()[:20]
+            output = folder / "candidates" / key
+            path = output / "result.json"
+            with lock(output / ".candidate.lock"):
+                if not path.exists() and (output / "skipped.json").exists() and not retry_skipped:
+                    return None  # A recorded skip stays skipped, as in search().
+                if not path.exists():
+                    try:
+                        result = evaluate(entry["parameters"], output, **options)
+                        if not math.isfinite(result["score"]):
+                            raise ValueError("Nonfinite validation score")
+                    except Exception as error:
+                        save(output / "failure.json", {
+                            "parameters": entry["parameters"],
+                            "traceback": traceback.format_exc(),
+                        })
+                        if isinstance(error, StopSearch):
+                            raise
+                        if not skip:
+                            raise StopSearch(f"{type(error).__name__}: {error}") from error
+                        log.warning("Skipped %s candidate %s in %s: %s",
+                                    name, entry["trial"], directory, error)
+                        save(output / "skipped.json", {"error": f"{type(error).__name__}: {error}"})
+                        return None
+                    save(path, {**result, "source": source_identity()})
+                result = json.loads(path.read_text())
+            return {**entry, "score": result["score"], "result_path": str(path)}
+
+        # As in search(): stop submitting after a failure, finish running work, then raise.
+        scored, failure, queue = [], None, list(candidates)
+        with ThreadPoolExecutor(max_workers=concurrency) as pool:
+            pending = set()
+            while queue or pending:
+                while failure is None and queue and len(pending) < concurrency:
+                    pending.add(pool.submit(run, queue.pop(0)))
+                if not pending:
+                    break
+                done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                for future in done:
+                    try:
+                        result = future.result()
+                    except Exception as error:
+                        failure = failure or error
+                        continue
+                    if result is not None:
+                        scored.append(result)
+        if failure is not None:
+            raise failure
+        return ranked(scored, direction)
+
+    for prompts, indices in rungs[1:]:
+        promoted = entries[: promoted_count(len(entries), keep)]
+        entries = score_round(f"rung-{prompts}", promoted, indices=indices)
+        history["rungs"].append({"prompts": prompts, "scores": entries})
+        if not entries:
+            return None
+    finalists = entries[: halving.get("finalists", 3)]
+    final = score_round(
+        "finalists",
+        finalists,
+        indices=rungs[-1][1],
+        seeds=halving["finalist_seeds"],
+        overrides=halving.get("finalist_overrides"),
+    )
+    history["finalists"] = final
+    if not final:
+        return None
+    best = final[0]
+    result = json.loads(Path(best["result_path"]).read_text())
+    selected = {**result, "parameters": best["parameters"], "halving": history}
+    save(directory / "selected.json", selected)
+    return selected
 
 
 # Preserve existing callers and saved launcher commands.
 run_study = run_case
+
+
+def generation_cost(spec):
+    """Upper-bound generation work of one case: sequences and network calls.
+
+    Counts every validation trial (each halving rung and finalist round) and the
+    final test evaluation(s), per NFE budget and training candidate. Skipped
+    candidates and early-stopping samplers make the real cost lower.
+    """
+    evaluation = spec["evaluation"]
+    seeds = len(evaluation["seeds"])
+    tuning = test = calls = 0
+    for budget in nfe_budgets(evaluation):
+        sequences = 0
+        for policy in spec["inference"]:
+            trials = policy["trials"]
+            if "halving" in evaluation:
+                halving = evaluation["halving"]
+                count = trials
+                for index, prompts in enumerate(halving["rungs"]):
+                    if index:
+                        count = promoted_count(count, halving.get("keep", 1 / 3))
+                    sequences += count * prompts * seeds
+                finalists = min(halving.get("finalists", 3), count)
+                sequences += finalists * halving["rungs"][-1] * len(halving["finalist_seeds"])
+            else:
+                sequences += trials * len(evaluation["tuning_indices"]) * seeds
+        sequences *= spec["training"]["trials"]
+        final = len(evaluation["test_indices"]) * len(evaluation["test_seeds"])
+        tuning, test = tuning + sequences, test + final
+        calls += (sequences + final) * budget
+    return {"tuning_sequences": tuning, "test_sequences": test, "network_calls": calls}
 
 
 def check_manifest(specs, output=None):
@@ -770,7 +1041,7 @@ def check_manifest(specs, output=None):
 
     With ``output``, also flag cases whose stored protocol.json a resume would
     refuse. Each row is (case, training trials, policies, inference trials, NFE,
-    state) for a one-line summary per case.
+    state, generated sequences, network calls) for a one-line summary per case.
     """
     rows, errors, names = [], [], set()
     for spec in specs:
@@ -782,6 +1053,9 @@ def check_manifest(specs, output=None):
             validate(spec)
             if not Path(spec["config"]).exists():
                 raise FileNotFoundError(f"config {spec['config']} is missing")
+            checkpoint = spec["training"].get("checkpoint")
+            if checkpoint and not Path(checkpoint).is_file():
+                raise FileNotFoundError(f"fixed checkpoint {checkpoint} is missing")
             state = "new"
             if output is not None:
                 stored = Path(output) / name / "protocol.json"
@@ -793,26 +1067,32 @@ def check_manifest(specs, output=None):
             errors.append(f"{name}: {error}")
             continue
         policies = spec["inference"]
+        cost = generation_cost(spec)
+        budgets = nfe_budgets(spec["evaluation"])
         rows.append((
             name,
             spec["training"]["trials"],
             len(policies),
             sum(policy["trials"] for policy in policies),
-            policies[0].get("nfe", spec["evaluation"].get("nfe")),
+            "/".join(map(str, budgets)),
             state,
+            cost["tuning_sequences"] + cost["test_sequences"],
+            cost["network_calls"],
         ))
     return rows, errors
 
 
 def print_check(rows, errors):
-    header = ("case", "train", "policies", "inference", "nfe", "state")
+    header = ("case", "train", "policies", "inference", "nfe", "state", "sequences", "calls")
     width = max([len(header[0])] + [len(row[0]) for row in rows])
     print(f"{header[0]:{width}}  " + "  ".join(f"{h:>9}" for h in header[1:]))
     for row in rows:
         print(f"{row[0]:{width}}  " + "  ".join(f"{str(v):>9}" for v in row[1:]))
     trained = sum(row[1] for row in rows)
     print(f"{len(rows)} cases, {trained} training runs, "
-          f"{sum(row[1] * row[3] for row in rows)} inference trials")
+          f"{sum(row[1] * row[3] for row in rows)} inference trials, "
+          f"{sum(row[6] for row in rows)} generated sequences, "
+          f"{sum(row[7] for row in rows) / 1e6:.1f}M sequence network calls")
     for error in errors:
         print("ERROR", error)
 

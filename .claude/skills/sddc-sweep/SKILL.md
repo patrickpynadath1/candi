@@ -50,13 +50,18 @@ What to decide:
   (`experiments/*/evaluation/`) when comparing with published numbers.
 - **Inference policies** (`preparation.inference`): each has a `name`, a search `space`
   (only `sampler.*` keys other than `sampler.steps`/`max_steps`, plus
-  `algorithm.predictor.temperature` and `algorithm.predictor.commitment`), `trials`,
+  `algorithm.predictor.temperature`, `algorithm.predictor.commitment` and
+  `algorithm.predictor.top_p`; a `when:` condition makes a key conditional), `trials`,
   `budget_parameter: steps`, and optionally its own `sampler` or `sampler_overrides`. Shared
-  sets live in `configs/inference/inference_policies/`.
+  sets live in `configs/inference/inference_policies/`; single-policy files there
+  (`eb_churn`, `psi`, `uniform_psi`) add to a set through `preparation.extra_inference`.
+- **Successive halving** (opt-in): an evaluation-file `halving` block (rungs, keep,
+  finalists, fresh `finalist_seeds`); see `docs/guides/nested-tuning.md`.
 - **Training search** (`preparation.training.space`, `trials`): keys must start with
   `optimizer.`, `model.`, `algorithm.`, `objective.`, `noise_schedule.`, `time_sampler.`,
   `training.`, `self_conditioning.` or `lr_scheduler.`. Default: one fixed candidate.
-- **Budget**: `preparation.evaluation.nfe` (default 128 network calls, terminal included).
+- **Budget**: `preparation.evaluation.nfe` (default 128 network calls, terminal included;
+  a list such as `[128, 512]` tunes and tests at each budget).
 - **Resources**: `preparation.local.resources_per_job` (0 or 1 whole GPU per worker).
 
 ## 2. Prepare and collect

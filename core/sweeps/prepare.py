@@ -16,7 +16,7 @@ from omegaconf import OmegaConf
 
 from .budget import sampler_steps
 from .configuration import capture_runtime_paths
-from .nested_tuning import validate
+from .nested_tuning import nfe_budgets, validate
 
 
 def load_evaluation(path, task_name):
@@ -61,7 +61,7 @@ def prepare_case(config):
     budget_parameter = metadata.get("sampler_budget_parameter", "steps")
     if budget_parameter is not None:
         config.sampler[budget_parameter] = sampler_steps(
-            config, sampler, evaluation["nfe"]
+            config, sampler, nfe_budgets(evaluation)[0]
         )
     recipe = {
         key: None if config[key] is None else OmegaConf.to_container(config[key], resolve=False)
@@ -87,7 +87,14 @@ def prepare_case(config):
     # Fail at export, not on a worker, if anything is unresolved.
     OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     policies = []
-    for policy in metadata["inference"]:
+    # ``extra_inference`` maps names to policies, so several policy files can each add
+    # one (Hydra merges mappings; lists would replace each other).
+    extra = [
+        {"name": name, **policy}
+        for name, policy in (metadata.get("extra_inference") or {}).items()
+        if policy is not None
+    ]
+    for policy in metadata["inference"] + extra:
         native = policy.get("sampler") or OmegaConf.to_container(
             config.sampler, resolve=True
         )

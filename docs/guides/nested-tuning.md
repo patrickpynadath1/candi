@@ -88,6 +88,57 @@ Both search levels support categorical lists, continuous float distributions and
 integer distributions (`type: int`, inclusive `low`/`high`, optional `step` or
 `log`). Add sampler policies to `inference` to compare multiple samplers. All
 policies use the same validation metric and examples. Each has its own budget.
+Inference spaces may tune `sampler.*` keys and the predictor's sampling-only
+`temperature`, `commitment` and `top_p`. A distribution with
+`when: {earlier.key: value or [values]}` exists only under that condition (e.g. the
+Ψ-sampler's `t_on` only for `schedule: loop`); otherwise the sampler keeps its
+configured value. Categorical distributions that need a condition use
+`{type: categorical, choices: [...], when: ...}`.
+
+In sweep configs, `preparation.extra_inference` maps policy names to policies and is
+appended to `preparation.inference`; it lets several policy files each add one policy
+(`- /inference/inference_policies: [hybrid_renoising, eb_churn, psi]`).
+
+### Successive halving (opt-in)
+
+An `evaluation.halving` block replaces each policy's flat search by successive
+halving over the tuning pool:
+
+```python
+"halving": {
+    "rungs": [64, 256, 1024],     # prompts per rung: prefixes of tuning_indices
+    "keep": 1 / 3,                # fraction promoted from each rung (at least one)
+    "finalists": 3,               # re-scored on the largest rung
+    "finalist_seeds": [2041],     # fresh: unlike the tuning and test seeds
+    "finalist_overrides": {"task.sol.bootstrap": 200},  # e.g. a bootstrap interval
+}
+```
+
+The policy's Optuna study proposes its `trials` candidates as before, but each is
+scored on the first `rungs[0]` prompts only (the study sees these scores). The best
+third is scored on the first `rungs[1]` prompts, its best third on `rungs[2]`, and the
+best `finalists` of the largest rung are re-scored on it with `finalist_seeds`; the best
+re-score is the policy's selection and competes with the other policies. Ties keep the
+earlier trial. Every evaluation is cached under
+`<policy>/{candidates,rung-<n>,finalists}/<parameters hash>/result.json`, so a resume
+repeats nothing and selects the same candidate; `selected.json` records every rung's
+ranking under `halving`. When the metric reports an interval (SOL with
+`task.sol.bootstrap`), the finalists' results and `selected.json` carry it as
+`score_interval`. The test split is still scored once, after selection. Without
+`halving`, cases behave exactly as before.
+
+### Several NFE budgets
+
+`evaluation.nfe` may be a list (e.g. `[128, 512]`): every policy is tuned separately at
+each budget, and each budget's winner is scored once on the test split. The first
+budget keeps the single-budget layout (`inference/<policy>`, `final/`); the others use
+`inference-nfe-<n>/<policy>` and `final-nfe-<n>/`. The case's `selected.json` is the
+first budget's winner with all winners under `budgets`. A training search selects on the
+first budget.
+
+`--check` prints, per case, the generated sequences and sequence network calls these
+settings imply (an upper bound: early-stopping samplers and skipped trials use less), and
+refuses a fixed `training.checkpoint` that does not exist on this machine.
 
 ### Search algorithm
 
