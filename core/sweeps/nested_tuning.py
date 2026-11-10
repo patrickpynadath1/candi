@@ -656,6 +656,9 @@ def _evaluate_worker(payload, output):
         evaluation, payload["policy"], payload["parameters"],
     )
     config.mode = "evaluate"
+    # A tuning trial generates for seconds; compiling the transformer blocks costs more
+    # than it saves, and leaves the GPU idle meanwhile. Outputs match within tolerance.
+    config.compile = False
     config.evaluation.checkpoint = payload["checkpoint"]["checkpoint"]
     config.evaluation.legacy = False
     config.evaluation.max_examples = None

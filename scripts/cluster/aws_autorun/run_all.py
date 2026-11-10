@@ -34,7 +34,7 @@ def main():
     parser.add_argument("plans", nargs="+", type=Path)
     parser.add_argument("--runs", type=Path, required=True)
     parser.add_argument("--case-concurrency", type=int, default=None, help="Default: number of GPUs")
-    parser.add_argument("--concurrency", type=int, default=2, help="Inference candidates per case")
+    parser.add_argument("--concurrency", type=int, default=4, help="Inference candidates per case")
     parser.add_argument("--cases", type=Path, help="Run only these PLAN/CASE names (one per line)")
     args = parser.parse_args()
     import ray
