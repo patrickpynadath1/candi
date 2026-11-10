@@ -9,19 +9,17 @@ import torch
 
 from core.cluster.slurm import entrypoint, node_command, prepare_ray_worker
 from core.sweeps import smoke, nested_tuning
-from core.tests.test_programmatic_sweeps import tiny
+from core.tests.test_run_preparation import tiny
 from core.sweeps.configuration import compose
+from core.tests.networks import TINY16
 
 
 def case(tmp_path):
     cfg = compose(
         "corruption_factorial",
         [
-            "hybrid_view@model.views.content=masked",
-            "model.backbone.hidden_size=16",
-            "model.backbone.cond_dim=8",
-            "model.backbone.n_heads=2",
-            "model.backbone.n_blocks=1",
+            "information_path/hybrid_view@model.views.content=masked",
+            *TINY16,
         ],
     )
     small = OmegaConf.create(tiny())
