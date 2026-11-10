@@ -55,17 +55,31 @@ INFERENCE_KEYS = {
 }
 
 
+# Recipe options added after checkpoints were written, with the value that reproduces
+# the behaviour before they existed. A checkpoint whose saved recipe lacks such a key
+# matches when the current value is that default; any other value is a mismatch.
+ADDED_DEFAULTS = {
+    # Self-conditioning gradient and feedback controls (REPLAiD, commit 462a1bb).
+    "algorithm.prediction.selected_gradients": "all",
+    "algorithm.prediction.fixed_feedback": "prediction",
+}
+_ABSENT = object()
+
+
 def _differences(saved, current, prefix):
     if prefix in INFERENCE_KEYS:
         return []
+    if saved is _ABSENT and prefix in ADDED_DEFAULTS:
+        return [] if current == ADDED_DEFAULTS[prefix] else [prefix]
     if isinstance(saved, dict) and isinstance(current, dict):
         return [
             difference
             for key in sorted(set(saved) | set(current))
             for difference in _differences(
-                saved.get(key), current.get(key), f"{prefix}.{key}"
+                saved.get(key, _ABSENT), current.get(key, _ABSENT), f"{prefix}.{key}"
             )
         ]
+    saved, current = (None if v is _ABSENT else v for v in (saved, current))
     return [] if saved == current else [prefix]
 
 

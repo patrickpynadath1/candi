@@ -15,13 +15,44 @@ import json
 import math
 import logging
 import os
+import re
 import traceback
 from pathlib import Path
 
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 from core.evaluation.reporting import metric_value
 from core.sweeps.configuration import prepare_run
+
+
+INTERPOLATION = re.compile(r"^\$\{([A-Za-z_][\w.]*)\}$")
+
+
+def resolve_key(config, key):
+    """The dotted key a write to ``key`` must target, following interpolated parents.
+
+    Unresolved configs alias nodes (``algorithm.predictor: ${parameterization}``).
+    ``OmegaConf.update`` on a child of an alias would replace the alias by a new,
+    incomplete node; writing to the alias target keeps every recipe field and every
+    other reference to it consistent.
+    """
+    parts = key.split(".")
+    node = config
+    for index, part in enumerate(parts[:-1]):
+        if not isinstance(node, DictConfig) or part not in node:
+            return key
+        if OmegaConf.is_interpolation(node, part):
+            target = INTERPOLATION.match(str(node._get_node(part)._value()))
+            if target is None:
+                raise ValueError(f"cannot write {key} through the interpolation at {part}")
+            return resolve_key(config, ".".join([target.group(1), *parts[index + 1:]]))
+        node = node[part]
+    return key
+
+
+def update(config, key, value, **options):
+    """``OmegaConf.update`` that writes through interpolated parent nodes."""
+    OmegaConf.update(config, resolve_key(config, key), value, **options)
 
 
 @contextmanager
@@ -545,9 +576,9 @@ def _train_worker(payload, output):
     for key, value in payload["parameters"].items():
         if OmegaConf.select(config, key, default="__missing__") == "__missing__":
             raise ValueError(f"Unknown training parameter: {key}")
-        OmegaConf.update(config, key, value, merge=False, force_add=False)
+        update(config, key, value, merge=False, force_add=False)
     for key, value in payload["validation"].get("overrides", {}).items():
-        OmegaConf.update(config, key, value, force_add=True)
+        update(config, key, value, force_add=True)
     config.mode = "train"
     config.checkpoint.resume = None
     config = prepare_run(
@@ -586,31 +617,44 @@ def _train_worker(payload, output):
     return {"config": str(evaluation_path), "checkpoint": str(previous)}
 
 
-def _evaluate_worker(payload, output):
-    from core.training.runner import run
+def evaluation_config(config, evaluation, policy, parameters):
+    """A case config with an evaluation's overrides, a policy's sampler and a trial's values.
+
+    The sampler's step count is set from the NFE budget. Shared by the evaluate
+    worker and the tests that check every policy composes for every case.
+    """
     from hydra.utils import instantiate
 
-    evaluation, policy = payload["evaluation"], payload["policy"]
-    config = OmegaConf.load(payload["checkpoint"]["config"])
+    from .budget import sampler_steps
+
     for key, value in evaluation.get("overrides", {}).items():
-        OmegaConf.update(config, key, value, merge=False, force_add=True)
+        update(config, key, value, merge=False, force_add=True)
     config.sampler = OmegaConf.create(policy["sampler"])
-    for key, value in payload["parameters"].items():
+    for key, value in parameters.items():
         # A tuned algorithm key that does not exist (e.g. a temperature on an
         # algorithm without a predictor) would make every trial identical.
         if key.startswith("algorithm.") and (
             OmegaConf.select(config, key, default="__missing__") == "__missing__"
         ):
             raise ValueError(f"Unknown inference parameter for this recipe: {key}")
-        OmegaConf.update(config, key, value, merge=False, force_add=True)
+        update(config, key, value, merge=False, force_add=True)
     # Resolve after trial overrides: correction count can itself be tuned.
     sampler = instantiate(config.sampler)
-    from .budget import sampler_steps
-
     if policy["budget_parameter"] is not None:
         config.sampler[policy["budget_parameter"]] = sampler_steps(
             config, sampler, evaluation["nfe"]
         )
+    return config
+
+
+def _evaluate_worker(payload, output):
+    from core.training.runner import run
+
+    evaluation = payload["evaluation"]
+    config = evaluation_config(
+        OmegaConf.load(payload["checkpoint"]["config"]),
+        evaluation, payload["policy"], payload["parameters"],
+    )
     config.mode = "evaluate"
     config.evaluation.checkpoint = payload["checkpoint"]["checkpoint"]
     config.evaluation.legacy = False

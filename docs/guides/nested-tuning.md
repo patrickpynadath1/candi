@@ -95,6 +95,13 @@ Inference spaces may tune `sampler.*` keys and the predictor's sampling-only
 configured value. Categorical distributions that need a condition use
 `{type: categorical, choices: [...], when: ...}`.
 
+Workers write tuned values and overrides through interpolated parents. In an
+unresolved config such as `algorithm.predictor: ${parameterization}`, the key
+`algorithm.predictor.temperature` sets `parameterization.temperature`. Writing to the
+alias would replace the whole parameterization with a one-key node.
+`core/tests/test_rerun_cases_compose.py` composes and instantiates every rerun case
+under every policy this way.
+
 In sweep configs, `preparation.extra_inference` maps policy names to policies and is
 appended to `preparation.inference`; it lets several policy files each add one policy
 (`- /inference/inference_policies: [hybrid_renoising, eb_churn, psi]`).

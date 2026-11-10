@@ -54,6 +54,16 @@ checkpoint's saved `algorithm`, `block_diffusion`, `variable_length`,
 `token_feedback` and `encoder_decoder` sections with the current config and
 raises on any difference. Sampling knobs (`predictor.temperature`, `top_k`,
 `top_p`, `commitment`), the training time sampler and the training objective may differ.
+Recipe options added after a checkpoint was written are listed with the value that
+reproduces the earlier behaviour (`ADDED_DEFAULTS` in
+[checkpoints.py](../../core/training/checkpoints.py)). Two keys are listed so far:
+`prediction.selected_gradients: all` and `prediction.fixed_feedback: prediction`, both
+from the REPLAiD components.
+
+- A key that is absent from the checkpoint's saved recipe matches only at that value.
+- Any other value is reported as a mismatch.
+- Unregistered new keys are always mismatches.
+
 Set `evaluation.allow_config_mismatch=true` only for a deliberate cross-recipe
 evaluation. Legacy imports are not checked.
 
