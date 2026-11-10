@@ -46,7 +46,8 @@ A manifest lists cases; each case can contain nested Optuna studies. Both traini
 and inference choices are selected on validation before final evaluation.
 
 - [Nested training and inference tuning](guides/nested-tuning.md), including
-  inference-only tuning of a fixed checkpoint
+  inference-only tuning of a fixed checkpoint, two-stage sampler selection and
+  several NFE budgets
 
 - [Training](guides/training.md)
 - [Sampling and evaluation](guides/sampling-and-evaluation.md)
@@ -63,7 +64,7 @@ and inference choices are selected on validation before final evaluation.
 | --- | --- |
 | Information path | [Representations](components/representations.md), [processes](components/processes.md), [noise schedules](components/noise-schedules.md) |
 | Denoising task | [Backbones/models](components/models.md), [output parameterizations](components/predictors.md), [objectives](components/objectives.md), [training time sampling](components/time-sampling.md) |
-| Inference settings | [Samplers](components/samplers.md), with compatible process updates and predictor shaping |
+| Inference settings | [Samplers](components/samplers.md), with compatible process updates and predictor shaping; [Ψ-samplers](components/psi-sampler.md) |
 | Coordination | [Algorithms](components/algorithms.md) connect the components; [architecture](concepts/architecture.md) describes execution ownership |
 
 Architectural/sequence modifiers have dedicated references:
@@ -99,7 +100,7 @@ Architectural/sequence modifiers have dedicated references:
 
 See [task conventions](tasks/overview.md), then
 [Sudoku](tasks/sudoku.md), [Text8](tasks/text8.md),
-[N-Queens](tasks/nqueens.md), [TinyStories](tasks/tinystories.md),
+[N-Queens](tasks/nqueens.md), [TinyStories](tasks/tinystories.md) (with the [SOL](tasks/sol.md) and [ref_w1](tasks/ref-w1.md) metrics),
 [Mazes](tasks/maze.md), [OpenWebText](tasks/openwebtext.md), or [TinyGSM](tasks/tinygsm.md).
 
 ## Extend and assess

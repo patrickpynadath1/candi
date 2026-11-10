@@ -1,0 +1,23 @@
+# @package task.ref_w1
+# ref_w1 (core/evaluation/ref_w1.py): W1 between real and generated per-continuation
+# Zstandard coding rates (prompt-conditioned, reference dictionary) plus W1 between their
+# GPT-2 Large NLLs, each over its real-vs-real floor. Lower is better. The dictionary is
+# built from the validation stories listed in fit_indices, which must be disjoint from
+# every evaluated prompt; an evaluation spec sets them and pins dictionary_sha256.
+# Select with `+task/ref_w1=gpt2_large task.ref_w1.fit_indices=[...] task.primary_metric=ref_w1`.
+fit_split: validation
+fit_indices: ???
+dictionary_sha256: null
+dictionary_bytes: 65536
+level: 10
+window_log: 23
+nll:
+  model_name: gpt2-large
+  revision: 32b71b12589c2f8d625668d2335a01cac3249519
+  dtype: auto
+  max_length: auto
+  batch_size: 16
+bootstrap: 0
+bootstrap_confidence: 0.95
+bootstrap_seed: 0
+cache_dir: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/ref_w1_cache

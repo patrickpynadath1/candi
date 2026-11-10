@@ -10,9 +10,13 @@ from .base import Task, PrimaryMetric
 from .tinystories_metrics import TinyStoriesMetrics
 
 
+# Selectable primaries and their directions. termination_rate is a diagnostic,
+# NOT a proxy for coherent story quality; sol needs a ``sol`` scorer.
+PRIMARY_METRICS = {"termination_rate": "max", "corpus_bleu": "max", "sol": "min", "ref_w1": "min"}
+
+
 class TinyStoriesTask(Task):
     name = "tinystories"
-    # A diagnostic primary, NOT a proxy for coherent story quality.
     primary_metric = PrimaryMetric("termination_rate", "max")
 
     def __init__(
@@ -26,6 +30,9 @@ class TinyStoriesTask(Task):
         variable_length=False,
         calculate_bleu=False,
         tokenizer=None,
+        sol=None,
+        primary_metric="termination_rate",
+        ref_w1=None,
     ):
         tokenizer = tokenizer if tokenizer is not None else StoryByteTokenizer()
         if (
@@ -42,6 +49,18 @@ class TinyStoriesTask(Task):
         self.evaluation_seed, self.variable_length = evaluation_seed, variable_length
         self.calculate_bleu = calculate_bleu
         self.tokenizer = tokenizer
+        if primary_metric not in PRIMARY_METRICS:
+            raise ValueError(f"TinyStories primary metric must be one of {sorted(PRIMARY_METRICS)}")
+        if primary_metric == "sol" and sol is None:
+            raise ValueError("primary_metric=sol needs a task.sol scorer configuration")
+        if primary_metric == "ref_w1" and ref_w1 is None:
+            raise ValueError("primary_metric=ref_w1 needs a task.ref_w1 scorer configuration")
+        if primary_metric == "corpus_bleu" and not calculate_bleu:
+            raise ValueError("primary_metric=corpus_bleu needs calculate_bleu=true")
+        self.primary_metric = PrimaryMetric(primary_metric, PRIMARY_METRICS[primary_metric])
+        # The scorer (and its encoder) is built on first scoring, never for training.
+        self.sol_settings, self._sol = sol, None
+        self.ref_w1_settings, self._ref_w1 = ref_w1, None
         self._datasets = {}
 
     def _dataset(self, split):
@@ -114,5 +133,45 @@ class TinyStoriesTask(Task):
         if evaluation_name != "validation":
             raise ValueError(f"unknown TinyStories evaluation set: {evaluation_name}")
         return TinyStoriesMetrics(
-            self.tokenizer, self.calculate_bleu, self._dataset(evaluation_name).manifest
+            self.tokenizer,
+            self.calculate_bleu,
+            self._dataset(evaluation_name).manifest,
+            sol=self.sol_scorer(),
+            ref_w1=self.ref_w1_scorer(),
         )
+
+    def sol_scorer(self):
+        if self.sol_settings is None:
+            return None
+        if self._sol is None:
+            from omegaconf import DictConfig, OmegaConf
+            from core.evaluation.sol import SOLScorer
+
+            settings = self.sol_settings
+            if isinstance(settings, DictConfig):
+                settings = OmegaConf.to_container(settings, resolve=True)
+            self._sol = (
+                settings if isinstance(settings, SOLScorer) else SOLScorer(**dict(settings))
+            )
+        return self._sol
+
+    def ref_w1_scorer(self):
+        """The ref_w1 scorer; its dictionary comes from ``fit_indices`` of the validation set."""
+        if self.ref_w1_settings is None:
+            return None
+        if self._ref_w1 is None:
+            from omegaconf import DictConfig, OmegaConf
+            from core.evaluation.ref_w1 import RefW1Scorer
+
+            settings = self.ref_w1_settings
+            if isinstance(settings, RefW1Scorer):
+                self._ref_w1 = settings
+                return settings
+            if isinstance(settings, DictConfig):
+                settings = OmegaConf.to_container(settings, resolve=True)
+            settings = dict(settings)
+            fit = settings.pop("fit_indices")
+            records = self._dataset(settings.pop("fit_split", "validation")).records
+            texts = [records[i]["prompt"] + records[i]["reference"] for i in fit]
+            self._ref_w1 = RefW1Scorer(texts, **settings)
+        return self._ref_w1

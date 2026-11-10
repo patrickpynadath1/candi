@@ -2,6 +2,8 @@
 
 Instructions for coding agents working in this repository. People should start at
 [README.md](README.md); contributors at [CONTRIBUTING.md](CONTRIBUTING.md).
+For a **new Slurm deployment / colleague handoff**, start with
+[CAMPAIGN_HANDOFF.md](CAMPAIGN_HANDOFF.md) and follow its readiness gates.
 
 SDDC (Some DLM Design Choices) is a framework for controlled experiments on diffusion
 language models. A model is a **recipe** with three parts, and the code and configs follow

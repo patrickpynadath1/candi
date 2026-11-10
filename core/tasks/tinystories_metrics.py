@@ -38,14 +38,32 @@ class StoryAggregate:
     bleu_signature: str | None
     data_manifest: dict
     records: list[StoryRecord]
+    # BLEU without its brevity penalty: the geometric mean of n-gram precisions.
+    corpus_bleu_no_bp: float | None = None
+    bleu_brevity_penalty: float | None = None
+    # SOL against the references of the same prompts (lower is better).
+    sol: float | None = None
+    sol_interval: dict | None = None
+    sol_signature: dict | None = None
+    # ref_w1 (core/evaluation/ref_w1.py): coding-rate and NLL W1s over their floors.
+    ref_w1: float | None = None
+    ref_w1_rate: float | None = None
+    ref_w1_rate_floor: float | None = None
+    ref_w1_nll: float | None = None
+    ref_w1_nll_floor: float | None = None
+    ref_w1_interval: dict | None = None
+    ref_w1_signature: dict | None = None
 
 
 class TinyStoriesMetrics:
     supports_variable_length = True
 
-    def __init__(self, tokenizer, calculate_bleu=False, data_manifest=None):
+    def __init__(self, tokenizer, calculate_bleu=False, data_manifest=None, sol=None,
+                 ref_w1=None):
         self.tokenizer, self.records = tokenizer, []
         self.data_manifest = data_manifest or {}
+        self.sol = sol  # an optional core.evaluation.sol.SOLScorer
+        self.ref_w1 = ref_w1  # an optional core.evaluation.ref_w1.RefW1Scorer
         self.bleu = None
         if calculate_bleu:
             from sacrebleu.metrics import BLEU
@@ -100,12 +118,27 @@ class TinyStoriesMetrics:
             return len(set(grams)) / len(grams) if grams else None
 
         total = sum(r.token_count for r in records)
-        bleu, signature = None, None
+        bleu, signature, bleu_no_bp, brevity = None, None, None, None
         if self.bleu is not None and n:
-            bleu = self.bleu.corpus_score(
+            corpus = self.bleu.corpus_score(
                 [r.continuation for r in records], [[r.reference for r in records]]
-            ).score
+            )
+            bleu, brevity = corpus.score, corpus.bp
+            # score = 100 * bp * geometric mean of precisions; bp == 0 only for empty output.
+            bleu_no_bp = corpus.score / corpus.bp if corpus.bp > 0 else 0.0
             signature = str(self.bleu.get_signature())
+        sol = {}
+        if self.sol is not None and n:
+            sol = self.sol.score(
+                [r.continuation for r in records], [r.reference for r in records]
+            )
+            sol["sol_signature"] = self.sol.signature()
+        if self.ref_w1 is not None and n:
+            sol.update(self.ref_w1.score(
+                [r.prompt for r in records],
+                [r.continuation for r in records],
+                [r.reference for r in records],
+            ))
         return StoryAggregate(
             n,
             mean("eos_present"),
@@ -122,4 +155,7 @@ class TinyStoriesMetrics:
             signature,
             self.data_manifest,
             records,
+            bleu_no_bp,
+            brevity,
+            **sol,
         )

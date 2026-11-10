@@ -1,0 +1,32 @@
+# @package _global_
+# Adds one policy (preparation.extra_inference merges by name, so combine this file with a
+# policy set: `- /inference/inference_policies: [hybrid_renoising, eb_churn]`).
+# Entropy-bounded greedy commitment with random uncommitment (RandomUncommitment):
+# continuous and hybrid recipes. rate 0 is plain eb_greedy.
+preparation:
+  extra_inference:
+    eb_churn:
+      sampler:
+        _target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
+        steps: 127
+        epsilon: 1.0e-05
+        freeze: true
+        greedy_clean_estimate: true
+        entropy_bound: 0.1
+        churn:
+          _target_: core.samplers.churn.RandomUncommitment
+          rate: 0.05
+          stop_fraction: 0.8
+      space:
+        sampler.churn.rate: {type: float, low: 0.0, high: 0.2}
+        sampler.churn.stop_fraction: {type: float, low: 0.5, high: 1.0}
+        sampler.entropy_bound: {type: float, low: 0.02, high: 0.5, log: true}
+        algorithm.predictor.temperature: {type: float, low: 0.5, high: 1.5}
+      initial_points:
+      - sampler.churn.rate: 0.05
+        sampler.churn.stop_fraction: 0.8
+        sampler.entropy_bound: 0.1
+        algorithm.predictor.temperature: 1.0
+      trials: 24
+      budget_parameter: steps
+      search: {algorithm: gp}

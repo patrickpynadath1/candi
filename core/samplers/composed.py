@@ -124,6 +124,10 @@ class ComposedSampler:
         times = torch.linspace(
             1, self.epsilon, self.steps + 1, device=prompt_tokens.device, dtype=self.grid_dtype
         )
+        # A transition may reshape the grid (Ψ loop); the step count, hence NFE, is fixed.
+        warp = getattr(self.transition, "time_warp", None)
+        if warp is not None:
+            times = warp(algo, times, generated)
         points = algo.points(times[0].expand(batch), corruption_mask=generated)
         def initial(view, point):
             if self.prior_mode == "standard_normal":
@@ -178,6 +182,14 @@ class ComposedSampler:
             )
             released = committed & generated & ~selected & ~complete[:, None]
             updated = []
+            # A transition may draw choices shared by all views once per step (Ψ).
+            shared = (
+                {"step": self.transition.prepare(
+                    algo.views, logits, probabilities, source, destination, generated
+                )}
+                if callable(getattr(self.transition, "prepare", None))
+                else {}
+            )
             for view, state, pt, ps in zip(algo.views, states, source, destination):
                 value = self.transition(
                     view,
@@ -191,6 +203,7 @@ class ComposedSampler:
                     prompt_tokens=prompt_tokens,
                     released=released,
                     previous_tokens=output,
+                    **shared,
                 )
                 if self.commitment == "none":
                     value = select_state(selected, value, state)

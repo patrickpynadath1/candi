@@ -63,11 +63,24 @@ def source_identity():
     }
 
 
+def active(distribution, values):
+    """A parameter with ``when: {key: value or [values]}`` exists only under that condition."""
+    when = {} if isinstance(distribution, list) else distribution.get("when") or {}
+    return all(
+        values.get(key) in (expected if isinstance(expected, list) else [expected])
+        for key, expected in when.items()
+    )
+
+
 def suggest(trial, space):
     values = {}
     for key, distribution in space.items():
+        if not active(distribution, values):
+            continue  # The sampler keeps its configured value for this parameter.
         if isinstance(distribution, list):
             values[key] = trial.suggest_categorical(key, distribution)
+        elif distribution["type"] == "categorical":
+            values[key] = trial.suggest_categorical(key, distribution["choices"])
         elif distribution["type"] == "float":
             values[key] = trial.suggest_float(
                 key,
@@ -105,18 +118,73 @@ def validate_inference(spec):
         raise ValueError(
             "Final generation seeds must be nonempty and separate from tuning"
         )
-    if spec["nfe"] < 2 or spec["trials"] < 1:
+    budgets = spec["nfe"] if isinstance(spec["nfe"], list) else [spec["nfe"]]
+    if (
+        not budgets
+        or len(set(budgets)) != len(budgets)
+        or any(type(b) is not int or b < 2 for b in budgets)
+        or spec["trials"] < 1
+    ):
         raise ValueError("Invalid NFE or trial budget")
     if spec["direction"] not in ("minimize", "maximize"):
         raise ValueError("Invalid optimization direction")
     if spec["budget_parameter"] not in (None, "steps", "max_steps"):
         raise ValueError("Unsupported sampler budget parameter")
-    for key in spec["space"]:
+    seen = []
+    for key, distribution in spec["space"].items():
         if key in {"sampler.steps", "sampler.max_steps"} or not (
-            key.startswith("sampler.")
-            or key in {"algorithm.predictor.temperature", "algorithm.predictor.commitment"}
+            key.startswith("sampler.") or key in PREDICTOR_PARAMETERS
         ):
             raise ValueError(f"Not a tunable inference parameter: {key}")
+        when = {} if isinstance(distribution, list) else distribution.get("when") or {}
+        if any(condition not in seen for condition in when):
+            raise ValueError(f"{key}: a `when` condition must name an earlier parameter")
+        seen.append(key)
+    if "two_stage" in spec:
+        validate_two_stage(spec)
+    extra = spec.get("extra_test_nfe", [])
+    if any(type(b) is not int or b < 2 for b in extra) or len(set(extra)) != len(extra) or (
+        set(extra) & set(budgets)
+    ):
+        raise ValueError("extra_test_nfe must list distinct NFE budgets not used for tuning")
+    count = spec.get("extra_test_examples", EXTRA_TEST_EXAMPLES)
+    if count is not None and (type(count) is not int or count < 1):
+        raise ValueError("extra_test_examples must be a positive integer or null")
+    seeds = spec.get("extra_test_seeds", spec["test_seeds"][:1])
+    if not seeds or len(set(seeds)) != len(seeds) or not set(seeds) <= set(spec["test_seeds"]):
+        raise ValueError("extra_test_seeds must be distinct test seeds")
+
+
+# Sampling-only predictor settings a policy may tune (never the training objective).
+PREDICTOR_PARAMETERS = {
+    "algorithm.predictor.temperature",
+    "algorithm.predictor.commitment",
+    "algorithm.predictor.top_p",
+}
+
+
+def validate_two_stage(spec):
+    stages = spec["two_stage"]
+    first, second = stages.get("stage1"), stages.get("stage2")
+    if any(type(n) is not int or n < 1 for n in (first, second)):
+        raise ValueError("Two-stage selection needs positive stage1 and stage2 prompt counts")
+    if first + second > len(spec["tuning_indices"]):
+        raise ValueError("stage1 + stage2 prompts exceed the tuning pool")
+    if type(stages.get("finalists", 3)) is not int or stages.get("finalists", 3) < 1:
+        raise ValueError("Two-stage selection needs at least one finalist")
+    seeds = stages.get("stage2_seeds", [])
+    if not seeds or len(set(seeds)) != len(seeds) or set(seeds) & (
+        set(spec["seeds"]) | set(spec["test_seeds"])
+    ):
+        raise ValueError("Stage-2 seeds must be fresh: unique, unlike tuning and test seeds")
+    bootstrap = stages.get("stage2_bootstrap")
+    if bootstrap is not None and (type(bootstrap) is not int or bootstrap < 1):
+        raise ValueError("stage2_bootstrap must be a positive replicate count")
+    if bootstrap and not spec["score"].get("per_example"):
+        raise ValueError("stage2_bootstrap needs score.per_example (a per-record path)")
+    for override in stages.get("stage2_overrides", {}):
+        if not override.startswith("task."):
+            raise ValueError(f"Not a stage-2 evaluation override: {override}")
 
 
 def validate(spec):
@@ -153,9 +221,11 @@ def validate(spec):
             )
         ):
             raise ValueError(f"Not a training hyperparameter: {key}")
-    for override in evaluation.get("overrides", {}):
+    for override in {**evaluation.get("overrides", {}), **evaluation.get("test_overrides", {})}:
         if not override.startswith(("task.", "loader.eval_batch_size")):
             raise ValueError(f"Not an evaluation override: {override}")
+    if evaluation.get("test_score", {"kind": "metric"}).get("kind") != "metric":
+        raise ValueError("test_score must be a scalar task metric")
     resources = spec.get("resources", {"cpu": 4, "gpu": 1})
     if resources.get("gpu", 1) not in (0, 1) or resources.get("cpu", 4) < 1:
         raise ValueError("Workers require positive CPUs and zero or one whole GPU")
@@ -167,6 +237,9 @@ SEARCH_ALGORITHMS = {
     "tpe": "TPESampler",
     "random": "RandomSampler",
     "qmc": "QMCSampler",
+    # Gaussian-process Bayesian optimisation (needs torch and scipy); best for small,
+    # continuous spaces. Parameters outside its relative space fall back to random.
+    "gp": "GPSampler",
 }
 FAILURE_POLICIES = ("skip", "stop")
 
@@ -178,7 +251,7 @@ class StopSearch(RuntimeError):
 def make_sampler(settings, completed_trials=0):
     """Build a study's Optuna sampler from its ``search`` block.
 
-    ``search: {algorithm: tpe|random|qmc, ...options}``; the seed comes from the
+    ``search: {algorithm: tpe|random|qmc|gp, ...options}``; the seed comes from the
     study's ``seed`` (default 42). A resumed TPE or random study is reseeded by
     its trial count so it never replays proposals it already made. QMC indexes a
     fixed low-discrepancy sequence by trial number, so its seed stays fixed.
@@ -315,7 +388,8 @@ def search(directory, settings, direction, objective, concurrency, retry_skipped
             optuna.trial.TrialState.FAIL,
         ) or (old.user_attrs.get("skipped") and not retry_skipped):
             continue
-        if set(old.params) != set(settings["space"]) or any(
+        expected = {k for k, d in settings["space"].items() if active(d, old.params)}
+        if set(old.params) != expected or any(
             t.params == old.params for t in completed + skipped
         ):
             continue
@@ -547,7 +621,7 @@ def _evaluate_worker(payload, output):
         "evaluation_name": evaluation.get("dataset", "validation"),
         "indices": evaluation["indices"],
     }
-    scores = []
+    scores, intervals, examples = [], [], []
     for seed in evaluation["seeds"]:
         destination = Path(output) / f"seed-{seed}"
         config.seed = seed
@@ -561,7 +635,46 @@ def _evaluate_worker(payload, output):
         if result["max_nfe"] > evaluation["nfe"]:
             raise ValueError("Sampler exceeded NFE budget")
         scores.append(metric_value(result, evaluation["score"]["metric"]))
-    return {"score": sum(scores) / len(scores), "seed_scores": scores}
+        intervals.append(result.get(f"{evaluation['score']['metric']}_interval"))
+        if evaluation.get("bootstrap") and evaluation["score"].get("per_example"):
+            examples.append(per_example_scores(result, evaluation["score"], scores[-1]))
+    record = {"score": sum(scores) / len(scores), "seed_scores": scores}
+    if examples:
+        record["score_interval"] = mean_bootstrap(examples, evaluation["bootstrap"])
+    elif any(interval is not None for interval in intervals):
+        # A metric's own bootstrap interval (e.g. SOL with task.sol.bootstrap).
+        record["seed_intervals"] = intervals
+        if len(intervals) == 1:
+            record["score_interval"] = intervals[0]
+    return record
+
+
+def per_example_scores(result, score, aggregate):
+    """{example index: value} at ``score.per_example`` in each record; checks the mean."""
+    values = {
+        int(record["index"]): metric_value(record, score["per_example"])
+        for record in result["records"]
+    }
+    mean = sum(values.values()) / len(values)
+    if not math.isclose(mean, aggregate, rel_tol=1e-9, abs_tol=1e-12):
+        raise ValueError(
+            f"per_example {score['per_example']} averages to {mean}, not the metric {aggregate}"
+        )
+    return values
+
+
+def mean_bootstrap(examples, replicates, confidence=0.95, seed=0):
+    """Percentile interval of the seed-averaged mean, resampling examples (paired)."""
+    import numpy as np
+
+    keys = sorted(set.intersection(*(set(e) for e in examples)))
+    values = np.array([[e[k] for k in keys] for e in examples], dtype=np.float64).mean(0)
+    generator = np.random.default_rng(seed)
+    means = [values[generator.integers(0, len(keys), len(keys))].mean() for _ in range(int(replicates))]
+    tail = (1 - confidence) / 2
+    low, high = np.quantile(means, [tail, 1 - tail])
+    return {"low": float(low), "high": float(high), "replicates": int(replicates),
+            "confidence": confidence, "resampling": "paired_examples"}
 
 
 def record_attempt(output):
@@ -659,51 +772,88 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
     validation = {
         k: v
         for k, v in evaluation.items()
-        if k not in ("test_indices", "test_seeds", "test_dataset", "tuning_indices")
+        if k not in ("test_indices", "test_seeds", "test_dataset", "tuning_indices",
+                     "test_score", "test_overrides")
     }
     validation["indices"] = evaluation["tuning_indices"]
 
-    def inference(checkpoint, directory):
-        choices = []
-        for policy in spec["inference"]:
+    budgets = nfe_budgets(evaluation)
 
-            def objective(parameters, output):
-                result = execute(
-                    "evaluate",
-                    {
+    def budget_directory(base, budget):
+        # The first budget keeps the single-budget layout (status/analysis read it).
+        return base if budget == budgets[0] else base.parent / f"{base.name}-nfe-{budget}"
+
+    def inference(checkpoint, directory):
+        winners = {}
+        for budget in budgets:
+            tuned = {**validation, "nfe": budget}
+            choices = []
+            for policy in spec["inference"]:
+
+                def evaluate(parameters, output, indices=None, seeds=None, overrides=None,
+                             bootstrap=None, policy=policy, tuned=tuned):
+                    settings = dict(tuned)
+                    if bootstrap:
+                        settings["bootstrap"] = bootstrap
+                    if indices is not None:
+                        settings["indices"] = indices
+                    if seeds is not None:
+                        settings["seeds"] = seeds
+                    if overrides:
+                        settings["overrides"] = {**settings.get("overrides", {}), **overrides}
+                    result = execute(
+                        "evaluate",
+                        {
+                            "checkpoint": checkpoint,
+                            "policy": policy,
+                            "parameters": parameters,
+                            "evaluation": settings,
+                            "resources": resources,
+                        },
+                        output,
+                    )
+                    record = {
+                        **result,
                         "checkpoint": checkpoint,
                         "policy": policy,
-                        "parameters": parameters,
-                        "evaluation": validation,
-                        "resources": resources,
-                    },
-                    output,
-                )
-                return {
-                    **result,
-                    "checkpoint": checkpoint,
-                    "policy": policy,
-                    "inference_parameters": parameters,
-                }
+                        "inference_parameters": parameters,
+                    }
+                    if "two_stage" in evaluation or len(budgets) > 1:
+                        record.update(
+                            nfe=budget,
+                            prompts=len(settings["indices"]),
+                            seeds=list(settings["seeds"]),
+                        )
+                    return record
 
-            choices.append(
-                search(
-                    directory / policy["name"],
-                    policy,
-                    direction,
-                    objective,
-                    concurrency,
-                    retry_skipped,
+                folder = budget_directory(directory, budget) / policy["name"]
+                if "two_stage" in evaluation:
+                    choice = two_stage_search(
+                        folder, policy, direction, evaluate, evaluation, concurrency,
+                        retry_skipped,
+                    )
+                else:
+                    choice = search(
+                        folder, policy, direction, evaluate, concurrency, retry_skipped
+                    )
+                choices.append(choice)
+            # A policy whose every trial failed (and was skipped) has no candidate.
+            choices = [choice for choice in choices if choice is not None]
+            if not choices:
+                raise RuntimeError(
+                    f"Every inference policy failed for {checkpoint['checkpoint']}"
                 )
-            )
-        # A policy whose every trial failed (and was skipped) has no candidate.
-        choices = [choice for choice in choices if choice is not None]
-        if not choices:
-            raise RuntimeError(
-                f"Every inference policy failed for {checkpoint['checkpoint']}"
-            )
-        choose = max if direction == "maximize" else min
-        return choose(choices, key=lambda r: r["score"])
+            choose = max if direction == "maximize" else min
+            winners[budget] = choose(choices, key=lambda r: r["score"])
+            if budget == budgets[0] and evaluation.get("extra_test_nfe"):
+                # Each policy's own validation winner, for the extra test measurements.
+                winners["policies"] = {c["policy"]["name"]: c for c in choices}
+        first = winners[budgets[0]]
+        if "policies" in winners:
+            first = {**first, "policy_winners": winners["policies"]}
+        if len(budgets) == 1:
+            return first
+        return {**first, "budgets": {str(b): winners[b] for b in budgets}}
 
     def train_candidate(parameters, output):
         output.mkdir(parents=True, exist_ok=True)
@@ -735,34 +885,286 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
         )
     save(root / "selected.json", winner)
     # No final evaluation occurs until both levels and sampler selection finish.
-    final_path = root / "final/result.json"
-    if not final_path.exists():
-        verify_checkpoint(winner["checkpoint"])
+    # With several NFE budgets each budget's winner is scored once on the test split.
+    for budget in budgets:
+        selection = winner if len(budgets) == 1 else winner["budgets"][str(budget)]
+        final_dir = budget_directory(root / "final", budget)
+        final_path = final_dir / "result.json"
+        if final_path.exists():
+            continue
+        verify_checkpoint(selection["checkpoint"])
         final = {
             **validation,
+            "nfe": budget,
             "dataset": evaluation.get(
                 "test_dataset", validation.get("dataset", "validation")
             ),
             "indices": evaluation["test_indices"],
             "seeds": evaluation["test_seeds"],
         }
+        final.pop("two_stage", None)
+        final.update(test_settings(evaluation, final))
         result = execute(
             "evaluate",
             {
-                "checkpoint": winner["checkpoint"],
-                "policy": winner["policy"],
-                "parameters": winner["inference_parameters"],
+                "checkpoint": selection["checkpoint"],
+                "policy": selection["policy"],
+                "parameters": selection["inference_parameters"],
                 "evaluation": final,
                 "resources": resources,
             },
-            root / "final",
+            final_dir,
         )
-        save(final_path, {**result, "selection": winner, "source": source_identity()})
+        save(final_path, {**result, "selection": selection, "source": source_identity()})
+    # Extra measurements after selection, never read by it: every policy's validation
+    # winner scored once on a fixed test subset at each extra NFE budget.
+    extra_indices, extra_seeds = extra_test_subset(evaluation)
+    for budget in evaluation.get("extra_test_nfe", []):
+        for name, selection in winner["policy_winners"].items():
+            folder = root / "final-extra" / f"nfe-{budget}" / name
+            if (folder / "result.json").exists():
+                continue
+            verify_checkpoint(selection["checkpoint"])
+            final = {
+                **validation,
+                "nfe": budget,
+                "dataset": evaluation.get(
+                    "test_dataset", validation.get("dataset", "validation")
+                ),
+                "indices": extra_indices,
+                "seeds": extra_seeds,
+            }
+            final.pop("two_stage", None)
+            final.update(test_settings(evaluation, final))
+            result = execute(
+                "evaluate",
+                {
+                    "checkpoint": selection["checkpoint"],
+                    "policy": selection["policy"],
+                    "parameters": selection["inference_parameters"],
+                    "evaluation": final,
+                    "resources": resources,
+                },
+                folder,
+            )
+            save(folder / "result.json", {
+                **result, "nfe": budget, "measurement": "extra_test_nfe",
+                "selection": selection, "source": source_identity(),
+            })
     return winner
+
+
+EXTRA_TEST_EXAMPLES = 128
+
+
+def extra_test_subset(evaluation):
+    """(indices, seeds) of the extra-budget smoke measurement: a fixed test subset.
+
+    ``extra_test_examples`` prompts (default 128; null = the whole test partition) drawn
+    with a fixed seed from ``test_indices``, and ``extra_test_seeds`` (default: the first
+    test seed). The same subset for every policy and every resume.
+    """
+    import random
+
+    test = list(evaluation["test_indices"])
+    count = evaluation.get("extra_test_examples", EXTRA_TEST_EXAMPLES)
+    indices = test if count is None or count >= len(test) else sorted(
+        random.Random(0).sample(test, count)
+    )
+    return indices, list(evaluation.get("extra_test_seeds", evaluation["test_seeds"][:1]))
+
+
+def test_settings(evaluation, final):
+    """The test split's score and task overrides (``test_score``, ``test_overrides``).
+
+    Tuning reads ``score``; a test evaluation may report another metric (SOL on
+    TinyStories while ref_w1 tunes). Selection never reads test results.
+    """
+    settings = {}
+    if evaluation.get("test_score"):
+        settings["score"] = evaluation["test_score"]
+    if evaluation.get("test_overrides"):
+        settings["overrides"] = {**final.get("overrides", {}), **evaluation["test_overrides"]}
+    return settings
+
+
+def nfe_budgets(evaluation):
+    """The NFE budgets a case tunes at: ``nfe`` is one integer or a list of them."""
+    nfe = evaluation["nfe"]
+    return list(nfe) if isinstance(nfe, list) else [nfe]
+
+
+def ranked(entries, direction):
+    """Best first; ties keep the earlier trial (deterministic on resume)."""
+    sign = -1 if direction == "maximize" else 1
+    return sorted(entries, key=lambda e: (sign * e["score"], e["trial"]))
+
+
+def completed_trials(directory):
+    """(trial number, parameters, score) of every completed trial of a study."""
+    import optuna
+
+    study = optuna.load_study(
+        storage=f"sqlite:///{Path(directory).resolve() / 'optuna.sqlite'}", study_name="search"
+    )
+    return [
+        {"trial": t.number, "parameters": t.params, "score": t.value}
+        for t in study.trials
+        if t.state == optuna.trial.TrialState.COMPLETE
+    ]
+
+
+def two_stage_subsets(evaluation):
+    """(stage-1 indices, stage-2 indices): disjoint consecutive slices of the tuning pool."""
+    stages = evaluation["two_stage"]
+    pool, first = evaluation["tuning_indices"], stages["stage1"]
+    return pool[:first], pool[first : first + stages["stage2"]]
+
+
+def two_stage_search(directory, policy, direction, evaluate, evaluation, concurrency,
+                     retry_skipped=False):
+    """Two-stage selection of one policy's trials.
+
+    Stage 1: the policy's Optuna study proposes ``trials`` candidates, each scored on the
+    first ``stage1`` tuning prompts with the tuning seeds (the study sees only these
+    scores). Stage 2: the best ``finalists`` (default 3) are re-scored on the next
+    ``stage2`` prompts of the pool (disjoint from stage 1) with ``stage2_seeds`` and
+    ``stage2_overrides`` (e.g. a bootstrap); the best stage-2 score is selected. Every
+    evaluation is cached by its parameters, so a resumed run repeats nothing and
+    selects the same candidate. Ties keep the earlier trial.
+    """
+    stages = evaluation["two_stage"]
+    first_indices, second_indices = two_stage_subsets(evaluation)
+    directory = Path(directory).resolve()
+    skip = policy.get("on_failure", "skip") == "skip"
+    log = logging.getLogger(__name__)
+
+    def first(parameters, output):
+        return evaluate(parameters, output, indices=first_indices)
+
+    if search(directory, policy, direction, first, concurrency, retry_skipped) is None:
+        return None
+    entries = ranked(completed_trials(directory), direction)
+
+    def score_round(name, candidates, **options):
+        folder = directory / name
+
+        def run(entry):
+            key = hashlib.sha256(
+                json.dumps(entry["parameters"], sort_keys=True).encode()
+            ).hexdigest()[:20]
+            output = folder / "candidates" / key
+            path = output / "result.json"
+            with lock(output / ".candidate.lock"):
+                if not path.exists() and (output / "skipped.json").exists() and not retry_skipped:
+                    return None  # A recorded skip stays skipped, as in search().
+                if not path.exists():
+                    try:
+                        result = evaluate(entry["parameters"], output, **options)
+                        if not math.isfinite(result["score"]):
+                            raise ValueError("Nonfinite validation score")
+                    except Exception as error:
+                        save(output / "failure.json", {
+                            "parameters": entry["parameters"],
+                            "traceback": traceback.format_exc(),
+                        })
+                        if isinstance(error, StopSearch):
+                            raise
+                        if not skip:
+                            raise StopSearch(f"{type(error).__name__}: {error}") from error
+                        log.warning("Skipped %s candidate %s in %s: %s",
+                                    name, entry["trial"], directory, error)
+                        save(output / "skipped.json", {"error": f"{type(error).__name__}: {error}"})
+                        return None
+                    save(path, {**result, "source": source_identity()})
+                result = json.loads(path.read_text())
+            return {**entry, "score": result["score"], "result_path": str(path)}
+
+        # As in search(): stop submitting after a failure, finish running work, then raise.
+        scored, failure, queue = [], None, list(candidates)
+        with ThreadPoolExecutor(max_workers=concurrency) as pool:
+            pending = set()
+            while queue or pending:
+                while failure is None and queue and len(pending) < concurrency:
+                    pending.add(pool.submit(run, queue.pop(0)))
+                if not pending:
+                    break
+                done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                for future in done:
+                    try:
+                        result = future.result()
+                    except Exception as error:
+                        failure = failure or error
+                        continue
+                    if result is not None:
+                        scored.append(result)
+        if failure is not None:
+            raise failure
+        return ranked(scored, direction)
+
+    finalists = entries[: stages.get("finalists", 3)]
+    final = score_round(
+        "stage2",
+        finalists,
+        indices=second_indices,
+        seeds=stages["stage2_seeds"],
+        overrides=stages.get("stage2_overrides"),
+        bootstrap=stages.get("stage2_bootstrap"),
+    )
+    if not final:
+        return None
+    best = final[0]
+    result = json.loads(Path(best["result_path"]).read_text())
+    selected = {
+        **result,
+        "parameters": best["parameters"],
+        "two_stage": {"stage1": entries, "stage2": final},
+    }
+    save(directory / "selected.json", selected)
+    return selected
 
 
 # Preserve existing callers and saved launcher commands.
 run_study = run_case
+
+
+def generation_cost(spec):
+    """Upper-bound generation work of one case: sequences and network calls.
+
+    Counts every validation trial (both two-stage rounds) and the
+    final test evaluation(s), per NFE budget and training candidate. Skipped
+    candidates and early-stopping samplers make the real cost lower.
+    """
+    evaluation = spec["evaluation"]
+    seeds = len(evaluation["seeds"])
+    tuning = test = tuning_calls = test_calls = 0
+    for budget in nfe_budgets(evaluation):
+        sequences = 0
+        for policy in spec["inference"]:
+            trials = policy["trials"]
+            if "two_stage" in evaluation:
+                stages = evaluation["two_stage"]
+                sequences += trials * stages["stage1"] * seeds
+                finalists = min(stages.get("finalists", 3), trials)
+                sequences += finalists * stages["stage2"] * len(stages["stage2_seeds"])
+            else:
+                sequences += trials * len(evaluation["tuning_indices"]) * seeds
+        sequences *= spec["training"]["trials"]
+        final = len(evaluation["test_indices"]) * len(evaluation["test_seeds"])
+        tuning, test = tuning + sequences, test + final
+        tuning_calls += sequences * budget
+        test_calls += final * budget
+    indices, extra_seeds = extra_test_subset(evaluation)
+    final = len(indices) * len(extra_seeds)
+    extra = sum(len(spec["inference"]) * final for _ in evaluation.get("extra_test_nfe", []))
+    extra_calls = sum(
+        len(spec["inference"]) * final * b for b in evaluation.get("extra_test_nfe", [])
+    )
+    return {
+        "tuning_sequences": tuning, "test_sequences": test, "extra_test_sequences": extra,
+        "tuning_calls": tuning_calls, "test_calls": test_calls, "extra_test_calls": extra_calls,
+        "network_calls": tuning_calls + test_calls + extra_calls,
+    }
 
 
 def check_manifest(specs, output=None):
@@ -770,7 +1172,7 @@ def check_manifest(specs, output=None):
 
     With ``output``, also flag cases whose stored protocol.json a resume would
     refuse. Each row is (case, training trials, policies, inference trials, NFE,
-    state) for a one-line summary per case.
+    state, generated sequences, network calls) for a one-line summary per case.
     """
     rows, errors, names = [], [], set()
     for spec in specs:
@@ -782,6 +1184,9 @@ def check_manifest(specs, output=None):
             validate(spec)
             if not Path(spec["config"]).exists():
                 raise FileNotFoundError(f"config {spec['config']} is missing")
+            checkpoint = spec["training"].get("checkpoint")
+            if checkpoint and not Path(checkpoint).is_file():
+                raise FileNotFoundError(f"fixed checkpoint {checkpoint} is missing")
             state = "new"
             if output is not None:
                 stored = Path(output) / name / "protocol.json"
@@ -793,26 +1198,42 @@ def check_manifest(specs, output=None):
             errors.append(f"{name}: {error}")
             continue
         policies = spec["inference"]
+        budgets = nfe_budgets(spec["evaluation"])
         rows.append((
             name,
             spec["training"]["trials"],
             len(policies),
             sum(policy["trials"] for policy in policies),
-            policies[0].get("nfe", spec["evaluation"].get("nfe")),
+            budgets[0] if len(budgets) == 1 else "/".join(map(str, budgets)),
             state,
         ))
     return rows, errors
 
 
-def print_check(rows, errors):
+def print_check(rows, errors, costs=None):
+    """One line per case; ``costs`` ({case: generation_cost}) adds two columns."""
+    costs = costs or {}
     header = ("case", "train", "policies", "inference", "nfe", "state")
+    if costs:
+        header += ("sequences", "calls")
     width = max([len(header[0])] + [len(row[0]) for row in rows])
     print(f"{header[0]:{width}}  " + "  ".join(f"{h:>9}" for h in header[1:]))
     for row in rows:
-        print(f"{row[0]:{width}}  " + "  ".join(f"{str(v):>9}" for v in row[1:]))
+        extra = ()
+        if costs:
+            cost = costs[row[0]]
+            extra = (cost["tuning_sequences"] + cost["test_sequences"]
+                     + cost["extra_test_sequences"], cost["network_calls"])
+        print(f"{row[0]:{width}}  " + "  ".join(f"{str(v):>9}" for v in (*row[1:], *extra)))
     trained = sum(row[1] for row in rows)
-    print(f"{len(rows)} cases, {trained} training runs, "
-          f"{sum(row[1] * row[3] for row in rows)} inference trials")
+    summary = (f"{len(rows)} cases, {trained} training runs, "
+               f"{sum(row[1] * row[3] for row in rows)} inference trials")
+    if costs:
+        sequences = sum(c["tuning_sequences"] + c["test_sequences"] + c["extra_test_sequences"]
+                        for c in costs.values())
+        calls = sum(c["network_calls"] for c in costs.values())
+        summary += f", {sequences} generated sequences, {calls / 1e6:.1f}M sequence network calls"
+    print(summary)
     for error in errors:
         print("ERROR", error)
 
@@ -846,8 +1267,11 @@ def main():
     )
     args = parser.parse_args()
     if args.check:
-        rows, errors = check_manifest(json.loads(args.manifest.read_text()), args.output)
-        print_check(rows, errors)
+        specs = json.loads(args.manifest.read_text())
+        rows, errors = check_manifest(specs, args.output)
+        valid = {row[0] for row in rows}
+        costs = {s["name"]: generation_cost(s) for s in specs if s.get("name") in valid}
+        print_check(rows, errors, costs)
         raise SystemExit(1 if errors else 0)
     if args.output is None:
         parser.error("--output is required")

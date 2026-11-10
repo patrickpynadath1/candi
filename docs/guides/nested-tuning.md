@@ -88,6 +88,92 @@ Both search levels support categorical lists, continuous float distributions and
 integer distributions (`type: int`, inclusive `low`/`high`, optional `step` or
 `log`). Add sampler policies to `inference` to compare multiple samplers. All
 policies use the same validation metric and examples. Each has its own budget.
+Inference spaces may tune `sampler.*` keys and the predictor's sampling-only
+`temperature`, `commitment` and `top_p`. A distribution with
+`when: {earlier.key: value or [values]}` exists only under that condition (e.g. the
+Ψ-sampler's `t_on` only for `schedule: loop`); otherwise the sampler keeps its
+configured value. Categorical distributions that need a condition use
+`{type: categorical, choices: [...], when: ...}`.
+
+In sweep configs, `preparation.extra_inference` maps policy names to policies and is
+appended to `preparation.inference`; it lets several policy files each add one policy
+(`- /inference/inference_policies: [hybrid_renoising, eb_churn, psi]`).
+
+### Two-stage selection (opt-in)
+
+An `evaluation.two_stage` block replaces each policy's flat search by two stages over
+the tuning pool:
+
+```python
+"two_stage": {
+    "stage1": 64,             # every trial: the first 64 prompts of tuning_indices
+    "stage2": 256,            # the top finalists: the next 256 prompts (disjoint)
+    "finalists": 3,
+    "stage2_seeds": [2041],   # fresh: unlike the tuning and test seeds
+    "stage2_overrides": {"task.sol.bootstrap": 200},  # e.g. a bootstrap interval
+}
+```
+
+1. **Stage 1.** The policy's Optuna study proposes its `trials` candidates as before.
+   Each is scored on the stage-1 prompts with the tuning seeds, and the study sees only
+   these scores.
+2. **Stage 2.** The best `finalists` are re-scored on the stage-2 prompts with
+   `stage2_seeds`. The best stage-2 score is the policy's selection and competes with the
+   other policies. Ties keep the earlier trial.
+
+Every evaluation is cached under
+`<policy>/{candidates,stage2}/<parameters hash>/result.json`, so a resume repeats nothing
+and selects the same candidate. `selected.json` records both rankings under `two_stage`.
+When the metric reports an interval (SOL with `task.sol.bootstrap`), the stage-2 results
+and `selected.json` carry it as `score_interval`. The test split is still scored once,
+after selection. Without `two_stage`, cases behave exactly as before.
+
+`stage2_bootstrap: N` adds a per-example bootstrap interval to the stage-2 scores of
+metrics that are means over examples. `score.per_example` names the per-record field,
+such as `exact` for Sudoku accuracy or `generated/by_min_length/5/counts/unique_valid`
+for text8; the worker checks that it averages to the metric. Prompts are resampled and
+paired across seeds. Set-level metrics report their own interval through a task
+override instead, for example `stage2_overrides: {task.ref_w1.bootstrap: 200}`.
+
+### A different test metric
+
+`evaluation.test_score` and `evaluation.test_overrides` apply to the test evaluations
+only: the winner's test, and the extra-budget measurements. The TinyStories reruns tune
+with `ref_w1` and report SOL on the test split, with `test_overrides` adding the SOL
+scorer. Tuning workers never receive these fields.
+
+A Wilcoxon pruner (Optuna's `WilcoxonPruner`, stopping a trial early on per-example
+scores) is not offered. Each evaluation is one remote worker that loads the checkpoint
+and returns aggregate metrics, so scoring a trial in prompt batches would multiply the
+model loads. SOL is a set-level metric with no per-example scores at all.
+
+### Several NFE budgets
+
+`evaluation.nfe` may be a list (e.g. `[128, 512]`): every policy is tuned separately at
+each budget, and each budget's winner is scored once on the test split. The first
+budget keeps the single-budget layout (`inference/<policy>`, `final/`); the others use
+`inference-nfe-<n>/<policy>` and `final-nfe-<n>/`. The case's `selected.json` is the
+first budget's winner with all winners under `budgets`. A training search selects on the
+first budget.
+
+### Extra test budgets (reported only)
+
+`evaluation.extra_test_nfe` (e.g. `[512]`) adds a smoke measurement after selection and
+after the main test evaluation. Each policy's own validation winner (from the first tuning
+budget, on the selected training candidate) is scored once at each listed NFE, into
+`final-extra/nfe-<n>/<policy>/result.json` with `"measurement": "extra_test_nfe"`.
+
+- The scoring uses a fixed subset of the test partition: `extra_test_examples` prompts
+  (default 128, drawn with a fixed seed; `null` uses the whole partition) and
+  `extra_test_seeds` (default: the first test seed).
+- Every policy is scored on the same subset.
+- Nothing reads these results for selection.
+- Their budgets must differ from the tuning budgets. The winners' parameters are reused,
+  with the steps recomputed for the larger budget.
+
+`--check` prints, per case, the generated sequences and sequence network calls these
+settings imply (an upper bound: early-stopping samplers and skipped trials use less), and
+refuses a fixed `training.checkpoint` that does not exist on this machine.
 
 ### Search algorithm
 
@@ -99,6 +185,8 @@ block naming an Optuna sampler; options go to its constructor unchanged:
 "search": {"algorithm": "tpe", "n_startup_trials": 4, "constant_liar": True}
 "search": {"algorithm": "random"}
 "search": {"algorithm": "qmc", "scramble": True}                 # quasi-random
+"search": {"algorithm": "gp"}                                    # Gaussian process
+"search": {"algorithm": "tpe", "multivariate": True, "group": True}
 ```
 
 The default is Optuna's `TPESampler` with its default options, which is what
@@ -109,6 +197,17 @@ every existing protocol used. With 16 trials, TPE spends its first 10
 resumed TPE or random study is reseeded by its trial count so it never repeats a
 proposal, while QMC keeps its seed because it indexes a fixed sequence by trial
 number. The `search` block is part of the protocol: changing it needs a new case.
+
+`gp` is Optuna's `GPSampler`, Bayesian optimisation with a Gaussian process. It needs
+torch and scipy, both project dependencies. It suits small, continuous spaces (a
+temperature, an entropy bound, churn rates). It proposes randomly for its first 10
+trials (`n_startup_trials`), and it refits on all stored trials, so a resumed study
+continues from them. For categorical or conditional spaces (the Ψ policy, whose
+`t_on`/`t_off` exist only for `loop`), use TPE with `multivariate: true, group: true`,
+which models the parameters jointly and groups trials by which parameters they have. A
+sweep can set fields of policies from a shared set without copying it:
+`preparation.inference_overrides: {native: {search: {algorithm: gp}}}` updates the named
+policies (unknown names are refused).
 
 ### Failed candidates
 
