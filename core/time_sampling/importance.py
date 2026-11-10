@@ -8,14 +8,25 @@ generation uses the same map on its uniform grid. ``proposal_density(u)`` is
 integrand by its detached value. ``adaptation_loss`` is the score-function
 surrogate whose gradient (and only its gradient) minimizes the estimator's second
 moment, so the density logits train for variance, never for the loss value.
+
+Here the learned map is both a warp and a training time sampler: generation
+reuses it. Its weighting is ``importance_corrected`` (the hybrid ELBO divides by
+``q`` itself); ``uncorrected`` only applies to objectives that do not.
 """
 
 import torch
 from torch import nn
 
+from .density import check_objective_weighting
+
 
 class StratifiedUniformTimeSampler:
     """One float64 draw per stratum, ``(i + U_i) / n``, in random row order."""
+
+    objective_weighting = "uncorrected"
+
+    def time_density(self, time):
+        return torch.ones_like(time)
 
     def sample(self, count, device, **context):
         if count < 1:
@@ -30,10 +41,11 @@ class StratifiedUniformTimeSampler:
 class PiecewiseImportanceTimeSampler(nn.Module):
     """Learned mixture of a piecewise-constant density and a uniform floor."""
 
-    def __init__(self, bins=64, uniform_mix=0.01):
+    def __init__(self, bins=64, uniform_mix=0.01, objective_weighting="importance_corrected"):
         super().__init__()
         if bins < 1 or not 0 < uniform_mix <= 1:
             raise ValueError("require positive bins and a mixture weight in (0, 1]")
+        self.objective_weighting = check_objective_weighting(objective_weighting)
         self.clock_logits = nn.Parameter(torch.zeros(bins, dtype=torch.float64))
         self.uniform_mix = float(uniform_mix)
         self.uniform = StratifiedUniformTimeSampler()
@@ -63,6 +75,10 @@ class PiecewiseImportanceTimeSampler(nn.Module):
         p = self.probabilities()
         index = (value * p.numel()).long().clamp_max(p.numel() - 1)
         return p.numel() * p[index]
+
+    def time_density(self, value):
+        """Detached density of the local times ``u = Q(t)`` (the contract)."""
+        return self.proposal_density(value).detach()
 
     def draw(self, count):
         """Local times and their proposal densities (one stratified batch)."""

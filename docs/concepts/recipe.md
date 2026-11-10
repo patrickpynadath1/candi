@@ -14,6 +14,37 @@ components, not a new wrapper class.
 | [Denoising task](denoising-task.md) | What must the model predict, and how is it trained? | Backbone, output parameterization, objective, training time sampler |
 | [Inference settings](inference-settings.md) | How are predictions turned into generated sequences? | Initialization, inference time/noise grid, update rule, terminal decoding |
 
+## Noise schedule and training time sampler
+
+Two components in different parts both concern time, and the recipe keeps them
+apart:
+
+- The **noise schedule** (information path, config group
+  `information_path/noise_schedule`) fixes what each time `t` means: the corruption
+  level at `t`. Training and generation share it. An adaptive schedule such as
+  CDCD's learns it from training losses so that the loss rises linearly in `t`.
+- The **training time sampler** (denoising task, config group
+  `denoising_task/time_sampler`) decides how often training visits each `t`. It
+  is used only in training and has no role at inference.
+
+In training only their combination, together with the loss weighting, matters: a
+schedule that spends more of `[0, 1]` on mid-range corruption looks the same to the
+optimizer as a sampler that visits those times more often. They are separate
+components for two reasons. Generation reuses the schedule but not the sampler,
+so moving a choice from one to the other changes the inference grid. And an
+adaptive schedule's linearity constraint pins the schedule's shape, so any further
+emphasis on some times has to come from the sampler.
+
+Every training time sampler reports the density of its draws relative to uniform.
+Adaptive noise schedules divide their fitting weights by that density, so the
+schedule they learn does not depend on the sampler. Each sampler also declares an
+`objective_weighting`: `importance_corrected` divides the loss by the density, so
+the objective is unchanged and only its variance differs, while `uncorrected`
+lets oversampling also re-weight the objective. See
+[training time samplers](../components/time-sampling.md) for the contract and each
+sampler's default, and `+experiment=cdcd_mid_range_times` for a recipe that
+combines CDCD's adaptive schedule with a non-uniform sampler.
+
 Tasks supply data, conditioning masks, and metrics independently of these choices.
 A Sudoku task does not select a corruption process. An experiment combines recipes
 with a set of tasks ([preparing sweeps](../guides/programmatic-sweeps.md)), budgets, seeds, and an evaluation

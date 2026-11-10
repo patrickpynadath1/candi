@@ -21,6 +21,8 @@ from .weighting import ObjectiveResult
 class HybridELBO:
     requires_context = True
     supports_sequence_layout = False
+    # Importance-corrects itself: the algorithm must not divide by q again.
+    divides_by_time_density = True
 
     def __init__(self, gaussian_view=0, reveal_view=1):
         self.gaussian_view, self.reveal_view = gaussian_view, reveal_view

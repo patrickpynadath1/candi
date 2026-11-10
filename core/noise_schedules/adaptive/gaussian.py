@@ -41,8 +41,10 @@ class AdaptiveGaussianSchedule(nn.Module):
             path.alpha, path.sigma, path.dalpha_dt * speed, path.dsigma_dt * speed
         )
 
-    def observe(self, time, loss, step, *, training=False):
-        self.clock.observe(time, loss, step, training=training and self.training)
+    def observe(self, time, loss, step, *, training=False, density=None):
+        self.clock.observe(
+            time, loss, step, training=training and self.training, density=density
+        )
 
     def snapshot(self):
         result = self.clock.snapshot()

@@ -1,0 +1,15 @@
+# @package _global_
+# CDCD Gaussian with its adaptive noise schedule (learned so the loss rises
+# linearly in t) and an independent, non-uniform training time sampler that
+# visits mid-range t more often. The schedule's fit divides by the sampler's draw
+# density, so it learns the schedule uniform times would give; with
+# objective_weighting=importance_corrected the training objective is unchanged
+# as well, and only the gradient variance differs from +experiment=cdcd.
+# Generation reuses the schedule and never consults the training time sampler.
+defaults:
+- cdcd
+- override /denoising_task/time_sampler: piecewise_fixed
+- _self_
+time_sampler:
+  weights: [1.0, 3.0, 3.0, 1.0]
+  objective_weighting: importance_corrected

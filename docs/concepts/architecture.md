@@ -16,7 +16,7 @@ flowchart TD
     Runner --> Trainer[TrainingModule]
     Trainer --> Algo[Algorithm]
     Task -->|tokens and masks| Algo
-    Algo --> Time[Time sampler]
+    Algo --> Time[Training time sampler]
     Algo --> Schedule[Noise schedule]
     Algo --> Process[Process corruption]
     Algo --> Model[Model]
@@ -61,9 +61,13 @@ uv files; copying only `core/` omits the CLI and configuration catalog.
    computes the per-device microbatch from global batch size and accumulation.
 2. `TrainingModule` calls `algorithm.loss(...)`, providing global step and time
    sampling context, including distributed rank and accumulation index.
-3. The algorithm samples time, evaluates the schedule, corrupts the clean data,
-   obtains a parameterized prediction, and evaluates the objective. The particular
-   method determines its representation, weighting, and adaptive feedback.
+3. The algorithm draws times from the training time sampler (and, when a consumer
+   needs it, the draws' density), evaluates the noise schedule, corrupts the clean
+   data, obtains a parameterized prediction, and evaluates the objective. It
+   weights the loss by the sampler's `objective_weighting` and sends adaptive
+   noise schedules the unweighted loss together with the draw density. The
+   particular method determines its representation, weighting, and adaptive
+   feedback.
 4. Lightning performs backward/optimizer steps. EMA updates and component
    `post_optimizer_step` hooks run in the training wrapper.
 

@@ -1,7 +1,7 @@
 # Algorithms
 
 Algorithms connect the components for training and expose prediction endpoints for
-sampling. They own batch preparation, calling time samplers and schedules,
+sampling. They own batch preparation, calling training time samplers and noise schedules,
 corruption, model evaluation, prediction interpretation, objective evaluation, and
 masked loss reduction. The trainer owns optimizer steps, EMA, and checkpointing;
 the sampler owns the generation trajectory.

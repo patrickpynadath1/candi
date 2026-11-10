@@ -6,7 +6,16 @@ from .clock import BufferedAdaptiveSchedule
 
 
 class CDCDAdaptiveSchedule(BufferedAdaptiveSchedule):
-    """Buffered CDCD-style monotone fit in physical corruption coordinates."""
+    """Buffered CDCD-style monotone fit in physical corruption coordinates.
+
+    The noise schedule is learned so the loss rises linearly in ``t``. Each
+    observation's isotonic-regression weight is ``1 / (p_warp * d)``, clipped at
+    ``max_importance``: ``p_warp`` is the density of the corruption level that the
+    current warp induces from uniform times (``importance_buf``), and ``d`` the
+    training time sampler's density of the draw (``draw_weight_buf`` holds
+    ``1 / d``), so the fit targets the true loss along the corruption level for
+    any training time sampler. With a uniform sampler ``d = 1``.
+    """
 
     def __init__(self, *args, bins=100, max_importance=100.0, **kwargs):
         kwargs.setdefault("coordinate", "physical")
@@ -46,9 +55,10 @@ class CDCDAdaptiveSchedule(BufferedAdaptiveSchedule):
         # relative continuous density whose uniform value is one.
         return density * len(self.sampling_density)
 
-    def record_time_loss_pair(self, t, loss, step):
+    def record_time_loss_pair(self, t, loss, step, density=None):
         if step < self.warmup_steps:
             return
+        draw_weight = self.draw_weight(density, t)
         clean = self.base.alpha_t(torch.zeros_like(t))
         noisy = self.base.alpha_t(torch.ones_like(t))
         progress = ((clean - self.alpha_t(t)) / (clean - noisy)).clamp(0, 1)
@@ -58,25 +68,31 @@ class CDCDAdaptiveSchedule(BufferedAdaptiveSchedule):
             .clamp_max(self.cdcd_max_importance)
         )
         if torch.distributed.is_available() and torch.distributed.is_initialized():
-            triples = [None] * torch.distributed.get_world_size()
+            gathered = [None] * torch.distributed.get_world_size()
             torch.distributed.all_gather_object(
-                triples,
+                gathered,
                 (
                     progress.detach().cpu(),
                     loss.detach().cpu(),
                     importance.detach().cpu(),
+                    draw_weight.cpu(),
                 ),
             )
-            progress = torch.cat([item[0] for item in triples])
-            loss = torch.cat([item[1] for item in triples])
-            importance = torch.cat([item[2] for item in triples])
+            progress = torch.cat([item[0] for item in gathered])
+            loss = torch.cat([item[1] for item in gathered])
+            importance = torch.cat([item[2] for item in gathered])
+            draw_weight = torch.cat([item[3] for item in gathered])
         finite = (
-            torch.isfinite(progress) & torch.isfinite(loss) & torch.isfinite(importance)
+            torch.isfinite(progress)
+            & torch.isfinite(loss)
+            & torch.isfinite(importance)
+            & torch.isfinite(draw_weight)
         )
-        progress, loss, importance = (
+        progress, loss, importance, draw_weight = (
             progress[finite],
             loss[finite],
             importance[finite],
+            draw_weight[finite],
         )
         if not len(progress):
             return
@@ -84,6 +100,7 @@ class CDCDAdaptiveSchedule(BufferedAdaptiveSchedule):
         progress = progress[-self.buffer_size :]
         loss = loss[-self.buffer_size :]
         importance = importance[-self.buffer_size :]
+        draw_weight = draw_weight[-self.buffer_size :]
         n = len(progress)
         pos = self.buf_pos.item()
         end = pos + n
@@ -100,6 +117,7 @@ class CDCDAdaptiveSchedule(BufferedAdaptiveSchedule):
         write_ring(self.t_buf, progress)
         write_ring(self.loss_buf, loss)
         write_ring(self.importance_buf, importance)
+        write_ring(self.draw_weight_buf, draw_weight)
         self.buf_pos.fill_(end % self.buffer_size)
         if (
             self.num_observed.item() >= self.buffer_size
@@ -113,6 +131,10 @@ class CDCDAdaptiveSchedule(BufferedAdaptiveSchedule):
         progress = self.t_buf.cpu().numpy()
         losses = self.loss_buf.cpu().numpy()
         weights = self.importance_buf.cpu().numpy()
+        draw_weights = self.draw_weight_buf.cpu().numpy()
+        if not np.all(draw_weights == 1):
+            # A non-uniform training time sampler: correct for its draws too.
+            weights = np.minimum(weights * draw_weights, self.cdcd_max_importance)
         estimator = IsotonicRegression(increasing=True, y_min=0.0, out_of_bounds="clip")
         estimator.fit(progress, losses, sample_weight=weights)
         bin_grid = np.linspace(0, 1, self.cdcd_bins + 1)

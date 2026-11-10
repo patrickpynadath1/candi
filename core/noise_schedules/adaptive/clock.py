@@ -1,4 +1,12 @@
-"""Shared observation buffers, schedule state, and checkpoint restoration."""
+"""Shared observation buffers, schedule state, and checkpoint restoration.
+
+An adaptive noise schedule fits what each time means from (time, loss) pairs of
+training batches. Those times come from the training time sampler, which need not
+be uniform: ``observe(..., density=d)`` passes each draw's density relative to
+uniform, and the fit weights every observation by ``1 / d`` so it targets the
+true per-time loss whatever the training time sampler (``density=None`` means
+uniform draws, the behaviour before the sampler reported densities).
+"""
 
 import numpy as np
 import torch
@@ -45,6 +53,10 @@ class BufferedAdaptiveSchedule(torch.nn.Module):
         self.register_buffer("num_observed", torch.tensor(0, dtype=torch.long))
         self.register_buffer("t_buf", torch.zeros(buffer_size, dtype=torch.float64))
         self.register_buffer("loss_buf", torch.zeros(buffer_size, dtype=torch.float64))
+        # 1 / (training time sampler density) of each buffered draw.
+        self.register_buffer(
+            "draw_weight_buf", torch.ones(buffer_size, dtype=torch.float64)
+        )
         self.register_buffer("buf_pos", torch.tensor(0, dtype=torch.long))
         self.register_buffer("alpha_vals", torch.zeros(n_grid, dtype=torch.float64))
         self.register_buffer("has_schedule", torch.tensor(False))
@@ -59,9 +71,27 @@ class BufferedAdaptiveSchedule(torch.nn.Module):
         self._alpha_spline = None
         self._dalpha_spline = None
 
-    def record_time_loss_pair(self, t, loss, step):
+    @staticmethod
+    def draw_weight(density, like):
+        """Importance weight ``1 / density`` of each training time draw."""
+        if density is None:
+            return torch.ones_like(like, dtype=torch.float64)
+        return density.detach().to(like.device, torch.float64).reciprocal()
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        # Checkpoints from before draw weights were recorded hold uniform draws.
+        key = prefix + "draw_weight_buf"
+        if "draw_weight_buf" in self._buffers and key not in state_dict:
+            state_dict[key] = torch.ones_like(self.draw_weight_buf)
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+        # Recursive parent-module loading bypasses load_state_dict below.
+        self._alpha_spline = None
+        self._dalpha_spline = None
+
+    def record_time_loss_pair(self, t, loss, step, density=None):
         if step < self.warmup_steps:
             return
+        weight = self.draw_weight(density, t)
         if self.coordinate == "physical":
             # Store the corruption at observation time, not a clock whose
             # meaning changes every time the schedule is refitted.
@@ -71,30 +101,33 @@ class BufferedAdaptiveSchedule(torch.nn.Module):
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             pairs = [None] * torch.distributed.get_world_size()
             torch.distributed.all_gather_object(
-                pairs, (t.detach().cpu(), loss.detach().cpu())
+                pairs, (t.detach().cpu(), loss.detach().cpu(), weight.cpu())
             )
             t = torch.cat([pair[0] for pair in pairs])
             loss = torch.cat([pair[1] for pair in pairs])
-        finite = torch.isfinite(t) & torch.isfinite(loss)
-        t, loss = t[finite], loss[finite]
+            weight = torch.cat([pair[2] for pair in pairs])
+        finite = torch.isfinite(t) & torch.isfinite(loss) & torch.isfinite(weight)
+        t, loss, weight = t[finite], loss[finite], weight[finite]
         if not len(t):
             return
         self.num_observed.add_(len(t)).clamp_max_(self.buffer_size)
         t, loss = t[-self.buffer_size :], loss[-self.buffer_size :]
+        weight = weight[-self.buffer_size :]
         n = len(t)
         pos = self.buf_pos.item()
         end = pos + n
-        t_val = t.detach().to(self.t_buf)
-        loss_val = loss.detach().to(self.loss_buf)
-        if end <= self.buffer_size:
-            self.t_buf[pos:end] = t_val
-            self.loss_buf[pos:end] = loss_val
-        else:
-            first = self.buffer_size - pos
-            self.t_buf[pos:] = t_val[:first]
-            self.loss_buf[pos:] = loss_val[:first]
-            self.t_buf[: n - first] = t_val[first:]
-            self.loss_buf[: n - first] = loss_val[first:]
+        for buffer, values in (
+            (self.t_buf, t),
+            (self.loss_buf, loss),
+            (self.draw_weight_buf, weight),
+        ):
+            values = values.detach().to(buffer)
+            if end <= self.buffer_size:
+                buffer[pos:end] = values
+            else:
+                first = self.buffer_size - pos
+                buffer[pos:] = values[:first]
+                buffer[: n - first] = values[first:]
         self.buf_pos.fill_(end % self.buffer_size)
         buffer_full = self.num_observed.item() >= self.buffer_size
         if (
@@ -104,12 +137,6 @@ class BufferedAdaptiveSchedule(torch.nn.Module):
         ):
             self._refit()
             self.last_refit_step.fill_(step)
-
-    def _load_from_state_dict(self, *args, **kwargs):
-        super()._load_from_state_dict(*args, **kwargs)
-        # Recursive parent-module loading bypasses load_state_dict below.
-        self._alpha_spline = None
-        self._dalpha_spline = None
 
     def load_state_dict(self, state_dict, strict=True, *args, **kwargs):
         result = super().load_state_dict(state_dict, strict=strict, *args, **kwargs)
@@ -188,16 +215,26 @@ class BufferedAdaptiveSchedule(torch.nn.Module):
         return keep.clamp(min=noisy, max=upper), derivative * within
 
     @torch.no_grad()
-    def observe(self, time, loss, step, *, training=False):
-        """Accept detached, masked per-example feedback only during training."""
+    def observe(self, time, loss, step, *, training=False, density=None):
+        """Accept detached, masked per-example feedback only during training.
+
+        ``density`` is the training time sampler's density of each draw relative
+        to uniform (None: uniform draws); rows without a finite positive density
+        (e.g. a point-mass estimator) are dropped.
+        """
         if training and self.training:
             if time.shape != loss.shape or time.ndim != 1:
                 raise ValueError(
                     "adaptive observations must be matching per-example vectors"
                 )
+            if density is not None and density.shape != time.shape:
+                raise ValueError("draw densities must match the observed times")
             finite = torch.isfinite(time) & torch.isfinite(loss)
+            if density is not None:
+                finite = finite & torch.isfinite(density) & (density > 0)
+                density = density[finite].detach()
             self.record_time_loss_pair(
-                time[finite].detach(), loss[finite].detach(), int(step)
+                time[finite].detach(), loss[finite].detach(), int(step), density=density
             )
 
     def training_time(self, time):

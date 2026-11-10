@@ -8,8 +8,13 @@ relaxation of the one-hot tokens instead of a uniform-corrupted token state.
 from torch.nn import functional as F
 
 from .uniform_diffusion import UniformDiffusion
-from .adaptive import observe_training_loss
+from .adaptive import observe_training_loss, observes_training_loss
 from .training_loss import reduce_token_loss
+from core.time_sampling.density import (
+    objective_weighting,
+    training_time_density,
+    weight_objective,
+)
 from core.modifiers.hybrid.views import ViewPoint
 from core.processes.gaussian import GaussianProcess
 from core.representations.noisy_inputs import TokenRepresentation
@@ -120,5 +125,17 @@ class Duo(UniformDiffusion):
             loss_mask,
             step=step,
             training=training,
+            density=(
+                training_time_density(self.time_sampler, time)
+                if training and observes_training_loss(self.schedule)
+                else None
+            ),
         )
+        if objective_weighting(self.time_sampler) != "uncorrected":
+            per_token = weight_objective(
+                per_token,
+                self.time_sampler,
+                training_time_density(self.time_sampler, time),
+                self.objective,
+            )
         return reduce_token_loss(per_token, loss_mask)

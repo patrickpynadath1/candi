@@ -46,8 +46,10 @@ class AdaptiveTimeMap(torch.nn.Module):
         keep, _ = self.clock(time)
         return (1 - keep).clamp(0, 1)
 
-    def observe(self, time, loss, step, *, training=False):
-        self.clock.observe(time, loss, step, training=training and self.training)
+    def observe(self, time, loss, step, *, training=False, density=None):
+        self.clock.observe(
+            time, loss, step, training=training and self.training, density=density
+        )
 
     def snapshot(self):
         return self.clock.snapshot()

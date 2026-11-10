@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from .simplex_grid import SimplexInferenceGrid
 from .uniform import UniformTimeSampler
+from .density import check_objective_weighting
 
 
 def interpolate(x, xp, fp):
@@ -14,6 +15,12 @@ def interpolate(x, xp, fp):
 
 
 class LossDerivativeTimeSampler(nn.Module):
+    """Training times drawn from a fitted loss-derivative CDF (SDM Appendix J.1).
+
+    The default ``objective_weighting=uncorrected`` keeps SDM's heuristic: times
+    oversampled where the loss changes fastest are also up-weighted in the loss.
+    """
+
     def __init__(
         self,
         adaptive=False,
@@ -25,8 +32,10 @@ class LossDerivativeTimeSampler(nn.Module):
         momentum=0.9,
         epsilon=1e-5,
         antithetic=True,
+        objective_weighting="uncorrected",
     ):
         super().__init__()
+        self.objective_weighting = check_objective_weighting(objective_weighting)
         if (
             buffer_size < 2
             or bins < 2
@@ -64,6 +73,16 @@ class LossDerivativeTimeSampler(nn.Module):
 
     def forward(self, uniform):
         return interpolate(uniform, self.cdf.to(uniform), self.grid.to(uniform))
+
+    def time_density(self, time):
+        """Density of the draws: the slope of the piecewise-linear CDF that
+        ``forward`` inverts, constant on each grid cell (1 when not adaptive)."""
+        if not self.adaptive:
+            return torch.ones_like(time)
+        grid, cdf = self.grid.to(time), self.cdf.to(time)
+        slopes = torch.diff(cdf) / torch.diff(grid).clamp_min(1e-15)
+        cell = torch.searchsorted(grid.contiguous(), time.contiguous(), right=True) - 1
+        return slopes[cell.clamp(0, len(slopes) - 1)]
 
     @torch.no_grad()
     def observe(self, times, token_loss, mask, step):

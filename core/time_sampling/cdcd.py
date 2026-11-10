@@ -11,6 +11,9 @@ are accumulated across microbatches and ranks, then a separate Adam update is
 committed by TrainingModule's post_optimizer_step hook. Checkpoints include all
 fitting and pending-gradient state. Legacy loss_derivative checkpoints must not
 be loaded as this sampler without explicitly resetting the sampler state.
+
+The default ``objective_weighting=uncorrected`` keeps CDCD's time warping as a
+loss reweighting: oversampled times also weigh more in the objective.
 """
 
 import math
@@ -18,13 +21,16 @@ import torch
 from torch import nn
 from .uniform import UniformTimeSampler
 from .simplex_grid import SimplexInferenceGrid
+from .density import check_objective_weighting
 
 
 class CDCDTimeSampler(nn.Module):
     def __init__(self, adaptive=False, bins=100, min_bin_size=1e-4,
                  learning_rate=1e-3, momentum=0.99, warmup=1000,
-                 refit_every=1, epsilon=1e-5, antithetic=True):
+                 refit_every=1, epsilon=1e-5, antithetic=True,
+                 objective_weighting="uncorrected"):
         super().__init__()
+        self.objective_weighting = check_objective_weighting(objective_weighting)
         if (not isinstance(bins, int) or bins < 2 or
                 not math.isfinite(min_bin_size) or not 0 < min_bin_size < 1 / bins or
                 not math.isfinite(learning_rate) or learning_rate <= 0 or
@@ -74,6 +80,18 @@ class CDCDTimeSampler(nn.Module):
     def density(self, times):
         widths = self._widths(self.ema_logits)
         return self._piecewise(self._unit_time(times), widths[0], widths[1])[1] / (1 - self.uniform.epsilon)
+
+    def time_density(self, times):
+        """Density of the draws relative to uniform (1 until the warp is active).
+
+        Draws are ``epsilon + (1 - epsilon) F^-1(u)``, so this is the CDF slope
+        ``F'`` at the unit time (``density`` is the same slope per unit of
+        physical time, including the ``1 / (1 - epsilon)`` floor factor)."""
+        if not self.adaptive or not bool(self.ready):
+            return torch.ones_like(times)
+        widths = self._widths(self.ema_logits)
+        slope = self._piecewise(self._unit_time(times), widths[0], widths[1])[1]
+        return slope.to(times.dtype)
 
     @torch.no_grad()
     def inverse_cdf(self, probabilities):

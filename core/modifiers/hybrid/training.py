@@ -7,10 +7,19 @@ from torch.nn import functional as F
 from .views import ViewPoint, point, clamp
 
 from core.algorithms.posterior import PosteriorDiffusion
-from core.algorithms.adaptive import validate_adaptive_feedback, observe_training_loss
+from core.algorithms.adaptive import (
+    observe_training_loss,
+    observes_training_loss,
+    validate_adaptive_feedback,
+)
 from core.modifiers.self_conditioning.gradient_routing import detach_selected
 from core.modifiers.self_conditioning.prediction import select_batch
 from core.objectives.weighting import ObjectiveContext, ObjectiveResult
+from core.time_sampling.density import (
+    objective_weighting,
+    training_time_density,
+    weight_objective,
+)
 
 
 def detach_rows(value, rows):
@@ -202,12 +211,18 @@ class HybridDiffusion(PosteriorDiffusion):
 
     def _observe(
         self, sampler, feedback_time, time, points, prediction, tokens, per_token, loss_mask, step,
-        *, terms=None, draw=None, detached_rows=None,
+        *, terms=None, draw=None, detached_rows=None, densities=None,
     ):
         """Training-loss feedback to the time sampler and each view's clocks.
 
         Components with ``observe_terms`` receive the objective's named terms
-        (and the time draw) instead of the total tokenwise loss."""
+        (and the time draw) instead of the total tokenwise loss. ``densities``
+        maps a coordinate to the training time sampler's per-row draw density
+        (``densities(local=False)`` for the coordinator time, ``local=True`` for
+        the adaptive views' local time); adaptive noise schedules and clocks
+        divide their fitting weights by it."""
+        if densities is None:
+            densities = lambda local=False: None  # noqa: E731
         observation = dict(draw=draw, loss_mask=loss_mask, detached_rows=detached_rows)
         observe_terms = getattr(sampler, "observe_terms", None)
         observe_time = getattr(sampler, "observe", None)
@@ -220,12 +235,22 @@ class HybridDiffusion(PosteriorDiffusion):
             observe_terms(terms, **observation)
         elif observe_time is not None:
             observe_time(feedback_time, per_token, loss_mask, step)
-        for view, local in zip(self.views, points):
+        for index, (view, local) in enumerate(zip(self.views, points)):
             observe_training_loss(
-                view.time_map, time, prediction, tokens, per_token, loss_mask, step=step, training=True
+                view.time_map, time, prediction, tokens, per_token, loss_mask, step=step,
+                training=True,
+                density=(
+                    densities(local=False) if observes_training_loss(view.time_map) else None
+                ),
             )
             observe_training_loss(
-                view.schedule, local.time, prediction, tokens, per_token, loss_mask, step=step, training=True
+                view.schedule, local.time, prediction, tokens, per_token, loss_mask, step=step,
+                training=True,
+                density=(
+                    densities(local=index in self.adaptive_time_views)
+                    if observes_training_loss(view.schedule)
+                    else None
+                ),
             )
             schedule_terms = getattr(view.schedule, "observe_terms", None)
             if callable(schedule_terms):
@@ -391,6 +416,30 @@ class HybridDiffusion(PosteriorDiffusion):
         feedback_time = self._adaptive_time(time) if self.adaptive_time_views else time
         proposal_density = getattr(default_sampler, "proposal_density", None)
         density = proposal_density(feedback_time) if callable(proposal_density) else None
+        if (
+            getattr(objective, "divides_by_time_density", False)
+            and density is not None
+            and objective_weighting(default_sampler) == "uncorrected"
+        ):
+            raise ValueError(
+                f"{type(objective).__name__} divides by the training time sampler's "
+                "density itself, so objective_weighting=uncorrected is unavailable"
+            )
+        cache = {}
+
+        def densities(local=True):
+            """Per-row draw density of the training time sampler (cached, lazy).
+
+            ``local`` is the time the adaptive views read (``feedback_time``);
+            the coordinator time comes from the sampler's uniform draws then."""
+            key = bool(local) or not self.adaptive_time_views
+            if key not in cache:
+                cache[key] = (
+                    training_time_density(default_sampler, feedback_time)
+                    if key
+                    else training_time_density(sampler, time)
+                )
+            return cache[key]
         selected = (
             self.prediction.select(len(tokens), tokens.device, training)
             if getattr(self.prediction, "selected_gradients", "all") == "denoiser_only"
@@ -446,6 +495,13 @@ class HybridDiffusion(PosteriorDiffusion):
         count = weights.sum()
         if count <= 0:
             raise ValueError("loss mask must include at least one target")
+        # The optimized loss follows the sampler's objective_weighting; observers
+        # below always see the unweighted per-time loss.
+        optimized = (
+            per_token
+            if objective_weighting(default_sampler) == "uncorrected"
+            else weight_objective(per_token, default_sampler, densities(local=True), objective)
+        )
         if training:
             adaptation_loss = getattr(default_sampler, "adaptation_loss", None)
             if callable(adaptation_loss):
@@ -454,13 +510,15 @@ class HybridDiffusion(PosteriorDiffusion):
                         f"{type(default_sampler).__name__} needs an objective that "
                         "reports per-example estimates (ObjectiveResult.estimate)"
                     )
-                per_token = per_token + adaptation_loss(result.estimate, density)[:, None] * weights
+                surrogate = adaptation_loss(result.estimate, density)[:, None] * weights
+                per_token = per_token + surrogate
+                optimized = optimized + surrogate
             self._observe(
                 default_sampler, feedback_time, time, points, prediction, tokens, per_token,
                 loss_mask, step, terms=None if result is None else result.terms, draw=draw,
-                detached_rows=selected,
+                detached_rows=selected, densities=densities,
             )
-        total = (per_token * weights).sum()
+        total = (optimized * weights).sum()
         return {
             "loss": total / count,
             "loss_sum": total.detach(),
