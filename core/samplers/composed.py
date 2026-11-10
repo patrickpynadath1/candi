@@ -124,6 +124,10 @@ class ComposedSampler:
         times = torch.linspace(
             1, self.epsilon, self.steps + 1, device=prompt_tokens.device, dtype=self.grid_dtype
         )
+        # A transition may reshape the grid (Ψ loop); the step count, hence NFE, is fixed.
+        warp = getattr(self.transition, "time_warp", None)
+        if warp is not None:
+            times = warp(algo, times)
         points = algo.points(times[0].expand(batch), corruption_mask=generated)
         def initial(view, point):
             if self.prior_mode == "standard_normal":

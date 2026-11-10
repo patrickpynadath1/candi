@@ -27,6 +27,7 @@ A prompt mask fixes tokens regardless of whether they appear in a training loss.
 | `simplex` | Dirichlet bridge sampling, optional churn/guidance |
 | `blur_ancestral` | Spectral blurring reverse updates |
 | `hybrid`, `hybrid_entropy_bounded` | Shared posterior feeding multiple branch updates |
+| `psi`, `uniform_psi` | Ψ-samplers: ancestral posterior mixed with forward re-noising ([page](psi-sampler.md)) |
 | `autoregressive`, `permuted_autoregressive` | Incremental causal decoding with KV cache |
 
 See [configs](../../configs/inference/sampler/) and [implementations](../../core/samplers/).
@@ -322,6 +323,15 @@ already configured with `self_conditioning_mode=bootstrap`. For native Gaussian
 DDPM, use its own `self_conditioning_mode=bootstrap` or `previous` option instead.
 Trajectory conditioning reuses earlier predictions and usually costs one forward
 per prediction, allowing more sampling steps at the same NFE budget.
+
+### Ψ-samplers
+
+`inference/sampler=psi` (masked recipes and hybrids with a masked or uniform view) and
+`inference/sampler=uniform_psi` (DUO/UDLM) use `PsiTransition` in the composed loop:
+each discrete-view step draws from κ_t times the ancestral posterior plus (1-κ_t) times
+the forward marginal of the prediction at the destination time, with κ_t from a ReMDM
+`rescale`, `cap` or `loop` schedule. `eta=0` is the ancestral sampler. One network call
+per step, as ancestral. See [Ψ-samplers](psi-sampler.md).
 
 ### Random uncommitment (EB churn)
 
