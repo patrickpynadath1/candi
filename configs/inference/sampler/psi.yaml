@@ -1,9 +1,12 @@
 # @package sampler
-# Ψ-sampler (Duo II, arXiv 2602.21185) for masked recipes and hybrids with a masked or
-# uniform discrete view: the ancestral posterior mixed with forward re-noising of x_θ,
-# weighted by κ_t from a ReMDM schedule. eta=0 is the ancestral sampler (greedy terminal
-# decode, float64 probabilities as AncestralSampler). Continuous views keep their native
-# update. One network call per step; see docs/components/psi-sampler.md.
+# Ψ-sampler (Duo II, arXiv 2602.21185), generalised to every corruption: each step,
+# each generated position takes the native reverse step with probability κ_t and is
+# otherwise re-noised from the predicted clean token to the next time with its view's
+# forward kernel (corrupt_state). κ_t from a ReMDM rescale | cap | loop schedule, or
+# constant (κ = 1 - eta). eta=0 is the native (hybrid/ancestral) sampler; constant with
+# eta=1 is forward re-sampling. Float32 probabilities as HybridSampler (use float64 to
+# match AncestralSampler bit for bit). One network call per step; see
+# docs/components/psi-sampler.md.
 _target_: core.samplers.composed.ComposedSampler
 steps: 127
 epsilon: 1.0e-05
@@ -19,6 +22,7 @@ transition:
   t_on: 0.55          # loop only
   t_off: 0.05         # loop only
   alpha_on: 0.9       # loop only: the held keep rate α(t_on)
+  clean: sample       # x̂_θ for the re-noising branch: sample | greedy
 commitment: none
 final_denoise: greedy
-precision: float64
+precision: float32

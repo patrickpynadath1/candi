@@ -1,10 +1,12 @@
 # @package _global_
-# Adds the Ψ-sampler policy (configs/inference/sampler/psi.yaml) for masked recipes and
-# hybrids with a masked or uniform discrete view; combine with a policy set, e.g.
-# `- /inference/inference_policies: [hybrid_renoising, psi]`. Uniform single-view
-# recipes (DUO/UDLM) use uniform_psi instead. t_on/t_off are tuned only for loop.
+# Adds the Ψ-sampler policy (configs/inference/sampler/psi.yaml) for every diffusion recipe
+# with a clean-token prediction (masked, uniform, Gaussian, simplex, spherical, vMF,
+# blurring and their hybrids); combine with a policy set, e.g.
+# `- /inference/inference_policies: [hybrid_renoising, eb_churn, psi]`. DUO/UDLM presets
+# with uniform_ancestral sampling use uniform_psi. t_on/t_off are tuned only for loop.
 # Initial points: the paper's best language settings (rescale, eta 0.02 and 0.01) with
-# its nucleus p = 0.9. The native policy of the set is the ancestral control.
+# its nucleus p = 0.9. The native and renoising policies of the set are the κ = 1 and
+# κ = 0 controls.
 preparation:
   extra_inference:
     psi:
@@ -23,7 +25,7 @@ preparation:
           alpha_on: 0.9
         commitment: none
         final_denoise: greedy
-        precision: float64
+        precision: float32
       space:
         sampler.transition.schedule: [rescale, cap, loop]
         sampler.transition.eta: {type: float, low: 0.005, high: 0.1, log: true}

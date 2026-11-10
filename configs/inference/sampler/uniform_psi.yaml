@@ -1,6 +1,6 @@
 # @package sampler
 # Ψ-sampler for uniform-state recipes (DUO/UDLM): as uniform_ancestral (epsilon 1e-3,
-# an ancestral terminal step, float64) with the Ψ transition; π is uniform 1/K.
+# an ancestral terminal step, float64) with the Ψ transition; re-noising is uniform 1/K.
 # eta=0 is the ancestral sampler. See docs/components/psi-sampler.md.
 _target_: core.samplers.composed.ComposedSampler
 steps: 1023

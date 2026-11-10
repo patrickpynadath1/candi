@@ -27,7 +27,7 @@ A prompt mask fixes tokens regardless of whether they appear in a training loss.
 | `simplex` | Dirichlet bridge sampling, optional churn/guidance |
 | `blur_ancestral` | Spectral blurring reverse updates |
 | `hybrid`, `hybrid_entropy_bounded` | Shared posterior feeding multiple branch updates |
-| `psi`, `uniform_psi` | Ψ-samplers: ancestral posterior mixed with forward re-noising ([page](psi-sampler.md)) |
+| `psi`, `uniform_psi` | Ψ-samplers: native reverse steps mixed per position with forward re-noising, any corruption ([page](psi-sampler.md)) |
 | `autoregressive`, `permuted_autoregressive` | Incremental causal decoding with KV cache |
 
 See [configs](../../configs/inference/sampler/) and [implementations](../../core/samplers/).
@@ -326,12 +326,13 @@ per prediction, allowing more sampling steps at the same NFE budget.
 
 ### Ψ-samplers
 
-`inference/sampler=psi` (masked recipes and hybrids with a masked or uniform view) and
-`inference/sampler=uniform_psi` (DUO/UDLM) use `PsiTransition` in the composed loop:
-each discrete-view step draws from κ_t times the ancestral posterior plus (1-κ_t) times
-the forward marginal of the prediction at the destination time, with κ_t from a ReMDM
-`rescale`, `cap` or `loop` schedule. `eta=0` is the ancestral sampler. One network call
-per step, as ancestral. See [Ψ-samplers](psi-sampler.md).
+`inference/sampler=psi` (every diffusion recipe with a clean-token prediction, including
+hybrids) and `inference/sampler=uniform_psi` (DUO/UDLM) use `PsiTransition` in the
+composed loop. Each step, each generated position takes the native reverse step with
+probability κ_t and is otherwise re-noised from the predicted clean token with its view's
+forward kernel, with κ_t from a ReMDM `rescale`, `cap` or `loop` schedule, or `constant`.
+κ = 1 is the native sampler and κ = 0 is forward re-sampling. One network call per step.
+See [Ψ-samplers](psi-sampler.md).
 
 ### Random uncommitment (EB churn)
 

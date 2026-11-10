@@ -1,45 +1,70 @@
-"""Ψ-sampler transitions: ancestral posteriors mixed with forward re-noising.
+"""Ψ-sampler transitions: native reverse steps mixed with forward re-noising.
 
 From "The Diffusion Duality, Chapter II: Ψ-Samplers and Efficient Curriculum"
-(arXiv 2602.21185, Eq. 12 and Suppl. A.4-A.5). For a discrete view with keep
-rates α_t (source) and α_s (destination), prediction x_θ and noise prior π:
+(arXiv 2602.21185, Eq. 12 and Suppl. A.4-A.5), generalised to every corruption:
 
-    Ψ_{s|t} = κ_t q_{s|t}(· | z_t, x_θ) + (1 - κ_t) [α_s q_{0|t}(· | z_t, x_θ) + (1 - α_s) π]
+    Ψ_{s|t} = κ_t · (native reverse step z_t -> z_s given x̂_θ)
+            + (1 - κ_t) · (forward marginal q_s(z_s | x̂_θ))
 
-π is the mask token for absorbing views and uniform 1/K for uniform views;
-q_{0|t}(· | z_t, x_θ) is x_θ, with absorbing views carrying unmasked tokens over.
-κ_t = 1 is the ancestral sampler. κ_t comes from a ReMDM remasking scale σ_t:
-κ_t = 1 - σ_t / (1 - α_s), σ_t^max = min{1, (1 - α_s) / α_t}, with
+mixed per position: each generated position takes the native step with
+probability κ_t and is otherwise re-noised from the predicted clean token x̂_θ
+to time s with its view's forward kernel (``corrupt_state``, as in
+``ForwardResamplingSampler``). For a discrete view the second branch is
+α_s · x̂ + (1 - α_s) · π (π = mask, or uniform 1/K): the paper's formula. For
+Gaussian, simplex, spherical, vMF and blurring views it re-noises the
+prediction with that process's own kernel. One κ_t, one clean token and one
+branch choice per position are shared by all views of a hybrid.
 
-- ``rescale``: σ_t = η σ_t^max;
-- ``cap``:     σ_t = min{η, σ_t^max};
-- ``loop``:    the sampler's time grid is warped (``LoopTimeWarp``) so α_t is piecewise
-               linear: 0 -> α_on on (t_on, 1], held at α_on on [t_off, t_on], α_on -> 1
-               on [0, t_off). Outside the hold, plain posterior steps (κ = 1); inside it
-               (α_s = α_t = α_on) σ_t = η, i.e. κ = 1 - η / (1 - α_on).
+κ_t = 1 is the native sampler; κ_t = 0 is forward re-sampling. κ_t comes from a
+ReMDM remasking scale σ_t: κ_t = 1 - σ_t / (1 - α_s), σ_t^max = min{1, (1 - α_s) / α_t}:
 
-This is a transition policy for ``ComposedSampler``; time progression, stopping
-and NFE accounting stay in the sampler (one network call per step, as ancestral).
-Continuous views of a hybrid recipe keep their native reverse update.
+- ``rescale``:  σ_t = η σ_t^max;
+- ``cap``:      σ_t = min{η, σ_t^max};
+- ``loop``:     the sampler's grid is warped (``LoopTimeWarp``) so α_t is piecewise
+                linear: 0 -> α_on on (t_on, 1], α_on on [t_off, t_on], α_on -> 1 on
+                [0, t_off); on the hold σ_t = η, elsewhere κ = 1;
+- ``constant``: κ_t = 1 - η at every step (the paper's image setting, e.g. κ = 0.95).
+
+α_t is the reference view's clean fraction (``keep_rate``): the keep rate of the
+first discrete view, else the first view's (Gaussian α²/(α²+σ²), simplex α,
+otherwise 1 - t). This is a transition policy for ``ComposedSampler``: time
+progression, stopping and NFE accounting stay in the sampler (one network call
+per step, as ancestral and forward re-sampling).
 """
 
 import math
+from dataclasses import dataclass
 
 import torch
 
 from core.processes.absorbing import AbsorbingProcess
 from core.processes.uniform import UniformProcess
-from .policies import ReverseTransition
-from .utils import sample_categorical
+from .policies import ReverseTransition, select_state
 
-SCHEDULES = ("rescale", "cap", "loop")
+SCHEDULES = ("rescale", "cap", "loop", "constant")
+CLEAN = ("sample", "greedy")
 
 
-def _rows(value, like):
-    """Broadcast per-row keep rates over the trailing (length, vocab) axes."""
-    while value.ndim < like.ndim:
-        value = value.unsqueeze(-1)
-    return value.to(like)
+def keep_rate(view, point):
+    """Clean fraction α of a view at a point, one value per batch row."""
+    coefficients = point.coefficients
+    if isinstance(view.process, (AbsorbingProcess, UniformProcess)):
+        return coefficients[0].double()
+    alpha, sigma = getattr(coefficients, "alpha", None), getattr(coefficients, "sigma", None)
+    if alpha is not None and sigma is not None:  # Gaussian path: signal-variance fraction
+        alpha, sigma = alpha.double(), sigma.double()
+        return alpha**2 / (alpha**2 + sigma**2)
+    if alpha is not None:  # simplex path: the clean mixing weight
+        return alpha.double()
+    return (1 - point.time).double()
+
+
+def reference_view(views):
+    """The view whose schedule sets α_t: the first discrete view, else the first."""
+    return next(
+        (i for i, v in enumerate(views) if isinstance(v.process, (AbsorbingProcess, UniformProcess))),
+        0,
+    )
 
 
 class KappaSchedule:
@@ -56,6 +81,8 @@ class KappaSchedule:
     def __call__(self, keep_t, keep_s):
         """κ per row from source and destination keep rates (float64)."""
         keep_t, keep_s = keep_t.double(), keep_s.double()
+        if self.schedule == "constant":
+            return torch.full_like(keep_s, 1 - self.eta)
         room = (1 - keep_s).clamp_min(0)
         if self.schedule == "loop":
             # The warped grid makes the hold phase exactly the steps with α_s = α_t.
@@ -70,67 +97,84 @@ class KappaSchedule:
         kappa = torch.where(room > 0, 1 - sigma / room.clamp_min(1e-300), torch.ones_like(room))
         return kappa.clamp(0, 1)
 
-    def warp(self, steps):
+    def warp(self):
         return LoopTimeWarp(self.t_on, self.t_off, self.alpha_on) if self.schedule == "loop" else None
 
 
+@dataclass
+class PsiStep:
+    """Shared per-step choices: κ per row, clean tokens and the native-branch mask."""
+
+    kappa: torch.Tensor
+    clean: torch.Tensor
+    native: torch.Tensor
+
+
 class PsiTransition(ReverseTransition):
-    """Ψ transition for absorbing and uniform views; native updates elsewhere."""
+    """Ψ transition for every view; ``clean`` picks x̂_θ by sampling or argmax."""
 
     requires_tokens = False
 
-    def __init__(self, schedule="rescale", eta=0.02, t_on=0.55, t_off=0.05, alpha_on=0.9):
+    def __init__(
+        self, schedule="rescale", eta=0.02, t_on=0.55, t_off=0.05, alpha_on=0.9, clean="sample"
+    ):
         super().__init__()
+        if clean not in CLEAN:
+            raise ValueError(f"clean must be one of {CLEAN}")
         self.kappa = KappaSchedule(schedule, eta, t_on, t_off, alpha_on)
+        self.clean = clean
 
     @property
     def time_warp(self):
-        return self.kappa.warp(None)
+        return self.kappa.warp()
 
     def validate(self, views, commitment):
         super().validate(views, commitment)
         if commitment != "none":
             raise ValueError("Ψ transitions re-noise committed tokens; use commitment=none")
-        if not any(isinstance(v.process, (AbsorbingProcess, UniformProcess)) for v in views):
-            raise TypeError("Ψ-sampling needs a masked (absorbing) or uniform discrete view")
+        for view in views:
+            if not callable(getattr(view.process, "corrupt_state", None)) or not callable(
+                getattr(view.representation, "encode", None)
+            ):
+                raise TypeError("Ψ-sampling needs a forward corrupt_state kernel in every view")
 
-    def probabilities(self, view, state, probabilities, source, destination):
-        """Ψ_{s|t} over the view's state values, or None for κ = 1 everywhere."""
-        process = view.process
-        if not isinstance(process, (AbsorbingProcess, UniformProcess)):
-            return None
-        keep_t, keep_s = source.coefficients[0], destination.coefficients[0]
-        kappa = self.kappa(keep_t, keep_s)
+    def prepare(self, views, logits, probabilities, source, destination, generated):
+        """Draw this step's shared choices once for all views; None when κ = 1."""
+        index = reference_view(views)
+        kappa = self.kappa(
+            keep_rate(views[index], source[index]), keep_rate(views[index], destination[index])
+        ).to(generated.device)
         if bool((kappa == 1).all()):
-            return None
-        if isinstance(process, AbsorbingProcess):
-            mask = process.mask_index
-            if probabilities.shape[-1] == mask:
-                probabilities = torch.nn.functional.pad(probabilities, (0, 1))
-            probabilities = probabilities.double()
-            observed = torch.nn.functional.one_hot(state, probabilities.shape[-1]).double()
-            masked = state.eq(mask)[..., None]
-            at, ass = _rows(keep_t, probabilities), _rows(keep_s, probabilities)
-            # q_{s|t}: a masked token unmasks to x_θ w.p. (α_s - α_t)/(1 - α_t); others stay.
-            posterior = probabilities * (ass - at) / (1 - at).clamp_min(1e-300)
-            posterior[..., mask] = ((1 - ass) / (1 - at).clamp_min(1e-300))[..., 0]
-            posterior = torch.where(masked, posterior, observed)
-            clean = torch.where(masked, probabilities, observed)  # q_{0|t}: carry-over
-            prior = torch.nn.functional.one_hot(torch.full_like(state, mask), probabilities.shape[-1])
-        elif isinstance(process, UniformProcess):
-            probabilities = probabilities.double()
-            posterior = process.reverse_probabilities(state, probabilities, keep_t, keep_s).double()
-            clean = probabilities
-            prior = torch.full_like(probabilities, 1 / probabilities.shape[-1])
-            ass = _rows(keep_s, probabilities)
-        k = _rows(kappa, probabilities)
-        return k * posterior + (1 - k) * (ass * clean + (1 - ass) * prior.double())
+            return None  # The native sampler, with its exact random-number use.
+        clean = (
+            probabilities.argmax(-1)
+            if self.clean == "greedy"
+            else torch.distributions.Categorical(logits=logits).sample()
+        )
+        if bool((kappa == 0).all()):
+            native = torch.zeros_like(generated)  # Forward re-sampling, with its RNG use.
+        else:
+            native = torch.rand(generated.shape, device=generated.device) < kappa[:, None]
+        return PsiStep(kappa, clean, native & generated)
 
-    def __call__(self, view, state, probabilities, tokens, source, destination, **context):
-        mixture = self.probabilities(view, state, probabilities, source, destination)
-        if mixture is None:  # κ = 1 (or a continuous view): the exact native update.
+    def __call__(self, view, state, probabilities, tokens, source, destination, *, step=None,
+                 **context):
+        if step is None:
             return super().__call__(view, state, probabilities, tokens, source, destination, **context)
-        return sample_categorical(mixture.clamp_min(0))
+        generated, prompt_tokens = context["generated"], context["prompt_tokens"]
+        native = (
+            super().__call__(view, state, probabilities, tokens, source, destination, **context)
+            if step.native.any()
+            else state
+        )
+        renoise = generated & ~step.native
+        if not renoise.any():
+            return native
+        clean = torch.where(generated, step.clean, prompt_tokens)
+        forward = view.process.corrupt_state(
+            view.representation.encode(clean), destination.coefficients, generated
+        )
+        return select_state(step.native, native, forward)
 
 
 class LoopTimeWarp:
@@ -138,7 +182,7 @@ class LoopTimeWarp:
 
     The target α(t) is piecewise linear (ReMDM-loop): (1 - t) α_on / (1 - t_on) above
     t_on, α_on on [t_off, t_on], and 1 - t (1 - α_on) / t_off below t_off. Schedule times
-    are found by bisection on the first discrete view's keep rate (monotone in time).
+    are found by bisection on the reference view's clean fraction (monotone in time).
     """
 
     def __init__(self, t_on=0.55, t_off=0.05, alpha_on=0.9, iterations=60):
@@ -152,13 +196,13 @@ class LoopTimeWarp:
         hold = torch.full_like(t, self.alpha_on)
         return torch.where(t > self.t_on, high, torch.where(t < self.t_off, low, hold))
 
-    def __call__(self, algo, times):
-        index = next(
-            i for i, v in enumerate(algo.views) if isinstance(v.process, (AbsorbingProcess, UniformProcess))
-        )
+    def __call__(self, algo, times, generated=None):
+        index = reference_view(algo.views)
+        view = algo.views[index]
 
         def keep(time):
-            return algo.points(time.to(times.dtype))[index].coefficients[0].double()
+            mask = None if generated is None else generated[:1].expand(len(time), -1)
+            return keep_rate(view, algo.points(time.to(times.dtype), corruption_mask=mask)[index])
 
         lo, hi = torch.full_like(times, float(times.min())), torch.full_like(times, float(times.max()))
         floor, ceiling = keep(hi[:1]).item(), keep(lo[:1]).item()  # keep(1), keep(epsilon)
