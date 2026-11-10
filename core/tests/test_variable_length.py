@@ -495,9 +495,10 @@ def test_text8_variable_metrics_exclude_storage_padding():
 
 @pytest.mark.parametrize("continuous", [False, True])
 def test_adaptive_time_aux_feedback_includes_fully_deleted_examples(continuous):
-    from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
+    from core.noise_schedules.learned_time_maps import LossDerivativeTimeMap
+    from core.time_sampling.uniform import UniformTimeSampler
 
-    class FixedTimes(LossDerivativeTimeSampler):
+    class FixedTimes(UniformTimeSampler):
         def sample(self, count, device, **context):
             return torch.full((count,), 0.5, device=device)
 
@@ -517,8 +518,11 @@ def test_adaptive_time_aux_feedback_includes_fully_deleted_examples(continuous):
     losses, gradients = [], []
     for include in (False, True):
         algo.time_sampling_include_aux = include
-        sampler = FixedTimes(adaptive=True, warmup=100, buffer_size=16)
-        algo.algorithm.time_sampler = sampler
+        # The loss-derivative clock is a whole-path learned time map.
+        sampler = LossDerivativeTimeMap(adaptive=True, warmup=100, buffer_size=16)
+        algo.algorithm.time_sampler = FixedTimes()
+        algo.algorithm.time_map = sampler
+        algo.algorithm.time_map_reads_path = True
         algo.zero_grad(set_to_none=True)
         torch.manual_seed(81)
         result = algo.loss(tokens, mask, training=True)
@@ -554,15 +558,17 @@ def test_adaptive_time_aux_feedback_includes_fully_deleted_examples(continuous):
 def test_parallel_blocks_score_every_target_in_one_fused_pass(continuous, feedback):
     from unittest.mock import patch
     from core.modifiers.block_diffusion import BlockDiffusion
-    from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
+    from core.noise_schedules.learned_time_maps import LossDerivativeTimeMap
 
     algo = BlockDiffusion(
         assembly(feedback=feedback, continuous=continuous), block_size=2
     )
     algo.algorithm.algorithm.prediction.probability = 1.0
-    algo.algorithm.algorithm.time_sampler = LossDerivativeTimeSampler(
+    # The loss-derivative clock is a whole-path learned time map.
+    algo.algorithm.algorithm.time_map = LossDerivativeTimeMap(
         adaptive=True, warmup=0, refit_every=1, bins=2
     )
+    algo.algorithm.algorithm.time_map_reads_path = True
     algo.algorithm.time_sampling_include_aux = True
     tokens = torch.tensor([[1, 2, 3, 4, 1], [4, 3, 2, 1, 4]])
     weights = torch.tensor([[1.0, 0.5, 1.0, 1.0, 0.5], [1.0, 1.0, 0.5, 1.0, 1.0]])
@@ -592,7 +598,7 @@ def test_parallel_blocks_score_every_target_in_one_fused_pass(continuous, feedba
     assert all(
         torch.isfinite(p.grad).all() for p in algo.parameters() if p.grad is not None
     )
-    sampler = algo.algorithm.algorithm.time_sampler
+    sampler = algo.algorithm.algorithm.time_map
     assert (
         sampler.count == 6
     )  # two examples, three blocks, including the short last block

@@ -12,7 +12,8 @@ from core.processes.simplex_math import (
 from core.processes.dirichlet import DirichletProcess
 from core.samplers.simplex import SimplexBridgeSampler
 from core.samplers.simplex_utils import guided_log_probs
-from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
+from core.samplers.simplex_grid import SimplexInferenceGrid
+from core.noise_schedules.learned_time_maps import LossDerivativeTimeMap
 from core.sweeps.configuration import compose
 from core.tests.networks import TINY16
 
@@ -64,7 +65,7 @@ def test_log_space_tiny_shapes_and_exact_faces():
 
 
 def test_adaptive_clock_concentrates_on_loss_derivative_and_reloads():
-    sampler = LossDerivativeTimeSampler(
+    sampler = LossDerivativeTimeMap(
         adaptive=True, buffer_size=2000, bins=50, warmup=10, refit_every=5
     )
     t = torch.linspace(0, 1, 2000)
@@ -80,11 +81,11 @@ def test_adaptive_clock_concentrates_on_loss_derivative_and_reloads():
         atol=0.025,
         rtol=0,
     )
-    restored = LossDerivativeTimeSampler(adaptive=True, buffer_size=2000)
+    restored = LossDerivativeTimeMap(adaptive=True, buffer_size=2000)
     restored.load_state_dict(sampler.state_dict())
     torch.testing.assert_close(restored.cdf, sampler.cdf)
     with pytest.raises(ValueError, match="fitted"):
-        LossDerivativeTimeSampler().sampling_grid(3, "adaptive", "cpu")
+        SimplexInferenceGrid("adaptive", LossDerivativeTimeMap(adaptive=False)).build(3, "cpu")
 
 
 def test_reverse_bridge_supports_reference_on_a_face():

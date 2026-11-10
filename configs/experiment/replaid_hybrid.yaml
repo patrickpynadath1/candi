@@ -1,11 +1,13 @@
 # @package _global_
 # Conditional REPLAiD hybrid as a recipe over HybridDiffusion (no family class):
 # a Gaussian view on learned unit embeddings and a forced-target absorbing view
-# share one local time drawn from a learned importance density; revealed tokens
+# share one local time u = Q(t) from a learned importance map (an information-path
+# time map; the training time sampler draws stratified uniform t); revealed tokens
 # feed a clean-context input slot. See docs/methods/replaid-hybrid.md.
 defaults:
 - /information_path/hybrid_view@model.input.views.content: learned_log_snr_gaussian
 - /information_path/hybrid_view@model.input.views.revealed: forced_target_mask
+- /information_path/time_map: piecewise_importance
 - override /denoising_task/model: continuous_dit
 - override /denoising_task/model/input@model.input: revealed_context
 - override /denoising_task/model/output@model.output: adaln
@@ -14,14 +16,18 @@ defaults:
 - override /information_path/token_space@token_space: data_only
 - override /denoising_task/algorithm: hybrid_diffusion
 - override /denoising_task/objective: hybrid_elbo
-- override /denoising_task/time_sampler: piecewise_importance
+- override /denoising_task/time_sampler: stratified
 - override /inference/sampler: revealed_hybrid
 - _self_
 algorithm:
   synchronize_committed: true
-  # Both views read the importance sampler's quantile map, in training and
+  # Both views read the learned time map's quantile map, in training and
   # generation (one shared local time).
   adaptive_time_views: [0, 1]
+  time_map: ${time_map}
+time_sampler:
+  # The hybrid ELBO divides by the map's density q(u) itself.
+  objective_weighting: importance_corrected
 representation:
   dimension: 16
   trainable: true
@@ -39,7 +45,7 @@ optimizer:
   groups:
   - patterns:
     - model.input.views.0.representation.table
-    - time_sampler.clock_logits
+    - time_map.clock_logits
     lr: 0.01
     weight_decay: 0.0
   - patterns:

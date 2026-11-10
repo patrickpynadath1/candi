@@ -1,16 +1,21 @@
-"""Adaptive continuous clocks must not warp the discrete corruption clock."""
+"""Adaptive continuous clocks must not warp the discrete corruption clock.
+
+The learned time map (``algorithm.time_map``) places the adaptive views' local
+time; the training time sampler draws the uniform coordinator time."""
 import pytest
 import torch
+from core.noise_schedules.learned_time_maps import LossDerivativeTimeMap
 from core.tests.test_hybrid_diffusion import make_algorithm
-from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
+from core.time_sampling.uniform import UniformTimeSampler
 
 
 def algorithm():
     algo = make_algorithm(self_conditioning=True)
-    algo.time_sampler = LossDerivativeTimeSampler(adaptive=True, grid_size=101)
+    algo.time_sampler = UniformTimeSampler(1e-5)
+    algo.time_map = LossDerivativeTimeMap(adaptive=True, grid_size=101)
     algo.adaptive_time_views = (1,)  # Test fixture orders discrete then Gaussian.
     with torch.no_grad():
-        algo.time_sampler.cdf.copy_(algo.time_sampler.grid.square())
+        algo.time_map.cdf.copy_(algo.time_map.grid.square())
     return algo
 
 
@@ -27,9 +32,8 @@ def test_loss_draws_uniform_and_observes_continuous_time(monkeypatch):
     algo = algorithm()
     uniform = torch.tensor([0.04, 0.25, 0.64])
     seen = []
-    monkeypatch.setattr(algo.time_sampler.uniform, 'sample', lambda *args, **kwargs: uniform)
-    monkeypatch.setattr(algo.time_sampler, 'sample', lambda *args, **kwargs: pytest.fail('global adaptive draw'))
-    monkeypatch.setattr(algo.time_sampler, 'observe', lambda t, *args: seen.append(t.clone()))
+    monkeypatch.setattr(algo.time_sampler, 'sample', lambda *args, **kwargs: uniform)
+    monkeypatch.setattr(algo.time_map, 'observe', lambda t, *args: seen.append(t.clone()))
     original = algo.training_prediction
     def prediction(states, points, time):
         torch.testing.assert_close(time, uniform)
@@ -61,7 +65,7 @@ def test_simplex_hybrid_local_time_training_and_generation(kind, monkeypatch):
     from core.sweeps.configuration import compose
     from core.training.module import TrainingModule
     cfg = compose('hybrid', [
-        'denoising_task/time_sampler=cdcd', 'time_sampler.adaptive=true',
+        '+information_path/time_map@algorithm.time_map=cdcd_loss_cdf',
         'information_path/hybrid_view@model.views.first=simplex', f'information_path/hybrid_view@model.views.second={kind}',
         '+algorithm.adaptive_time_views=[0]', 'self_conditioning.enabled=true',
         'self_conditioning.source=hidden', 'self_conditioning.probability=0.9',
@@ -78,22 +82,22 @@ def test_simplex_hybrid_local_time_training_and_generation(kind, monkeypatch):
     cfg.sampler.steps = 2
     algo = TrainingModule(cfg).algorithm
     with torch.no_grad():
-        n = algo.time_sampler.bins
+        n = algo.time_map.bins
         edges = torch.linspace(0, 1, n + 1)
         widths = edges.square().diff()
-        logits = (widths * (1 + n * algo.time_sampler.min_bin_size) - algo.time_sampler.min_bin_size).log()
-        algo.time_sampler.ema_logits[1].copy_(logits)
-        algo.time_sampler.ready.fill_(True)
+        logits = (widths * (1 + n * algo.time_map.min_bin_size) - algo.time_map.min_bin_size).log()
+        algo.time_map.ema_logits[1].copy_(logits)
+        algo.time_map.ready.fill_(True)
     time = torch.tensor([0.04, 0.25, 0.64])
-    eps = algo.time_sampler.uniform.epsilon
+    eps = algo.time_map.epsilon
     expected = eps + (1 - eps) * ((time - eps) / (1 - eps)).sqrt()
     for training in [True, False]:
         continuous, discrete = algo.points(time, training=training)
         torch.testing.assert_close(discrete.time, time)
         torch.testing.assert_close(continuous.time, expected, atol=2e-4, rtol=2e-4)
-    monkeypatch.setattr(algo.time_sampler.uniform, 'sample', lambda *a, **kw: time)
+    monkeypatch.setattr(algo.time_sampler, 'sample', lambda *a, **kw: time)
     seen = []
-    monkeypatch.setattr(algo.time_sampler, 'observe', lambda t, *a: seen.append(t.clone()))
+    monkeypatch.setattr(algo.time_map, 'observe', lambda t, *a: seen.append(t.clone()))
     tokens = torch.randint(0, 31, (3, 8))
     target = torch.ones_like(tokens, dtype=torch.bool)
     target[:, :2] = False
@@ -118,9 +122,9 @@ def test_flat_cdf_preserves_prior_and_first_reverse_endpoint(
 
     algo, sampler = compose_hybrid(continuous, discrete, feedback="hidden")
     algo.eval()
-    algo.time_sampler = LossDerivativeTimeSampler(adaptive=True, grid_size=101)
+    algo.time_map = LossDerivativeTimeMap(adaptive=True, grid_size=101)
     algo.adaptive_time_views = (0,)
-    clock = algo.time_sampler
+    clock = algo.time_map
     with torch.no_grad():
         if cdf_source == "plateau":
             # Both tails are flat; interior quantiles must still be adaptive.

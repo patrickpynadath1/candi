@@ -2,15 +2,20 @@
 # Feature PCA only; positional DCT blur is deliberately not composed here.
 defaults:
 - corruption_factorial
+- /information_path/time_map: cdcd_loss_cdf
 - override /information_path/hybrid_view@model.views.content: pca_blurring
 - override /task: sudoku
 - override /inference/sampler: forward_resampling
-- override /denoising_task/time_sampler: cdcd
+- override /denoising_task/time_sampler: antithetic
 - _self_
+# CDCD's learned loss CDF as the content view's time map (training and
+# generation); the training time sampler draws uniform coordinator times.
 algorithm:
   adaptive_time_views: [0]
+  time_map: ${time_map}
 time_sampler:
-  adaptive: true
+  epsilon: 0.001
+time_map:
   epsilon: 0.001
 self_conditioning:
   enabled: false

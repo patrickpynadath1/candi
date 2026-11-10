@@ -27,9 +27,9 @@ uv run python main.py +experiment=sudoku_simplex sampler.churn=0.2 sampler.time_
 
 ## Adaptive clock
 
-The adaptive preset uses 50 loss bins, a 65,536-example observation buffer, 1,000 grid points, 1,000-step warmup, refitting every 50 steps, and density momentum .9. It changes the distribution of training times without changing physical corruption or adding importance weighting. Validation does not update it; buffers are checkpointed.
+The simplex presets' loss-derivative clock is a [learned time map](../components/noise-schedules.md#learned-time-maps), a noise-schedule-side warp (`information_path/time_map: loss_derivative` at `algorithm.time_map`), with an `antithetic` training time sampler (`epsilon: 1.0e-05`). It is off (`adaptive: false`, the identity) except in the adaptive preset, where training times are the map's `Q(t)` of uniform `t`, the same draws as the former adaptive `loss_derivative` training time sampler. It uses 50 loss bins, a 65,536-example observation buffer, 1,000 grid points, 1,000-step warmup, refitting every 50 steps, and density momentum .9. It changes the distribution of training times without changing physical corruption or adding importance weighting. Validation does not update it; buffers are checkpointed (`time_map.*`).
 
-Training callbacks retain the reference's linear inference grid. Set `sampler.time_grid=adaptive` separately when evaluating a fitted checkpoint. It fails explicitly if no profile has been fitted yet. See [time sampling](../components/time-sampling.md).
+Training callbacks retain the reference's linear inference grid. Set `sampler.time_grid=adaptive` separately when evaluating a fitted checkpoint: the grid is `Q` of a uniform grid, read from the time map, never from the training time sampler. It fails explicitly if no profile has been fitted yet. Runs saved with the `loss_derivative` time sampler (adaptive or not) migrate to the time map on load. See [time sampling](../components/time-sampling.md).
 
 ## Conditioning and guidance
 

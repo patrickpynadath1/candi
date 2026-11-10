@@ -34,7 +34,7 @@ def tiny_case(plan, tmp_path):
     config.training.performance.compile.enabled = False
     config.checkpoint.every_n_steps = 3
     config.callback.every_n_steps = 1000
-    config.time_sampler.warmup = 1  # let the CDCD clock become ready and warp time
+    config.time_map.warmup = 1  # let the CDCD clock become ready and warp time
     config.wandb = None
     path = tmp_path / "tiny.yaml"
     OmegaConf.save(config, path)
@@ -85,7 +85,7 @@ def test_prepare_tune_and_analyze_one_tiny_case(tmp_path):
     config = OmegaConf.load(case["config"])
     assert config.trainer.max_steps == 20000
     assert (config.model.n_blocks, config.model.hidden_size) == (8, 512)
-    assert config.time_sampler._target_.endswith("CDCDTimeSampler") and config.time_sampler.adaptive
+    assert config.time_map._target_.endswith("CDCDTimeMap") and config.time_map.adaptive
 
     spec = tiny_case(plan, tmp_path)
     runs = tmp_path / "runs"

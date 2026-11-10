@@ -138,10 +138,10 @@ def test_masking_empty_observations_and_warmup():
 
 
 def test_legacy_proposal_state_is_rejected():
-    from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
+    from core.noise_schedules.learned_time_maps import LossDerivativeTimeMap
 
     with pytest.raises(RuntimeError):
-        sampler().load_state_dict(LossDerivativeTimeSampler(adaptive=True).state_dict())
+        sampler().load_state_dict(LossDerivativeTimeMap(adaptive=True).state_dict())
 
 
 def test_reset_sampler_gets_warmup_even_on_late_model_checkpoint():
@@ -195,9 +195,11 @@ def test_distributed_fit_matches_single_global_batch(tmp_path):
 
 def test_collapsed_legacy_proposal_still_gets_low_noise_observations_with_cdcd():
     """Regression for the observed flat-CDF + probability-epsilon dead zone."""
-    from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
+    from core.noise_schedules.learned_time_maps import LossDerivativeTimeMap
+    from core.time_sampling.uniform import UniformTimeSampler
 
-    old = LossDerivativeTimeSampler(adaptive=True, epsilon=0.001)
+    old = LossDerivativeTimeMap(adaptive=True)
+    uniform = UniformTimeSampler(0.001)
     old.cdf.copy_(((old.grid - 0.7) / 0.3).clamp(0, 1))
     new = CDCDTimeSampler(adaptive=True, bins=100, epsilon=0.001, warmup=0)
     edges = torch.linspace(0, 1, 101)
@@ -206,7 +208,7 @@ def test_collapsed_legacy_proposal_still_gets_low_noise_observations_with_cdcd()
     new.ema_logits.copy_(new.logits)
     new.ready.fill_(True)
     torch.manual_seed(17)
-    old_times = old.sample(8192, "cpu")
+    old_times = old(uniform.sample(8192, "cpu"))
     torch.manual_seed(17)
     new_times = new.sample(8192, "cpu")
     assert (old_times < 0.5).sum() == 0

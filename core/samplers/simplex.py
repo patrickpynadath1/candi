@@ -4,7 +4,7 @@ import math
 import torch
 from .loop import FixedGridLoop
 from core.modifiers.self_conditioning.session import prediction_session
-from core.time_sampling.simplex_grid import SimplexInferenceGrid
+from .simplex_grid import SimplexInferenceGrid
 from .simplex_utils import guided_log_probs, confidence_commit
 from .view_calls import is_view_algorithm, predict
 from . import requirements
@@ -47,7 +47,7 @@ class SimplexBridgeSampler:
         batch = len(prompt_tokens)
         device = prompt_tokens.device
         times = (
-            SimplexInferenceGrid(self.time_grid, algo.time_sampler)
+            SimplexInferenceGrid(self.time_grid, getattr(algo, "time_map", None))
             .build(self.steps, device)
             .double()
         )

@@ -25,7 +25,18 @@ apart:
   CDCD's learns it from training losses so that the loss rises linearly in `t`.
 - The **training time sampler** (denoising task, config group
   `denoising_task/time_sampler`) decides how often training visits each `t`. It
-  is used only in training and has no role at inference.
+  is used only in training and has no role at inference: generation never
+  consults it, in any recipe.
+
+A learned map that generation also reads belongs with the schedule: a **learned
+time map** `u = Q(t)` (information path, config group `information_path/time_map`,
+placed at `algorithm.time_map`). CDCD's learned loss CDF for adaptive views
+(`path_schedule=cdcd`), the REPLAiD hybrid's learned importance density and the
+simplex loss-derivative CDF (SDM's warp toward the `t` where the loss changes
+fastest, read by `time_grid=adaptive`) are such maps. Their
+recipes draw uniform `t` with the training time sampler; the views read `Q(t)` in
+training and generation, and the density of `Q(t)` is the map's
+([learned time maps](../components/noise-schedules.md#learned-time-maps)).
 
 In training only their combination, together with the loss weighting, matters: a
 schedule that spends more of `[0, 1]` on mid-range corruption looks the same to the

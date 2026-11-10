@@ -12,12 +12,13 @@ from core.objectives.gaussian_elbo import gaussian_diffusion_weight, gaussian_pr
 from core.processes.absorbing import AbsorbingProcess
 from core.processes.forced_mask import ForcedTargetMask
 from core.time_sampling.adaptive_allocation import TimeAllocation
-from core.time_sampling.importance import PiecewiseImportanceTimeSampler
+from core.noise_schedules.learned_time_maps import PiecewiseImportanceTimeMap
+from core.time_sampling.uniform import StratifiedUniformTimeSampler
 from core.training.legacy_checkpoints import rename_replaid_key
 
 
 def test_importance_density_is_normalized_and_quantile_map_is_detached():
-    sampler = PiecewiseImportanceTimeSampler(bins=5, uniform_mix=0.2)
+    sampler = PiecewiseImportanceTimeMap(bins=5, uniform_mix=0.2)
     with torch.no_grad():
         sampler.clock_logits.copy_(torch.tensor([2.0, -1.0, 0.0, 1.0, -3.0]))
     grid = (torch.arange(50_000, dtype=torch.float64) + 0.5) / 50_000
@@ -29,13 +30,13 @@ def test_importance_density_is_normalized_and_quantile_map_is_detached():
     assert torch.all(sampler(t).diff() >= 0)
     value, derivative = sampler.inverse_cdf(t[1:-1])
     torch.testing.assert_close(derivative, 1 / sampler.proposal_density(value))
-    clone = PiecewiseImportanceTimeSampler(bins=5, uniform_mix=0.2)
+    clone = PiecewiseImportanceTimeMap(bins=5, uniform_mix=0.2)
     clone.load_state_dict(sampler.state_dict())
     assert torch.equal(clone(t), sampler(t))
 
 
 def test_stratified_uniform_draws_one_time_per_stratum():
-    time = PiecewiseImportanceTimeSampler().uniform.sample(32, "cpu")
+    time = StratifiedUniformTimeSampler().sample(32, "cpu")
     assert time.dtype == torch.float64
     assert torch.equal((time * 32).floor().sort().values, torch.arange(32.0, dtype=torch.float64))
 
@@ -201,5 +202,5 @@ def test_clean_fixed_feedback_in_training_bootstrap():
 def test_legacy_hybrid_key_names():
     old = "algorithm.model.input.views.1.schedule.clock.width_raw"
     assert rename_replaid_key(old) == "algorithm.model.input.views.0.schedule.gamma_delta_raw"
-    assert rename_replaid_key("model.input.views.0.schedule.clock.clock_logits") == "time_sampler.clock_logits"
+    assert rename_replaid_key("model.input.views.0.schedule.clock.clock_logits") == "time_map.clock_logits"
     assert rename_replaid_key("own_views.0.schedule.bias") == "own_views.0.schedule.bias"

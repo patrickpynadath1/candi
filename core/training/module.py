@@ -334,6 +334,15 @@ class TrainingModule(L.LightningModule):
         }
 
     def on_load_checkpoint(self, checkpoint):
+        # Resuming a run saved with its learned time map in the time sampler
+        # slot: Lightning loads the state dict after this hook.
+        from .legacy_checkpoints import migrate_time_map_state_dict
+
+        state = checkpoint.get("state_dict")
+        if state is not None and any(".time_sampler." in f".{key}" for key in state):
+            renamed = migrate_time_map_state_dict(state, self.state_dict())
+            state.clear()
+            state.update(renamed)
         if self.ema:
             if "ema" not in checkpoint:
                 raise ValueError("EMA-enabled resume requires saved EMA state")

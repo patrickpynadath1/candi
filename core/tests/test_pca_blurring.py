@@ -109,7 +109,7 @@ def test_sudoku_recipe_trains_and_renoises():
             "model.views.content.representation.state_dim=8",
             "model.views.content.representation.state_representation.dimension=8",
             "sampler.steps=3",
-            "time_sampler.warmup=0",
+            "time_map.warmup=0",
         ],
     )
     algo = instantiate(cfg.algorithm)
@@ -120,8 +120,8 @@ def test_sudoku_recipe_trains_and_renoises():
     result["loss"].backward()
     assert result["loss"].isfinite()
     assert all(p.grad.isfinite().all() for p in algo.parameters() if p.grad is not None)
-    algo.time_sampler.post_optimizer_step()
-    assert algo.time_sampler.ready
+    algo.time_map.post_optimizer_step()
+    assert algo.time_map.ready
     algo.eval()
     with torch.no_grad():
         generated, info = algo.generate(instantiate(cfg.sampler), tokens, ~mask)

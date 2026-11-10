@@ -71,7 +71,7 @@ def test_compiled_uniform_objective_matches_values_and_gradients():
     torch.testing.assert_close(right.grad, left.grad)
 
 
-ADAPTIVE = ["denoising_task/time_sampler=cdcd", "time_sampler.adaptive=true", "+algorithm.adaptive_time_views=[0]"]
+ADAPTIVE = ["+information_path/time_map@algorithm.time_map=cdcd_loss_cdf", "+algorithm.adaptive_time_views=[0]"]
 
 
 @pytest.mark.parametrize(

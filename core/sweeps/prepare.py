@@ -66,6 +66,8 @@ def prepare_case(config):
     recipe = {
         key: None if config[key] is None else OmegaConf.to_container(config[key], resolve=False)
         for key in metadata["recipe_fields"]
+        # Optional recipe sections (e.g. a learned time_map) only when present.
+        if key in config
     }
     config.algorithm_definition = recipe
     config.benchmark = dict(

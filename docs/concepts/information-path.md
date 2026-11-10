@@ -36,6 +36,14 @@ schedule fits from the times the sampler draws. Training therefore passes each
 draw's density to the schedule, and the schedule divides it out, so the schedule
 it learns does not depend on the sampler (see the [recipe](recipe.md#noise-schedule-and-training-time-sampler)).
 
+A [learned time map](../components/noise-schedules.md#learned-time-maps)
+(`information_path/time_map`, placed at `algorithm.time_map`) is the shared form of
+such a clock: one learned map `u = Q(t)` that several views read
+(`algorithm.adaptive_time_views`), or that places a simplex path's times and its
+adaptive generation grid. CDCD's learned loss CDF (`path_schedule=cdcd`) and the
+REPLAiD hybrid's importance density are such maps. They belong to the information
+path, not to the training time sampler, because generation reads them.
+
 ## Multiple paths and changing sequence length
 
 [Hybrid views](../methods/hybrids.md) each own a representation, process, schedule,

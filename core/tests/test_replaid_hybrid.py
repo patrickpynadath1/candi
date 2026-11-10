@@ -1,7 +1,7 @@
 """Independent estimator, gradient, clock and sampler checks for the hybrid port.
 
 The REPLAiD hybrid is the replaid_hybrid preset over HybridDiffusion: the shared
-clock is the algorithm's importance time sampler, read by both views."""
+clock is the algorithm's learned importance time map, read by both views."""
 import itertools
 import torch
 import pytest
@@ -11,7 +11,8 @@ from core.noise_schedules.gaussian_path import path_from_gamma
 from core.objectives.hybrid_elbo import HybridELBO
 from core.objectives.weighting import ObjectiveContext
 from core.processes.absorbing import AbsorbingProcess
-from core.time_sampling.importance import PiecewiseImportanceTimeSampler as PiecewiseInverseCDFClock
+from core.noise_schedules.learned_time_maps import PiecewiseImportanceTimeMap as PiecewiseInverseCDFClock
+from core.time_sampling.uniform import StratifiedUniformTimeSampler
 from core.training.module import TrainingModule
 
 
@@ -31,7 +32,8 @@ def test_clock_inverse_cdf_and_endpoints():
     torch.testing.assert_close(u, torch.linspace(0,1,4).double())
     assert clock.inverse_cdf(torch.tensor([0.,1.]))[0].tolist() == [0.,1.]
     torch.manual_seed(4)
-    values, density = clock.draw(9000)
+    values = clock(StratifiedUniformTimeSampler().sample(9000, "cpu"))
+    density = clock.proposal_density(values)
     counts = torch.bincount((values*3).long(), minlength=3)/9000
     torch.testing.assert_close(counts.double(), p, atol=.002, rtol=0)
     assert torch.all(density > 0)
@@ -112,7 +114,7 @@ def test_train_checkpoint_generate_and_nfe(tmp_path):
     loss.backward()
     for name,p in algo.named_parameters():
         assert p.grad is not None and torch.isfinite(p.grad).all(), name
-    assert algo.time_sampler.clock_logits.grad.abs().sum() > 0
+    assert algo.time_map.clock_logits.grad.abs().sum() > 0
     checkpoint = tmp_path/'state.pt'
     torch.save(algo.state_dict(),checkpoint)
     clone = TrainingModule(cfg).algorithm
@@ -129,18 +131,18 @@ def test_train_checkpoint_generate_and_nfe(tmp_path):
     assert generated.min() >= 0 and generated.max() < 5
     # Both views must read the same learned clock, including after reload.
     assert clone.adaptive_time_views == (0, 1)
-    assert torch.equal(clone.time_sampler.clock_logits, algo.time_sampler.clock_logits)
+    assert torch.equal(clone.time_map.clock_logits, algo.time_map.clock_logits)
     t = torch.linspace(0, 1, 7, dtype=torch.float64)
     gaussian, reveal = clone.points(t)
     assert torch.equal(gaussian.time, reveal.time)
-    assert torch.equal(gaussian.time, clone.time_sampler(t))
+    assert torch.equal(gaussian.time, clone.time_map(t))
 
 
 def test_validation_does_not_train_clock_logits():
     a=instantiate(config().algorithm)
     x=torch.randint(5,(2,4))
     a.loss(x,torch.ones_like(x).bool(),training=False)['loss'].backward()
-    assert a.time_sampler.clock_logits.grad is None
+    assert a.time_map.clock_logits.grad is None
 
 
 def test_mask_contract():
@@ -168,7 +170,7 @@ def test_lightning_two_updates_then_generate(tmp_path):
                       enable_model_summary=False,num_sanity_val_steps=0)
     trainer.fit(module,loader)
     assert trainer.global_step==2
-    assert torch.isfinite(module.algorithm.time_sampler.clock_logits).all()
+    assert torch.isfinite(module.algorithm.time_map.clock_logits).all()
     x=torch.tensor([[1,2,3,4]])
     fixed=torch.tensor([[True,False,False,False]])
     generated,_=module.algorithm.generate(instantiate(cfg.sampler,steps=1),x,fixed)

@@ -16,8 +16,8 @@ from core.modifiers.self_conditioning.gradient_routing import detach_selected
 from core.modifiers.self_conditioning.prediction import select_batch
 from core.objectives.weighting import ObjectiveContext, ObjectiveResult
 from core.time_sampling.density import (
+    mapped_time_density,
     objective_weighting,
-    training_time_density,
     weight_objective,
 )
 
@@ -53,10 +53,13 @@ class HybridDiffusion(PosteriorDiffusion):
     (e.g. REPLAiD) need no class of their own:
 
     - a time sampler may return a draw object with ``.time`` (an estimator
-      allocation), declare ``min_batch``, expose ``proposal_density`` (importance
-      density of the local time, passed to the objective) and ``adaptation_loss``
-      (a zero-valued variance surrogate added in training), and observe objective
-      terms through ``observe_terms`` instead of ``observe``;
+      allocation), declare ``min_batch``, and observe objective terms through
+      ``observe_terms`` instead of ``observe``;
+    - a learned time map (``time_map``, an information-path component read by the
+      ``adaptive_time_views`` in training and generation) may expose
+      ``proposal_density`` (importance density of the local time, passed to the
+      objective) and ``adaptation_loss`` (a zero-valued variance surrogate added
+      in training), or fit training losses through ``observe``;
     - a schedule may expose ``training_coefficients`` (see views.point) and
       ``observe_terms``;
     - an objective may return an ``ObjectiveResult`` and declare
@@ -84,10 +87,19 @@ class HybridDiffusion(PosteriorDiffusion):
         adaptive_time_views=None,
         views=None,
         corrupt_all=False,
+        time_map=None,
     ):
         """``views`` holds the views on the algorithm, for a network with a
         single-state input slot (e.g. a continuous network); otherwise the
-        network's own views input supplies them."""
+        network's own views input supplies them.
+
+        ``time_map`` is a learned map ``u = Q(t)`` from the coordinator clock
+        (``core/noise_schedules/learned_time_maps.py``); the views listed in
+        ``adaptive_time_views`` read ``Q(t)`` in training and generation.
+        Without adaptive views the map warps the whole path's time: training
+        times are ``Q(t)`` of the sampler's draws (``time_map_reads_path``), and
+        a sampler with an adaptive grid (simplex) reads it. The training time
+        sampler only draws ``t``; generation never reads it."""
         super().__init__(prediction)
         if views is None and getattr(model, "views", None) is None:
             raise TypeError("HybridDiffusion requires a fused-stream hybrid model")
@@ -113,6 +125,9 @@ class HybridDiffusion(PosteriorDiffusion):
             # Registered after the network and predictor, where the standalone
             # classes held process, schedule and representation.
             self.own_views = torch.nn.ModuleList(views)
+        # Registered where the time sampler used to hold the learned map, so
+        # parameter order (EMA shadows, optimizer state) is unchanged.
+        self.time_map = time_map
         self.time_sampler, self.objective = time_sampler, objective
         self.length = length
         self.synchronize_committed = bool(synchronize_committed)
@@ -124,11 +139,15 @@ class HybridDiffusion(PosteriorDiffusion):
                 for i in self.adaptive_time_views
             ):
                 raise ValueError("adaptive_time_views must contain valid view indices")
-            if not hasattr(time_sampler, "uniform") or not callable(time_sampler):
+            if time_map is None:
                 raise TypeError(
-                    "view-local adaptive time requires a sampler with uniform draws "
-                    "and a quantile map"
+                    "adaptive_time_views read a learned time map: set algorithm.time_map "
+                    "(information_path/time_map) and a uniform training time sampler; "
+                    "configs saved with the map as the time sampler migrate with "
+                    "core.training.legacy_checkpoints.migrate_legacy_config"
                 )
+        # Without adaptive views a learned map warps the whole path's time.
+        self.time_map_reads_path = time_map is not None and not self.adaptive_time_views
         self.validate_prediction()
 
     @property
@@ -137,7 +156,7 @@ class HybridDiffusion(PosteriorDiffusion):
         return self.model.views if own is None else own
 
     def _adaptive_time(self, time):
-        mapped = self.time_sampler(time)
+        mapped = self.time_map(time)
         # A flat CDF tail can make the generalized inverse send 1 to an
         # interior time. Priors require the exact pure-noise endpoint, and
         # the clean endpoint must remain exact too. Leave interior draws alone.
@@ -159,6 +178,11 @@ class HybridDiffusion(PosteriorDiffusion):
             )
             for index, view in enumerate(self.views)
         )
+
+    def _path_time(self, time):
+        """The training time every view and the network read: the sampler's
+        draw, warped by a whole-path learned time map."""
+        return self.time_map(time) if self.time_map_reads_path else time
 
     def model_inputs(self, states, points, global_time):
         return states, points, global_time
@@ -213,9 +237,12 @@ class HybridDiffusion(PosteriorDiffusion):
         self, sampler, feedback_time, time, points, prediction, tokens, per_token, loss_mask, step,
         *, terms=None, draw=None, detached_rows=None, densities=None,
     ):
-        """Training-loss feedback to the time sampler and each view's clocks.
+        """Training-loss feedback to the time sampler, the learned time map and
+        each view's clocks.
 
-        Components with ``observe_terms`` receive the objective's named terms
+        The learned time map observes ``feedback_time`` (the time it placed); the
+        sampler then observes the coordinator ``time`` it drew. Components with
+        ``observe_terms`` receive the objective's named terms
         (and the time draw) instead of the total tokenwise loss. ``densities``
         maps a coordinate to the training time sampler's per-row draw density
         (``densities(local=False)`` for the coordinator time, ``local=True`` for
@@ -234,7 +261,15 @@ class HybridDiffusion(PosteriorDiffusion):
                 )
             observe_terms(terms, **observation)
         elif observe_time is not None:
-            observe_time(feedback_time, per_token, loss_mask, step)
+            observe_time(
+                feedback_time if self.time_map is None else time, per_token, loss_mask, step
+            )
+        # A per-call sampler (block-size mixtures) bypasses a whole-path map.
+        observe_map = (
+            getattr(self.time_map, "observe", None) if sampler is self.time_sampler else None
+        )
+        if observe_map is not None:
+            observe_map(feedback_time, per_token, loss_mask, step)
         for index, (view, local) in enumerate(zip(self.views, points)):
             observe_training_loss(
                 view.time_map, time, prediction, tokens, per_token, loss_mask, step=step,
@@ -406,15 +441,17 @@ class HybridDiffusion(PosteriorDiffusion):
             corruption_mask = loss_mask
         if self.adaptive_time_views and time_sampler is not None:
             raise ValueError("per-call time samplers do not combine with adaptive views")
-        # Keep the coordinator/discrete clock uniform. Only selected continuous
-        # views receive the learned quantile map, in training AND generation.
-        sampler = (
-            default_sampler.uniform if self.adaptive_time_views else default_sampler
-        )
+        # The training time sampler draws the coordinator time. A learned time
+        # map (information path) places the adaptive views' local time, in
+        # training AND generation; the coordinator/discrete clock stays uniform.
+        sampler = default_sampler
         draw = sampler.sample(len(tokens), tokens.device, **time_context)
-        time, draw = (draw, None) if torch.is_tensor(draw) else (draw.time, draw)
+        drawn, draw = (draw, None) if torch.is_tensor(draw) else (draw.time, draw)
+        # A per-call sampler (block-size mixtures) bypasses a whole-path map.
+        path_map = self.time_map_reads_path and default_sampler is self.time_sampler
+        time = self._path_time(drawn) if path_map else drawn
         feedback_time = self._adaptive_time(time) if self.adaptive_time_views else time
-        proposal_density = getattr(default_sampler, "proposal_density", None)
+        proposal_density = getattr(self.time_map, "proposal_density", None)
         density = proposal_density(feedback_time) if callable(proposal_density) else None
         if (
             getattr(objective, "divides_by_time_density", False)
@@ -428,16 +465,21 @@ class HybridDiffusion(PosteriorDiffusion):
         cache = {}
 
         def densities(local=True):
-            """Per-row draw density of the training time sampler (cached, lazy).
+            """Per-row draw density relative to uniform (cached, lazy).
 
-            ``local`` is the time the adaptive views read (``feedback_time``);
-            the coordinator time comes from the sampler's uniform draws then."""
-            key = bool(local) or not self.adaptive_time_views
+            ``local`` is the time the adaptive views read (``feedback_time``):
+            the sampler's density of the coordinator draw times the learned
+            time map's density of the mapped time. ``local=False`` is the
+            coordinator time's: the sampler's, times the map's when the whole
+            path reads the map (``_path_time``)."""
+            key = bool(local) and bool(self.adaptive_time_views)
             if key not in cache:
                 cache[key] = (
-                    training_time_density(default_sampler, feedback_time)
+                    mapped_time_density(sampler, time, self.time_map, feedback_time)
                     if key
-                    else training_time_density(sampler, time)
+                    else mapped_time_density(
+                        sampler, drawn, self.time_map if path_map else None, time
+                    )
                 )
             return cache[key]
         selected = (
@@ -503,11 +545,11 @@ class HybridDiffusion(PosteriorDiffusion):
             else weight_objective(per_token, default_sampler, densities(local=True), objective)
         )
         if training:
-            adaptation_loss = getattr(default_sampler, "adaptation_loss", None)
+            adaptation_loss = getattr(self.time_map, "adaptation_loss", None)
             if callable(adaptation_loss):
                 if result is None or result.estimate is None:
                     raise ValueError(
-                        f"{type(default_sampler).__name__} needs an objective that "
+                        f"{type(self.time_map).__name__} needs an objective that "
                         "reports per-example estimates (ObjectiveResult.estimate)"
                     )
                 surrogate = adaptation_loss(result.estimate, density)[:, None] * weights

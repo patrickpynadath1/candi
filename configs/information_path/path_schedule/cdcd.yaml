@@ -1,12 +1,18 @@
 # @package _global_
-# Learn the continuous view's quantile map with the CDCD loss-CDF fitter.
-# The shared/discrete clock remains uniform; no legacy AdaptiveTimeMap is used.
+# Learn the continuous view's time map with the CDCD loss-CDF fitter. The map is
+# an information-path component (algorithm.time_map) that view 0 reads in
+# training and generation; the training time sampler draws uniform (antithetic)
+# coordinator times. The shared/discrete clock remains uniform; no legacy
+# AdaptiveTimeMap is used.
 defaults:
-- override /denoising_task/time_sampler: cdcd
+- /information_path/time_map: cdcd_loss_cdf
+- override /denoising_task/time_sampler: antithetic
 algorithm:
   adaptive_time_views: [0]
+  time_map: ${time_map}
 time_sampler:
-  adaptive: true
+  epsilon: 0.001
+time_map:
   epsilon: 0.001
 preparation:
   schedule_name: cdcd

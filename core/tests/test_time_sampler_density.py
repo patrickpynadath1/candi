@@ -23,13 +23,12 @@ from core.time_sampling.cdcd import CDCDTimeSampler
 from core.time_sampling.density import training_time_density, weight_objective
 from core.time_sampling.discrete import DiscreteTimeSampler
 from core.time_sampling.fixed import FixedTimeSampler
-from core.time_sampling.importance import (
-    PiecewiseImportanceTimeSampler,
-    StratifiedUniformTimeSampler,
+from core.noise_schedules.learned_time_maps import (
+    LossDerivativeTimeMap,
+    PiecewiseImportanceTimeMap,
 )
-from core.time_sampling.loss_derivative import LossDerivativeTimeSampler
 from core.time_sampling.piecewise import PiecewiseTimeSampler
-from core.time_sampling.uniform import UniformTimeSampler
+from core.time_sampling.uniform import StratifiedUniformTimeSampler, UniformTimeSampler
 
 N = 12800
 
@@ -37,10 +36,30 @@ N = 12800
 # --- (d) every training time sampler reports a density matching its draws ----
 
 
+class MappedTimes:
+    """Uniform draws through a learned time map: the mapped times' density is the map's."""
+
+    def __init__(self, time_map, uniform=None):
+        self.map, self.uniform = time_map, uniform or UniformTimeSampler(1e-5)
+
+    def sample(self, count, device):
+        return self.map(self.uniform.sample(count, device))
+
+    def time_density(self, time):
+        return self.map.time_density(time)
+
+    def observe(self, *args, **kwargs):
+        return self.map.observe(*args, **kwargs)
+
+    @property
+    def ready(self):
+        return self.map.ready
+
+
 def fitted_loss_derivative():
-    sampler = LossDerivativeTimeSampler(
+    sampler = MappedTimes(LossDerivativeTimeMap(
         adaptive=True, buffer_size=4096, bins=20, warmup=0, refit_every=1, momentum=0
-    )
+    ))
     torch.manual_seed(1)
     times = torch.rand(4096)
     sampler.observe(times, (times.square() * 3)[:, None], None, step=0)
@@ -58,18 +77,20 @@ def fitted_cdcd_time_sampler():
 
 
 class ImportanceLocalTimes:
-    """The importance sampler's local times: its quantile map of uniform draws."""
+    """Local times of the importance time map: its quantile map of stratified
+    uniform draws, whose density is the map's q(u)."""
 
     def __init__(self):
-        self.sampler = PiecewiseImportanceTimeSampler(bins=8, uniform_mix=0.1)
+        self.map = PiecewiseImportanceTimeMap(bins=8, uniform_mix=0.1)
+        self.uniform = StratifiedUniformTimeSampler()
         with torch.no_grad():
-            self.sampler.clock_logits.copy_(torch.linspace(-2, 2, 8, dtype=torch.float64))
+            self.map.clock_logits.copy_(torch.linspace(-2, 2, 8, dtype=torch.float64))
 
     def sample(self, count, device):
-        return self.sampler(self.sampler.uniform.sample(count, device))
+        return self.map(self.uniform.sample(count, device))
 
     def time_density(self, time):
-        return self.sampler.time_density(time)
+        return self.map.time_density(time)
 
 
 CONTINUOUS = {
@@ -77,7 +98,7 @@ CONTINUOUS = {
     "stratified_uniform": StratifiedUniformTimeSampler,
     "piecewise": lambda: PiecewiseTimeSampler([1, 5, 2, 0.5]),
     "loss_derivative": fitted_loss_derivative,
-    "loss_derivative_off": lambda: LossDerivativeTimeSampler(adaptive=False),
+    "loss_derivative_off": lambda: MappedTimes(LossDerivativeTimeMap(adaptive=False)),
     "cdcd": fitted_cdcd_time_sampler,
     "cdcd_unfitted": lambda: CDCDTimeSampler(adaptive=True),
     "piecewise_importance": ImportanceLocalTimes,

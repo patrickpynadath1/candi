@@ -6,7 +6,8 @@ from hydra.utils import instantiate
 
 from core.modifiers.hybrid.time_maps import IdentityTimeMap
 from core.sweeps.configuration import compose
-from core.time_sampling.cdcd import CDCDTimeSampler
+from core.noise_schedules.learned_time_maps import CDCDTimeMap
+from core.time_sampling.uniform import UniformTimeSampler
 
 
 def test_gaussian_cdcd_training_and_sampling():
@@ -16,10 +17,11 @@ def test_gaussian_cdcd_training_and_sampling():
     cfg.model.n_heads = 4
     cfg.model.n_blocks = 1
     cfg.model.dropout = 0
-    cfg.time_sampler.warmup = 1
+    cfg.time_map.warmup = 1
     algo = instantiate(cfg.algorithm)
-    assert isinstance(algo.time_sampler, CDCDTimeSampler)
-    assert algo.time_sampler.adaptive
+    # The learned map is on the information path; the sampler only draws.
+    assert isinstance(algo.time_map, CDCDTimeMap) and algo.time_map.adaptive
+    assert isinstance(algo.time_sampler, UniformTimeSampler)
     assert algo.adaptive_time_views == (0,)
     assert all(isinstance(v.time_map, IdentityTimeMap) for v in algo.views)
     tokens = torch.randint(0, cfg.task.vocab_size, (2, 8))
@@ -27,16 +29,16 @@ def test_gaussian_cdcd_training_and_sampling():
     loss = algo.loss(tokens, mask, step=0, training=True)["loss"]
     assert torch.isfinite(loss)
     loss.backward()
-    assert algo.time_sampler.pending_count == 2
-    algo.time_sampler.post_optimizer_step()
-    assert algo.time_sampler.ready
+    assert algo.time_map.pending_count == 2
+    algo.time_map.post_optimizer_step()
+    assert algo.time_map.ready
     # Deliberately nonidentity fitted clock to detect ignored/double warping.
     with torch.no_grad():
-        algo.time_sampler.ema_logits[1].copy_(
-            torch.linspace(-3, 0, algo.time_sampler.bins)
+        algo.time_map.ema_logits[1].copy_(
+            torch.linspace(-3, 0, algo.time_map.bins)
         )
     t = torch.tensor([0.2, 0.7])
-    expected = algo.time_sampler(t)
+    expected = algo.time_map(t)
     assert not torch.allclose(expected, t)
     for training in (False, True):
         points = algo.points(t, training=training)
@@ -67,9 +69,10 @@ def test_geometry_cdcd_training_and_sampling(path, feedback):
     cfg.model.n_heads = 4
     cfg.model.n_blocks = 1
     cfg.model.dropout = 0
-    cfg.time_sampler.warmup = 1
+    cfg.time_map.warmup = 1
     algo = instantiate(cfg.algorithm)
-    assert isinstance(algo.time_sampler, CDCDTimeSampler)
+    assert isinstance(algo.time_map, CDCDTimeMap)
+    assert isinstance(algo.time_sampler, UniformTimeSampler)
     assert algo.adaptive_time_views == (0,)
     assert isinstance(algo.views[0].time_map, IdentityTimeMap)
     if path != "simplex":
@@ -82,14 +85,14 @@ def test_geometry_cdcd_training_and_sampling(path, feedback):
     assert all(
         torch.isfinite(p.grad).all() for p in algo.parameters() if p.grad is not None
     )
-    algo.time_sampler.post_optimizer_step()
-    assert algo.time_sampler.ready
+    algo.time_map.post_optimizer_step()
+    assert algo.time_map.ready
     with torch.no_grad():
-        algo.time_sampler.ema_logits[1].copy_(
-            torch.linspace(-3, 0, algo.time_sampler.bins)
+        algo.time_map.ema_logits[1].copy_(
+            torch.linspace(-3, 0, algo.time_map.bins)
         )
     times = torch.tensor([0.2, 0.7])
-    torch.testing.assert_close(algo.points(times)[0].time, algo.time_sampler(times))
+    torch.testing.assert_close(algo.points(times)[0].time, algo.time_map(times))
     prompt = torch.zeros_like(mask)
     prompt[:, :2] = True
     for sampler in [

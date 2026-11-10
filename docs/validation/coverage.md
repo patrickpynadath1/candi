@@ -108,6 +108,20 @@ Carlo objective, and `uncorrected` re-weights it by the density. The
 touching the sampler. It has not been trained to convergence, so whether a
 non-uniform training time sampler helps CDCD is not established.
 
+Generation never consulting the training time sampler is execution tested for
+every preset in `configs/experiment`
+(`core/tests/test_generation_ignores_time_sampler.py`: one tiny training step,
+then generation with every training time sampler replaced by an object that
+raises on access gives identical tokens). Learned time maps that generation reads
+(`information_path/time_map`) moved there from the time sampler slot; when the
+move was made, a few CPU training steps and a seeded generation of the REPLAiD
+hybrid, the `path_schedule=cdcd` Gaussian and simplex views, `sudoku_pca_blurring`
+and `sudoku_simplex_adaptive` with `time_grid=adaptive` matched the previous code
+exactly (losses, parameters and buffers, tokens; zero deviation), and old-format
+checkpoints written by the previous code loaded and sampled identical tokens.
+`core/tests/test_time_map_migration.py` keeps the config and checkpoint
+migrations under test.
+
 | Infrastructure | Executed check | Remaining qualification |
 | --- | --- | --- |
 | DDP | Two GPUs, four MDLM steps, cosine scheduler, EMA, callback generation, checkpoint | Not a matrix of all algorithms/modifiers |

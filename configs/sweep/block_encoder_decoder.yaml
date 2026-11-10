@@ -29,7 +29,7 @@ preparation:
   output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/block-encoder-decoder
   family: block_encoder_decoder
   evaluation_file: experiments/block-encoder-decoder/evaluation/${preparation.task_name}.json
-  recipe_fields: [model, encoder_decoder, block_diffusion, representation, algorithm, parameterization, objective, noise_schedule, time_sampler, prediction, self_conditioning, optimizer]
+  recipe_fields: [model, encoder_decoder, block_diffusion, representation, algorithm, parameterization, objective, noise_schedule, time_sampler, time_map, prediction, self_conditioning, optimizer]
   wandb:
     project: block-encoder-decoder
   # Native ancestral sampling only; renoising samplers were not run on these models.

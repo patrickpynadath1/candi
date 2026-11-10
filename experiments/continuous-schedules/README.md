@@ -24,7 +24,7 @@ share of the loss. On the final checkpoints the example measures:
 | | |
 | --- | --- |
 | Grid | {Gaussian embeddings, simplex, spherical, vMF} x {no SC, SC} x {Sudoku-hard, text8, TinyStories BPE-10k} = 24 cases, one training seed |
-| Schedule | CDCD learned clock (`information_path/path_schedule=cdcd`) on the continuous view, with the inverse-CDF clamp fix in `core/time_sampling/cdcd.py` |
+| Schedule | CDCD learned clock (`information_path/path_schedule=cdcd`) on the continuous view: the learned time map `cdcd_loss_cdf` at `algorithm.time_map` with a uniform training time sampler (the source runs saved it as the `cdcd` time sampler; configs and checkpoints migrate on load), with the inverse-CDF clamp fix in `core/noise_schedules/learned_time_maps.py` |
 | Backbone | 8 blocks, width 512, 8 heads, AdaLN (the `corruption_factorial` recipe) |
 | Training | 20k steps, batch 256, lr 3e-4 with 2.5k warmup, EMA 0.9999, bf16 |
 | SC | `posterior_mean` (expected embedding of the previous prediction), probability 0.9 |

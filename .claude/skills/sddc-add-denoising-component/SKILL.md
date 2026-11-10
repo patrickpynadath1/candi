@@ -17,7 +17,7 @@ The denoising task fixes what the network predicts and how it is trained. Read
 | --- | --- | --- |
 | meaning of network outputs, constraints, inference shaping | `core/parameterizations/` | `denoising_task/parameterization` |
 | loss math or weighting | `core/objectives/` (compose with `core/objectives/composition.py`) | `denoising_task/objective` |
-| distribution of training times | `core/time_sampling/` | `denoising_task/time_sampler` |
+| distribution of training times (training only; a learned map that generation reads is an `information_path/time_map`) | `core/time_sampling/` | `denoising_task/time_sampler` |
 | how predictions are formed (shared) | `core/algorithms/posterior.py`, `core/modifiers/self_conditioning/prediction.py` | — |
 | orchestration that genuinely differs | a new class in `core/algorithms/` | `denoising_task/algorithm` |
 

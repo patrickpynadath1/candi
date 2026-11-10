@@ -122,7 +122,7 @@ def test_hybrid_config_keeps_the_saved_recipe_values():
     gamma_max = content.schedule.gamma_min + torch.nn.functional.softplus(content.schedule.gamma_delta_raw)
     assert float(content.schedule.gamma_min) == -11.0
     assert float(gamma_max) == pytest.approx(4.0)
-    assert algorithm.time_sampler.clock_logits.shape == (8,)
+    assert algorithm.time_map.clock_logits.shape == (8,)
     assert type(algorithm.model.input.views[1].process.proposal).__name__ == "ForcedTargetMask"
     assert migrate_legacy_config(OmegaConf.create(legacy_hybrid())).sampler.steps == 3
 
@@ -144,7 +144,7 @@ def _legacy_hybrid_state(module):
         renames = {
             "algorithm.model.input.views.0.schedule.gamma_min": "gamma_min",
             "algorithm.model.input.views.0.schedule.gamma_delta_raw": "width_raw",
-            "algorithm.time_sampler.clock_logits": "clock_logits",
+            "algorithm.time_map.clock_logits": "clock_logits",
         }
         if key in renames:
             for view in (0, 1):
@@ -164,8 +164,8 @@ def test_legacy_hybrid_checkpoint_loads_into_the_rebuilt_module(tmp_path):
             parameter.normal_()
     names = [name for name, _ in source.algorithm.named_parameters()]
     # The old parameter order put the bin logits right after the clock endpoints.
-    old = [n for n in names if n != "time_sampler.clock_logits"]
-    old.insert(old.index("model.input.views.0.schedule.gamma_delta_raw") + 1, "time_sampler.clock_logits")
+    old = [n for n in names if n != "time_map.clock_logits"]
+    old.insert(old.index("model.input.views.0.schedule.gamma_delta_raw") + 1, "time_map.clock_logits")
     shadows = {n: torch.full_like(p, float(i)) for i, (n, p) in enumerate(source.algorithm.named_parameters())}
     checkpoint = {
         "core_format_version": 1,
