@@ -57,7 +57,7 @@ class Recorder:
             raise RuntimeError("worker lost")
         self.calls.append(copy.deepcopy(payload))
         t = payload["parameters"]["algorithm.predictor.temperature"]
-        if evaluation["indices"] == TEST:
+        if set(evaluation["indices"]) <= set(TEST):  # the test split or its smoke subset
             return {"score": -1.0}
         value = score(t, len(evaluation["indices"]), evaluation["seeds"], evaluation["nfe"])
         result = {"score": value, "seed_scores": [value]}
@@ -180,15 +180,20 @@ def test_extra_test_budget_scores_every_policy_winner_after_selection(tmp_path, 
     second = copy.deepcopy(settings["inference"][0])
     second["name"] = "other"
     settings["inference"].append(second)
-    settings["evaluation"]["extra_test_nfe"] = [16]
+    settings["evaluation"].update(extra_test_nfe=[16], extra_test_examples=4)
     recorder = Recorder()
     monkeypatch.setattr(tuning, "execute", recorder)
     winner = tuning.run_case(settings, tmp_path / "runs", concurrency=1)
-    tests = [(i, c) for i, c in enumerate(recorder.calls) if c["evaluation"]["indices"] == TEST]
-    # One test call at the tuning budget for the winner, then one per policy at 16.
+    tests = [(i, c) for i, c in enumerate(recorder.calls)
+             if set(c["evaluation"]["indices"]) <= set(TEST)]
+    # One full test call at the tuning budget for the winner, then one smoke call per policy.
     assert [c["evaluation"]["nfe"] for _, c in tests] == [4, 16, 16]
     assert [i for i, _ in tests] == [len(recorder.calls) - 3, len(recorder.calls) - 2,
                                      len(recorder.calls) - 1]  # all after every validation call
+    assert tests[0][1]["evaluation"]["indices"] == TEST
+    subsets = [c["evaluation"]["indices"] for _, c in tests[1:]]
+    assert subsets[0] == subsets[1] and len(subsets[0]) == 4  # one fixed subset for all
+    assert all(c["evaluation"]["seeds"] == [1041] for _, c in tests[1:])  # one test seed
     assert {c["policy"]["name"] for _, c in tests[1:]} == {"native", "other"}
     for _, call in tests[1:]:
         name = call["policy"]["name"]
@@ -208,11 +213,16 @@ def test_extra_test_budget_scores_every_policy_winner_after_selection(tmp_path, 
     tuning.run_case(settings, tmp_path / "runs", concurrency=1)
     assert len(recorder.calls) == count
     cost = tuning.generation_cost(settings)
-    assert cost["extra_test_calls"] == 2 * len(TEST) * 1 * 16
+    assert cost["extra_test_calls"] == 2 * 4 * 1 * 16
+    assert tuning.extra_test_subset(settings["evaluation"])[0] == subsets[0]  # deterministic
     assert cost["network_calls"] == cost["tuning_calls"] + cost["test_calls"] + cost["extra_test_calls"]
-    settings["evaluation"]["extra_test_nfe"] = [4]
-    with pytest.raises(ValueError, match="extra_test_nfe"):
-        tuning.validate(settings)
+    for bad, message in [({"extra_test_nfe": [4]}, "extra_test_nfe"),
+                         ({"extra_test_examples": 0}, "extra_test_examples"),
+                         ({"extra_test_seeds": [41]}, "extra_test_seeds")]:
+        broken = copy.deepcopy(settings)
+        broken["evaluation"].update(bad)
+        with pytest.raises(ValueError, match=message):
+            tuning.validate(broken)
 
 
 def test_conditional_parameters_exist_only_under_their_condition(tmp_path):

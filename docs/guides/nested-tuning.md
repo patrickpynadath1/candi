@@ -138,13 +138,18 @@ first budget.
 
 ### Extra test budgets (reported only)
 
-`evaluation.extra_test_nfe` (e.g. `[512]`) adds measurements after selection and after
-the main test evaluation. Each policy's own validation winner (from the first tuning budget,
-on the selected training candidate) is scored once on the test split at each listed NFE,
-into `final-extra/nfe-<n>/<policy>/result.json` with `"measurement": "extra_test_nfe"`.
-Nothing reads these results for selection. Their budgets must differ from the tuning
-budgets, and the winners' parameters are reused with the steps recomputed for the larger
-budget.
+`evaluation.extra_test_nfe` (e.g. `[512]`) adds a smoke measurement after selection and
+after the main test evaluation. Each policy's own validation winner (from the first tuning
+budget, on the selected training candidate) is scored once at each listed NFE, into
+`final-extra/nfe-<n>/<policy>/result.json` with `"measurement": "extra_test_nfe"`.
+
+- The scoring uses a fixed subset of the test partition: `extra_test_examples` prompts
+  (default 128, drawn with a fixed seed; `null` uses the whole partition) and
+  `extra_test_seeds` (default: the first test seed).
+- Every policy is scored on the same subset.
+- Nothing reads these results for selection.
+- Their budgets must differ from the tuning budgets. The winners' parameters are reused,
+  with the steps recomputed for the larger budget.
 
 `--check` prints, per case, the generated sequences and sequence network calls these
 settings imply (an upper bound: early-stopping samplers and skipped trials use less), and

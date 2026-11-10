@@ -3,8 +3,9 @@
 # fixed checkpoint of its source case (same recipe, data and seed) with the evaluation
 # files in experiments/rerun/evaluation (TinyStories by SOL; Sudoku and text8 keep their
 # metrics), successive-halving sampler tuning at NFE 128, one test evaluation of the
-# winner, and every policy's validation winner scored once more on the test split at
-# NFE 512 (reported only, never used for selection). A sweep including this file sets
+# winner, and a smoke measurement: every policy's validation winner scored once at NFE 512
+# on a fixed 128-prompt test subset with one test seed (reported only, never used for
+# selection). A sweep including this file sets
 # preparation.source_runs to its source sweep's run directory.
 preparation:
   # Where the source runs live (the AWS H100 reproduction); prepare on that machine.
@@ -20,3 +21,5 @@ preparation:
   evaluation:
     nfe: 128
     extra_test_nfe: [512]
+    extra_test_examples: 128   # fixed subset of the test partition
+    extra_test_seeds: [1041]   # one test seed

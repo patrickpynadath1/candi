@@ -80,6 +80,7 @@ def test_prepare_reuses_source_checkpoints_and_recipes(tmp_path, source, count):
         assert case["inference"][:5] == base["inference"]  # the source policies, exactly
         evaluation = case["evaluation"]
         assert evaluation["nfe"] == 128 and evaluation["extra_test_nfe"] == [512]
+        assert (evaluation["extra_test_examples"], evaluation["extra_test_seeds"]) == (128, [1041])
         task = next(t for t in SIZES if base["name"].startswith(t))
         assert evaluation["test_indices"] == json.loads(
             (EVALUATION / f"{task}.json").read_text())["test_indices"]

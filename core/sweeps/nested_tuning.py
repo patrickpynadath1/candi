@@ -147,6 +147,12 @@ def validate_inference(spec):
         set(extra) & set(budgets)
     ):
         raise ValueError("extra_test_nfe must list distinct NFE budgets not used for tuning")
+    count = spec.get("extra_test_examples", EXTRA_TEST_EXAMPLES)
+    if count is not None and (type(count) is not int or count < 1):
+        raise ValueError("extra_test_examples must be a positive integer or null")
+    seeds = spec.get("extra_test_seeds", spec["test_seeds"][:1])
+    if not seeds or len(set(seeds)) != len(seeds) or not set(seeds) <= set(spec["test_seeds"]):
+        raise ValueError("extra_test_seeds must be distinct test seeds")
 
 
 # Sampling-only predictor settings a policy may tune (never the training objective).
@@ -865,7 +871,8 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
         )
         save(final_path, {**result, "selection": selection, "source": source_identity()})
     # Extra measurements after selection, never read by it: every policy's validation
-    # winner scored once on the test split at each extra NFE budget.
+    # winner scored once on a fixed test subset at each extra NFE budget.
+    extra_indices, extra_seeds = extra_test_subset(evaluation)
     for budget in evaluation.get("extra_test_nfe", []):
         for name, selection in winner["policy_winners"].items():
             folder = root / "final-extra" / f"nfe-{budget}" / name
@@ -878,8 +885,8 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
                 "dataset": evaluation.get(
                     "test_dataset", validation.get("dataset", "validation")
                 ),
-                "indices": evaluation["test_indices"],
-                "seeds": evaluation["test_seeds"],
+                "indices": extra_indices,
+                "seeds": extra_seeds,
             }
             final.pop("halving", None)
             result = execute(
@@ -898,6 +905,26 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
                 "selection": selection, "source": source_identity(),
             })
     return winner
+
+
+EXTRA_TEST_EXAMPLES = 128
+
+
+def extra_test_subset(evaluation):
+    """(indices, seeds) of the extra-budget smoke measurement: a fixed test subset.
+
+    ``extra_test_examples`` prompts (default 128; null = the whole test partition) drawn
+    with a fixed seed from ``test_indices``, and ``extra_test_seeds`` (default: the first
+    test seed). The same subset for every policy and every resume.
+    """
+    import random
+
+    test = list(evaluation["test_indices"])
+    count = evaluation.get("extra_test_examples", EXTRA_TEST_EXAMPLES)
+    indices = test if count is None or count >= len(test) else sorted(
+        random.Random(0).sample(test, count)
+    )
+    return indices, list(evaluation.get("extra_test_seeds", evaluation["test_seeds"][:1]))
 
 
 def nfe_budgets(evaluation):
@@ -1077,7 +1104,8 @@ def generation_cost(spec):
         tuning, test = tuning + sequences, test + final
         tuning_calls += sequences * budget
         test_calls += final * budget
-    final = len(evaluation["test_indices"]) * len(evaluation["test_seeds"])
+    indices, extra_seeds = extra_test_subset(evaluation)
+    final = len(indices) * len(extra_seeds)
     extra = sum(len(spec["inference"]) * final for _ in evaluation.get("extra_test_nfe", []))
     extra_calls = sum(
         len(spec["inference"]) * final * b for b in evaluation.get("extra_test_nfe", [])
