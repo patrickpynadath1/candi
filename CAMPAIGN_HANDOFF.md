@@ -48,7 +48,7 @@ resolved cases.
    reachability. Thirty nodes does not necessarily mean thirty GPUs. Keep
    credentials outside Git and manifests.
 3. Use the five committed tokenizer JSONs in
-   `artifacts/tokenizers/tinystories-bpe-20261102/`; do not retrain.
+   `artifacts/tokenizers/tinystories-bpe/`; do not retrain.
    Run `sha256sum -c SHA256SUMS` from that directory and set each case's
    `bpe.tokenizer_path` to the matching absolute shared-checkout path. Fetch the pinned
    TinyStories parquet revision documented in the protocol. Transfer original

@@ -52,7 +52,7 @@ the manifest and never include credentials in the delivery bundle.
 ## Data and tokenizer prerequisites
 
 The five existing tokenizer JSONs are now committed under
-`artifacts/tokenizers/tinystories-bpe-20261102/` (repository root). Do not retrain
+`artifacts/tokenizers/tinystories-bpe/` (repository root). Do not retrain
 them. Run `sha256sum -c SHA256SUMS` in that directory. Configure each case with
 the matching vocabulary size and absolute `bpe.tokenizer_path` on shared storage.
 See that directory's README for provenance and configuration. The checksum file
