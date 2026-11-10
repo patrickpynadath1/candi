@@ -1067,32 +1067,40 @@ def check_manifest(specs, output=None):
             errors.append(f"{name}: {error}")
             continue
         policies = spec["inference"]
-        cost = generation_cost(spec)
         budgets = nfe_budgets(spec["evaluation"])
         rows.append((
             name,
             spec["training"]["trials"],
             len(policies),
             sum(policy["trials"] for policy in policies),
-            "/".join(map(str, budgets)),
+            budgets[0] if len(budgets) == 1 else "/".join(map(str, budgets)),
             state,
-            cost["tuning_sequences"] + cost["test_sequences"],
-            cost["network_calls"],
         ))
     return rows, errors
 
 
-def print_check(rows, errors):
-    header = ("case", "train", "policies", "inference", "nfe", "state", "sequences", "calls")
+def print_check(rows, errors, costs=None):
+    """One line per case; ``costs`` ({case: generation_cost}) adds two columns."""
+    costs = costs or {}
+    header = ("case", "train", "policies", "inference", "nfe", "state")
+    if costs:
+        header += ("sequences", "calls")
     width = max([len(header[0])] + [len(row[0]) for row in rows])
     print(f"{header[0]:{width}}  " + "  ".join(f"{h:>9}" for h in header[1:]))
     for row in rows:
-        print(f"{row[0]:{width}}  " + "  ".join(f"{str(v):>9}" for v in row[1:]))
+        extra = ()
+        if costs:
+            cost = costs[row[0]]
+            extra = (cost["tuning_sequences"] + cost["test_sequences"], cost["network_calls"])
+        print(f"{row[0]:{width}}  " + "  ".join(f"{str(v):>9}" for v in (*row[1:], *extra)))
     trained = sum(row[1] for row in rows)
-    print(f"{len(rows)} cases, {trained} training runs, "
-          f"{sum(row[1] * row[3] for row in rows)} inference trials, "
-          f"{sum(row[6] for row in rows)} generated sequences, "
-          f"{sum(row[7] for row in rows) / 1e6:.1f}M sequence network calls")
+    summary = (f"{len(rows)} cases, {trained} training runs, "
+               f"{sum(row[1] * row[3] for row in rows)} inference trials")
+    if costs:
+        sequences = sum(c["tuning_sequences"] + c["test_sequences"] for c in costs.values())
+        calls = sum(c["network_calls"] for c in costs.values())
+        summary += f", {sequences} generated sequences, {calls / 1e6:.1f}M sequence network calls"
+    print(summary)
     for error in errors:
         print("ERROR", error)
 
@@ -1126,8 +1134,11 @@ def main():
     )
     args = parser.parse_args()
     if args.check:
-        rows, errors = check_manifest(json.loads(args.manifest.read_text()), args.output)
-        print_check(rows, errors)
+        specs = json.loads(args.manifest.read_text())
+        rows, errors = check_manifest(specs, args.output)
+        valid = {row[0] for row in rows}
+        costs = {s["name"]: generation_cost(s) for s in specs if s.get("name") in valid}
+        print_check(rows, errors, costs)
         raise SystemExit(1 if errors else 0)
     if args.output is None:
         parser.error("--output is required")
