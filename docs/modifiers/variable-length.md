@@ -268,9 +268,9 @@ tokens. Learning lengths near 32 is an empirical result of training, not an
 invariant. Exact 32-token terminal blocks would require an additional
 length-conditioned generation rule; that is not implemented.
 
-Fully protected blocks are copied directly. Variable blocks currently sample
-one example at a time and re-encode completed prefixes without KV caching,
-even if caching is requested. Packed training sequences are required, and the
+Fully protected blocks are copied directly. Variable blocks sample one example
+at a time; with `cache_clean_prefix=true` each completed token enters the clean
+stream once (see [block diffusion](block-diffusion.md)). Packed training sequences are required, and the
 optional clean autoregressive auxiliary loss is not supported on this path.
 See [block diffusion](block-diffusion.md) for visibility and API details.
 

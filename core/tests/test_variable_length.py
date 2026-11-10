@@ -317,8 +317,7 @@ def test_variable_blocks_isolate_future_tokens_and_cap_each_active_block():
     assert max(metadata["block_lengths"][0]) <= 3
     assert output.shape[1] == metadata["lengths"][0]
 
-    # Variable prefixes never reuse positional KV entries, so requesting the
-    # cache cannot change generation semantics.
+    # The clean-prefix cache changes cost, not generation semantics.
     torch.manual_seed(12)
     other, other_metadata = uncached.generate(sampler, tokens, prompt)
     assert torch.equal(output, other)
@@ -827,3 +826,118 @@ def test_insertion_count_scale_changes_poisson_rate(monkeypatch):
         algo.generate(InsertionSampler(steps=1, count_scale=scale), prompt, fixed)
     torch.testing.assert_close(rates[1], 2 * rates[0])
     assert rates[0].sum() > 0
+
+
+def _open_gates(model):
+    # Leave AdaLN-Zero initialization so clean context reaches the outputs.
+    for block in model.blocks:
+        if getattr(block, "adaLN", False):
+            torch.nn.init.normal_(block.adaLN_modulation.weight, std=0.1)
+    torch.nn.init.normal_(model.output_layer.linear.weight, std=0.1)
+
+
+def _record_clean_encodings(model, monkeypatch):
+    network, lengths = model.model, []
+    original = network.clean_token_hidden
+
+    def record(tokens, encode=None):
+        lengths.append(tokens.shape[1])
+        return original(tokens, encode)
+
+    monkeypatch.setattr(network, "clean_token_hidden", record)
+    return lengths
+
+
+def test_variable_block_prefix_cache_matches_recompute_and_drops_stale_entries(
+    monkeypatch,
+):
+    from core.modifiers.block_diffusion import BlockDiffusion
+    from core.modifiers.variable_length.model import forward_features
+
+    torch.manual_seed(5)
+    algo = BlockDiffusion(
+        assembly(continuous=True), block_size=2, max_length=4
+    ).eval()
+    _open_gates(algo.model.model)
+    sequence = torch.tensor([[1, 2, 3, 4, 2, 1]])
+    time = torch.tensor([0.4])
+    points = algo.algorithm.points(time)
+    noisy = torch.tensor([[3, 1, 0]])
+    valid = torch.tensor([[True, True, False]])
+    states = tuple(
+        view.process.corrupt_state(
+            view.representation.encode(noisy), point.coefficients, valid
+        )
+        for view, point in zip(algo.views, points)
+    )
+
+    def features(prefix, cache):
+        with torch.no_grad(), algo.model.clean_context(
+            prefix, offset=prefix.shape[1], cache=cache
+        ):
+            return forward_features(
+                algo.model, algo.algorithm.gap_head, states, points, time, valid
+            )
+
+    cache = {}
+    lengths = _record_clean_encodings(algo.model, monkeypatch)
+    # Variable blocks need not end on block_size multiples; the clean stream
+    # is token-causal, so each extension encodes only the new tokens.
+    for stop in (0, 3, 3, 5):
+        prefix = sequence[:, :stop]
+        cached = features(prefix, cache)
+        expected = features(prefix, None)
+        for actual, reference in zip(
+            (cached[0].logits, *cached[1:]), (expected[0].logits, *expected[1:])
+        ):
+            torch.testing.assert_close(actual, reference, atol=1e-5, rtol=1e-5)
+    # Even entries are cached calls, odd entries the full-prefix references.
+    assert [n for n in lengths[::2] if n] == [3, 2]
+    # An insertion inside the cached prefix shifts every later position: the
+    # stale entries must be discarded and the whole prefix re-encoded.
+    shifted = torch.cat([sequence[:, :1], torch.tensor([[4]]), sequence[:, 1:5]], 1)
+    del lengths[:]
+    cached = features(shifted, cache)
+    expected = features(shifted, None)
+    torch.testing.assert_close(
+        cached[0].logits, expected[0].logits, atol=1e-5, rtol=1e-5
+    )
+    torch.testing.assert_close(cached[1], expected[1], atol=1e-5, rtol=1e-5)
+    assert lengths == [6, 6]
+
+
+@pytest.mark.parametrize("continuous", [False, True])
+def test_variable_block_generation_encodes_each_completed_token_once(
+    continuous, monkeypatch
+):
+    from copy import deepcopy
+    from core.modifiers.block_diffusion import BlockDiffusion
+
+    torch.manual_seed(31)
+    base = assembly(feedback=True, continuous=continuous)
+    _open_gates(base.model)
+    clone = deepcopy(base)
+    cached = BlockDiffusion(
+        base, block_size=2, max_length=3, cache_clean_prefix=True
+    ).eval()
+    uncached = BlockDiffusion(
+        clone, block_size=2, max_length=3, cache_clean_prefix=False
+    ).eval()
+    tokens = torch.tensor([[1, 2, 3, 4, 1, 2], [2, 2, 1, 1, 3, 3]])
+    prompt = torch.tensor(
+        [[True, False, False, False, False, False], [False] * 6]
+    )
+    sampler = InsertionSampler(steps=3, max_length=20, overflow="truncate")
+    lengths = _record_clean_encodings(cached.model, monkeypatch)
+    torch.manual_seed(12)
+    output, metadata = cached.generate(sampler, tokens, prompt)
+    torch.manual_seed(12)
+    reference, reference_metadata = uncached.generate(sampler, tokens, prompt)
+    assert torch.equal(output, reference)
+    assert metadata == reference_metadata
+    # Each completed block enters the clean stream once, when it becomes a
+    # prefix; the final block is never a prefix. Every network call still
+    # counts as one NFE: 3 steps plus terminal decoding, for 3 blocks.
+    expected = [n for row in metadata["block_lengths"] for n in row[:-1] if n]
+    assert [n for n in lengths if n] == expected
+    assert metadata["nfe_per_sample"] == [12, 12]

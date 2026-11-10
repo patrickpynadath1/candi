@@ -206,9 +206,11 @@ class BlockDiffusionModel(nn.Module):
     ):
         """Variable-length feature path with a completed clean prefix.
 
-        The gap head's left boundary belongs to the noisy stream. Completed
-        blocks are re-encoded as clean tokens on every call; this deliberately
-        avoids reusing KV entries after a preceding block changed length.
+        The gap head's left boundary belongs to the noisy stream. The clean
+        stream is token-causal with absolute positions, and completed blocks
+        are frozen, so with a cache each clean token is encoded once: an edit
+        in the active block shifts only noisy positions after the prefix.
+        ``clean_context`` drops the cache whenever the cached prefix changed.
         """
         parallel = self._parallel_clean.get()
         if parallel is not None:
@@ -218,7 +220,16 @@ class BlockDiffusionModel(nn.Module):
         current = self._clean.get()
         if current is None:
             return None
-        clean, offset, _cache = current
+        clean, offset, cache = current
+        # Like the fixed-block cache, this runs model.blocks directly.
+        if (
+            cache is not None
+            and not self.training
+            and type(self.model.block_execution) is DiffusionBlocks
+        ):
+            return self._cached_sequence_features(
+                head, cache, states, points, time, valid, conditioning, clean, offset
+            )
         noisy_hidden, noisy_condition, clean_hidden, clean_condition = view_stream_inputs(
             self.model, states, points, time, conditioning, clean, self.clean_encoder
         )
@@ -296,6 +307,55 @@ class BlockDiffusionModel(nn.Module):
         expected, gap_logits = head(active, valid)
         logits = output.logits[:, clean_length + 1 :, : head.vocab_size]
         return ModelPrediction(logits, active[:, 1:]), expected, gap_logits
+
+    def _cached_sequence_features(
+        self, head, cache, states, points, time, valid, conditioning, clean, offset
+    ):
+        # Separate keys: this layout differs from the fixed-block one.
+        cache = cache.setdefault("sequence", {})
+        device, batch, clean_length = clean.device, len(clean), clean.shape[1]
+        encoded = cache.get("clean_length", 0)
+        noisy_hidden, noisy_condition, clean_hidden, clean_condition = view_stream_inputs(
+            self.model,
+            states,
+            points,
+            time,
+            conditioning,
+            clean[:, encoded:],
+            self.clean_encoder,
+        )
+        boundary = head.left_boundary.to(noisy_hidden).expand(len(noisy_hidden), 1, -1)
+        noisy_hidden = torch.cat([boundary, noisy_hidden], 1)
+        noisy_length = noisy_hidden.shape[1]
+        if clean_length > encoded:
+            rows = torch.arange(encoded, clean_length, device=device)
+            columns = torch.arange(clean_length, device=device)
+            causal = (columns[None, :] <= rows[:, None])[None, None]
+            self._extend_clean_cache(
+                cache,
+                clean_hidden,
+                clean_condition,
+                rows[None].expand(batch, -1),
+                causal.expand(batch, 1, -1, -1),
+            )
+            cache["clean_length"] = clean_length
+        keys = torch.cat(
+            [torch.ones(batch, clean_length + 1, dtype=torch.bool, device=device), valid],
+            1,
+        )
+        mask = keys[:, None, None, :].expand(-1, 1, noisy_length, -1)
+        positions = torch.arange(offset, offset + noisy_length, device=device)
+        output = self._cached_noisy(
+            cache,
+            noisy_hidden,
+            noisy_condition,
+            positions[None].expand(batch, -1),
+            mask,
+            clean_length,
+        )
+        expected, gap_logits = head(output.hidden, valid)
+        logits = output.logits[:, 1:, : head.vocab_size]
+        return ModelPrediction(logits, output.hidden[:, 1:]), expected, gap_logits
 
     def _parallel_sequence_features(
         self, head, states, points, time, valid, conditioning, clean, blocks
@@ -390,51 +450,61 @@ class BlockDiffusionModel(nn.Module):
         clean_hidden, clean_condition, noisy_hidden, noisy_condition = (
             self._stream_inputs(inputs, clean[:, encoded_length:], self_condition)
         )
-        layers = cache.setdefault("layers", [None] * len(self.model.blocks))
         if clean_length > encoded_length:
-            clean_ids = layout.position_ids[:, encoded_length:clean_length]
-            with torch.autocast(clean.device.type, enabled=False):
-                clean_rotary = self.model.rotary_emb(
-                    clean_hidden, position_ids=clean_ids
-                )
-            causal = layout.attention_mask[
-                :, :, encoded_length:clean_length, :clean_length
-            ]
-            with torch.autocast(
-                clean.device.type,
-                enabled=torch.is_autocast_enabled(clean.device.type),
-                cache_enabled=False,
-            ):
-                for index, block in enumerate(self.model.blocks):
-                    clean_hidden, new_kv = block(
-                        clean_hidden,
-                        clean_rotary,
-                        clean_condition,
-                        causal,
-                        key_value_prefix=layers[index],
-                        return_key_value=True,
-                    )
-                    layers[index] = append_key_value(layers[index], new_kv)
-            cache["clean_length"] = clean_length
-        with torch.autocast(noisy_hidden.device.type, enabled=False):
-            noisy_rotary = self.model.rotary_emb(
-                noisy_hidden, position_ids=layout.position_ids[:, clean_length:]
+            self._extend_clean_cache(
+                cache,
+                clean_hidden,
+                clean_condition,
+                layout.position_ids[:, encoded_length:clean_length],
+                layout.attention_mask[
+                    :, :, encoded_length:clean_length, :clean_length
+                ],
             )
-        noisy_mask = layout.attention_mask[:, :, clean_length:, :]
+            cache["clean_length"] = clean_length
+        result = self._cached_noisy(
+            cache,
+            noisy_hidden,
+            noisy_condition,
+            layout.position_ids[:, clean_length:],
+            layout.attention_mask[:, :, clean_length:, :],
+            clean_length,
+        )
+        return result if return_features else result.logits
+
+    def _extend_clean_cache(self, cache, hidden, condition, positions, mask):
+        """Append clean-stream K/V for new tokens; earlier entries are reused."""
+        layers = cache.setdefault("layers", [None] * len(self.model.blocks))
+        with torch.autocast(hidden.device.type, enabled=False):
+            rotary = self.model.rotary_emb(hidden, position_ids=positions)
         with torch.autocast(
-            noisy_hidden.device.type,
-            enabled=torch.is_autocast_enabled(noisy_hidden.device.type),
+            hidden.device.type,
+            enabled=torch.is_autocast_enabled(hidden.device.type),
+            cache_enabled=False,
+        ):
+            for index, block in enumerate(self.model.blocks):
+                hidden, new_kv = block(
+                    hidden,
+                    rotary,
+                    condition,
+                    mask,
+                    key_value_prefix=layers[index],
+                    return_key_value=True,
+                )
+                layers[index] = append_key_value(layers[index], new_kv)
+
+    def _cached_noisy(self, cache, hidden, condition, positions, mask, clean_length):
+        """Run the noisy stream against the cached clean-stream K/V."""
+        with torch.autocast(hidden.device.type, enabled=False):
+            rotary = self.model.rotary_emb(hidden, position_ids=positions)
+        with torch.autocast(
+            hidden.device.type,
+            enabled=torch.is_autocast_enabled(hidden.device.type),
             cache_enabled=False,
         ):
             for index, block in enumerate(self.model.blocks):
                 prefix = cache["layers"][index] if clean_length else None
-                noisy_hidden = block(
-                    noisy_hidden,
-                    noisy_rotary,
-                    noisy_condition,
-                    noisy_mask,
-                    key_value_prefix=prefix,
+                hidden = block(
+                    hidden, rotary, condition, mask, key_value_prefix=prefix
                 )
-            noisy_logits = self.model.project_hidden(noisy_hidden, noisy_condition)
-        result = ModelPrediction(noisy_logits, noisy_hidden)
-        return result if return_features else result.logits
+            logits = self.model.project_hidden(hidden, condition)
+        return ModelPrediction(logits, hidden)

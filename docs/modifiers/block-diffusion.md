@@ -91,11 +91,16 @@ Completed outputs are encoded through the clean stream; noisy KV entries are
 never recycled as clean context. This is separate from the ordinary autoregressive
 model's KV cache.
 
-Variable blocks currently re-encode their completed prefix on every model call,
-even when `cache_clean_prefix=true`. Earlier edits shift physical positions, so
-reusing a fixed-position prefix cache would be incorrect. Generation runs each
-example independently to keep its clean prefix free of storage padding. Fully
-protected blocks are copied without a model call or insertion opportunity.
+Variable blocks use the same cache. Their clean stream is token-causal with
+absolute positions, and a block is frozen before the next one starts, so the
+completed prefix only grows by appending: insertions and deletions in the active
+block shift noisy positions after the prefix, never cached ones. Each completed
+token is therefore encoded once, when its block becomes part of the prefix. The
+cache is discarded whenever the cached tokens are not a prefix of the new clean
+context (for example after an edit inside it). Caching changes cost, not NFE:
+every model call still counts. Generation runs each example independently to
+keep its clean prefix free of storage padding. Fully protected blocks are copied
+without a model call or insertion opportunity.
 
 ## Sequence-aware processes and hybrids
 

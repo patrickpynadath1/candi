@@ -78,7 +78,8 @@ class BlockSampler:
 
         Per-example execution keeps every clean prefix free of padding. A block's
         output is frozen before the next block starts, so shifting positions can
-        never move an edit into another logical block.
+        never move an edit into another logical block. The completed prefix only
+        grows by appending, so its clean-stream cache is extended once per block.
         """
         rows, totals, all_lengths, all_inserted, all_truncated = [], [], [], [], []
         per_block = []
@@ -87,6 +88,7 @@ class BlockSampler:
             completed = prompt_tokens.new_empty((1, 0))
             nfe = 0
             block_lengths, inserted, truncated = [], 0, False
+            cache = {} if self.cache_clean_prefix else None
             for start in range(0, source_length, self.block_size):
                 stop = min(start + self.block_size, source_length)
                 block_tokens = prompt_tokens[row : row + 1, start:stop]
@@ -95,10 +97,9 @@ class BlockSampler:
                     completed = torch.cat([completed, block_tokens], 1)
                     block_lengths.append(stop - start)
                     continue
-                # Prefix caches are intentionally not shared across variable
-                # blocks: a completed edit changes all following positions.
+                # Edits stay inside the active block, after the cached prefix.
                 with algo.model.clean_context(
-                    completed, offset=completed.shape[1], cache=None
+                    completed, offset=completed.shape[1], cache=cache
                 ):
                     output, metadata = self.sampler.sample(
                         _ActiveBlock(
