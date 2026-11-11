@@ -268,3 +268,24 @@ def test_cuda_loss_backward_and_sampling(sc, input_mode):
     )
     assert metadata["nfe"] == 3
     assert torch.equal(samples[:, :3], x[:, :3])
+
+
+def test_bridge_step_that_keeps_the_noise_level_leaves_the_state_unchanged():
+    # The hold of Ψ's loop schedule asks for steps with s = t; without churn the
+    # bridge must return the current state, and it must stay continuous as s -> t.
+    torch.manual_seed(0)
+    batch, length, vocabulary = 3, 32, 11
+    prior = torch.full((vocabulary,), 1.0 / vocabulary)
+    clean = torch.randint(vocabulary, (batch, length))
+    t = torch.full((batch,), 0.4)
+    c = torch.full((batch,), 20.0)
+    state = log_dirichlet_sample(
+        corruption_parameters(torch.nn.functional.one_hot(clean, vocabulary).float(), t, c, prior)
+    )
+    held = reverse_bridge(state, clean, t, t, c, c, prior, 0.0)
+    assert torch.allclose(held.exp(), state.exp(), atol=1e-5)
+    near = reverse_bridge(state, clean, t - 1e-4, t, c, c, prior, 0.0)
+    assert (near.exp() - state.exp()).abs().max() < 0.05
+    churned = reverse_bridge(state, clean, t, t, c, c, prior, 0.3)
+    assert torch.isfinite(churned).all()
+    assert torch.allclose(churned.exp().sum(-1), torch.ones(batch, length), atol=1e-5)

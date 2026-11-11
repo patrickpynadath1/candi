@@ -85,8 +85,10 @@ def reverse_bridge(log_pt, clean_tokens, s, t, cs, ct, prior, churn, backend="to
     """
     if not 0 <= churn <= 1:
         raise ValueError("churn must be in [0,1]")
-    if not ((s > 0) & (s < t) & (t <= 1)).all():
-        raise ValueError("bridge requires 0 < s < t <= 1")
+    # s = t is allowed: a step that keeps the noise level (the hold of Ψ's loop schedule)
+    # then leaves the state as it is, up to churn.
+    if not ((s > 0) & (s <= t) & (t <= 1)).all():
+        raise ValueError("bridge requires 0 < s <= t <= 1")
     clean = F.one_hot(clean_tokens, log_pt.shape[-1]).to(log_pt)
     bs = corruption_parameters(clean, s, cs, prior)
     if churn == 1:

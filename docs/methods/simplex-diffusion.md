@@ -15,7 +15,7 @@ uv run python main.py +experiment=sudoku_simplex_self_conditioning
 uv run python main.py +experiment=sudoku_simplex_adaptive
 ```
 
-Defaults use expected-embedding input, float32 neural computation, constant-then-linear normalized variance (`nu0=.4`, `nu1=.75`, `pivot=.8`), churn 1, and 180 sampling calls. Corruption at time zero returns an exact clean vertex. Reverse bridges operate for `0 < s < t <= 1`; final decoding draws a clean token.
+Defaults use expected-embedding input, float32 neural computation, constant-then-linear normalized variance (`nu0=.4`, `nu1=.75`, `pivot=.8`), churn 1, and 180 sampling calls. Corruption at time zero returns an exact clean vertex. Reverse bridges operate for `0 < s <= t <= 1` (s = t without churn leaves the state unchanged); final decoding draws a clean token.
 
 ```bash
 uv run python main.py +experiment=sudoku_simplex noise_schedule.kind=constant noise_schedule.nu0=0.4
