@@ -33,7 +33,9 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("plans", nargs="+", type=Path)
     parser.add_argument("--runs", type=Path, required=True)
-    parser.add_argument("--case-concurrency", type=int, default=None, help="Default: number of GPUs")
+    parser.add_argument("--case-concurrency", type=int, default=None, help="Default: twice the number of GPUs")
+    parser.add_argument("--inference-gpu", type=float, default=0.5,
+                        help="GPU share per evaluation job (TinyStories always uses a whole GPU)")
     parser.add_argument("--concurrency", type=int, default=4, help="Inference candidates per case")
     parser.add_argument("--cases", type=Path, help="Run only these PLAN/CASE names (one per line)")
     args = parser.parse_args()
@@ -57,13 +59,17 @@ def main():
 
     def one(item):
         plan, spec = item
+        # Execution-only: two short evaluation jobs share a GPU, except TinyStories,
+        # whose simplex states and GPT-2 Large scoring need most of one.
+        spec = {**spec, "resources": {**spec.get("resources", {"cpu": 4, "gpu": 1}),
+                "inference_gpu": 1 if "tinystories" in spec["name"] else args.inference_gpu}}
         try:
             nested_tuning.run_case(spec, args.runs / plan, args.concurrency, retry_skipped=True)
             print(f"done {plan}/{spec['name']}", flush=True)
         except Exception as error:  # noqa: BLE001 - keep the other cases running
             print(f"FAILED {plan}/{spec['name']}: {error!r}", flush=True)
 
-    with ThreadPoolExecutor(args.case_concurrency or max(gpus, 1)) as pool:
+    with ThreadPoolExecutor(args.case_concurrency or max(2 * gpus, 1)) as pool:
         list(pool.map(one, pending))
     remaining = [f"{p}/{s['name']}" for p, s in selected if not done(args.runs, p, s)]
     print(f"{len(remaining)} cases without a final result", flush=True)

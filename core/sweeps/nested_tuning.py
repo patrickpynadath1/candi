@@ -260,6 +260,8 @@ def validate(spec):
     resources = spec.get("resources", {"cpu": 4, "gpu": 1})
     if resources.get("gpu", 1) not in (0, 1) or resources.get("cpu", 4) < 1:
         raise ValueError("Workers require positive CPUs and zero or one whole GPU")
+    if not 0 <= resources.get("inference_gpu", resources.get("gpu", 1)) <= 1:
+        raise ValueError("inference_gpu is a GPU share between 0 and 1")
 
 
 # Optuna samplers a study may use. The default reproduces the TPE search used by
@@ -765,9 +767,14 @@ def execute(stage, payload, output):
     import ray
 
     resources = payload["resources"]
+    # Training needs a whole GPU; evaluation may share one (``inference_gpu``), since
+    # short sampling trials leave most of a GPU idle.
+    gpu = resources.get("gpu", 1)
+    if stage != "train":
+        gpu = resources.get("inference_gpu", gpu)
     remote = ray.remote(
         num_cpus=resources.get("cpu", 4),
-        num_gpus=resources.get("gpu", 1),
+        num_gpus=gpu,
         max_calls=1,
         label_selector=resources.get("label_selector"),
     )(_run_worker)

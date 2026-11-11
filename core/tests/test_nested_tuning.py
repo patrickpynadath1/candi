@@ -621,3 +621,25 @@ def test_retry_skipped_reruns_a_skipped_candidate_once(tmp_path):
     assert retried["parameters"] == {"x": 1} and retried["skipped_trials"] == []
     again = tuning.search(tmp_path, settings, "maximize", objective, 1)
     assert again["parameters"] == {"x": 1} and again["skipped_trials"] == []
+
+
+def test_evaluation_jobs_may_share_a_gpu_but_training_never_does(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    requested = []
+
+    def remote(**options):
+        requested.append(options["num_gpus"])
+
+        def decorate(worker):
+            return types.SimpleNamespace(remote=lambda *args: None)
+
+        return decorate
+
+    monkeypatch.setitem(sys.modules, "ray", types.SimpleNamespace(remote=remote, get=lambda value: value))
+    resources = {"cpu": 4, "gpu": 1, "inference_gpu": 0.5}
+    tuning.execute("train", {"resources": resources}, tmp_path)
+    tuning.execute("evaluate", {"resources": resources}, tmp_path)
+    tuning.execute("evaluate", {"resources": {"cpu": 4, "gpu": 1}}, tmp_path)
+    assert requested == [1, 0.5, 1]
