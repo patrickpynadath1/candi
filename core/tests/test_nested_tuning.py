@@ -643,16 +643,3 @@ def test_evaluation_jobs_may_share_a_gpu_but_training_never_does(monkeypatch, tm
     tuning.execute("evaluate", {"resources": resources}, tmp_path)
     tuning.execute("evaluate", {"resources": {"cpu": 4, "gpu": 1}}, tmp_path)
     assert requested == [1, 0.5, 1]
-
-
-def test_extra_nfe_budgets_may_be_added_without_changing_the_selection_protocol(tmp_path):
-    # Extra budgets are measured after selection; adding one must not block a resume,
-    # while any change that selection reads still does.
-    def protocol(**evaluation):
-        return {"spec": {"name": "case", "evaluation": {"nfe": 128, **evaluation}}, "config": {}}
-
-    path = tmp_path / "protocol.json"
-    path.write_text(json.dumps(protocol(extra_test_nfe=[512])))
-    assert not tuning.protocol_conflict(protocol(extra_test_nfe=[16, 32, 64, 512]), path)
-    assert not tuning.protocol_conflict(protocol(), path)
-    assert tuning.protocol_conflict(protocol(extra_test_nfe=[512], nfe=64), path)

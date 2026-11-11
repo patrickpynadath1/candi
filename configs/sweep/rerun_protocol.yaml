@@ -2,13 +2,13 @@
 # The evaluation protocol shared by the inference-only reruns (rerun_common) and the
 # gauss512 training sweeps: experiments/rerun/evaluation partitions (two-stage selection;
 # TinyStories tuned by ref_w1, tested by SOL), NFE 128, every policy's validation winner
-# also measured at NFE 16, 32, 64 and 512 on 128 test prompts with one seed, per-policy Optuna samplers,
+# smoke-tested at NFE 512 on 128 test prompts with one seed, per-policy Optuna samplers,
 # and manifests ordered longest task first.
 preparation:
   evaluation_file: experiments/rerun/evaluation/${preparation.task_name}.json
   evaluation:
     nfe: 128
-    extra_test_nfe: [16, 32, 64, 512]
+    extra_test_nfe: [512]
     extra_test_examples: 128   # fixed subset of the test partition
     extra_test_seeds: [1041]   # one test seed
   # Fields of the shared hybrid_renoising policies (eb_churn and psi set their own): GP

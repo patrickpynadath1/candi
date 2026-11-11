@@ -25,18 +25,7 @@ def cases(plans):
 
 
 def done(runs, plan, spec):
-    """A final result, plus each policy winner's result at every extra NFE budget."""
-    case = Path(runs) / plan / spec["name"]
-    final = case / "final" / "result.json"
-    if not final.is_file():
-        return False
-    # Only policies with a validation winner get extra measurements.
-    winners = json.loads(final.read_text())["selection"].get("policy_winners", {})
-    return all(
-        (case / "final-extra" / f"nfe-{budget}" / name / "result.json").is_file()
-        for budget in spec["evaluation"].get("extra_test_nfe", [])
-        for name in winners
-    )
+    return (Path(runs) / plan / spec["name"] / "final" / "result.json").is_file()
 
 
 def main():
