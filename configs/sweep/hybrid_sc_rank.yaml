@@ -8,8 +8,9 @@
 # 2 discrete views x 4 paths x {no SC, SC} x 3 tasks = 48 cases, trained like
 # hybrid_sc_gauss512 (global batch 256, accumulate 1, 20k steps) and tuned with the
 # rerun protocol. Exception: the 4 TinyStories simplex_rank cases run out of memory at
-# accumulate 1 (10k-vocabulary Dirichlet states); their plan configs use
-# trainer.accumulate_grad_batches=4 (same global batch), as their hybrid_sc counterparts did.
+# accumulate 1 and 4 (10k-vocabulary Dirichlet sampling peaks above 80 GB at some noise
+# levels the rank schedule reaches); their plan configs use
+# trainer.accumulate_grad_batches=8 (microbatch 32, same global batch 256).
 defaults:
 - hybrid_sc
 - rerun_protocol
