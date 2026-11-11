@@ -7,10 +7,11 @@
 # collapsed it to near-pure noise (continuous view at t >= 0.985 from u = 0.01).
 # 2 discrete views x 4 paths x {no SC, SC} x 3 tasks = 48 cases, trained like
 # hybrid_sc_gauss512 (global batch 256, accumulate 1, 20k steps) and tuned with the
-# rerun protocol. Exception: the 4 TinyStories simplex_rank cases run out of memory at
-# accumulate 1 and 4 (10k-vocabulary Dirichlet sampling peaks above 80 GB at some noise
-# levels the rank schedule reaches); their plan configs use
-# trainer.accumulate_grad_batches=8 (microbatch 32, same global batch 256).
+# rerun protocol. Exception: the 4 TinyStories simplex_rank cases run out of memory in
+# the Dirichlet corruption (10k vocabulary, whole batch at once; training at accumulate 1,
+# and validation at step 4000/accumulate). Their plan configs set
+# model.views.content.process.chunk_size=16384 (tokens per chunk; same distribution) and
+# trainer.accumulate_grad_batches=4 (same global batch 256); peak 33 GB with validation.
 defaults:
 - hybrid_sc
 - rerun_protocol
