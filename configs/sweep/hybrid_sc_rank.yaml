@@ -7,7 +7,9 @@
 # collapsed it to near-pure noise (continuous view at t >= 0.985 from u = 0.01).
 # 2 discrete views x 4 paths x {no SC, SC} x 3 tasks = 48 cases, trained like
 # hybrid_sc_gauss512 (global batch 256, accumulate 1, 20k steps) and tuned with the
-# rerun protocol.
+# rerun protocol. Exception: the 4 TinyStories simplex_rank cases run out of memory at
+# accumulate 1 (10k-vocabulary Dirichlet states); their plan configs use
+# trainer.accumulate_grad_batches=4 (same global batch), as their hybrid_sc counterparts did.
 defaults:
 - hybrid_sc
 - rerun_protocol
