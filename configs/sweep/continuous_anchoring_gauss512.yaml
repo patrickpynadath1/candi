@@ -1,0 +1,25 @@
+# @package _global_
+# Random anchoring on the 512-dimensional Gaussian-embedding checkpoints of
+# continuous_schedules_gauss512 (6 cases), with the same protocol and policies as
+# continuous_anchoring.
+defaults:
+- continuous_schedules_gauss512
+- rerun_common
+- override /inference/inference_policies: [anchoring]
+- _self_
+preparation:
+  name: continuous-anchoring-gauss512
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/continuous-anchoring-gauss512
+  family: continuous_anchoring_gauss512
+  source_root: ${oc.env:SDDC_GAUSS512_RUNS,/data/sddc/runs/rerun-20261110}
+  source_runs: ${preparation.source_root}/continuous_schedules_gauss512
+  source_case: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}-gauss512
+  case_name: ${preparation.source_case}-anchor
+  inference: []
+  inference_overrides: null
+  wandb:
+    project: continuous-anchoring-gauss512
+hydra:
+  sweeper:
+    params:
+      ablation_path: gaussian

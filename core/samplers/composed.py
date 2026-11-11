@@ -168,7 +168,13 @@ class ComposedSampler:
                 else algo.sampling_prediction(states, source, time)
             )
             probabilities = logits.to(self.precision).exp()
-            selected = self.positions(probabilities, active)
+            selected = (
+                self.positions(
+                    probabilities, active, step=index, steps=self.steps, generated=generated
+                )
+                if getattr(self.positions, "scheduled", False)
+                else self.positions(probabilities, active)
+            )
             clean = self.tokens(logits, probabilities)
             next_output = (
                 output if clean is None else torch.where(selected, clean, output)

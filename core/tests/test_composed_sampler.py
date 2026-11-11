@@ -11,6 +11,7 @@ from core.samplers.policies import (
     ForwardCorruption,
     ReverseTransition,
     EntropyPositions,
+    ScheduledRandomPositions,
 )
 from core.tests.test_sampler_equivalence import build_algorithm
 
@@ -80,3 +81,56 @@ def test_invalid_combinations_fail_early():
         RandomPositions(0)
     with pytest.raises(ValueError):
         EntropyPositions(float("nan"))
+
+
+def test_scheduled_random_positions_follow_the_anchoring_schedule():
+    # Linear power: after step k of S, round(L * k / S) generated positions are anchored;
+    # the last step anchors the rest. Prompts and inactive positions are never chosen.
+    policy = ScheduledRandomPositions(power=1.0)
+    generated = torch.tensor([[False] * 2 + [True] * 10, [True] * 12])
+    committed = ~generated
+    probabilities = torch.ones(2, 12, 5) / 5
+    torch.manual_seed(3)
+    counts = []
+    for step in range(4):
+        active = generated & ~committed
+        selected = policy(probabilities, active, step=step, steps=4, generated=generated)
+        assert not (selected & ~active).any()
+        committed |= selected
+        counts.append((committed & generated).sum(-1).tolist())
+    assert counts == [[3, 3], [5, 6], [8, 9], [10, 12]]  # half rounds up
+    late = ScheduledRandomPositions(power=3.0)
+    first = late(probabilities, generated, step=0, steps=4, generated=generated)
+    assert first.sum(-1).tolist() == [0, 0]  # (1/4)^3 of 10 or 12 rounds to zero
+    with pytest.raises(ValueError, match="power"):
+        ScheduledRandomPositions(0)
+
+
+@pytest.mark.parametrize("family", ["gaussian", "simplex", "spherical", "vmf"])
+@pytest.mark.parametrize("transition", [ReverseTransition, ForwardCorruption])
+@pytest.mark.parametrize("mode", ["sample", "greedy"])
+def test_random_anchoring_runs_on_pure_continuous_recipes(family, transition, mode):
+    algo = build_algorithm(family, None, "none")
+    sampler = ComposedSampler(
+        steps=5,
+        tokens=TokenSelection(mode),
+        positions=ScheduledRandomPositions(power=1.5),
+        transition=transition(),
+        commitment="freeze",
+    )
+    tokens = torch.tensor([[1, 2, 3, 4, 5, 6], [2, 3, 4, 5, 6, 7]])
+    prompt = torch.tensor([[True, True] + [False] * 4, [True] + [False] * 5])
+    samples, info = algo.generate(sampler, tokens, prompt)
+    assert torch.equal(samples[prompt], tokens[prompt])
+    # Every position is anchored by the last step, so no terminal call is needed.
+    assert info["completed_per_sample"] == [True, True]
+    assert info["nfe"] == 5 <= sampler.steps_for_nfe(6) + 1
+    assert [sum(row) for row in zip(*info["accepted_per_step"])] == [4, 5]
+
+
+def test_anchoring_policies_instantiate_from_their_config():
+    policies = OmegaConf.load("configs/inference/inference_policies/anchoring.yaml")
+    for name, policy in policies.preparation.extra_inference.items():
+        sampler = instantiate(policy.sampler)
+        assert isinstance(sampler.positions, ScheduledRandomPositions), name
+        assert sampler.commitment == "freeze" and sampler.steps_for_nfe(128) == 127

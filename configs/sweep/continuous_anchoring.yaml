@@ -1,0 +1,25 @@
+# @package _global_
+# Random anchoring on the pure-continuous checkpoints of continuous_schedules: 18 cases,
+# {simplex, spherical, vMF} x {no SC, SC} x 3 tasks, with the rerun protocol
+# (rerun_common) and only the two anchoring policies (inference_policies/anchoring.yaml).
+# The other samplers of these checkpoints are in continuous_schedules_rerun; analysis
+# merges a case's policies across both runs and selects by validation.
+defaults:
+- continuous_schedules
+- rerun_common
+- override /inference/inference_policies: [anchoring]
+- _self_
+preparation:
+  name: continuous-anchoring
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/continuous-anchoring
+  family: continuous_anchoring
+  source_runs: ${preparation.source_root}/continuous_schedules
+  case_name: ${preparation.source_case}-anchor
+  inference: []
+  inference_overrides: null  # rerun_protocol's overrides name hybrid_renoising policies
+  wandb:
+    project: continuous-anchoring
+hydra:
+  sweeper:
+    params:
+      ablation_path: simplex,spherical,spherical_vmf

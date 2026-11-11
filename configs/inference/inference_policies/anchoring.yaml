@@ -1,0 +1,47 @@
+# @package _global_
+# Random anchoring for single-view continuous recipes (Gaussian, simplex, spherical, vMF):
+# each step commits random positions on a schedule, fraction (k/S)^power by step k
+# (ScheduledRandomPositions), clamps them to their clean embedding from then on
+# (commitment=freeze), and moves the other positions with the native reverse update
+# (anchor_native) or forward re-noising from the predicted clean tokens (anchor_renoising).
+# This is the anchoring a masked hybrid's sampler gets from its mask view, without the
+# learned mask. Combine with a policy set, e.g.
+# `- /inference/inference_policies: [hybrid_renoising, anchoring]`.
+preparation:
+  extra_inference:
+    anchor_native:
+      sampler:
+        _target_: core.samplers.composed.ComposedSampler
+        steps: 127
+        epsilon: 1.0e-05
+        tokens: {_target_: core.samplers.policies.TokenSelection, mode: sample}
+        positions: {_target_: core.samplers.policies.ScheduledRandomPositions, power: 1.0}
+        transition: {_target_: core.samplers.policies.ReverseTransition}
+        commitment: freeze
+        final_denoise: greedy
+      space: &anchor_space
+        algorithm.predictor.temperature: {type: float, low: 0.5, high: 1.5}
+        sampler.tokens.mode: [sample, greedy]
+        sampler.positions.power: {type: float, low: 0.33, high: 3.0, log: true}
+      initial_points: &anchor_initial
+      - algorithm.predictor.temperature: 1.0
+        sampler.tokens.mode: sample
+        sampler.positions.power: 1.0
+      trials: 16
+      budget_parameter: steps
+      search: {algorithm: tpe, multivariate: true}
+    anchor_renoising:
+      sampler:
+        _target_: core.samplers.composed.ComposedSampler
+        steps: 127
+        epsilon: 1.0e-05
+        tokens: {_target_: core.samplers.policies.TokenSelection, mode: sample}
+        positions: {_target_: core.samplers.policies.ScheduledRandomPositions, power: 1.0}
+        transition: {_target_: core.samplers.policies.ForwardCorruption}
+        commitment: freeze
+        final_denoise: greedy
+      space: *anchor_space
+      initial_points: *anchor_initial
+      trials: 16
+      budget_parameter: steps
+      search: {algorithm: tpe, multivariate: true}

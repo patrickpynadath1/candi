@@ -50,6 +50,36 @@ class RandomPositions:
         return selected
 
 
+class ScheduledRandomPositions:
+    """Anchor uniformly random positions on a schedule.
+
+    After step ``k`` of ``S`` a fraction ``(k / S) ** power`` of each example's generated
+    positions is selected (``power`` 1 is linear, as a masked process on a linear
+    schedule; larger anchors later). With ``commitment="freeze"`` the selected positions
+    are clamped to their clean state from then on, and the last step selects the rest.
+    """
+
+    scheduled = True  # Called with the step index, the step count and the generated mask.
+
+    def __init__(self, power=1.0):
+        if not math.isfinite(power) or power <= 0:
+            raise ValueError("anchoring power must be finite and positive")
+        self.power = float(power)
+
+    def __call__(self, probabilities, active, *, step, steps, generated):
+        total = generated.sum(-1)
+        target = torch.floor(total * ((step + 1) / steps) ** self.power + 0.5).long()
+        if step == steps - 1:
+            target = total
+        need = (target - (generated & ~active).sum(-1)).clamp_min(0)
+        scores = torch.where(
+            active, torch.rand(active.shape, device=active.device), torch.full_like(
+                active, -1, dtype=torch.float)
+        )
+        rank = scores.argsort(-1, descending=True).argsort(-1)
+        return active & (rank < need[:, None])
+
+
 class EntropyPositions:
     def __init__(self, bound=0.1):
         if not math.isfinite(bound) or bound < 0:
