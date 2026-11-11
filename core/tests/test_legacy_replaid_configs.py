@@ -188,3 +188,19 @@ def test_legacy_hybrid_checkpoint_loads_into_the_rebuilt_module(tmp_path):
 def test_saved_config_dict_migration_is_idempotent():
     once = migrate_legacy_config_dict(legacy_replaid())
     assert migrate_legacy_config_dict(once) is once
+
+
+def test_rank_linear_clock_buffers_are_not_mistaken_for_a_legacy_replaid_clock():
+    # SimplexRankSchedule and SphericalRankSchedule own a RankLinearClock submodule, so
+    # their checkpoints have ".schedule.clock.ranks/progress" keys; only the old REPLAiD
+    # leaf names may trigger the migration.
+    from core.training.legacy_checkpoints import is_legacy_replaid_state
+
+    current = {
+        "algorithm.model.input.views.0.schedule.clock.ranks": None,
+        "algorithm.model.input.views.0.schedule.clock.progress": None,
+    }
+    legacy = {"algorithm.model.input.views.0.schedule.clock.gamma_min": None}
+    assert not is_legacy_replaid_state(current)
+    assert is_legacy_replaid_state(legacy)
+    assert is_legacy_replaid_state({**current, **legacy})

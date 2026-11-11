@@ -339,7 +339,7 @@ def migrate_legacy_checkpoint(checkpoint, module):
         if config is not hyper["config"]:
             checkpoint = dict(checkpoint)
             checkpoint["hyper_parameters"] = {**hyper, "config": config}
-    if any(".schedule.clock." in key for key in checkpoint["state_dict"]):
+    if is_legacy_replaid_state(checkpoint["state_dict"]):
         checkpoint = migrate_replaid_hybrid_checkpoint(checkpoint, module)
     if any(".time_sampler." in f".{key}" for key in checkpoint["state_dict"]):
         renamed = migrate_time_map_state_dict(checkpoint["state_dict"], module.state_dict())
@@ -354,6 +354,19 @@ _RENAMES = {
     "width_raw": "model.input.views.0.schedule.gamma_delta_raw",
     "clock_logits": "time_map.clock_logits",
 }
+
+
+def is_legacy_replaid_state(state_dict):
+    """True for the old REPLAiD clock keys (``.schedule.clock.gamma_min`` and the like).
+
+    Current schedules may own a submodule named ``clock`` too (the rank-linear
+    schedules' ``RankLinearClock``), so the leaf name decides, not the path.
+    """
+    return any(
+        key.split(".schedule.clock.", 1)[1] in _RENAMES
+        for key in state_dict
+        if ".schedule.clock." in key
+    )
 
 
 def rename_replaid_key(key):
