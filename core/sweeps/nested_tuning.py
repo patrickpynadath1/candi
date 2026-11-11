@@ -82,6 +82,12 @@ EXECUTION_FIELDS = ("resources", "wandb", "priority")
 def selection_protocol(protocol):
     """The part of a stored protocol (v1 or later) that a resume must match."""
     spec = {k: v for k, v in protocol["spec"].items() if k not in EXECUTION_FIELDS}
+    # Extra NFE budgets are measured after selection and never read by it, so budgets
+    # may be added to a finished case; each is kept in its own final-extra folder.
+    if "extra_test_nfe" in spec.get("evaluation", {}):
+        spec["evaluation"] = {
+            k: v for k, v in spec["evaluation"].items() if k != "extra_test_nfe"
+        }
     config = {k: v for k, v in protocol["config"].items() if k != "wandb"}
     return {"spec": spec, "config": config}
 
