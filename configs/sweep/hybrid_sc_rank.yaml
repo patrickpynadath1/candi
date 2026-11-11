@@ -1,0 +1,29 @@
+# @package _global_
+# hybrid_sc with a fixed rank-linear schedule instead of the CDCD learned clock: both views
+# read the same uniform time; the continuous view's noise makes the clean token's rank
+# fall linearly in time (Gaussian: EmbeddingSphereRankSchedule, its default; simplex and
+# spherical: their *_rank views). vMF has no rank schedule and keeps its fixed VMFSchedule.
+# The CDCD clock warped only the continuous view while being fit to the total loss, and
+# collapsed it to near-pure noise (continuous view at t >= 0.985 from u = 0.01).
+# 2 discrete views x 4 paths x {no SC, SC} x 3 tasks = 48 cases, trained like
+# hybrid_sc_gauss512 (global batch 256, accumulate 1, 20k steps) and tuned with the
+# rerun protocol.
+defaults:
+- hybrid_sc
+- rerun_protocol
+- override /information_path/path_schedule: rank_linear
+- override /inference/inference_policies: [hybrid_renoising, eb_churn, psi]
+- _self_
+trainer:
+  accumulate_grad_batches: 1
+preparation:
+  name: hybrid-sc-rank
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/hybrid-sc-rank
+  family: hybrid_sc_rank
+  case_name: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}-rank
+  wandb:
+    project: hybrid-sc-rank
+hydra:
+  sweeper:
+    params:
+      ablation_path: gaussian,simplex_rank,spherical_rank,spherical_vmf

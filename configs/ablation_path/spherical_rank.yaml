@@ -1,0 +1,8 @@
+# @package _global_
+# Spherical (SLERP) view on the rank-linear schedule (SphericalRankSchedule). Pair with
+# path_schedule=rank_linear (no time map).
+defaults:
+- /information_path/path_schedule: adaptive
+- override /information_path/hybrid_view@model.views.content: spherical_rank
+preparation:
+  path_name: spherical_rank

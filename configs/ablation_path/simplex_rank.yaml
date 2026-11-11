@@ -1,0 +1,8 @@
+# @package _global_
+# Simplex view on the rank-linear schedule (SimplexRankSchedule): the clean token's
+# normalized rank falls linearly in time. Pair with path_schedule=rank_linear (no time map).
+defaults:
+- /information_path/path_schedule: adaptive
+- override /information_path/hybrid_view@model.views.content: simplex_rank
+preparation:
+  path_name: simplex_rank
