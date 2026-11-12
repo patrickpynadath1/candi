@@ -42,6 +42,23 @@ import torch
 from .policies import ReverseTransition, select_state
 
 SCHEDULES = ("rescale", "cap", "loop", "constant")
+CLOCKS = ("controller", "log_snr")
+
+
+def gaussian_view(views):
+    """Index of the first Gaussian view (the log-SNR clock reads it)."""
+    from core.processes.gaussian import GaussianProcess
+
+    for index, view in enumerate(views):
+        if isinstance(view.process, GaussianProcess):
+            return index
+    raise TypeError("clock=log_snr needs a Gaussian view")
+
+
+def log_snr_alpha(point):
+    """sigmoid(log-SNR) = α² / (α² + σ²) of a Gaussian view's coefficients, per row."""
+    alpha, sigma = point.coefficients.alpha.double(), point.coefficients.sigma.double()
+    return alpha**2 / (alpha**2 + sigma**2)
 CLEAN = ("sample", "greedy")
 
 
@@ -75,8 +92,10 @@ class KappaSchedule:
         kappa = torch.where(room > 0, 1 - sigma / room.clamp_min(1e-300), torch.ones_like(room))
         return kappa.clamp(0, 1)
 
-    def warp(self):
-        return LoopTimeWarp(self.t_on, self.t_off, self.alpha_on) if self.schedule == "loop" else None
+    def warp(self, clock="controller"):
+        if self.schedule != "loop":
+            return None
+        return LoopTimeWarp(self.t_on, self.t_off, self.alpha_on, clock=clock)
 
 
 @dataclass
@@ -94,17 +113,23 @@ class PsiTransition(ReverseTransition):
     requires_tokens = False
 
     def __init__(
-        self, schedule="rescale", eta=0.02, t_on=0.55, t_off=0.05, alpha_on=0.9, clean="sample"
+        self, schedule="rescale", eta=0.02, t_on=0.55, t_off=0.05, alpha_on=0.9, clean="sample",
+        clock="controller",
     ):
+        """``clock`` sets the α κ is computed from: ``controller`` (default) is 1 - t on the
+        sampler's grid, for every view; ``log_snr`` is sigmoid(log-SNR) = α²/(α²+σ²) of the
+        first Gaussian view at its own (possibly learned-clock) time."""
         super().__init__()
         if clean not in CLEAN:
             raise ValueError(f"clean must be one of {CLEAN}")
+        if clock not in CLOCKS:
+            raise ValueError(f"clock must be one of {CLOCKS}")
         self.kappa = KappaSchedule(schedule, eta, t_on, t_off, alpha_on)
-        self.clean = clean
+        self.clean, self.clock = clean, clock
 
     @property
     def time_warp(self):
-        return self.kappa.warp()
+        return self.kappa.warp(self.clock)
 
     def validate(self, views, commitment):
         super().validate(views, commitment)
@@ -115,6 +140,8 @@ class PsiTransition(ReverseTransition):
                 getattr(view.representation, "encode", None)
             ):
                 raise TypeError("Ψ-sampling needs a forward corrupt_state kernel in every view")
+        if self.clock == "log_snr":
+            gaussian_view(views)
 
     def prepare(self, views, logits, probabilities, source, destination, generated, *,
                 time, next_time):
@@ -122,7 +149,12 @@ class PsiTransition(ReverseTransition):
 
         κ reads the grid times (α = 1 - t), not a view's own schedule.
         """
-        kappa = self.kappa(1 - time.double(), 1 - next_time.double()).to(generated.device)
+        if self.clock == "log_snr":
+            index = gaussian_view(views)
+            keep_t, keep_s = log_snr_alpha(source[index]), log_snr_alpha(destination[index])
+        else:
+            keep_t, keep_s = 1 - time.double(), 1 - next_time.double()
+        kappa = self.kappa(keep_t, keep_s).to(generated.device)
         if bool((kappa == 1).all()):
             return None  # The native sampler, with its exact random-number use.
         clean = (
@@ -164,8 +196,9 @@ class LoopTimeWarp:
     on the grid, the warped grid is 1 - α(t), the same for every view and recipe.
     """
 
-    def __init__(self, t_on=0.55, t_off=0.05, alpha_on=0.9):
+    def __init__(self, t_on=0.55, t_off=0.05, alpha_on=0.9, clock="controller", iterations=60):
         self.t_on, self.t_off, self.alpha_on = float(t_on), float(t_off), float(alpha_on)
+        self.clock, self.iterations = clock, int(iterations)
 
     def target(self, t):
         t = t.double()
@@ -175,8 +208,25 @@ class LoopTimeWarp:
         return torch.where(t > self.t_on, high, torch.where(t < self.t_off, low, hold))
 
     def __call__(self, algo, times, generated=None):
-        # α = 1 - t on the grid (see PsiTransition), so the warped time is 1 - target,
-        # kept inside the sampler's [epsilon, 1] range. Equal targets give equal times,
-        # so the plateau has exactly α_s == α_t.
         lo, hi = float(times.min()), float(times.max())
-        return (1 - self.target(times)).clamp(lo, hi).to(times.dtype)
+        if self.clock == "controller":
+            # α = 1 - t on the grid, so the warped time is 1 - target, kept inside the
+            # sampler's [epsilon, 1] range. Equal targets give equal times.
+            return (1 - self.target(times)).clamp(lo, hi).to(times.dtype)
+        # log_snr: bisect the grid time whose Gaussian-view α = sigmoid(log-SNR) meets the
+        # target (α decreases in time). Equal targets bisect identically: exact plateau.
+        index = gaussian_view(algo.views)
+
+        def keep(time):
+            mask = None if generated is None else generated[:1].expand(len(time), -1)
+            return log_snr_alpha(algo.points(time.to(times.dtype), corruption_mask=mask)[index])
+
+        low = torch.full_like(times, lo, dtype=torch.float64)
+        high = torch.full_like(times, hi, dtype=torch.float64)
+        floor, ceiling = keep(high[:1]).item(), keep(low[:1]).item()
+        goal = self.target(times).clamp(floor, ceiling)
+        for _ in range(self.iterations):
+            middle = (low + high) / 2
+            above = keep(middle) > goal
+            low, high = torch.where(above, middle, low), torch.where(above, high, middle)
+        return ((low + high) / 2).to(times.dtype)

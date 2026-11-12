@@ -1,0 +1,21 @@
+# @package _global_
+# Ψ on the 12 Gaussian-embedding hybrids with the log-SNR clock: κ from sigmoid(log-SNR)
+# of the Gaussian view at its CDCD time (PsiTransition clock=log_snr), the counterpart of
+# hybrid_sc_gauss512_psi2 (controller clock, α = 1 - t). Same checkpoints and protocol.
+# For pure Gaussian recipes the log-SNR variant is rerun-20261110's Ψ (the pre-1486161 code
+# computed exactly this α there), so no run is needed for them.
+defaults:
+- hybrid_sc_gauss512_psi2
+- _self_
+preparation:
+  name: hybrid-sc-gauss512-psilogsnr
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/hybrid-sc-gauss512-psilogsnr
+  family: hybrid_sc_gauss512_psilogsnr
+  case_name: ${preparation.source_case}-psilogsnr
+  extra_inference:
+    psi:
+      sampler:
+        transition:
+          clock: log_snr
+  wandb:
+    project: hybrid-sc-gauss512-psilogsnr

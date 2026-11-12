@@ -202,3 +202,47 @@ def test_sampler_configs_instantiate(config):
     sampler = instantiate(OmegaConf.load(f"configs/inference/sampler/{config}.yaml"))
     assert isinstance(sampler, ComposedSampler) and isinstance(sampler.transition, PsiTransition)
     assert sampler.transition.kappa.schedule == "rescale" and sampler.transition.kappa.eta == 0.02
+
+
+@pytest.mark.parametrize("name", [("gaussian", None), ("gaussian", "masked")], ids=["gaussian", "gaussian+masked"])
+def test_log_snr_clock_reads_the_gaussian_views_signal_to_noise(name, duo):
+    # clock=log_snr: α = sigmoid(log-SNR) of the Gaussian view at its own time, also in a
+    # hybrid whose discrete view would otherwise set the clock.
+    algo = recipe(name, duo)
+    index = next(i for i, v in enumerate(algo.views) if type(v.process).__name__ == "GaussianProcess")
+    time, next_time = torch.tensor([0.7, 0.3]), torch.tensor([0.6, 0.2])
+    source, destination = algo.points(time), algo.points(next_time)
+    logits = torch.zeros(2, 4, 12).log_softmax(-1)
+    generated = torch.ones(2, 4, dtype=torch.bool)
+    transition = PsiTransition("rescale", eta=0.5, clock="log_snr")
+    transition.validate(algo.views, "none")
+    step = transition.prepare(algo.views, logits, logits.exp(), source, destination, generated,
+                              time=time, next_time=next_time)
+
+    def sigmoid_log_snr(point):
+        c = point.coefficients
+        return torch.sigmoid(torch.log(c.alpha.double() ** 2 / c.sigma.double() ** 2))
+
+    expected = KappaSchedule("rescale", 0.5)(sigmoid_log_snr(source[index]), sigmoid_log_snr(destination[index]))
+    torch.testing.assert_close(step.kappa.double(), expected)
+    controller = PsiTransition("rescale", eta=0.5).prepare(
+        algo.views, logits, logits.exp(), source, destination, generated, time=time, next_time=next_time)
+    assert not torch.allclose(controller.kappa.double(), expected)  # the two clocks differ
+
+
+def test_log_snr_loop_warp_holds_the_gaussian_alpha_on_its_plateau():
+    algo = build_algorithm("gaussian", None, "none")
+    times = torch.linspace(1, 1e-5, 41, dtype=torch.float64)
+    warped = LoopTimeWarp(t_on=0.6, t_off=0.1, alpha_on=0.9, clock="log_snr")(algo, times)
+    c = algo.points(warped)[0].coefficients
+    alpha = (c.alpha.double() ** 2 / (c.alpha.double() ** 2 + c.sigma.double() ** 2))
+    plateau = (times <= 0.6) & (times >= 0.1)
+    torch.testing.assert_close(alpha[plateau], torch.full_like(alpha[plateau], 0.9), atol=1e-5, rtol=0)
+    assert len(set(warped[plateau].tolist())) == 1
+
+
+def test_log_snr_clock_refuses_recipes_without_a_gaussian_view():
+    with pytest.raises(TypeError, match="Gaussian view"):
+        PsiTransition(clock="log_snr").validate(mdlm().views, "none")
+    with pytest.raises(ValueError, match="clock"):
+        PsiTransition(clock="time")

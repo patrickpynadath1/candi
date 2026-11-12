@@ -56,6 +56,12 @@ vMF. (Before 2026-11-11, α_t was each view's own clean fraction: Gaussian α²/
 simplex α at the view's warped time, 1 - t for spherical/vMF. The κ curves then differed
 per method for the same η.)
 
+`clock` makes this explicit: `controller` (the default) is α_t = 1 - t above;
+`log_snr` uses sigmoid(log-SNR) = α²/(α² + σ²) of the first Gaussian view at its own time
+(after a learned clock), in pure Gaussian recipes and hybrids alike, and the `loop` warp
+then bisects on that α. `log_snr` refuses recipes without a Gaussian view. For pure
+Gaussian recipes, `log_snr` is what the sampler computed before 2026-11-11.
+
 `loop` also reshapes the time grid (`LoopTimeWarp`, applied by the sampler loop) so that
 α = 1 - t follows the ReMDM-loop profile:
 
