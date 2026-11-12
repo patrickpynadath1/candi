@@ -47,22 +47,24 @@ Prompts are clamped as in every composed sampler.
 | `loop` | σ_t = η on the hold, 0 elsewhere |
 | `constant` | κ_t = 1 - η at every step (the paper's image setting, κ = 0.95) |
 
-α_t is the clean fraction of a reference view's schedule (`keep_rate`):
+α_t = 1 - t on the sampler's own time grid: the coordinator time, before a learned clock
+(CDCD) warps a view's time. This holds for every view and every recipe, hybrids included.
+For discrete views it is their keep rate (up to the schedule's 10⁻³ floor), so the formulas
+are the paper's; for continuous views it makes κ the same function of t whatever the
+corruption, so one η and schedule mean the same thing for Gaussian, simplex, spherical and
+vMF. (Before 2026-11-11, α_t was each view's own clean fraction: Gaussian α²/(α²+σ²) and
+simplex α at the view's warped time, 1 - t for spherical/vMF. The κ curves then differed
+per method for the same η.)
 
-- the keep rate of the first discrete view, if there is one;
-- otherwise the first view's: Gaussian α²/(α² + σ²) (the signal-variance fraction),
-  simplex α, and 1 - t for spherical, vMF and blurring paths, whose coefficients have no
-  keep-rate reading.
-
-`loop` also reshapes the time grid (`LoopTimeWarp`, applied by the sampler loop). The
-reference clean fraction follows the ReMDM-loop profile:
+`loop` also reshapes the time grid (`LoopTimeWarp`, applied by the sampler loop) so that
+α = 1 - t follows the ReMDM-loop profile:
 
 - it rises linearly from 0 to `alpha_on` on (t_on, 1];
 - it is held at `alpha_on` on [t_off, t_on];
 - it rises linearly to 1 on [0, t_off).
 
-Schedule times for these targets are found by bisection, so the network is conditioned
-on the warped times. On the hold α_s = α_t, the native step is the identity and Ψ is a
+The warped grid is 1 - α(t) (closed form, the same for every recipe), and the network is
+conditioned on the warped times. On the hold α_s = α_t, the native step is the identity and Ψ is a
 pure corrector with κ = 1 - η / (1 - α_on). `alpha_on` (default 0.9, as ReMDM's scripts)
 is the paper's α(t_on).
 
@@ -100,4 +102,5 @@ masked and uniform views, two hybrids, MDLM and DUO:
 - κ = 1 equals the native sampler and κ = 0 equals `ForwardResamplingSampler` (same seed);
 - prompts and NFE are unchanged under every schedule;
 - revealed tokens re-mask only for κ < 1, and the uniform re-noising keeps full support;
-- the κ formulas, monotone clean fractions and the loop plateau.
+- the κ formulas, κ identical across corruption families at equal grid time, and the loop
+  plateau.

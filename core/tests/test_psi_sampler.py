@@ -15,7 +15,7 @@ from core.samplers.composed import ComposedSampler
 from core.samplers.forward_resampling import ForwardResamplingSampler
 from core.samplers.hybrid import HybridSampler
 from core.samplers.policies import TokenSelection
-from core.samplers.psi import KappaSchedule, LoopTimeWarp, PsiTransition, keep_rate
+from core.samplers.psi import KappaSchedule, LoopTimeWarp, PsiTransition
 from core.tests.networks import TINY32
 from core.tests.test_block_diffusion import open_output
 from core.tests.test_sampler_equivalence import build_algorithm
@@ -114,7 +114,8 @@ def point(keep):
 def call(transition, view, state, logits, keep_t, keep_s, generated):
     probabilities = logits.exp()
     source, destination = [point(keep_t)], [point(keep_s)]
-    step = transition.prepare([view], logits, probabilities, source, destination, generated)
+    step = transition.prepare([view], logits, probabilities, source, destination, generated,
+                              time=1 - torch.tensor([keep_t]), next_time=1 - torch.tensor([keep_s]))
     return transition(view, state, probabilities, None, source[0], destination[0], step=step,
                       final_step=False, generated=generated, prompt_tokens=state,
                       released=None, previous_tokens=state)
@@ -155,27 +156,39 @@ def test_kappa_schedules_follow_remdm_sigmas():
     assert hold[0].item() == pytest.approx(1 - 0.02 / 0.1) and hold[1].item() == 1
 
 
-def test_clean_fraction_is_monotone_for_every_family():
+def test_kappa_is_the_same_function_of_grid_time_for_every_corruption():
+    # κ reads α = 1 - t on the sampler's grid, so one η and schedule give one κ curve
+    # whatever the view's own schedule (Gaussian SNR, simplex mixing, discrete keep rate).
+    time, next_time = torch.tensor([0.7, 0.3]), torch.tensor([0.6, 0.2])
+    kappas = []
     for family in ("gaussian", "simplex", "spherical", "vmf", "masked", "uniform"):
         algo = build_algorithm(family, None, "none")
-        times = torch.linspace(1, 1e-5, 9)
-        keep = torch.cat([keep_rate(algo.views[0], algo.points(t[None])[0]) for t in times])
-        assert (keep[1:] >= keep[:-1] - 1e-9).all() and 0 <= keep.min() and keep.max() <= 1
+        source = algo.points(time, corruption_mask=None)
+        destination = algo.points(next_time, corruption_mask=None)
+        logits = torch.zeros(2, 4, 12).log_softmax(-1)
+        generated = torch.ones(2, 4, dtype=torch.bool)
+        step = PsiTransition("rescale", eta=0.5).prepare(
+            algo.views, logits, logits.exp(), source, destination, generated,
+            time=time, next_time=next_time)
+        kappas.append(step.kappa)
+    expected = KappaSchedule("rescale", 0.5)(1 - time.double(), 1 - next_time.double())
+    for kappa in kappas:
+        torch.testing.assert_close(kappa.double(), expected)
 
 
-@pytest.mark.parametrize("family", ["masked", "gaussian"])
-def test_loop_warp_holds_alpha_on_its_plateau(family):
-    algo = mdlm() if family == "masked" else build_algorithm("gaussian", None, "none")
+def test_loop_warp_is_one_minus_the_target_profile():
+    algo = build_algorithm("gaussian", None, "none")
     times = torch.linspace(1, 1e-5, 41, dtype=torch.float64)
-    warped = LoopTimeWarp(t_on=0.6, t_off=0.1, alpha_on=0.9)(algo, times)
-    keep = keep_rate(algo.views[0], algo.points(warped)[0])
+    warp = LoopTimeWarp(t_on=0.6, t_off=0.1, alpha_on=0.9)
+    warped = warp(algo, times)
+    alpha = 1 - warped
     plateau = (times <= 0.6) & (times >= 0.1)
-    torch.testing.assert_close(keep[plateau], torch.full_like(keep[plateau], 0.9), atol=1e-5, rtol=0)
     assert len(set(warped[plateau].tolist())) == 1
-    assert (keep[1:] >= keep[:-1] - 1e-9).all()
-    above = times > 0.6
-    ramp = ((1 - times[above]) * 0.9 / 0.4).clamp(min=keep[0].item())
-    torch.testing.assert_close(keep[above], ramp, atol=1e-5, rtol=0)
+    torch.testing.assert_close(alpha[plateau], torch.full_like(alpha[plateau], 0.9))
+    assert (alpha[1:] >= alpha[:-1] - 1e-12).all()  # monotone: cleaner as time runs down
+    assert warped.min() >= times.min() and warped.max() <= times.max()
+    other = build_algorithm("masked", None, "none")
+    assert torch.equal(warp(other, times), warped)  # the same grid for every recipe
 
 
 def test_refuses_commitments():

@@ -191,7 +191,8 @@ class ComposedSampler:
             # A transition may draw choices shared by all views once per step (Ψ).
             shared = (
                 {"step": self.transition.prepare(
-                    algo.views, logits, probabilities, source, destination, generated
+                    algo.views, logits, probabilities, source, destination, generated,
+                    time=time, next_time=next_time,
                 )}
                 if callable(getattr(self.transition, "prepare", None))
                 else {}

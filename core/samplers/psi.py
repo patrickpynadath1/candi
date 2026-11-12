@@ -25,9 +25,11 @@ ReMDM remasking scale σ_t: κ_t = 1 - σ_t / (1 - α_s), σ_t^max = min{1, (1 -
                 [0, t_off); on the hold σ_t = η, elsewhere κ = 1;
 - ``constant``: κ_t = 1 - η at every step (the paper's image setting, e.g. κ = 0.95).
 
-α_t is the reference view's clean fraction (``keep_rate``): the keep rate of the
-first discrete view, else the first view's (Gaussian α²/(α²+σ²), simplex α,
-otherwise 1 - t). This is a transition policy for ``ComposedSampler``: time
+α_t = 1 - t on the sampler's own time grid (the coordinator time, before any
+learned clock warps a view), for every view and recipe. For discrete views this
+is their keep rate up to the schedule's floor, which reproduces the paper; for
+continuous views and hybrids it makes κ_t the same function of t whatever the
+corruption, so one η and schedule mean the same thing across methods. This is a transition policy for ``ComposedSampler``: time
 progression, stopping and NFE accounting stay in the sampler (one network call
 per step, as ancestral and forward re-sampling).
 """
@@ -37,34 +39,10 @@ from dataclasses import dataclass
 
 import torch
 
-from core.processes.absorbing import AbsorbingProcess
-from core.processes.uniform import UniformProcess
 from .policies import ReverseTransition, select_state
 
 SCHEDULES = ("rescale", "cap", "loop", "constant")
 CLEAN = ("sample", "greedy")
-
-
-def keep_rate(view, point):
-    """Clean fraction α of a view at a point, one value per batch row."""
-    coefficients = point.coefficients
-    if isinstance(view.process, (AbsorbingProcess, UniformProcess)):
-        return coefficients[0].double()
-    alpha, sigma = getattr(coefficients, "alpha", None), getattr(coefficients, "sigma", None)
-    if alpha is not None and sigma is not None:  # Gaussian path: signal-variance fraction
-        alpha, sigma = alpha.double(), sigma.double()
-        return alpha**2 / (alpha**2 + sigma**2)
-    if alpha is not None:  # simplex path: the clean mixing weight
-        return alpha.double()
-    return (1 - point.time).double()
-
-
-def reference_view(views):
-    """The view whose schedule sets α_t: the first discrete view, else the first."""
-    return next(
-        (i for i, v in enumerate(views) if isinstance(v.process, (AbsorbingProcess, UniformProcess))),
-        0,
-    )
 
 
 class KappaSchedule:
@@ -138,12 +116,13 @@ class PsiTransition(ReverseTransition):
             ):
                 raise TypeError("Ψ-sampling needs a forward corrupt_state kernel in every view")
 
-    def prepare(self, views, logits, probabilities, source, destination, generated):
-        """Draw this step's shared choices once for all views; None when κ = 1."""
-        index = reference_view(views)
-        kappa = self.kappa(
-            keep_rate(views[index], source[index]), keep_rate(views[index], destination[index])
-        ).to(generated.device)
+    def prepare(self, views, logits, probabilities, source, destination, generated, *,
+                time, next_time):
+        """Draw this step's shared choices once for all views; None when κ = 1.
+
+        κ reads the grid times (α = 1 - t), not a view's own schedule.
+        """
+        kappa = self.kappa(1 - time.double(), 1 - next_time.double()).to(generated.device)
         if bool((kappa == 1).all()):
             return None  # The native sampler, with its exact random-number use.
         clean = (
@@ -181,13 +160,12 @@ class LoopTimeWarp:
     """Map the linear grid to schedule times whose keep rate follows the loop profile.
 
     The target α(t) is piecewise linear (ReMDM-loop): (1 - t) α_on / (1 - t_on) above
-    t_on, α_on on [t_off, t_on], and 1 - t (1 - α_on) / t_off below t_off. Schedule times
-    are found by bisection on the reference view's clean fraction (monotone in time).
+    t_on, α_on on [t_off, t_on], and 1 - t (1 - α_on) / t_off below t_off. With α = 1 - t
+    on the grid, the warped grid is 1 - α(t), the same for every view and recipe.
     """
 
-    def __init__(self, t_on=0.55, t_off=0.05, alpha_on=0.9, iterations=60):
+    def __init__(self, t_on=0.55, t_off=0.05, alpha_on=0.9):
         self.t_on, self.t_off, self.alpha_on = float(t_on), float(t_off), float(alpha_on)
-        self.iterations = int(iterations)
 
     def target(self, t):
         t = t.double()
@@ -197,20 +175,8 @@ class LoopTimeWarp:
         return torch.where(t > self.t_on, high, torch.where(t < self.t_off, low, hold))
 
     def __call__(self, algo, times, generated=None):
-        index = reference_view(algo.views)
-        view = algo.views[index]
-
-        def keep(time):
-            mask = None if generated is None else generated[:1].expand(len(time), -1)
-            return keep_rate(view, algo.points(time.to(times.dtype), corruption_mask=mask)[index])
-
-        lo, hi = torch.full_like(times, float(times.min())), torch.full_like(times, float(times.max()))
-        floor, ceiling = keep(hi[:1]).item(), keep(lo[:1]).item()  # keep(1), keep(epsilon)
-        goal = self.target(times).clamp(floor, ceiling)
-        lo, hi = lo.double(), hi.double()
-        for _ in range(self.iterations):  # keep decreases in time: larger keep, earlier time
-            middle = (lo + hi) / 2
-            above = keep(middle) > goal
-            lo, hi = torch.where(above, middle, lo), torch.where(above, hi, middle)
-        # Equal targets bisect identically, so the plateau has exactly α_s == α_t.
-        return ((lo + hi) / 2).to(times.dtype)
+        # α = 1 - t on the grid (see PsiTransition), so the warped time is 1 - target,
+        # kept inside the sampler's [epsilon, 1] range. Equal targets give equal times,
+        # so the plateau has exactly α_s == α_t.
+        lo, hi = float(times.min()), float(times.max())
+        return (1 - self.target(times)).clamp(lo, hi).to(times.dtype)
