@@ -57,9 +57,13 @@ class StoryAggregate:
     # and a reported-only MAUVE on GPT-2 Large features.
     mauve: float | None = None
     mauve_interval: dict | None = None
+    mauve_kmeans_values: list | None = None
+    mauve_kmeans_sd: float | None = None
     mauve_signature: dict | None = None
     mauve_gpt2_large: float | None = None
     mauve_gpt2_large_interval: dict | None = None
+    mauve_gpt2_large_kmeans_values: list | None = None
+    mauve_gpt2_large_kmeans_sd: float | None = None
     mauve_gpt2_large_signature: dict | None = None
 
 

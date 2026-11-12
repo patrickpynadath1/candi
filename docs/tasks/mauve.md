@@ -28,6 +28,10 @@ better: 1 means the two samples fall into the same histogram.
      5 restarts, 500 iterations, seed `seed + 2` (`seed` defaults to 25).
   3. Build one histogram per side. Compute the divergence frontier at 25 mixture
      weights, mapped by exp(-5 KL), and take the area under it.
+  4. With `kmeans_seeds: k` (default 1), repeat steps 2-3 for the MAUVE seeds `seed`,
+     ..., `seed + k - 1`, on the same features and PCA. The reported `mauve` is the mean;
+     `mauve_kmeans_values` and `mauve_kmeans_sd` record the values and their SD. With
+     `k = 1`, the score is the single-run value.
   - `num_buckets: auto` is mauve-text's rule, max(2, round(min(n_p, n_q) / 10)).
     Tuning fixes it per stage, because the auto value grows with n.
   - Rows are put in a canonical order first, so the score does not depend on sample
@@ -44,7 +48,9 @@ stability-study sample sets (`/data/sddc/analysis/mauve-dev/validation/`).
 - Averaged over 10 k-means seeds, the two agree to a mean of 0.011-0.017, with bias
   within ±0.006.
 - **Quantisation noise is large at tuning sizes.** At 128-256 stories, the k-means seed
-  alone moves a score by an SD of about 0.03-0.045 in both implementations.
+  alone moves a score by an SD of about 0.03-0.045 in both implementations. Averaging
+  `k` k-means seeds divides that variance by up to `k`; the evaluation file uses 5. The
+  noise from which prompts and generations were drawn remains.
 
 ## Use in TinyStories
 
@@ -53,7 +59,8 @@ an evaluation spec. `task.mauve_gpt2_large` takes the same settings with a GPT-2
 featuriser and is reported only. The recorded fields are:
 
 - `mauve`, `mauve_signature` (the featuriser, the settings, the bucket count used and the
-  sample sizes), and `mauve_interval` with `bootstrap: N` (paired prompt resampling);
+  sample sizes), `mauve_kmeans_values` and `mauve_kmeans_sd` (per k-means seed), and
+  `mauve_interval` with `bootstrap: N` (paired prompt resampling);
 - the same fields prefixed `mauve_gpt2_large` for the cross-check.
 
 `experiments/rerun/evaluation/tinystories-bpe-10000-mauve.json` tunes with MAUVE and
@@ -62,6 +69,7 @@ sets `score.pool_seeds: true` (see [nested tuning](../guides/nested-tuning.md)).
 (2,048 x 2), where SOL and GPT-2 Large MAUVE are also reported. The extra-budget test
 measurements (128 prompts x 1 seed) use 13 buckets (`extra_test_overrides`). Without
 that override they would inherit 205 buckets, and a MAUVE of about 0.02 came out of a
-128 vs 128 sample.
+128 vs 128 sample. Every MAUVE in the file, including GPT-2 Large on test, averages 5
+k-means seeds (`kmeans_seeds: 5`).
 
 Tests: `core/tests/test_mauve.py`.

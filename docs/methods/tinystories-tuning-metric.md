@@ -59,7 +59,10 @@ the same prompts; full value n = 4,096 vs 2,048 references):
 - References: the reference continuations of the same prompts the sampler was scored on.
 - A fixed bucket count, so scores are comparable across trials within a stage (the
   automatic count grows with n). Recorded in the evaluation file.
-- MAUVE's own seed fixed.
+- MAUVE's own seed fixed, and every score averaged over 5 k-means seeds (2026-11-12).
+  At 128-256 stories, the k-means seed alone moves MAUVE by an SD of 0.03-0.045. That
+  is most of the 0.05 SD between draws in the stability study. The 5 runs share the
+  features and PCA, and each costs about 0.1 s at n = 256.
 
 ## Implementation
 

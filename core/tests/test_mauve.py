@@ -13,7 +13,7 @@ from omegaconf import OmegaConf
 pytest.importorskip("sklearn")
 
 from core.evaluation.mauve import (  # noqa: E402
-    MauveFeaturizer, MauveScorer, auto_buckets, mauve_from_features,
+    MauveFeaturizer, MauveScorer, auto_buckets, mauve_from_features, mauve_values,
 )
 from core.sweeps import nested_tuning  # noqa: E402
 from core.tests.helpers import ROOT  # noqa: E402
@@ -69,6 +69,31 @@ def test_order_invariant_and_deterministic_with_a_fixed_seed():
     assert mauve_from_features(p, q)[1] == auto_buckets(200, 150) == 15
     with pytest.raises(ValueError, match="num_buckets"):
         mauve_from_features(p, q, num_buckets=1)
+
+
+def test_one_kmeans_seed_keeps_the_single_run_value_and_seeds_compose():
+    p, q = cloud(150, 0), cloud(150, 1, shift=0.5)
+    # The value of the single-k-means implementation (commit 1841292) on these features.
+    assert mauve_from_features(p, q, num_buckets=15) == (pytest.approx(0.8242888785306766, abs=1e-9), 15)
+    values, _ = mauve_values(p, q, num_buckets=15, seed=3, kmeans_seeds=5)
+    assert values == [mauve_values(p, q, num_buckets=15, seed=3 + j)[0][0] for j in range(5)]
+    assert mauve_from_features(p, q, num_buckets=15, seed=3, kmeans_seeds=5)[0] \
+        == pytest.approx(np.mean(values)) == mauve_from_features(p, q, num_buckets=15, seed=3,
+                                                                 kmeans_seeds=5)[0]
+    with pytest.raises(ValueError, match="kmeans_seeds"):
+        mauve_values(p, q, kmeans_seeds=0)
+
+
+def test_averaging_kmeans_seeds_shrinks_the_quantisation_noise():
+    p, q = cloud(150, 0), cloud(150, 1, shift=0.5)
+    single = [mauve_from_features(p, q, num_buckets=15, seed=10 * b)[0] for b in range(12)]
+    mean5 = [mauve_from_features(p, q, num_buckets=15, seed=10 * b, kmeans_seeds=5)[0]
+             for b in range(12)]
+    assert np.var(single) > 0 and np.var(mean5) < 0.5 * np.var(single)
+    scored = MauveScorer(FakeFeaturizer(), num_buckets=5, kmeans_seeds=3).score(
+        ["p"] * 30, [f"g{i}" for i in range(30)], [f"r{i}" for i in range(30)], range(30))
+    assert len(scored["mauve_kmeans_values"]) == 3 and scored["mauve_kmeans_sd"] >= 0
+    assert scored["mauve"] == pytest.approx(np.mean(scored["mauve_kmeans_values"]))
 
 
 def test_featurizer_takes_the_last_token_independent_of_batching_and_keeps_the_end():
@@ -189,7 +214,7 @@ def test_mauve_evaluation_file_keeps_the_partitions_and_lands_every_override():
     with pytest.raises(ValueError, match="pool_seeds"):
         nested_tuning.validate(spec_with(bad))
     yaml = OmegaConf.to_container(OmegaConf.load(ROOT / "configs/task/mauve/tinystories_33m.yaml"))
-    assert spec["overrides"]["task.mauve"] == {**yaml, "num_buckets": 13}
+    assert spec["overrides"]["task.mauve"] == {**yaml, "num_buckets": 13, "kmeans_seeds": 5}
 
     def task_after(overrides):
         config = OmegaConf.create({"task": {"_target_": "core.tasks.tinystories.TinyStoriesTask"}})

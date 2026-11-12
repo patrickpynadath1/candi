@@ -1,6 +1,6 @@
 {
  "task": "tinystories-bpe-10000",
- "source": "numpy.random.default_rng(20261113): test = 2048 of the 13092 validation examples, excluding the 128 tuning indices the source runs' training callbacks saw; tuning pool = 2048 of the rest, in draw order (two-stage selection uses its first stage1 and the next stage2 prompts). MAUVE variant (2026-11-12, docs/methods/tinystories-tuning-metric.md): the same partitions, seeds, test indices and two-stage sizes as tinystories-bpe-10000.json; tuning selects by MAUVE on TinyStories-33M features (maximize) instead of ref_w1, which is dropped. Each setting's seeds are pooled into one sample (score.pool_seeds; a prompt's reference counts once). Fixed bucket counts are mauve-text's auto values at 128 / 256 / 2048 stories: 13 in stage 1 (64 prompts x 2 seeds), 26 in stage 2 (256 prompts x 1 seed; replaces the ref_w1 bootstrap override), 205 on test (2048 prompts x 2 seeds vs 2048 references), where SOL (GPT-2 Large, unchanged) and GPT-2 Large MAUVE (205 buckets) are also reported",
+ "source": "numpy.random.default_rng(20261113): test = 2048 of the 13092 validation examples, excluding the 128 tuning indices the source runs' training callbacks saw; tuning pool = 2048 of the rest, in draw order (two-stage selection uses its first stage1 and the next stage2 prompts). MAUVE variant (2026-11-12, docs/methods/tinystories-tuning-metric.md): the same partitions, seeds, test indices and two-stage sizes as tinystories-bpe-10000.json; tuning selects by MAUVE on TinyStories-33M features (maximize) instead of ref_w1, which is dropped. Each setting's seeds are pooled into one sample (score.pool_seeds; a prompt's reference counts once). Fixed bucket counts are mauve-text's auto values at 128 / 256 / 2048 stories: 13 in stage 1 (64 prompts x 2 seeds), 26 in stage 2 (256 prompts x 1 seed; replaces the ref_w1 bootstrap override), 205 on test (2048 prompts x 2 seeds vs 2048 references), where SOL (GPT-2 Large, unchanged) and GPT-2 Large MAUVE (205 buckets) are also reported. The extra-budget test measurements (128 test prompts x 1 seed, configs/sweep/rerun_protocol.yaml) use 13 buckets (extra_test_overrides). Every MAUVE value is the mean over 5 k-means seeds (kmeans_seeds: the same features and PCA, k-means seeds 25..29), which cuts the quantisation noise at tuning sizes",
  "score": {
   "kind": "metric",
   "metric": "mauve",
@@ -51,6 +51,7 @@
    "scaling_factor": 5,
    "kmeans_n_init": 5,
    "kmeans_max_iter": 500,
+   "kmeans_seeds": 5,
    "curve_points": 25,
    "bootstrap": 0,
    "bootstrap_confidence": 0.95,
@@ -74,6 +75,7 @@
    "scaling_factor": 5,
    "kmeans_n_init": 5,
    "kmeans_max_iter": 500,
+   "kmeans_seeds": 5,
    "curve_points": 25,
    "bootstrap": 0,
    "bootstrap_confidence": 0.95,
@@ -120,6 +122,7 @@
    "scaling_factor": 5,
    "kmeans_n_init": 5,
    "kmeans_max_iter": 500,
+   "kmeans_seeds": 5,
    "curve_points": 25,
    "bootstrap": 0,
    "bootstrap_confidence": 0.95,

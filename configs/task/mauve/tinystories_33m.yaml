@@ -16,6 +16,7 @@ seed: 25
 scaling_factor: 5
 kmeans_n_init: 5
 kmeans_max_iter: 500
+kmeans_seeds: 1  # MAUVE is the mean over seeds seed .. seed + k - 1
 curve_points: 25
 bootstrap: 0
 bootstrap_confidence: 0.95

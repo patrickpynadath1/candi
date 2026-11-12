@@ -88,8 +88,11 @@ def mauve_from_histograms(p, q, scaling_factor=5, curve_points=25):
 
 
 def histograms(p_features, q_features, num_buckets, *, pca_variance=0.9, seed=25,
-               kmeans_n_init=5, kmeans_max_iter=500):
-    """Normalised bucket histograms (p, q) from a joint PCA + k-means quantisation."""
+               kmeans_n_init=5, kmeans_max_iter=500, kmeans_seeds=1):
+    """Normalised bucket histograms [(p, q), ...] from one joint PCA and k-means runs.
+
+    Run j uses k-means seed ``seed + j + 2`` (mauve-text's offset) on the same projection.
+    """
     from sklearn.cluster import KMeans
     from sklearn.decomposition import PCA
     from sklearn.preprocessing import normalize
@@ -103,28 +106,39 @@ def histograms(p_features, q_features, num_buckets, *, pca_variance=0.9, seed=25
     pca = PCA(n_components=None, whiten=False, random_state=seed + 1).fit(data)
     keep = int(np.argmax(np.cumsum(pca.explained_variance_ratio_) >= pca_variance)) + 1
     data = pca.transform(data)[:, :keep].astype(np.float32)
-    labels = KMeans(
-        num_buckets, init="random", n_init=kmeans_n_init, max_iter=kmeans_max_iter,
-        tol=0.0, random_state=seed + 2, algorithm="lloyd",
-    ).fit(data).labels_
-    count = len(q_features)
-    q = np.bincount(labels[:count], minlength=num_buckets).astype(np.float64)
-    p = np.bincount(labels[count:], minlength=num_buckets).astype(np.float64)
-    return p / p.sum(), q / q.sum()
+    count, out = len(q_features), []
+    for j in range(kmeans_seeds):
+        labels = KMeans(
+            num_buckets, init="random", n_init=kmeans_n_init, max_iter=kmeans_max_iter,
+            tol=0.0, random_state=seed + j + 2, algorithm="lloyd",
+        ).fit(data).labels_
+        q = np.bincount(labels[:count], minlength=num_buckets).astype(np.float64)
+        p = np.bincount(labels[count:], minlength=num_buckets).astype(np.float64)
+        out.append((p / p.sum(), q / q.sum()))
+    return out
 
 
-def mauve_from_features(p_features, q_features, *, num_buckets="auto", pca_variance=0.9,
-                        seed=25, scaling_factor=5, kmeans_n_init=5, kmeans_max_iter=500,
-                        curve_points=25):
-    """(MAUVE, bucket count) of features P (references) and Q (generated)."""
+def mauve_values(p_features, q_features, *, num_buckets="auto", pca_variance=0.9, seed=25,
+                 scaling_factor=5, kmeans_n_init=5, kmeans_max_iter=500, curve_points=25,
+                 kmeans_seeds=1):
+    """([MAUVE at MAUVE seeds seed, ..., seed + kmeans_seeds - 1], bucket count)."""
     if len(p_features) == 0 or len(q_features) == 0:
         raise ValueError("MAUVE needs two nonempty feature sets")
     buckets = auto_buckets(len(p_features), len(q_features)) if num_buckets == "auto" else num_buckets
     if isinstance(buckets, bool) or not isinstance(buckets, int) or buckets < 2:
         raise ValueError('num_buckets must be "auto" or an integer >= 2')
-    p, q = histograms(p_features, q_features, buckets, pca_variance=pca_variance, seed=seed,
-                      kmeans_n_init=kmeans_n_init, kmeans_max_iter=kmeans_max_iter)
-    return mauve_from_histograms(p, q, scaling_factor, curve_points), buckets
+    if isinstance(kmeans_seeds, bool) or not isinstance(kmeans_seeds, int) or kmeans_seeds < 1:
+        raise ValueError("kmeans_seeds must be a positive integer")
+    pairs = histograms(p_features, q_features, buckets, pca_variance=pca_variance, seed=seed,
+                       kmeans_n_init=kmeans_n_init, kmeans_max_iter=kmeans_max_iter,
+                       kmeans_seeds=kmeans_seeds)
+    return [mauve_from_histograms(p, q, scaling_factor, curve_points) for p, q in pairs], buckets
+
+
+def mauve_from_features(p_features, q_features, **settings):
+    """(MAUVE averaged over ``kmeans_seeds`` k-means seeds, bucket count)."""
+    values, buckets = mauve_values(p_features, q_features, **settings)
+    return float(np.mean(values)), buckets
 
 
 def load_pretrained(auto, name, options):
@@ -217,7 +231,8 @@ class MauveScorer:
 
     def __init__(self, featurizer=None, *, num_buckets="auto", pca_variance=0.9, seed=25,
                  scaling_factor=5, kmeans_n_init=5, kmeans_max_iter=500, curve_points=25,
-                 bootstrap=0, bootstrap_confidence=0.95, bootstrap_seed=0, cache_dir=None):
+                 kmeans_seeds=1, bootstrap=0, bootstrap_confidence=0.95, bootstrap_seed=0,
+                 cache_dir=None):
         if isinstance(featurizer, dict) or featurizer is None:
             featurizer = MauveFeaturizer(**(featurizer or {}))
         self.featurizer = featurizer
@@ -225,6 +240,7 @@ class MauveScorer:
             "num_buckets": num_buckets, "pca_variance": float(pca_variance), "seed": int(seed),
             "scaling_factor": float(scaling_factor), "kmeans_n_init": int(kmeans_n_init),
             "kmeans_max_iter": int(kmeans_max_iter), "curve_points": int(curve_points),
+            "kmeans_seeds": int(kmeans_seeds),
         }
         self.bootstrap, self.bootstrap_confidence = int(bootstrap), float(bootstrap_confidence)
         self.bootstrap_seed = int(bootstrap_seed)
@@ -268,12 +284,15 @@ class MauveScorer:
         keys = sorted(first)
         p = self.reference_features(keys, [prompts[first[k]] + references[first[k]] for k in keys])
         q = self.featurizer([a + b for a, b in zip(prompts, generated)])
-        value, buckets = mauve_from_features(p, q, **self.settings)
+        values, buckets = mauve_values(p, q, **self.settings)
+        value = float(np.mean(values))
         if not math.isfinite(value):
             raise FloatingPointError("nonfinite MAUVE")
         signature = {**self.signature(), "num_buckets_used": buckets,
                      "n_references": len(p), "n_generated": len(q)}
-        result = {"mauve": value, "mauve_signature": signature}
+        result = {"mauve": value, "mauve_kmeans_values": values,
+                  "mauve_kmeans_sd": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
+                  "mauve_signature": signature}
         if self.bootstrap:
             # Paired: resample prompts; each keeps its reference and all its generations.
             rows = {k: [r for r, i in enumerate(indices) if i == k] for k in keys}
