@@ -1,0 +1,24 @@
+# @package _global_
+# Ψ re-tune after the κ fix (1486161: κ from the sampler's grid time, α = 1 - t, for every
+# corruption): the same checkpoints and rerun protocol as hybrid_sc_rerun, with only the psi policy.
+# Analysis merges these Ψ results with the other samplers of hybrid_sc_rerun (same prompts and seeds)
+# and re-selects by validation; this run's Ψ test score is reported only.
+defaults:
+- hybrid_sc
+- rerun_common
+- override /inference/inference_policies: [psi]
+- _self_
+preparation:
+  name: hybrid-sc-psi2
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/hybrid-sc-psi2
+  family: hybrid_sc_psi2
+  source_runs: ${preparation.source_root}/hybrid_sc
+  case_name: ${preparation.source_case}-psi2
+  inference: []
+  inference_overrides: null  # rerun_protocol's overrides name hybrid_renoising policies
+  wandb:
+    project: hybrid-sc-psi2
+hydra:
+  sweeper:
+    params:
+      ablation_path: simplex,spherical,spherical_vmf
