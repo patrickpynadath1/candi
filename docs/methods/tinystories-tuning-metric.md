@@ -61,6 +61,13 @@ the same prompts; full value n = 4,096 vs 2,048 references):
   automatic count grows with n). Recorded in the evaluation file.
 - MAUVE's own seed fixed.
 
+## Implementation
+
+[MAUVE](../tasks/mauve.md) (`core/evaluation/mauve.py`), wired as `task.mauve` and
+`task.mauve_gpt2_large`. The evaluation file is
+`experiments/rerun/evaluation/tinystories-bpe-10000-mauve.json`, which pools both seeds
+of a setting into one sample (`score.pool_seeds`).
+
 ## Caveats
 
 - One training seed per model, as for every result in the post.

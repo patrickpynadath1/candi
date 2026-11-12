@@ -149,6 +149,16 @@ only: the winner's test, and the extra-budget measurements. The TinyStories reru
 with `ref_w1` and report SOL on the test split, with `test_overrides` adding the SOL
 scorer. Tuning workers never receive these fields.
 
+### Pooled seeds
+
+By default, each seed is scored on its own and the scores are averaged. With
+`score.pool_seeds: true` (and the same key in `test_score`), the worker also scores all
+seeds' records together as one sample. That pooled value is the score.
+`seed_scores` and `seed_mean_score` keep the per-seed values, and `pooled-results.json`
+holds the pooled metrics. Pooling suits set-level metrics whose quality depends on
+sample size, such as MAUVE. The task's metric accumulator must offer `load_records`
+(TinyStories does).
+
 A Wilcoxon pruner (Optuna's `WilcoxonPruner`, stopping a trial early on per-example
 scores) is not offered. Each evaluation is one remote worker that loads the checkpoint
 and returns aggregate metrics, so scoring a trial in prompt batches would multiply the
