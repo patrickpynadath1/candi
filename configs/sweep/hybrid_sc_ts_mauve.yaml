@@ -1,0 +1,24 @@
+# @package _global_
+# TinyStories re-tune with MAUVE on TinyStories-33M features (docs/methods/
+# tinystories-tuning-metric.md): the checkpoints and two-stage protocol of hybrid_sc_rerun, with the
+# evaluation file experiments/rerun/evaluation/tinystories-bpe-10000-mauve.json, so the
+# whole search (every trial, both stages) is guided by MAUVE. Samplers: hybrid_renoising, eb_churn, psi, psi_corruption.
+defaults:
+- hybrid_sc
+- rerun_common
+- override /inference/inference_policies: [hybrid_renoising, eb_churn, psi, psi_corruption]
+- _self_
+preparation:
+  name: hybrid-sc-ts-mauve
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/hybrid-sc-ts-mauve
+  family: hybrid_sc_ts_mauve
+  evaluation_file: experiments/rerun/evaluation/${preparation.task_name}-mauve.json
+  source_runs: ${preparation.source_root}/hybrid_sc
+  case_name: ${preparation.source_case}-mauve
+  wandb:
+    project: hybrid-sc-ts-mauve
+hydra:
+  sweeper:
+    params:
+      task: battery/tinystories_bpe
+      ablation_path: simplex,spherical,spherical_vmf
