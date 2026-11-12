@@ -1,0 +1,29 @@
+# @package _global_
+# Random anchoring on the sc_vs_depth_gauss512 Gaussian checkpoints (no SC / SC; text8 and
+# Sudoku), the copy the post keeps. continuous_anchoring_gauss512 ran on the duplicate
+# training in continuous_schedules_gauss512, so the kept copy lacked anchoring results.
+# Same protocol and policies as continuous_anchoring (TinyStories is covered by the MAUVE
+# re-tune, which includes the anchoring samplers).
+defaults:
+- sc_vs_depth_gauss512
+- rerun_common
+- override /inference/inference_policies: [anchoring]
+- _self_
+preparation:
+  name: sc-vs-depth-gauss512-anchoring
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/sc-vs-depth-gauss512-anchoring
+  family: sc_vs_depth_gauss512_anchoring
+  source_root: ${oc.env:SDDC_GAUSS512_RUNS,/data/sddc/runs/rerun-20261110}
+  source_runs: ${preparation.source_root}/sc_vs_depth_gauss512
+  source_case: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}-gauss512
+  case_name: ${preparation.source_case}-anchor
+  inference: []
+  inference_overrides: null
+  wandb:
+    project: sc-vs-depth-gauss512-anchoring
+hydra:
+  sweeper:
+    params:
+      task: battery/sudoku_hard,battery/text8
+      ablation_path: gaussian_cdcd
+      modifiers/feedback: none,expected_embedding
