@@ -17,6 +17,8 @@ preparation:
   source_runs: ${preparation.source_root}/sc_vs_depth_gauss512
   source_case: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}-gauss512
   case_name: ${preparation.source_case}-mauve
+  evaluation:
+    extra_test_nfe: []  # no NFE-512 check in this re-tune
   wandb:
     project: sc-vs-depth-gauss512-ts-mauve
 hydra:

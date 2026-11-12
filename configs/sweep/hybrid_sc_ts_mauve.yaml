@@ -15,6 +15,8 @@ preparation:
   evaluation_file: experiments/rerun/evaluation/${preparation.task_name}-mauve.json
   source_runs: ${preparation.source_root}/hybrid_sc
   case_name: ${preparation.source_case}-mauve
+  evaluation:
+    extra_test_nfe: []  # no NFE-512 check in this re-tune
   wandb:
     project: hybrid-sc-ts-mauve
 hydra:
