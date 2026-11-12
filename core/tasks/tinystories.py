@@ -11,8 +11,9 @@ from .tinystories_metrics import TinyStoriesMetrics
 
 
 # Selectable primaries and their directions. termination_rate is a diagnostic,
-# NOT a proxy for coherent story quality; sol needs a ``sol`` scorer.
-PRIMARY_METRICS = {"termination_rate": "max", "corpus_bleu": "max", "sol": "min", "ref_w1": "min"}
+# NOT a proxy for coherent story quality; sol, ref_w1 and mauve need their scorers.
+PRIMARY_METRICS = {"termination_rate": "max", "corpus_bleu": "max", "sol": "min", "ref_w1": "min",
+                   "mauve": "max"}
 
 
 class TinyStoriesTask(Task):
@@ -33,6 +34,8 @@ class TinyStoriesTask(Task):
         sol=None,
         primary_metric="termination_rate",
         ref_w1=None,
+        mauve=None,
+        mauve_gpt2_large=None,
     ):
         tokenizer = tokenizer if tokenizer is not None else StoryByteTokenizer()
         if (
@@ -55,12 +58,17 @@ class TinyStoriesTask(Task):
             raise ValueError("primary_metric=sol needs a task.sol scorer configuration")
         if primary_metric == "ref_w1" and ref_w1 is None:
             raise ValueError("primary_metric=ref_w1 needs a task.ref_w1 scorer configuration")
+        if primary_metric == "mauve" and mauve is None:
+            raise ValueError("primary_metric=mauve needs a task.mauve scorer configuration")
         if primary_metric == "corpus_bleu" and not calculate_bleu:
             raise ValueError("primary_metric=corpus_bleu needs calculate_bleu=true")
         self.primary_metric = PrimaryMetric(primary_metric, PRIMARY_METRICS[primary_metric])
         # The scorer (and its encoder) is built on first scoring, never for training.
         self.sol_settings, self._sol = sol, None
         self.ref_w1_settings, self._ref_w1 = ref_w1, None
+        # MAUVE scorers by slot; mauve_gpt2_large is reported only, never a primary.
+        self.mauve_settings = {"mauve": mauve, "mauve_gpt2_large": mauve_gpt2_large}
+        self._mauve = {}
         self._datasets = {}
 
     def _dataset(self, split):
@@ -138,7 +146,24 @@ class TinyStoriesTask(Task):
             self._dataset(evaluation_name).manifest,
             sol=self.sol_scorer(),
             ref_w1=self.ref_w1_scorer(),
+            mauve=self.mauve_scorer("mauve"),
+            mauve_gpt2_large=self.mauve_scorer("mauve_gpt2_large"),
         )
+
+    def mauve_scorer(self, slot="mauve"):
+        settings = self.mauve_settings[slot]
+        if settings is None:
+            return None
+        if slot not in self._mauve:
+            from omegaconf import DictConfig, OmegaConf
+            from core.evaluation.mauve import MauveScorer
+
+            if isinstance(settings, DictConfig):
+                settings = OmegaConf.to_container(settings, resolve=True)
+            self._mauve[slot] = (
+                settings if isinstance(settings, MauveScorer) else MauveScorer(**dict(settings))
+            )
+        return self._mauve[slot]
 
     def sol_scorer(self):
         if self.sol_settings is None:

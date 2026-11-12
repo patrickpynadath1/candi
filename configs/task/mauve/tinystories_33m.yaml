@@ -1,0 +1,23 @@
+# @package task.mauve
+# MAUVE on TinyStories-33M features: the final hidden state of the last token of
+# prompt + continuation, FP32, pinned revision; mauve-text 0.4.0's quantisation and
+# frontier settings. Fix num_buckets per sample size when tuning (auto grows with n).
+# Select with `+task/mauve=tinystories_33m task.primary_metric=mauve`; see docs/tasks/mauve.md.
+featurizer:
+  model_name: roneneldan/TinyStories-33M
+  revision: 2ad0a164221b7c4d21cac7c46aec74f6f98dbfc8
+  dtype: float32
+  max_length: auto
+  batch_size: 128
+  max_tokens_per_batch: 16384
+num_buckets: auto
+pca_variance: 0.9
+seed: 25
+scaling_factor: 5
+kmeans_n_init: 5
+kmeans_max_iter: 500
+curve_points: 25
+bootstrap: 0
+bootstrap_confidence: 0.95
+bootstrap_seed: 0
+cache_dir: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/mauve_cache

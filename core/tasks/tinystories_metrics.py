@@ -53,22 +53,37 @@ class StoryAggregate:
     ref_w1_nll_floor: float | None = None
     ref_w1_interval: dict | None = None
     ref_w1_signature: dict | None = None
+    # MAUVE (core/evaluation/mauve.py) on TinyStories-33M features (higher is better),
+    # and a reported-only MAUVE on GPT-2 Large features.
+    mauve: float | None = None
+    mauve_interval: dict | None = None
+    mauve_signature: dict | None = None
+    mauve_gpt2_large: float | None = None
+    mauve_gpt2_large_interval: dict | None = None
+    mauve_gpt2_large_signature: dict | None = None
 
 
 class TinyStoriesMetrics:
     supports_variable_length = True
 
     def __init__(self, tokenizer, calculate_bleu=False, data_manifest=None, sol=None,
-                 ref_w1=None):
+                 ref_w1=None, mauve=None, mauve_gpt2_large=None):
         self.tokenizer, self.records = tokenizer, []
         self.data_manifest = data_manifest or {}
         self.sol = sol  # an optional core.evaluation.sol.SOLScorer
         self.ref_w1 = ref_w1  # an optional core.evaluation.ref_w1.RefW1Scorer
+        # Optional core.evaluation.mauve.MauveScorer instances.
+        self.mauve, self.mauve_gpt2_large = mauve, mauve_gpt2_large
         self.bleu = None
         if calculate_bleu:
             from sacrebleu.metrics import BLEU
 
             self.bleu = BLEU()
+
+    def load_records(self, records):
+        """Add serialised records (e.g. several seeds' results.json) to be scored together."""
+        fields = StoryRecord.__dataclass_fields__
+        self.records.extend(StoryRecord(**{k: r[k] for k in fields}) for r in records)
 
     def update(self, samples, examples, indices, *, lengths=None):
         for row, (sample, example, index) in enumerate(zip(samples, examples, indices)):
@@ -139,6 +154,12 @@ class TinyStoriesMetrics:
                 [r.continuation for r in records],
                 [r.reference for r in records],
             ))
+        for name in ("mauve", "mauve_gpt2_large"):
+            scorer = getattr(self, name)
+            if scorer is not None and n:
+                scored = scorer.score([r.prompt for r in records], [r.continuation for r in records],
+                                      [r.reference for r in records], [r.index for r in records])
+                sol.update({name + key[len("mauve"):]: value for key, value in scored.items()})
         return StoryAggregate(
             n,
             mean("eos_present"),

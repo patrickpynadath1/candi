@@ -257,6 +257,9 @@ def validate(spec):
             raise ValueError(f"Not an evaluation override: {override}")
     if evaluation.get("test_score", {"kind": "metric"}).get("kind") != "metric":
         raise ValueError("test_score must be a scalar task metric")
+    for score in (evaluation["score"], evaluation.get("test_score", {})):
+        if not isinstance(score.get("pool_seeds", False), bool):
+            raise ValueError("score.pool_seeds must be true or false")
     resources = spec.get("resources", {"cpu": 4, "gpu": 1})
     if resources.get("gpu", 1) not in (0, 1) or resources.get("cpu", 4) < 1:
         raise ValueError("Workers require positive CPUs and zero or one whole GPU")
@@ -670,7 +673,7 @@ def _evaluate_worker(payload, output):
         "evaluation_name": evaluation.get("dataset", "validation"),
         "indices": evaluation["indices"],
     }
-    scores, intervals, examples = [], [], []
+    scores, intervals, examples, results = [], [], [], []
     for seed in evaluation["seeds"]:
         destination = Path(output) / f"seed-{seed}"
         config.seed = seed
@@ -683,6 +686,7 @@ def _evaluate_worker(payload, output):
         result = json.loads((destination / "results.json").read_text())
         if result["max_nfe"] > evaluation["nfe"]:
             raise ValueError("Sampler exceeded NFE budget")
+        results.append(result)
         scores.append(metric_value(result, evaluation["score"]["metric"]))
         intervals.append(result.get(f"{evaluation['score']['metric']}_interval"))
         if evaluation.get("bootstrap") and evaluation["score"].get("per_example"):
@@ -695,7 +699,26 @@ def _evaluate_worker(payload, output):
         record["seed_intervals"] = intervals
         if len(intervals) == 1:
             record["score_interval"] = intervals[0]
+    if evaluation["score"].get("pool_seeds") and len(results) > 1:
+        # One sample of every seed's generations (e.g. MAUVE at 2 x the prompts).
+        pooled = pooled_result(prepared, evaluation.get("dataset", "validation"), results)
+        save(Path(output) / "pooled-results.json", pooled)
+        record["seed_mean_score"] = record["score"]
+        record["score"] = metric_value(pooled, evaluation["score"]["metric"])
     return record
+
+
+def pooled_result(config, name, results):
+    """Task metrics of all seeds' records scored together (``score.pool_seeds``)."""
+    from dataclasses import asdict
+
+    from hydra.utils import instantiate
+
+    metrics = instantiate(config.task).create_metric_accumulator(name)
+    metrics.load_records([r for result in results for r in result["records"]])
+    pooled = asdict(metrics.compute())
+    pooled.pop("records", None)  # already saved per seed
+    return pooled
 
 
 def per_example_scores(result, score, aggregate):
