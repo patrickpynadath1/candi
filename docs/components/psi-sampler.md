@@ -60,7 +60,11 @@ per method for the same η.)
 `log_snr` uses sigmoid(log-SNR) = α²/(α² + σ²) of the first Gaussian view at its own time
 (after a learned clock), in pure Gaussian recipes and hybrids alike, and the `loop` warp
 then bisects on that α. `log_snr` refuses recipes without a Gaussian view. For pure
-Gaussian recipes, `log_snr` is what the sampler computed before 2026-11-11.
+Gaussian recipes, `log_snr` is what the sampler computed before 2026-11-11. `corruption`
+restores that earlier rule for every recipe: α is the reference view's own clean fraction
+(the first discrete view, else the first: Gaussian α²/(α²+σ²), simplex α, the discrete keep
+rate, 1 - τ for spherical and vMF), at the view's own time. Both `controller` and
+`corruption` are tuned as separate samplers (`psi` and `psi_corruption`).
 
 `loop` also reshapes the time grid (`LoopTimeWarp`, applied by the sampler loop) so that
 α = 1 - t follows the ReMDM-loop profile:

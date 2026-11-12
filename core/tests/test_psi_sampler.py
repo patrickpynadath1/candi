@@ -246,3 +246,42 @@ def test_log_snr_clock_refuses_recipes_without_a_gaussian_view():
         PsiTransition(clock="log_snr").validate(mdlm().views, "none")
     with pytest.raises(ValueError, match="clock"):
         PsiTransition(clock="time")
+
+
+def test_corruption_clock_is_each_recipes_own_clean_fraction(duo):
+    # clock=corruption: α is the reference view's own keep rate. For pure Gaussian it is the
+    # log-SNR clock; for discrete views the keep rate; it differs from the controller clock.
+    from core.samplers.psi import keep_rate, reference_view
+
+    time, next_time = torch.tensor([0.7, 0.3]), torch.tensor([0.6, 0.2])
+    logits = torch.zeros(2, 4, 12).log_softmax(-1)
+    generated = torch.ones(2, 4, dtype=torch.bool)
+    for name in [("gaussian", None), ("simplex", None), ("masked", None), ("gaussian", "masked")]:
+        algo = recipe(name, duo)
+        source, destination = algo.points(time), algo.points(next_time)
+        index = reference_view(algo.views)
+        step = PsiTransition("rescale", eta=0.5, clock="corruption").prepare(
+            algo.views, logits, logits.exp(), source, destination, generated,
+            time=time, next_time=next_time)
+        expected = KappaSchedule("rescale", 0.5)(
+            keep_rate(algo.views[index], source[index]), keep_rate(algo.views[index], destination[index]))
+        torch.testing.assert_close(step.kappa.double(), expected)
+    gaussian = recipe(("gaussian", None), duo)
+    a, b = gaussian.points(time), gaussian.points(next_time)
+    corruption = PsiTransition("rescale", eta=0.5, clock="corruption").prepare(
+        gaussian.views, logits, logits.exp(), a, b, generated, time=time, next_time=next_time)
+    log_snr = PsiTransition("rescale", eta=0.5, clock="log_snr").prepare(
+        gaussian.views, logits, logits.exp(), a, b, generated, time=time, next_time=next_time)
+    torch.testing.assert_close(corruption.kappa, log_snr.kappa)
+
+
+def test_corruption_loop_warp_holds_the_reference_alpha_on_its_plateau():
+    from core.samplers.psi import keep_rate
+
+    algo = build_algorithm("simplex", None, "none")
+    times = torch.linspace(1, 1e-5, 41, dtype=torch.float64)
+    warped = LoopTimeWarp(t_on=0.6, t_off=0.1, alpha_on=0.9, clock="corruption")(algo, times)
+    keep = keep_rate(algo.views[0], algo.points(warped)[0])
+    plateau = (times <= 0.6) & (times >= 0.1)
+    torch.testing.assert_close(keep[plateau], torch.full_like(keep[plateau], 0.9), atol=1e-5, rtol=0)
+    assert len(set(warped[plateau].tolist())) == 1

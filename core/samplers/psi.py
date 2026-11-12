@@ -42,7 +42,35 @@ import torch
 from .policies import ReverseTransition, select_state
 
 SCHEDULES = ("rescale", "cap", "loop", "constant")
-CLOCKS = ("controller", "log_snr")
+CLOCKS = ("controller", "log_snr", "corruption")
+
+
+def keep_rate(view, point):
+    """A view's own clean fraction α at a point, one value per batch row (``corruption``)."""
+    from core.processes.absorbing import AbsorbingProcess
+    from core.processes.uniform import UniformProcess
+
+    coefficients = point.coefficients
+    if isinstance(view.process, (AbsorbingProcess, UniformProcess)):
+        return coefficients[0].double()
+    alpha, sigma = getattr(coefficients, "alpha", None), getattr(coefficients, "sigma", None)
+    if alpha is not None and sigma is not None:  # Gaussian path: signal-variance fraction
+        alpha, sigma = alpha.double(), sigma.double()
+        return alpha**2 / (alpha**2 + sigma**2)
+    if alpha is not None:  # simplex path: the clean mixing weight
+        return alpha.double()
+    return (1 - point.time).double()
+
+
+def reference_view(views):
+    """The view whose schedule sets α for ``corruption``: the first discrete view, else the first."""
+    from core.processes.absorbing import AbsorbingProcess
+    from core.processes.uniform import UniformProcess
+
+    return next(
+        (i for i, v in enumerate(views) if isinstance(v.process, (AbsorbingProcess, UniformProcess))),
+        0,
+    )
 
 
 def gaussian_view(views):
@@ -118,7 +146,9 @@ class PsiTransition(ReverseTransition):
     ):
         """``clock`` sets the α κ is computed from: ``controller`` (default) is 1 - t on the
         sampler's grid, for every view; ``log_snr`` is sigmoid(log-SNR) = α²/(α²+σ²) of the
-        first Gaussian view at its own (possibly learned-clock) time."""
+        first Gaussian view at its own (possibly learned-clock) time; ``corruption`` is the
+        reference view's own clean fraction (``keep_rate``: the first discrete view, else the
+        first view), the sampler's rule before 2026-11-11."""
         super().__init__()
         if clean not in CLEAN:
             raise ValueError(f"clean must be one of {CLEAN}")
@@ -152,6 +182,10 @@ class PsiTransition(ReverseTransition):
         if self.clock == "log_snr":
             index = gaussian_view(views)
             keep_t, keep_s = log_snr_alpha(source[index]), log_snr_alpha(destination[index])
+        elif self.clock == "corruption":
+            index = reference_view(views)
+            keep_t = keep_rate(views[index], source[index])
+            keep_s = keep_rate(views[index], destination[index])
         else:
             keep_t, keep_s = 1 - time.double(), 1 - next_time.double()
         kappa = self.kappa(keep_t, keep_s).to(generated.device)
@@ -213,13 +247,19 @@ class LoopTimeWarp:
             # α = 1 - t on the grid, so the warped time is 1 - target, kept inside the
             # sampler's [epsilon, 1] range. Equal targets give equal times.
             return (1 - self.target(times)).clamp(lo, hi).to(times.dtype)
-        # log_snr: bisect the grid time whose Gaussian-view α = sigmoid(log-SNR) meets the
-        # target (α decreases in time). Equal targets bisect identically: exact plateau.
-        index = gaussian_view(algo.views)
+        # log_snr / corruption: bisect the grid time whose α (the Gaussian view's
+        # sigmoid(log-SNR), or the reference view's keep rate) meets the target (α decreases
+        # in time). Equal targets bisect identically: exact plateau.
+        if self.clock == "log_snr":
+            index = gaussian_view(algo.views)
+            read = lambda point: log_snr_alpha(point)  # noqa: E731
+        else:
+            index = reference_view(algo.views)
+            read = lambda point: keep_rate(algo.views[index], point)  # noqa: E731
 
         def keep(time):
             mask = None if generated is None else generated[:1].expand(len(time), -1)
-            return log_snr_alpha(algo.points(time.to(times.dtype), corruption_mask=mask)[index])
+            return read(algo.points(time.to(times.dtype), corruption_mask=mask)[index])
 
         low = torch.full_like(times, lo, dtype=torch.float64)
         high = torch.full_like(times, hi, dtype=torch.float64)
