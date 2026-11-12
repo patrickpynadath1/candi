@@ -100,7 +100,7 @@ Architectural/sequence modifiers have dedicated references:
 
 See [task conventions](tasks/overview.md), then
 [Sudoku](tasks/sudoku.md), [Text8](tasks/text8.md),
-[N-Queens](tasks/nqueens.md), [TinyStories](tasks/tinystories.md) (with the [SOL](tasks/sol.md) and [ref_w1](tasks/ref-w1.md) metrics),
+[N-Queens](tasks/nqueens.md), [TinyStories](tasks/tinystories.md) (with the [SOL](tasks/sol.md), [ref_w1](tasks/ref-w1.md) and [MAUVE](tasks/mauve.md) metrics),
 [Mazes](tasks/maze.md), [OpenWebText](tasks/openwebtext.md), or [TinyGSM](tasks/tinygsm.md).
 
 ## Extend and assess
