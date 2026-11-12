@@ -127,6 +127,10 @@
    "cache_dir": "${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/mauve_cache"
   }
  },
+ "extra_test_overrides": {
+  "task.mauve.num_buckets": 13,
+  "task.mauve_gpt2_large.num_buckets": 13
+ },
  "tuning_indices": [
   9249,
   4233,

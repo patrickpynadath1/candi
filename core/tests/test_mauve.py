@@ -211,3 +211,12 @@ def test_mauve_evaluation_file_keeps_the_partitions_and_lands_every_override():
     cross = test["mauve_gpt2_large"]
     assert (cross["featurizer"]["model_name"], cross["num_buckets"]) == ("gpt2-large", 205)
     assert test["primary_metric"] == "mauve" and "ref_w1" not in test
+    # Extra-budget measurements (128 prompts x 1 seed) get the bucket count of that size.
+    extra = task_after({**settings["overrides"], **spec["extra_test_overrides"]})
+    assert extra["mauve"]["num_buckets"] == extra["mauve_gpt2_large"]["num_buckets"] \
+        == auto_buckets(128, 128) == 13
+    assert extra["sol"] == test["sol"]
+    bad = copy.deepcopy(spec)
+    bad["extra_test_overrides"] = {"sampler.steps": 3}
+    with pytest.raises(ValueError, match="evaluation override"):
+        nested_tuning.validate(spec_with(bad))

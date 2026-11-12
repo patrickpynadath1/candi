@@ -147,7 +147,9 @@ override instead, for example `stage2_overrides: {task.ref_w1.bootstrap: 200}`.
 `evaluation.test_score` and `evaluation.test_overrides` apply to the test evaluations
 only: the winner's test, and the extra-budget measurements. The TinyStories reruns tune
 with `ref_w1` and report SOL on the test split, with `test_overrides` adding the SOL
-scorer. Tuning workers never receive these fields.
+scorer. Tuning workers never receive these fields. `evaluation.extra_test_overrides` is
+applied after them to the extra-budget measurements only. These have a smaller sample,
+for example 128 test prompts, so they need e.g. a smaller MAUVE bucket count.
 
 ### Pooled seeds
 

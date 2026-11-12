@@ -59,6 +59,9 @@ featuriser and is reported only. The recorded fields are:
 `experiments/rerun/evaluation/tinystories-bpe-10000-mauve.json` tunes with MAUVE and
 sets `score.pool_seeds: true` (see [nested tuning](../guides/nested-tuning.md)). It uses
 13 buckets in stage 1 (64 prompts x 2 seeds), 26 in stage 2 (256 x 1) and 205 on test
-(2,048 x 2), where SOL and GPT-2 Large MAUVE are also reported.
+(2,048 x 2), where SOL and GPT-2 Large MAUVE are also reported. The extra-budget test
+measurements (128 prompts x 1 seed) use 13 buckets (`extra_test_overrides`). Without
+that override they would inherit 205 buckets, and a MAUVE of about 0.02 came out of a
+128 vs 128 sample.
 
 Tests: `core/tests/test_mauve.py`.

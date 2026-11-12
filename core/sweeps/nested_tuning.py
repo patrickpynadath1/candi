@@ -252,7 +252,8 @@ def validate(spec):
             )
         ):
             raise ValueError(f"Not a training hyperparameter: {key}")
-    for override in {**evaluation.get("overrides", {}), **evaluation.get("test_overrides", {})}:
+    for override in {**evaluation.get("overrides", {}), **evaluation.get("test_overrides", {}),
+                     **evaluation.get("extra_test_overrides", {})}:
         if not override.startswith(("task.", "loader.eval_batch_size")):
             raise ValueError(f"Not an evaluation override: {override}")
     if evaluation.get("test_score", {"kind": "metric"}).get("kind") != "metric":
@@ -850,7 +851,7 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
         k: v
         for k, v in evaluation.items()
         if k not in ("test_indices", "test_seeds", "test_dataset", "tuning_indices",
-                     "test_score", "test_overrides")
+                     "test_score", "test_overrides", "extra_test_overrides")
     }
     validation["indices"] = evaluation["tuning_indices"]
 
@@ -1013,6 +1014,10 @@ def _run_case(spec, root, concurrency, retry_skipped=False):
             }
             final.pop("two_stage", None)
             final.update(test_settings(evaluation, final))
+            if evaluation.get("extra_test_overrides"):
+                # e.g. a MAUVE bucket count for the small extra-test sample.
+                final["overrides"] = {**final.get("overrides", {}),
+                                      **evaluation["extra_test_overrides"]}
             result = execute(
                 "evaluate",
                 {
