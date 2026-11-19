@@ -156,7 +156,7 @@ def oracle(logits=oracle_logits):
 
 
 @pytest.mark.parametrize(
-    "sampler", [AncestralSampler(4), EntropyBoundedSampler(0.1, 5)]
+    "sampler", [AncestralSampler(4), EntropyBoundedSampler(entropy_bound=0.1, steps=5)]
 )
 def test_generation_preserves_prompt_and_counts_model_evaluations(sampler):
     algorithm = oracle()
@@ -174,7 +174,7 @@ def test_generation_preserves_prompt_and_counts_model_evaluations(sampler):
 def test_entropy_is_measured_before_greedy_commitment():
     algorithm = oracle(uncertain_logits)
     prompt = torch.zeros(1, 5, dtype=torch.long)
-    _, metadata = algorithm.generate(EntropyBoundedSampler(0, 5), prompt, prompt.bool())
+    _, metadata = algorithm.generate(EntropyBoundedSampler(entropy_bound=0, steps=5), prompt, prompt.bool())
     assert metadata["nfe"] == 5
     assert metadata["accepted_per_step"] == [[1]] * 5
 
@@ -184,13 +184,13 @@ def test_entropy_budget_and_exhaustion():
     assert select_prefix(
         entropy, torch.ones_like(entropy, dtype=torch.bool), 0.1
     ).tolist() == [[True, True, False]]
-    sampler = EntropyBoundedSampler(0, 1)
+    sampler = EntropyBoundedSampler(entropy_bound=0, steps=1, require_completion=True)
 
     algorithm = oracle(uncertain_logits)
     calls = []
     hook = algorithm.model.register_forward_hook(lambda *args: calls.append(1))
     prompt = torch.zeros(1, 5, dtype=torch.long)
-    with pytest.raises(RuntimeError, match="exceeded"):
+    with pytest.raises(RuntimeError, match="exhausted"):
         algorithm.generate(sampler, prompt, prompt.bool())
     hook.remove()
     assert len(calls) == 1

@@ -1,8 +1,7 @@
 import pytest
 import torch
 from core.tests.test_hybrid_composition import compose_hybrid
-from core.samplers.parallel_entropy_bounded import ParallelEntropyBoundedSampler
-from core.samplers.hybrid_entropy_bounded import MaskedHybridEntropyBoundedSampler
+from core.samplers.entropy_bounded import EntropyBoundedSampler as ParallelEntropyBoundedSampler
 
 
 @pytest.mark.parametrize("family", ["gaussian", "spherical", "simplex"])
@@ -35,7 +34,7 @@ def test_frozen_matches_existing_masked_sampler(family):
     tokens = torch.randint(0, 12, (2, 5))
     mask = torch.zeros_like(tokens, dtype=torch.bool)
     torch.manual_seed(9)
-    a, ma = algo.generate(MaskedHybridEntropyBoundedSampler(steps=5), tokens, mask)
+    a, ma = algo.generate(ParallelEntropyBoundedSampler(steps=5, require_completion=True), tokens, mask)
     torch.manual_seed(9)
     b, mb = algo.generate(ParallelEntropyBoundedSampler(steps=5), tokens, mask)
     assert torch.equal(a, b)
@@ -44,7 +43,7 @@ def test_frozen_matches_existing_masked_sampler(family):
 
 def test_released_gaussian_commitment_is_forward_corrupted(monkeypatch):
     from unittest.mock import Mock
-    import core.samplers.parallel_entropy_bounded as eb
+    import core.samplers.entropy_bounded as eb
 
     algo, _ = compose_hybrid("gaussian", "uniform")
     view = algo.views[0]
@@ -65,7 +64,7 @@ def test_released_gaussian_commitment_is_forward_corrupted(monkeypatch):
     )
     tokens = torch.tensor([[1, 2, 3]])
     sample, info = algo.generate(
-        eb.ParallelEntropyBoundedSampler(freeze=False, steps=2),
+        eb.EntropyBoundedSampler(freeze=False, steps=2),
         tokens,
         torch.tensor([[True, False, False]]),
     )

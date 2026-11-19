@@ -114,26 +114,23 @@ A separate fresh 2,000-step standard-masking run solved 746/2,000 (37.3%), with 
 
 Sources: [modifier](../../core/modifiers/hybrid/), [representations](../../core/representations/noisy_inputs.py), [updates](../../core/samplers/hybrid_updates.py), [view configurations](../../configs/information_path/hybrid_view/).
 
-## EB for masked hybrids
+## Entropy-bounded sampling
 
-Use `inference/sampler=masked_hybrid_entropy_bounded` for a hybrid with an absorbing view,
-including Gaussian embedding + masked corruption. This sampler uses the shared
-global time grid and each view's configured schedule and update, independently of
-view order. EB selects tokens using cumulative entropy excluding the largest
-entropy in the selected prefix (default bound 0.1). Selected tokens are committed
-clean in every view; unselected absorbing positions stay masked. Other views
-advance with their configured updates and zero supplied transition noise.
-The default commitment is greedy, with a maximum of 180 prediction steps.
-
-This is a different sampler from `hybrid_entropy_bounded`, which retains the
-historical CANDI-specific time conditioning and view layout. Neither changes the
-checkpoint's training corruption. EB may finish before traversing the full time
-grid; exhausting the grid without committing every token raises an error.
+One sampler, `core.samplers.entropy_bounded.EntropyBoundedSampler`
+(`inference/sampler=entropy_bounded`), serves every recipe: pure or hybrid, masked,
+uniform or continuous, in any view order. It uses the shared global time grid and each
+view's configured schedule and update. EB selects tokens using cumulative entropy
+excluding the largest entropy in the selected prefix (default bound 0.1). Selected tokens
+are committed clean in every view; unselected absorbing positions stay masked. Other views
+advance with their own reverse update (`continuous_noise: zero`, the default, supplies zero
+transition noise; `native` keeps the update's own noise). It does not change the
+checkpoint's training corruption. EB may finish before traversing the full time grid; with
+`require_completion: true` (the `hybrid_entropy_bounded` and `masked_hybrid_entropy_bounded`
+presets) exhausting the grid without committing every token raises an error, otherwise the
+remaining tokens are decoded in one final call.
 
 ## Comparing frozen and revisable EB
 
-`core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler` extends
-frozen EB to posterior-based continuous-only and uniform hybrid assemblies.
 `freeze=true` retains cumulative clean commitments in every view. With
 `freeze=false`, all generated positions are reconsidered each step. A released
 continuous commitment is forward-corrupted from its prior committed token at the

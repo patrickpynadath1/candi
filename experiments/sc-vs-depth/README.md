@@ -31,7 +31,7 @@ The five policies (the post's "Inference Pipeline"):
 | --- | --- | --- |
 | `native` | the method's own reverse step (`HybridSampler`) | temperature, 16 trials |
 | `native_greedy` | same step, argmax clean estimate | final denoise greedy/sample, 2 trials |
-| `eb_greedy` | commit argmax tokens below an entropy bound (`ParallelEntropyBoundedSampler`) | temperature, entropy bound, 16 trials |
+| `eb_greedy` | commit argmax tokens below an entropy bound (`EntropyBoundedSampler`) | temperature, entropy bound, 16 trials |
 | `renoise_sample` | sample a clean sequence, re-corrupt it with the forward process to the next level (`ForwardResamplingSampler`) | temperature, 16 trials |
 | `renoise_greedy` | the same with the argmax clean estimate | final denoise greedy/sample, 2 trials |
 

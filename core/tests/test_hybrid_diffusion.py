@@ -23,7 +23,7 @@ from core.processes.candi_gaussian import CANDIGaussianProcess
 from core.processes.gaussian import GaussianProcess
 from core.representations.one_hot import OneHotRepresentation
 from core.samplers.hybrid import HybridSampler
-from core.samplers.hybrid_entropy_bounded import CANDIEntropyBoundedSampler
+from core.samplers.entropy_bounded import EntropyBoundedSampler
 from core.time_sampling.uniform import UniformTimeSampler
 
 
@@ -153,7 +153,7 @@ def test_alternate_absorbing_plus_standard_gaussian_composition():
 def test_hybrid_entropy_bounded_accepts_without_discrete_branch_updates():
     algo = make_algorithm()
     prompt = torch.zeros(2, 7, dtype=torch.long)
-    result, metadata = CANDIEntropyBoundedSampler(
+    result, metadata = EntropyBoundedSampler(
         entropy_bound=100.0, steps=1, greedy_clean_estimate=True
     ).sample(algo, prompt, torch.zeros_like(prompt, dtype=torch.bool))
     assert result.shape == prompt.shape

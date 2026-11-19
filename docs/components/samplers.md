@@ -17,16 +17,16 @@ A prompt mask fixes tokens regardless of whether they appear in a training loss.
 | `sampler` | Intended process / policy |
 | --- | --- |
 | `ancestral` | Absorbing posterior reverse steps |
-| `entropy_bounded` | Absorbing entropy-bounded commitments |
+| `entropy_bounded` | Entropy-bounded commitments for any recipe (one sampler; `freeze` true or false). `parallel_entropy_bounded`, `uniform_entropy_bounded`, `hybrid_entropy_bounded`, `masked_hybrid_entropy_bounded` and `entropy_churn` are presets of it |
 | `analytic` | SEDD absorbing-score analytic transition |
-| `uniform_ancestral`, `uniform_entropy_bounded` | Uniform plug-in or posterior transition with matching predictor/process |
+| `uniform_ancestral` | Uniform plug-in or posterior transition with matching predictor/process |
 | `dfm` | Sampled-endpoint CTMC updates for masked or posterior-uniform mixture paths |
 | `euler`, `heun`, `ode` | Gaussian posterior-derived velocity integration |
 | `gaussian_ddpm` | Stochastic Gaussian reverse posterior steps |
 | `spherical` | Posterior-derived spherical tangent flow |
 | `simplex` | Dirichlet bridge sampling, optional churn/guidance |
 | `blur_ancestral` | Spectral blurring reverse updates |
-| `hybrid`, `hybrid_entropy_bounded` | Shared posterior feeding multiple branch updates |
+| `hybrid` | Shared posterior feeding multiple branch updates |
 | `psi`, `uniform_psi` | Ψ-samplers: native reverse steps mixed per position with forward re-noising, any corruption ([page](psi-sampler.md)) |
 | `autoregressive`, `permuted_autoregressive` | Incremental causal decoding with KV cache |
 
@@ -362,8 +362,8 @@ other discrete view to use EB or random uncommitment**. The sampler stores the
 committed token IDs and clamps their continuous states to the representation's
 clean state. Churn clears that bookkeeping and applies the continuous process's
 forward kernel. In a hybrid model, the same mask additionally resets its other
-views. `ParallelEntropyBoundedSampler` supports both one and multiple views;
-"parallel" does not require a discrete branch.
+views. `EntropyBoundedSampler` supports both one and multiple views and has no
+per-process code: each view follows its own reverse update.
 
 For example, compose a pure simplex or spherical recipe with
 `inference/sampler=entropy_churn`; set `sampler.churn.rate=0.05` and

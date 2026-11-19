@@ -151,7 +151,7 @@ def test_sessions_unshaped_feedback_reset_and_nested_independence(source):
 
 @pytest.mark.parametrize("source", ["posterior_mean", "hidden"])
 @pytest.mark.parametrize(
-    "sampler", [AncestralSampler(steps=3), EntropyBoundedSampler(max_steps=8)]
+    "sampler", [AncestralSampler(steps=3), EntropyBoundedSampler(steps=8)]
 )
 def test_sampler_no_extra_nfe_prompt_preservation_and_reset(source, sampler):
     algo = algorithm(source)
@@ -176,8 +176,8 @@ def test_sampler_exception_does_not_leak_conditioning():
     tokens = torch.ones(1, 7, dtype=torch.long)
     mask = torch.zeros_like(tokens, dtype=torch.bool)
     calls, handle = recorder(algo.model)
-    with pytest.raises(RuntimeError, match="exceeded max_steps"):
-        algo.generate(EntropyBoundedSampler(entropy_bound=0, max_steps=1), tokens, mask)
+    with pytest.raises(RuntimeError, match="exhausted"):
+        algo.generate(EntropyBoundedSampler(entropy_bound=0, steps=1, require_completion=True), tokens, mask)
     assert algo.training
     calls.clear()
     algo.generate(AncestralSampler(steps=2), tokens, mask)
@@ -295,7 +295,7 @@ def test_cuda_mixed_precision_training_and_both_samplers(source):
     loss.backward()
     assert torch.isfinite(loss)
     assert torch.isfinite(next(algo.model.conditioning_adapter.parameters()).grad).all()
-    for sampler in [AncestralSampler(steps=3), EntropyBoundedSampler(max_steps=12)]:
+    for sampler in [AncestralSampler(steps=3), EntropyBoundedSampler(steps=12)]:
         with torch.autocast("cuda", dtype=torch.bfloat16):
             result, _ = algo.generate(sampler, tokens, mask)
         torch.testing.assert_close(result[mask], tokens[mask])

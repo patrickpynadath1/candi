@@ -7,7 +7,7 @@ preparation:
   extra_inference:
     eb_churn:
       sampler:
-        _target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
+        _target_: core.samplers.entropy_bounded.EntropyBoundedSampler
         steps: 127
         epsilon: 1.0e-05
         freeze: true

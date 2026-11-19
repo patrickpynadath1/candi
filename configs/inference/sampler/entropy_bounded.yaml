@@ -1,4 +1,7 @@
 # @package sampler
 _target_: core.samplers.entropy_bounded.EntropyBoundedSampler
 entropy_bound: 0.1
-max_steps: ${task.length}
+steps: 127
+epsilon: 1.0e-5
+freeze: true
+greedy_clean_estimate: true

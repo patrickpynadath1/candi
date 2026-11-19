@@ -68,7 +68,7 @@ def build_algorithm(family, discrete, sc):
 def sampler_for(name):
     from core.samplers.hybrid import HybridSampler
     from core.samplers.forward_resampling import ForwardResamplingSampler
-    from core.samplers.parallel_entropy_bounded import ParallelEntropyBoundedSampler
+    from core.samplers.entropy_bounded import EntropyBoundedSampler
 
     if name == "native":
         return HybridSampler(
@@ -80,7 +80,7 @@ def sampler_for(name):
         return ForwardResamplingSampler(steps=3, final_denoise="sample")
     if name == "forward_greedy":
         return ForwardResamplingSampler(steps=3, greedy_clean_estimate=True)
-    return ParallelEntropyBoundedSampler(
+    return EntropyBoundedSampler(
         steps=3, freeze=name != "eb_revise", greedy_clean_estimate=name != "eb_sample"
     )
 

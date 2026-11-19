@@ -100,7 +100,7 @@ def test_geometry_cdcd_training_and_sampling(path, feedback):
         instantiate(cfg.sampler, steps=2, greedy_clean_estimate=True),
         instantiate(
             {
-                "_target_": "core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler",
+                "_target_": "core.samplers.entropy_bounded.EntropyBoundedSampler",
                 "steps": 2,
                 "freeze": True,
                 "greedy_clean_estimate": True,

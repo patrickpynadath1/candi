@@ -261,7 +261,7 @@ class ComposedSampler:
             return output, {"nfe": nfe, "nfe_per_sample": [nfe] * batch}
         if self.commitment == "none" or not complete.all():
             if self.require_completion:
-                raise RuntimeError("masked hybrid EB exhausted steps before completion")
+                raise RuntimeError("entropy-bounded sampling exhausted steps before completion")
             time = times[-1].expand(batch)
             points = algo.points(time, corruption_mask=generated)
             prediction = (

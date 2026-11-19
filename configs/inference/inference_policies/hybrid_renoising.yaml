@@ -20,7 +20,7 @@ preparation:
       greedy_clean_estimate: true
   - name: eb_greedy
     sampler:
-      _target_: core.samplers.parallel_entropy_bounded.ParallelEntropyBoundedSampler
+      _target_: core.samplers.entropy_bounded.EntropyBoundedSampler
       steps: 127
       freeze: true
       greedy_clean_estimate: true

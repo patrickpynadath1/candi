@@ -5,7 +5,7 @@ import torch
 from hydra.utils import instantiate
 from core.tests.test_replaid_hybrid import config
 from core.samplers.churn import RandomUncommitment
-from core.samplers.parallel_entropy_bounded import ParallelEntropyBoundedSampler
+from core.samplers.entropy_bounded import EntropyBoundedSampler as ParallelEntropyBoundedSampler
 
 
 def test_reopening_resets_both_views_and_preserves_other_positions():

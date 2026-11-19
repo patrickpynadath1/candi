@@ -66,7 +66,7 @@ def test_ancestral_sampler_orchestrates_process_and_final_denoising(final):
     assert metadata["nfe"] == 2 + (final != "none")
 
 
-def test_eb_reuses_prediction_for_entropy_and_commitment_without_extra_model_calls():
+def test_eb_makes_one_model_call_per_step():
     from core.samplers.entropy_bounded import EntropyBoundedSampler
 
     def uncertain(tokens):
@@ -78,26 +78,11 @@ def test_eb_reuses_prediction_for_entropy_and_commitment_without_extra_model_cal
     prompt = torch.zeros(1, 5, dtype=torch.long)
     calls = []
     hook = algorithm.model.register_forward_hook(lambda *args: calls.append(1))
-    with (
-        patch.object(
-            algorithm.predictor, "entropy", wraps=algorithm.predictor.entropy
-        ) as entropy,
-        patch.object(
-            algorithm.predictor,
-            "probabilities",
-            wraps=algorithm.predictor.probabilities,
-        ) as commitment,
-    ):
-        result, metadata = algorithm.generate(
-            EntropyBoundedSampler(0, 5), prompt, prompt.bool()
-        )
+    result, metadata = algorithm.generate(
+        EntropyBoundedSampler(entropy_bound=0, steps=5), prompt, prompt.bool()
+    )
     hook.remove()
-    assert len(calls) == metadata["nfe"] == entropy.call_count == commitment.call_count
-    for entropy_call, commitment_call in zip(
-        entropy.call_args_list, commitment.call_args_list
-    ):
-        assert entropy_call.args[0] is commitment_call.args[0]
-    assert metadata["nfe"] == 5
+    assert len(calls) == metadata["nfe"] == 5
     assert result.tolist() == [[1, 1, 1, 1, 1]]
     assert prompt.eq(0).all()
 

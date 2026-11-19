@@ -26,7 +26,7 @@ from core.curricula.duo import DuoCurriculum
 from core.models.layers import EmbeddingLayer
 from core.tests import networks
 from core.samplers.uniform_ancestral import UniformAncestralSampler
-from core.samplers.uniform_entropy_bounded import UniformEntropyBoundedSampler
+from core.samplers.entropy_bounded import EntropyBoundedSampler
 from core.samplers.analytic import AnalyticSampler
 from core.samplers.ancestral import AncestralSampler
 from core.sweeps.configuration import compose
@@ -182,7 +182,7 @@ def test_method_configs_loss_gradients_and_checkpoint(method, table_path, tmp_pa
     samplers = (
         [AnalyticSampler(3)]
         if method == "sedd_absorb"
-        else [UniformAncestralSampler(3), UniformEntropyBoundedSampler(steps=10)]
+        else [UniformAncestralSampler(3), EntropyBoundedSampler(steps=10, freeze=False)]
     )
     for sampler in samplers:
         sample, meta = a.generate(sampler, tokens, ~mask)

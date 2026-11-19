@@ -4,7 +4,22 @@ import math
 import torch
 from core.processes.absorbing import AbsorbingProcess
 from core.processes.uniform import UniformProcess
-from .entropy_bounded import select_prefix
+
+
+def select_prefix(entropy, active, bound):
+    """Per row, the lowest-entropy active positions whose entropy sum minus its max stays within bound."""
+    selected = torch.zeros_like(active)
+    for row in range(len(active)):
+        positions = active[row].nonzero(as_tuple=True)[0]
+        ordered = positions[entropy[row, positions].argsort()]
+        values = entropy[row, ordered]
+        if len(values):
+            tolerance = torch.finfo(values.dtype).eps * max(1.0, abs(bound)) * 8
+            count = (
+                (values.cumsum(0) - values.cummax(0).values) <= bound + tolerance
+            ).sum()
+            selected[row, ordered[: int(count)]] = True
+    return selected
 
 
 class TokenSelection:
