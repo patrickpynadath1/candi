@@ -17,7 +17,7 @@ A prompt mask fixes tokens regardless of whether they appear in a training loss.
 | `sampler` | Intended process / policy |
 | --- | --- |
 | `ancestral` | Absorbing posterior reverse steps |
-| `entropy_bounded` | Entropy-bounded commitments for any recipe (one sampler; `freeze` true or false). `parallel_entropy_bounded`, `uniform_entropy_bounded`, `hybrid_entropy_bounded`, `masked_hybrid_entropy_bounded` and `entropy_churn` are presets of it |
+| `entropy_bounded` | Entropy-bounded commitments for any recipe (one sampler; `freeze` true or false). `uniform_entropy_bounded`, `hybrid_entropy_bounded` and `entropy_churn` are presets of it |
 | `analytic` | SEDD absorbing-score analytic transition |
 | `uniform_ancestral` | Uniform plug-in or posterior transition with matching predictor/process |
 | `dfm` | Sampled-endpoint CTMC updates for masked or posterior-uniform mixture paths |

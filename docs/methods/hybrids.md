@@ -125,8 +125,8 @@ are committed clean in every view; unselected absorbing positions stay masked. O
 advance with their own reverse update (`continuous_noise: zero`, the default, supplies zero
 transition noise; `native` keeps the update's own noise). It does not change the
 checkpoint's training corruption. EB may finish before traversing the full time grid; with
-`require_completion: true` (the `hybrid_entropy_bounded` and `masked_hybrid_entropy_bounded`
-presets) exhausting the grid without committing every token raises an error, otherwise the
+`require_completion: true` (the `hybrid_entropy_bounded`
+preset) exhausting the grid without committing every token raises an error, otherwise the
 remaining tokens are decoded in one final call.
 
 ## Comparing frozen and revisable EB

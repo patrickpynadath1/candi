@@ -1,7 +1,0 @@
-# @package sampler
-_target_: core.samplers.entropy_bounded.EntropyBoundedSampler
-entropy_bound: 0.1
-steps: 180
-epsilon: 1.0e-5
-greedy_clean_estimate: true
-require_completion: true

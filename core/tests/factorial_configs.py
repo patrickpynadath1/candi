@@ -68,7 +68,7 @@ def samplers(entropy_bound=0.1):
             },
         ),
         (
-            "parallel_entropy_bounded",
+            "entropy_bounded",
             {
                 "steps": 127,
                 "entropy_bound": entropy_bound,

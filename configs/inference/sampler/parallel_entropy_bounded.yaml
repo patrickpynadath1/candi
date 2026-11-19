@@ -1,8 +1,0 @@
-# @package sampler
-# Same sampler as entropy_bounded; kept as a config name.
-_target_: core.samplers.entropy_bounded.EntropyBoundedSampler
-steps: 127
-epsilon: 1.0e-05
-entropy_bound: 0.1
-freeze: true
-greedy_clean_estimate: true
