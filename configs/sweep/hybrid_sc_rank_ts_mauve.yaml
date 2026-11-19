@@ -1,0 +1,33 @@
+# @package _global_
+# TinyStories re-tune with MAUVE on TinyStories-33M features (docs/methods/
+# tinystories-tuning-metric.md) of the 16 rank-linear hybrids (hybrid_sc_rank): their checkpoints
+# from hybrid-rank-20261111, the two-stage protocol, and the evaluation file
+# experiments/rerun/evaluation/tinystories-bpe-10000-mauve.json, so the whole search is guided by
+# MAUVE. Samplers as for the CDCD hybrids' re-tune (hybrid_sc_ts_mauve), so the two compare directly:
+# hybrid_renoising, eb_churn, psi, psi_corruption.
+# The 4 simplex_rank checkpoints were trained with model.views.content.process.chunk_size=16384
+# (see hybrid_sc_rank.yaml), so their plan configs must set it too, or the recipe check refuses
+# the checkpoint; it was added to those 4 plan configs by hand (2026-11-13).
+defaults:
+- hybrid_sc_rank
+- rerun_common
+- override /inference/inference_policies: [hybrid_renoising, eb_churn, psi, psi_corruption]
+- _self_
+preparation:
+  name: hybrid-sc-rank-ts-mauve
+  output: ${oc.env:SDDC_STORAGE_ROOT,${oc.env:HOME}/.cache/sddc}/plans/hybrid-sc-rank-ts-mauve
+  family: hybrid_sc_rank_ts_mauve
+  evaluation_file: experiments/rerun/evaluation/${preparation.task_name}-mauve.json
+  source_root: ${oc.env:SDDC_RANK_RUNS,/data/sddc/runs/hybrid-rank-20261111}
+  source_runs: ${preparation.source_root}/hybrid_sc_rank
+  source_case: ${preparation.task_name}-${preparation.recipe_name}-seed-${seed}-rank
+  case_name: ${preparation.source_case}-mauve
+  evaluation:
+    extra_test_nfe: []  # no NFE-512 check in this re-tune
+  wandb:
+    project: hybrid-sc-rank-ts-mauve
+hydra:
+  sweeper:
+    params:
+      task: battery/tinystories_bpe
+      ablation_path: gaussian,simplex_rank,spherical_rank,spherical_vmf
